@@ -160,6 +160,12 @@ export async function resolveTextToFilters(params: {
     synonymMatches = [];
   }
   synonymMatches = negateSynonymMatches(q, synonymMatches);
+  // Only matches that actually set a filter may be stripped from the free
+  // text below. A match that resolves to no filter — or to a filter type
+  // that takes no value here — used to be removed anyway, which turned a
+  // search like "hodetelefoner" into an empty query that returned every
+  // listing with no chip explaining why.
+  const appliedMatches: typeof synonymMatches = [];
   for (const m of synonymMatches) {
     // attrFilters is category-scoped (empty when no category was
     // recognized) — fall back to the unscoped list so a globally-resolved
@@ -176,22 +182,26 @@ export async function resolveTextToFilters(params: {
         if (!values.includes(m.optionValue)) {
           attrPatch[m.filterKey] = { kind: "exclude", values: [...values, m.optionValue] };
         }
+        appliedMatches.push(m);
       }
       continue;
     }
     if (filter.type === "boolean") {
       attrPatch[m.filterKey] = { kind: "boolean", value: true };
+      appliedMatches.push(m);
     } else if (filter.type === "select" && m.optionValue) {
       attrPatch[m.filterKey] = { kind: "select", value: m.optionValue };
+      appliedMatches.push(m);
     } else if (filter.type === "multiselect" && m.optionValue) {
       const current = attrPatch[m.filterKey];
       const values = current?.kind === "multiselect" ? current.values : [];
       if (!values.includes(m.optionValue)) {
         attrPatch[m.filterKey] = { kind: "multiselect", values: [...values, m.optionValue] };
       }
+      appliedMatches.push(m);
     }
   }
-  q = removeMatchedWords(q, synonymMatches);
+  q = removeMatchedWords(q, appliedMatches);
   q = stripFillerWords(q);
   const criteria: InterpretedCriterion[] = [
     ...(categoryMatch

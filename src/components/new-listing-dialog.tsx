@@ -21,9 +21,9 @@ export function NewListingDialog({
 }) {
   return (
     <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
-      <ResponsiveOverlayContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Hva vil du annonsere?</DialogTitle>
+      <ResponsiveOverlayContent className="sm:max-w-4xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Hva vil du gjøre?</DialogTitle>
         </DialogHeader>
         <IntentTitleLanding onNavigate={() => onOpenChange(false)} defaultIntent={defaultIntent} />
       </ResponsiveOverlayContent>

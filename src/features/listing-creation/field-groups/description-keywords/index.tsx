@@ -26,9 +26,10 @@ export function DescriptionField({
   touchedFields,
   description,
   isVehicle,
+  isFree,
 }: Pick<
   WizardSharedProps,
-  "native" | "register" | "errors" | "touchedFields" | "description" | "isVehicle"
+  "native" | "register" | "errors" | "touchedFields" | "description" | "isVehicle" | "isFree"
 >) {
   // Kjøretøy (Bil og MC) har egne felt for Tilstand og kjente feil/mangler
   // (vehicle-condition), og kan aldri sendes/fraktes — den generiske
@@ -36,7 +37,11 @@ export function DescriptionField({
   // derfor ikke og ble opplevd som misvisende for kjøretøyannonser.
   const placeholder = isVehicle
     ? "Forsøk å gi en så detaljert beskrivelse som mulig. Dette er annonsens hovedinnhold."
-    : "Beskriv tilstand, alder, hvorfor du selger, og om henting/sending.";
+    : isFree
+      ? // Ingenting selges i gi bort-flyten, så "hvorfor du selger" ba
+        // brukeren om å svare på noe annonsen ikke handler om.
+        "Beskriv tilstand, alder, hvorfor du gir det bort, og hvordan det kan hentes."
+      : "Beskriv tilstand, alder, hvorfor du selger, og om henting/sending.";
   const field = (
     <>
       <div className="flex items-center justify-between">

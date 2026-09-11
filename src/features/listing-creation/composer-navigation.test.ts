@@ -52,7 +52,6 @@ describe("composerflyt fra preview og review", () => {
     });
     expect(composerForwardStep(5, nativePages.length, true)).toBe(5);
   });
-
   it("finner båtens detaljside når flere feltgrupper deler samme native side", () => {
     const boatPages = [
       { groups: [{ key: "photos" }] },

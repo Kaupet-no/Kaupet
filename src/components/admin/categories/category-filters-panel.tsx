@@ -45,7 +45,10 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
       const { data, error } = await supabase
         .from("categories")
         .select(
-          "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
+          // select("*") rather than a column list so the query keeps working in the
+          // window before the search_synonyms migration is applied — same reason
+          // as in use-category-filters.ts.
+          "*",
         )
         .order("sort_order")
         .order("name_nb");

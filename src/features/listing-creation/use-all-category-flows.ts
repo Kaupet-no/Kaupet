@@ -16,7 +16,7 @@ export function useAllCategoryFlows() {
     queryFn: async (): Promise<CategoryFlowRow[]> => {
       const { data, error } = await supabase
         .from("category_flows")
-        .select("id, category_id, field_groups, modules, sort_order");
+        .select("id, category_id, field_groups, sort_order");
       if (error) throw error;
       return data ?? [];
     },

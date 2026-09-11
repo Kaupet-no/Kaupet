@@ -132,6 +132,144 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
       .eq("conversation_id", conversationId);
     expect(messages).toHaveLength(0);
   });
+
+  it("rejects direct message writes, including valid-length bodies (M-7)", async () => {
+    const buyer = await signIn(emails.buyer);
+    const {
+      data: { user: buyerUser },
+    } = await buyer.auth.getUser();
+    const { error } = await buyer.from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: buyerUser!.id,
+      body: "x".repeat(4001),
+    });
+    expect(error).not.toBeNull();
+
+    const { error: okError } = await buyer.from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: buyerUser!.id,
+      body: "x".repeat(4000),
+    });
+    expect(okError).not.toBeNull();
+  });
+  it("inserts messages atomically and returns the same row for retries", async () => {
+    const buyerId = userIds[0]!;
+    const clientId = crypto.randomUUID();
+    const args = {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Idempotent message",
+      _attachment_path: null,
+      _client_id: clientId,
+    };
+    const first = await admin.rpc("send_message_rate_limited", args);
+    expect(first.error).toBeNull();
+    const second = await admin.rpc("send_message_rate_limited", args);
+    expect(second.error).toBeNull();
+    expect(second.data?.id).toBe(first.data?.id);
+  });
+
+  it("rejects direct profile writes, including valid-length names (M-7)", async () => {
+    const buyer = await signIn(emails.buyer);
+    const {
+      data: { user: buyerUser },
+    } = await buyer.auth.getUser();
+    const { error } = await buyer
+      .from("profiles")
+      .update({ display_name: "x".repeat(81) })
+      .eq("id", buyerUser!.id);
+    expect(error).not.toBeNull();
+
+    const { error: okError } = await buyer
+      .from("profiles")
+      .update({ display_name: "x".repeat(80) })
+      .eq("id", buyerUser!.id);
+    expect(okError).not.toBeNull();
+  });
+
+  it("denies category sync to authenticated users", async () => {
+    const buyer = await signIn(emails.buyer);
+    const { error } = await buyer.rpc("sync_categories_from_payload", {
+      p_categories: {},
+      p_category_filters: {},
+      p_category_flows: {},
+      p_filter_synonyms: {},
+      p_default_search_examples: [],
+      p_synced_by: userIds[0]!,
+    });
+    expect(error?.code).toBe("42501");
+  });
+
+  it("lar hver deltaker flytte sin egen samtale til papirkurven og gjenopprette den", async () => {
+    const buyer = await signIn(emails.buyer);
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const { data: buyerUser } = await buyer.auth.getUser();
+
+    const { error: deleteError, count: deleteCount } = await buyer
+      .from("conversations")
+      .update({ buyer_deleted_at: new Date().toISOString() }, { count: "exact" })
+      .eq("id", conversationId);
+    expect(deleteError).toBeNull();
+    expect(deleteCount).toBe(1);
+
+    const { data: buyerInbox } = await buyer
+      .from("conversations")
+      .select("id")
+      .or(
+        `and(buyer_id.eq.${buyerUser.user!.id},buyer_deleted_at.is.null),and(seller_id.eq.${buyerUser.user!.id},seller_deleted_at.is.null)`,
+      )
+      .eq("id", conversationId);
+    expect(buyerInbox).toHaveLength(0);
+
+    const { data: buyerTrash } = await buyer
+      .from("conversations")
+      .select("id, buyer_deleted_at")
+      .eq("id", conversationId)
+      .not("buyer_deleted_at", "is", null);
+    expect(buyerTrash).toHaveLength(1);
+
+    const { data: sellerInbox } = await seller
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId);
+    expect(sellerInbox).toHaveLength(1);
+
+    const { error: outsiderError, count: outsiderCount } = await outsider
+      .from("conversations")
+      .update({ buyer_deleted_at: new Date().toISOString() }, { count: "exact" })
+      .eq("id", conversationId);
+    expect(outsiderError).toBeNull();
+    expect(outsiderCount).toBe(0);
+
+    const { error: restoreError, count: restoreCount } = await buyer
+      .from("conversations")
+      .update({ buyer_deleted_at: null }, { count: "exact" })
+      .eq("id", conversationId);
+    expect(restoreError).toBeNull();
+    expect(restoreCount).toBe(1);
+    const expiredAt = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: expireError } = await admin
+      .from("conversations")
+      .update({ buyer_deleted_at: expiredAt })
+      .eq("id", conversationId);
+    expect(expireError).toBeNull();
+
+    const { data: expiredTrash } = await buyer
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .gte("buyer_deleted_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString());
+    expect(expiredTrash).toHaveLength(0);
+
+    const { error: expiredRestoreError } = await buyer
+      .from("conversations")
+      .update({ buyer_deleted_at: null })
+      .eq("id", conversationId);
+    expect(expiredRestoreError).not.toBeNull();
+
+    await admin.from("conversations").update({ buyer_deleted_at: null }).eq("id", conversationId);
+  });
 });
 
 describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writes", () => {
@@ -228,12 +366,11 @@ describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writ
 
   it("blocks the owner from re-activating an admin-disabled listing", async () => {
     const seller = await signIn(emails.seller);
-    const { error, count } = await seller
+    const { error } = await seller
       .from("listings")
       .update({ status: "active" }, { count: "exact" })
       .eq("id", disabledListingId);
-    expect(error).toBeNull();
-    expect(count).toBe(0);
+    expect(error).not.toBeNull();
 
     const { data: check } = await admin
       .from("listings")
@@ -1267,12 +1404,12 @@ describe.skipIf(!canRun)(
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets a user submit their own report", async () => {
+    it("rejects direct report writes; the server function owns submission", async () => {
       const reporter = await signIn(emails.reporter);
       const { error } = await reporter
         .from("reports")
         .insert({ listing_id: listingId, reporter_id: reporterId, reason: "Second report" });
-      expect(error).toBeNull();
+      expect(error).not.toBeNull();
     });
 
     it("blocks a user from submitting a report on someone else's behalf", async () => {
@@ -1867,34 +2004,31 @@ describe.skipIf(!canRun)(
       expect(data).toHaveLength(0);
     });
 
-    it("lets the owner update and activate their own draft", async () => {
+    it("rejects direct WTB updates, including the owner path", async () => {
       const owner = await signIn(emails.owner);
-      const { error, count } = await owner
+      const { error } = await owner
         .from("wtb_listings")
         .update({ title: "Updated private draft", status: "active" }, { count: "exact" })
         .eq("id", activatableDraftId);
-      expect(error).toBeNull();
-      expect(count).toBe(1);
+      expect(error).not.toBeNull();
     });
 
-    it("blocks a non-owner from activating someone else's draft", async () => {
+    it("rejects direct WTB updates from other users", async () => {
       const other = await signIn(emails.other);
-      const { error, count } = await other
+      const { error } = await other
         .from("wtb_listings")
         .update({ status: "active" }, { count: "exact" })
         .eq("id", draftId);
-      expect(error).toBeNull();
-      expect(count).toBe(0);
+      expect(error).not.toBeNull();
     });
 
-    it("lets the owner delete their own draft", async () => {
+    it("rejects direct WTB deletes; the server function owns deletion", async () => {
       const owner = await signIn(emails.owner);
-      const { error, count } = await owner
+      const { error } = await owner
         .from("wtb_listings")
         .delete({ count: "exact" })
         .eq("id", deletableDraftId);
-      expect(error).toBeNull();
-      expect(count).toBe(1);
+      expect(error).not.toBeNull();
     });
 
     it("creates WTB notifications only when the owner opted in", async () => {
@@ -1906,14 +2040,13 @@ describe.skipIf(!canRun)(
       expect(data?.map((row) => row.wtb_listing_id)).toEqual([notifiedActiveId]);
     });
 
-    it("blocks a non-owner from updating someone else's wtb listing", async () => {
+    it("rejects direct WTB updates from another user", async () => {
       const other = await signIn(emails.other);
-      const { error, count } = await other
+      const { error } = await other
         .from("wtb_listings")
         .update({ title: "Hijacked" }, { count: "exact" })
         .eq("id", activeId);
-      expect(error).toBeNull();
-      expect(count).toBe(0);
+      expect(error).not.toBeNull();
     });
 
     it("blocks a user from creating a wtb listing on someone else's behalf", async () => {
@@ -2299,6 +2432,7 @@ describe.skipIf(!canRun)(
     const userIds: string[] = [];
     let sellerId: string;
     let draftListingId: string;
+    let imagePath: string;
     let draftImageId: string;
 
     async function signIn(email: string) {
@@ -2332,9 +2466,14 @@ describe.skipIf(!canRun)(
       if (listingErr) throw listingErr;
       draftListingId = listing.id;
 
+      imagePath = `${sellerId}/${draftListingId}/rls-test-${suffix}.jpg`;
+      const { error: uploadError } = await admin.storage
+        .from("listing-images")
+        .upload(imagePath, new Blob(["test"], { type: "image/jpeg" }), { upsert: false });
+      if (uploadError) throw uploadError;
       const { data: image, error: imageErr } = await admin
         .from("listing_images")
-        .insert({ listing_id: draftListingId, storage_path: `rls-test/${suffix}.jpg` })
+        .insert({ listing_id: draftListingId, storage_path: imagePath })
         .select("id")
         .single();
       if (imageErr) throw imageErr;
@@ -2344,6 +2483,7 @@ describe.skipIf(!canRun)(
     afterAll(async () => {
       if (!canRun) return;
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+      await admin.storage.from("listing-images").remove([imagePath]);
     });
 
     it("lets the owner see images on their own draft listing", async () => {
@@ -2801,25 +2941,21 @@ describe.skipIf(!canRun)(
         .delete()
         .eq("word", lexeme)
         .eq("category_id", categoryId);
-      await admin.from("categories").delete().eq("id", categoryId);
-      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets an anonymous visitor read both stats tables", async () => {
+    it("keeps search statistics private to server code", async () => {
       const anon = createClient(URL!, ANON_KEY!);
-      const { data: wordData, error: wordErr } = await anon
+      const { error: wordErr } = await anon
         .from("listing_category_word_stats")
         .select("lexeme")
         .eq("lexeme", lexeme);
-      expect(wordErr).toBeNull();
-      expect(wordData).toHaveLength(1);
+      expect(wordErr).not.toBeNull();
 
-      const { data: keywordData, error: keywordErr } = await anon
+      const { error: keywordErr } = await anon
         .from("listing_keyword_stats")
         .select("word")
         .eq("word", lexeme);
-      expect(keywordErr).toBeNull();
-      expect(keywordData).toHaveLength(1);
+      expect(keywordErr).not.toBeNull();
     });
 
     it("blocks a regular authenticated client from writing to either stats table", async () => {
@@ -3406,3 +3542,1116 @@ describe.skipIf(!canRun)("RLS: aktive salgsannonser krever pris", () => {
     expect(error).toBeNull();
   });
 });
+describe.skipIf(!canRun)(
+  "RLS: business organizations, listings, messages, storage and Proff entitlement",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-business-owner-${suffix}@example.com`,
+      member: `rls-business-member-${suffix}@example.com`,
+      buyer: `rls-business-buyer-${suffix}@example.com`,
+      other: `rls-business-other-${suffix}@example.com`,
+    };
+    const userIds: string[] = [];
+    const organizationIds: string[] = [];
+    const locationIds = new Map<string, string>();
+    const objectPaths: string[] = [];
+    const listingImagePaths: string[] = [];
+    let ownerId: string;
+    let memberId: string;
+    let buyerId: string;
+    let otherId: string;
+    let organizationId: string;
+    let otherOrganizationId: string;
+    let memberListingId: string;
+    let ownerListingId: string;
+    let otherOrganizationListingId: string;
+    let insertedListingId: string;
+    let conversationId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const createUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        const id = data.user!.id;
+        userIds.push(id);
+        return id;
+      };
+
+      ownerId = await createUser(emails.owner);
+      memberId = await createUser(emails.member);
+      buyerId = await createUser(emails.buyer);
+      otherId = await createUser(emails.other);
+
+      const createOrganization = async (number: string, name: string) => {
+        const now = Date.now();
+        const { data, error } = await admin
+          .from("organizations")
+          .insert({
+            organization_number: number,
+            legal_name: name,
+            display_name: name,
+            selected_plan: "proff",
+            proff_trial_started_at: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+            proff_trial_ends_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            proff_access_until: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            // This block tests membership/listing/storage RLS, not M-4's
+            // registration-affiliation gate — grandfather these orgs in as
+            // verified like a real approved business.
+            verification_status: "verified",
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        if (!data) throw new Error("Organization insert returned no row");
+        organizationIds.push(data.id);
+        const { data: location, error: locationError } = await admin
+          .from("organization_locations")
+          .insert({
+            organization_id: data.id,
+            name: "Hovedlokasjon",
+            address_line: "Storgata 1",
+            postal_code: "0001",
+            city: "Oslo",
+            is_default: true,
+          })
+          .select("id")
+          .single();
+        if (locationError) throw locationError;
+        if (!location) throw new Error("Location insert returned no row");
+        locationIds.set(data.id, location.id);
+        return data.id;
+      };
+      const organizationNumber = 100_000_000 + (suffix % 800_000_000);
+      organizationId = await createOrganization(
+        String(organizationNumber),
+        `RLS Bedrift ${suffix}`,
+      );
+      otherOrganizationId = await createOrganization(
+        String(organizationNumber + 1),
+        `RLS Annen bedrift ${suffix}`,
+      );
+
+      const { error: memberError } = await admin.from("organization_members").insert([
+        { organization_id: organizationId, user_id: ownerId, role: "superuser", status: "active" },
+        { organization_id: organizationId, user_id: memberId, role: "member", status: "active" },
+        {
+          organization_id: otherOrganizationId,
+          user_id: otherId,
+          role: "superuser",
+          status: "active",
+        },
+      ]);
+      if (memberError) throw memberError;
+      const { error: locationMemberError } = await admin
+        .from("organization_location_members")
+        .insert([
+          {
+            organization_id: organizationId,
+            location_id: locationIds.get(organizationId)!,
+            user_id: ownerId,
+            role: "manager",
+            listing_access: "all",
+            listing_edit_scope: "all",
+            chat_access: "all",
+          },
+          {
+            organization_id: organizationId,
+            location_id: locationIds.get(organizationId)!,
+            user_id: memberId,
+            role: "member",
+            listing_access: "all",
+            listing_edit_scope: "all",
+            chat_access: "all",
+          },
+          {
+            organization_id: otherOrganizationId,
+            location_id: locationIds.get(otherOrganizationId)!,
+            user_id: otherId,
+            role: "manager",
+            listing_access: "all",
+            listing_edit_scope: "all",
+            chat_access: "all",
+          },
+        ]);
+      if (locationMemberError) throw locationMemberError;
+
+      const createListing = async (
+        sellerId: string,
+        listingOrganizationId: string,
+        status: "draft" | "active",
+        title: string,
+      ) => {
+        const { data, error } = await admin
+          .from("listings")
+          .insert({
+            seller_id: sellerId,
+            organization_id: listingOrganizationId,
+            organization_location_id: locationIds.get(listingOrganizationId)!,
+            title,
+            price_nok: 100,
+            status,
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        return data.id;
+      };
+
+      memberListingId = await createListing(
+        memberId,
+        organizationId,
+        "draft",
+        "RLS business member draft",
+      );
+      ownerListingId = await createListing(
+        memberId,
+        organizationId,
+        "active",
+        "RLS business owner active",
+      );
+      otherOrganizationListingId = await createListing(
+        otherId,
+        otherOrganizationId,
+        "draft",
+        "RLS other business draft",
+      );
+
+      const { data: conversation, error: conversationError } = await admin
+        .from("conversations")
+        .insert({ listing_id: ownerListingId, buyer_id: buyerId, seller_id: memberId })
+        .select("id")
+        .single();
+      if (conversationError) throw conversationError;
+      conversationId = conversation.id;
+
+      const { error: messageError } = await admin.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: buyerId,
+        body: "Er annonsen fortsatt tilgjengelig?",
+      });
+      if (messageError) throw messageError;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      if (objectPaths.length > 0) {
+        await admin.storage.from("organization-logos").remove(objectPaths);
+      }
+      if (listingImagePaths.length > 0) {
+        await admin.storage.from("listing-images").remove(listingImagePaths);
+      }
+      await Promise.all(
+        organizationIds.map((id) => admin.from("organizations").delete().eq("id", id)),
+      );
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("isolates organization members while exposing public organization rows", async () => {
+      const owner = await signIn(emails.owner);
+      const member = await signIn(emails.member);
+      const other = await signIn(emails.other);
+      const anon = createClient(URL!, ANON_KEY!);
+
+      const { data: ownerMembers, error: ownerError } = await owner
+        .from("organization_members")
+        .select("organization_id, user_id, role")
+        .eq("organization_id", organizationId);
+      expect(ownerError).toBeNull();
+      expect(ownerMembers).toHaveLength(2);
+
+      const { data: memberRows, error: memberError } = await member
+        .from("organization_members")
+        .select("organization_id, user_id")
+        .in("organization_id", [organizationId, otherOrganizationId]);
+      expect(memberError).toBeNull();
+      expect(memberRows).toEqual([{ organization_id: organizationId, user_id: memberId }]);
+
+      const { data: otherRows, error: otherError } = await other
+        .from("organization_members")
+        .select("organization_id, user_id")
+        .in("organization_id", [organizationId, otherOrganizationId]);
+      expect(otherError).toBeNull();
+      expect(otherRows).toEqual([{ organization_id: otherOrganizationId, user_id: otherId }]);
+
+      // M-5: the base table is member-only now — commercial state
+      // (selected_plan, proff_access_until, ...) must not be readable by
+      // anon or by a member of a different organization.
+      const { data: anonBaseRow, error: anonBaseError } = await anon
+        .from("organizations")
+        .select("id")
+        .eq("id", organizationId);
+      expect(anonBaseError).toBeNull();
+      expect(anonBaseRow).toHaveLength(0);
+
+      const { data: otherBaseRow, error: otherBaseError } = await other
+        .from("organizations")
+        .select("id")
+        .eq("id", organizationId);
+      expect(otherBaseError).toBeNull();
+      expect(otherBaseRow).toHaveLength(0);
+
+      // The public view exposes only branding columns, for every org — it
+      // never had a selected_plan column to select in the first place.
+      const { error: publicError } = await anon
+        .from("organizations_public")
+        .select("id, selected_plan" as "id")
+        .in("id", [organizationId, otherOrganizationId]);
+      expect(publicError).not.toBeNull();
+
+      const { data: publicSafeColumns, error: publicSafeError } = await anon
+        .from("organizations_public")
+        .select("id, listing_concept, listing_font, listing_overtitle")
+        .in("id", [organizationId, otherOrganizationId]);
+      expect(publicSafeError).toBeNull();
+      expect(publicSafeColumns?.map((row) => row.id).sort()).toEqual(
+        [organizationId, otherOrganizationId].sort(),
+      );
+      expect(
+        publicSafeColumns?.every(
+          (row) =>
+            row.listing_concept === "redaksjonell" &&
+            row.listing_font === "newsreader" &&
+            row.listing_overtitle === "presentert_av",
+        ),
+      ).toBe(true);
+      const { error: anonymousMembershipError } = await anon
+        .from("organization_members")
+        .select("organization_id")
+        .eq("organization_id", organizationId);
+      expect(anonymousMembershipError).not.toBeNull();
+
+      const { error: directMembershipInsertError } = await member
+        .from("organization_members")
+        .insert({
+          organization_id: organizationId,
+          user_id: buyerId,
+          role: "member",
+          status: "active",
+        });
+      expect(directMembershipInsertError).not.toBeNull();
+      const { error: directOrganizationUpdateError } = await owner
+        .from("organizations")
+        .update({ display_name: "forged" })
+        .eq("id", organizationId);
+      expect(directOrganizationUpdateError).not.toBeNull();
+    });
+
+    it("allows business listing access only within the matching membership boundary", async () => {
+      const owner = await signIn(emails.owner);
+      const member = await signIn(emails.member);
+      const other = await signIn(emails.other);
+      const anon = createClient(URL!, ANON_KEY!);
+
+      const { data: ownerListings, error: ownerError } = await owner
+        .from("listings")
+        .select("id")
+        .in("id", [memberListingId, ownerListingId, otherOrganizationListingId]);
+      expect(ownerError).toBeNull();
+      expect(ownerListings?.map((row) => row.id).sort()).toEqual(
+        [memberListingId, ownerListingId].sort(),
+      );
+
+      const { data: memberListings, error: memberError } = await member
+        .from("listings")
+        .select("id")
+        .in("id", [memberListingId, ownerListingId, otherOrganizationListingId]);
+      expect(memberError).toBeNull();
+      expect(memberListings?.map((row) => row.id).sort()).toEqual(
+        [memberListingId, ownerListingId].sort(),
+      );
+
+      const { data: otherListings, error: otherError } = await other
+        .from("listings")
+        .select("id")
+        .in("id", [memberListingId, ownerListingId, otherOrganizationListingId]);
+      expect(otherError).toBeNull();
+      expect(otherListings?.map((row) => row.id).sort()).toEqual(
+        [ownerListingId, otherOrganizationListingId].sort(),
+      );
+
+      const { data: anonymousListings, error: anonymousError } = await anon
+        .from("listings")
+        .select("id")
+        .in("id", [memberListingId, ownerListingId, otherOrganizationListingId]);
+      expect(anonymousError).toBeNull();
+      expect(anonymousListings).toEqual([{ id: ownerListingId }]);
+
+      const { error: anonymousInsertError } = await anon.from("listings").insert({
+        seller_id: memberId,
+        organization_id: organizationId,
+        title: "RLS anonymous business listing",
+        price_nok: 101,
+        status: "draft",
+      });
+      expect(anonymousInsertError).not.toBeNull();
+
+      const { data: insertedListing, error: insertError } = await admin
+        .from("listings")
+        .insert({
+          seller_id: memberId,
+          organization_id: organizationId,
+          organization_location_id: locationIds.get(organizationId)!,
+          title: "RLS member-created business listing",
+          price_nok: 101,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      expect(insertError).toBeNull();
+      expect(insertedListing?.id).toBeTruthy();
+      insertedListingId = insertedListing!.id;
+
+      const { error: forgedInsertError } = await member.from("listings").insert({
+        seller_id: memberId,
+        organization_id: otherOrganizationId,
+        title: "RLS forged organization listing",
+        price_nok: 101,
+        status: "draft",
+      });
+      expect(forgedInsertError).not.toBeNull();
+
+      const { error: memberUpdateError, count: memberUpdateCount } = await member
+        .from("listings")
+        .update({ title: "RLS member updated listing" }, { count: "exact" })
+        .eq("id", memberListingId);
+      expect(memberUpdateError).toBeNull();
+      expect(memberUpdateCount).toBe(1);
+
+      const { error: outsiderUpdateError, count: outsiderUpdateCount } = await other
+        .from("listings")
+        .update({ title: "RLS cross-business update" }, { count: "exact" })
+        .eq("id", memberListingId);
+      expect(outsiderUpdateError).toBeNull();
+      expect(outsiderUpdateCount).toBe(0);
+
+      const { count: ownerDeleteCount } = await owner
+        .from("listings")
+        .delete({ count: "exact" })
+        .eq("id", insertedListingId);
+      expect(ownerDeleteCount).toBe(1);
+    });
+
+    it("lets an authorized organization member attach an image uploaded under their own id", async () => {
+      const owner = await signIn(emails.owner);
+      const path = `${ownerId}/${memberListingId}/rls-${suffix}.png`;
+      listingImagePaths.push(path);
+
+      const { error: uploadError } = await owner.storage
+        .from("listing-images")
+        .upload(path, new Blob(["img"], { type: "image/png" }), {
+          contentType: "image/png",
+        });
+      expect(uploadError).toBeNull();
+
+      const { data: image, error: metadataError } = await owner
+        .from("listing_images")
+        .insert({
+          listing_id: memberListingId,
+          storage_path: path,
+          sort_order: 0,
+        })
+        .select("id")
+        .single();
+      expect(metadataError).toBeNull();
+      expect(image?.id).toBeTruthy();
+    });
+
+    it("lets an organization superuser read and send messages, but not another business", async () => {
+      const owner = await signIn(emails.owner);
+      const member = await signIn(emails.member);
+      const other = await signIn(emails.other);
+
+      const { data: ownerConversations, error: ownerConversationError } = await owner
+        .from("conversations")
+        .select("id")
+        .eq("id", conversationId);
+      expect(ownerConversationError).toBeNull();
+      expect(ownerConversations).toHaveLength(1);
+
+      const { data: ownerMessages, error: ownerMessageError } = await owner
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conversationId);
+      expect(ownerMessageError).toBeNull();
+      expect(ownerMessages).toHaveLength(1);
+
+      const { data: memberConversations, error: memberConversationError } = await member
+        .from("conversations")
+        .select("id")
+        .eq("id", conversationId);
+      expect(memberConversationError).toBeNull();
+      expect(memberConversations).toHaveLength(1);
+
+      const { data: memberMessages, error: memberMessageError } = await member
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conversationId);
+      expect(memberMessageError).toBeNull();
+      expect(memberMessages).toHaveLength(1);
+
+      const { data: otherConversations, error: otherConversationError } = await other
+        .from("conversations")
+        .select("id")
+        .eq("id", conversationId);
+      expect(otherConversationError).toBeNull();
+      expect(otherConversations).toHaveLength(0);
+
+      const { error: sendError } = await owner.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: ownerId,
+        body: "Jeg følger opp på vegne av bedriften.",
+      });
+      expect(sendError).not.toBeNull();
+
+      const { error: readUpdateError, count: readUpdateCount } = await owner
+        .from("conversations")
+        .update({ seller_last_read_at: new Date().toISOString() }, { count: "exact" })
+        .eq("id", conversationId);
+      expect(readUpdateError).toBeNull();
+      expect(readUpdateCount).toBe(1);
+
+      const { error: outsiderSendError } = await other.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: otherId,
+        body: "Cross-business message",
+      });
+      expect(outsiderSendError).not.toBeNull();
+    });
+
+    it("allows only an effective-Proff superuser to write organization logos", async () => {
+      const owner = await signIn(emails.owner);
+      const member = await signIn(emails.member);
+      const other = await signIn(emails.other);
+      const anon = createClient(URL!, ANON_KEY!);
+      const path = `${organizationId}/rls-logo-${suffix}.png`;
+      objectPaths.push(path);
+      const content = new Blob(["rls-logo"], { type: "image/png" });
+
+      const { error: ownerUploadError } = await owner.storage
+        .from("organization-logos")
+        .upload(path, content, { contentType: "image/png", upsert: true });
+      expect(ownerUploadError).toBeNull();
+
+      const { data: anonymousDownload, error: anonymousDownloadError } = await anon.storage
+        .from("organization-logos")
+        .download(path);
+      expect(anonymousDownloadError).toBeNull();
+      expect(anonymousDownload).toBeTruthy();
+
+      const memberPath = `${organizationId}/member-${suffix}.png`;
+      objectPaths.push(memberPath);
+      const { error: memberUploadError } = await member.storage
+        .from("organization-logos")
+        .upload(memberPath, content, {
+          contentType: "image/png",
+          upsert: true,
+        });
+      expect(memberUploadError).not.toBeNull();
+
+      const otherPath = `${organizationId}/other-${suffix}.png`;
+      objectPaths.push(otherPath);
+      const { error: otherUploadError } = await other.storage
+        .from("organization-logos")
+        .upload(otherPath, content, {
+          contentType: "image/png",
+          upsert: true,
+        });
+      expect(otherUploadError).not.toBeNull();
+    });
+
+    it("enforces the Proff entitlement boundary for owner, member, other user and anon", async () => {
+      const owner = await signIn(emails.owner);
+      const member = await signIn(emails.member);
+      const other = await signIn(emails.other);
+      const anon = createClient(URL!, ANON_KEY!);
+
+      const access = async (client: SupabaseClient) => {
+        const { data, error } = await client.rpc("can_act_for_organization", {
+          _organization_id: organizationId,
+        });
+        expect(error).toBeNull();
+        return data;
+      };
+
+      expect(await access(owner)).toBe(true);
+      expect(await access(member)).toBe(true);
+      expect(await access(other)).toBe(false);
+      expect(await access(anon)).toBe(false);
+
+      const expiredAt = new Date(Date.now() - 1_000).toISOString();
+      const { error: expirationError } = await admin
+        .from("organizations")
+        .update({ proff_access_until: expiredAt })
+        .eq("id", organizationId);
+      expect(expirationError).toBeNull();
+
+      const { error: syncError } = await admin.rpc("sync_organization_entitlements", {
+        _organization_id: organizationId,
+      });
+      expect(syncError).toBeNull();
+
+      expect(await access(owner)).toBe(true);
+      expect(await access(member)).toBe(false);
+      expect(await access(other)).toBe(false);
+      expect(await access(anon)).toBe(false);
+
+      const { data: deactivatedMember, error: memberStatusError } = await owner
+        .from("organization_members")
+        .select("status")
+        .eq("organization_id", organizationId)
+        .eq("user_id", memberId)
+        .single();
+      expect(memberStatusError).toBeNull();
+      expect(deactivatedMember?.status).toBe("deactivated");
+
+      const { data: expiredMemberListing, error: expiredListingError } = await member
+        .from("listings")
+        .select("id")
+        .eq("id", memberListingId);
+      expect(expiredListingError).toBeNull();
+      expect(expiredMemberListing).toHaveLength(0);
+      const { data: ownerStillSeesListing, error: ownerListingError } = await owner
+        .from("listings")
+        .select("id")
+        .eq("id", memberListingId);
+      expect(ownerListingError).toBeNull();
+      expect(ownerStillSeesListing).toHaveLength(1);
+
+      const expiredLogoPath = `${organizationId}/expired-${suffix}.png`;
+      objectPaths.push(expiredLogoPath);
+      const { error: expiredOwnerUploadError } = await owner.storage
+        .from("organization-logos")
+        .upload(expiredLogoPath, new Blob(["expired"], { type: "image/png" }), {
+          contentType: "image/png",
+          upsert: true,
+        });
+      expect(expiredOwnerUploadError).not.toBeNull();
+    });
+
+    it("keeps proff_orders server-only and stacks paid terms on remaining access", async () => {
+      const owner = await signIn(emails.owner);
+      const anon = createClient(URL!, ANON_KEY!);
+
+      const { data: order, error: orderError } = await admin
+        .from("proff_orders")
+        .insert({
+          organization_id: otherOrganizationId,
+          term: "monthly",
+          price_ex_vat_nok: 1490,
+          billing_email: `faktura-${suffix}@example.com`,
+        })
+        .select("id")
+        .single();
+      expect(orderError).toBeNull();
+
+      // Billing data must never leak to the client, not even to the superuser.
+      for (const client of [owner, anon]) {
+        const { data, error } = await client.from("proff_orders").select("id");
+        expect(error !== null || (data ?? []).length === 0).toBe(true);
+      }
+
+      const expiredAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { error: expireError } = await admin
+        .from("organizations")
+        .update({ proff_access_until: expiredAt })
+        .eq("id", otherOrganizationId);
+      expect(expireError).toBeNull();
+
+      const extend = async (months: number) => {
+        const { data, error } = await admin
+          .rpc("extend_proff_access", { _organization_id: otherOrganizationId, _months: months })
+          .single();
+        expect(error).toBeNull();
+        return data as unknown as { period_start: string; period_end: string };
+      };
+
+      // Expired access starts a fresh period from now, not from the old date.
+      const first = await extend(1);
+      expect(Date.parse(first.period_start)).toBeGreaterThan(Date.parse(expiredAt));
+      expect(Date.parse(first.period_end)).toBeGreaterThan(Date.now());
+
+      // A renewal stacks on the remaining period instead of truncating it.
+      const second = await extend(12);
+      expect(Date.parse(second.period_start)).toBe(Date.parse(first.period_end));
+
+      const { data: organization, error: readError } = await admin
+        .from("organizations")
+        .select("selected_plan, proff_access_until")
+        .eq("id", otherOrganizationId)
+        .single();
+      expect(readError).toBeNull();
+      expect(organization?.selected_plan).toBe("proff");
+      expect(Date.parse(organization!.proff_access_until!)).toBe(Date.parse(second.period_end));
+
+      await admin.from("proff_orders").delete().eq("id", order!.id);
+    });
+  },
+);
+
+describe.skipIf(!canRun)("RLS: storage buckets enforce owner/participant access (K-2)", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    seller: `rls-storage-seller-${suffix}@example.com`,
+    buyer: `rls-storage-buyer-${suffix}@example.com`,
+    outsider: `rls-storage-outsider-${suffix}@example.com`,
+  };
+
+  const userIds: string[] = [];
+  const objectPaths: Record<string, string[]> = {
+    "listing-images": [],
+    "listing-360-frames": [],
+    avatars: [],
+    "message-attachments": [],
+  };
+  let sellerId: string;
+  let buyerId: string;
+  let activeListingId: string;
+  let draftListingId: string;
+  let conversationId: string;
+
+  async function signIn(email: string) {
+    return signInWithRetry(email);
+  }
+
+  beforeAll(async () => {
+    const mkUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+    sellerId = await mkUser(emails.seller);
+    buyerId = await mkUser(emails.buyer);
+    await mkUser(emails.outsider);
+
+    const { data: active, error: activeErr } = await admin
+      .from("listings")
+      .insert({
+        seller_id: sellerId,
+        title: "RLS storage active listing",
+        price_nok: 100,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (activeErr) throw activeErr;
+    activeListingId = active.id;
+
+    const { data: draft, error: draftErr } = await admin
+      .from("listings")
+      .insert({
+        seller_id: sellerId,
+        title: "RLS storage draft listing",
+        price_nok: 100,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (draftErr) throw draftErr;
+    draftListingId = draft.id;
+
+    const { data: conv, error: convErr } = await admin
+      .from("conversations")
+      .insert({ listing_id: activeListingId, buyer_id: buyerId, seller_id: sellerId })
+      .select("id")
+      .single();
+    if (convErr) throw convErr;
+    conversationId = conv.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    for (const [bucket, paths] of Object.entries(objectPaths)) {
+      if (paths.length > 0) await admin.storage.from(bucket).remove(paths);
+    }
+    await admin.from("listings").delete().in("id", [activeListingId, draftListingId]);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("lets only the seller upload/delete listing images, but anyone read an active listing's", async () => {
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["img"], { type: "image/png" });
+
+    const path = `${sellerId}/${activeListingId}/rls-${suffix}.png`;
+    objectPaths["listing-images"].push(path);
+
+    const { error: outsiderUploadError } = await outsider.storage
+      .from("listing-images")
+      .upload(path, content, { contentType: "image/png" });
+    expect(outsiderUploadError).not.toBeNull();
+
+    const { error: sellerUploadError } = await seller.storage
+      .from("listing-images")
+      .upload(path, content, { contentType: "image/png" });
+    expect(sellerUploadError).toBeNull();
+
+    const { data: anonDownload, error: anonDownloadError } = await anon.storage
+      .from("listing-images")
+      .download(path);
+    expect(anonDownloadError).toBeNull();
+    expect(anonDownload).toBeTruthy();
+
+    const { error: outsiderDeleteError } = await outsider.storage
+      .from("listing-images")
+      .remove([path]);
+    // Supabase Storage returns ok even when RLS silently filters the row
+    // out of the delete set, so assert the object is still there instead.
+    expect(outsiderDeleteError).toBeNull();
+    const { data: stillThere } = await seller.storage.from("listing-images").download(path);
+    expect(stillThere).toBeTruthy();
+  });
+
+  it("hides a draft listing's images from everyone but the seller", async () => {
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["img"], { type: "image/png" });
+
+    const path = `${sellerId}/${draftListingId}/rls-${suffix}.png`;
+    objectPaths["listing-images"].push(path);
+    const { error: uploadError } = await seller.storage
+      .from("listing-images")
+      .upload(path, content, { contentType: "image/png" });
+    expect(uploadError).toBeNull();
+
+    const { error: anonError } = await anon.storage.from("listing-images").download(path);
+    expect(anonError).not.toBeNull();
+
+    const { error: outsiderError } = await outsider.storage.from("listing-images").download(path);
+    expect(outsiderError).not.toBeNull();
+
+    const { data: sellerDownload, error: sellerError } = await seller.storage
+      .from("listing-images")
+      .download(path);
+    expect(sellerError).toBeNull();
+    expect(sellerDownload).toBeTruthy();
+  });
+
+  it("exposes 360 frames of an active listing publicly but hides a draft's", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["frame"], { type: "image/webp" });
+
+    const activePath = `${activeListingId}/0.webp`;
+    objectPaths["listing-360-frames"].push(activePath);
+    const { error: activeUploadError } = await admin.storage
+      .from("listing-360-frames")
+      .upload(activePath, content, { contentType: "image/webp" });
+    expect(activeUploadError).toBeNull();
+
+    const draftPath = `${draftListingId}/0.webp`;
+    objectPaths["listing-360-frames"].push(draftPath);
+    const { error: draftUploadError } = await admin.storage
+      .from("listing-360-frames")
+      .upload(draftPath, content, { contentType: "image/webp" });
+    expect(draftUploadError).toBeNull();
+
+    const { data: activeDownload, error: activeError } = await anon.storage
+      .from("listing-360-frames")
+      .download(activePath);
+    expect(activeError).toBeNull();
+    expect(activeDownload).toBeTruthy();
+
+    const { error: draftError } = await anon.storage.from("listing-360-frames").download(draftPath);
+    expect(draftError).not.toBeNull();
+  });
+
+  it("lets only conversation participants read/write message attachments", async () => {
+    const seller = await signIn(emails.seller);
+    const buyer = await signIn(emails.buyer);
+    const outsider = await signIn(emails.outsider);
+    const content = new Blob(["attachment"], { type: "image/png" });
+
+    const path = `${conversationId}/rls-${suffix}.png`;
+    objectPaths["message-attachments"].push(path);
+
+    const { error: outsiderUploadError } = await outsider.storage
+      .from("message-attachments")
+      .upload(path, content, { contentType: "image/png" });
+    expect(outsiderUploadError).not.toBeNull();
+
+    const { error: buyerUploadError } = await buyer.storage
+      .from("message-attachments")
+      .upload(path, content, { contentType: "image/png" });
+    expect(buyerUploadError).toBeNull();
+
+    const { data: sellerDownload, error: sellerDownloadError } = await seller.storage
+      .from("message-attachments")
+      .download(path);
+    expect(sellerDownloadError).toBeNull();
+    expect(sellerDownload).toBeTruthy();
+
+    const { error: outsiderDownloadError } = await outsider.storage
+      .from("message-attachments")
+      .download(path);
+    expect(outsiderDownloadError).not.toBeNull();
+  });
+
+  it("lets anyone read avatars but only the owner write their own", async () => {
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["avatar"], { type: "image/png" });
+
+    const path = `${sellerId}/avatar-${suffix}.png`;
+    objectPaths.avatars.push(path);
+
+    const { error: outsiderUploadError } = await outsider.storage
+      .from("avatars")
+      .upload(path, content, { contentType: "image/png" });
+    expect(outsiderUploadError).not.toBeNull();
+
+    const { error: sellerUploadError } = await seller.storage
+      .from("avatars")
+      .upload(path, content, { contentType: "image/png" });
+    expect(sellerUploadError).toBeNull();
+
+    const { data: anonDownload, error: anonDownloadError } = await anon.storage
+      .from("avatars")
+      .download(path);
+    expect(anonDownloadError).toBeNull();
+    expect(anonDownload).toBeTruthy();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: feedback rate limiting is enforced in the database (M-8)", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+
+  it("only service_role may call submit_feedback_rate_limited", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { error } = await anon.rpc("submit_feedback_rate_limited", {
+      _key_hash: "a".repeat(64),
+      _type: "ris",
+      _message: "hei",
+      _user_id: null,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("allows 5 submissions per key per window and rejects the 6th", async () => {
+    const keyHash = createHash("sha256").update(`m8-${suffix}`).digest("hex");
+
+    for (let i = 0; i < 5; i++) {
+      const { error } = await admin.rpc("submit_feedback_rate_limited", {
+        _key_hash: keyHash,
+        _type: "ris",
+        _message: `attempt ${i}`,
+        _user_id: null,
+      });
+      expect(error).toBeNull();
+    }
+
+    const { error: sixthError } = await admin.rpc("submit_feedback_rate_limited", {
+      _key_hash: keyHash,
+      _type: "ris",
+      _message: "attempt 5",
+      _user_id: null,
+    });
+    expect(sixthError?.message).toMatch(/rate_limited/);
+
+    const { data: rows } = await admin.from("feedback").select("id").eq("message", `attempt 4`);
+    expect(rows).toHaveLength(1);
+
+    await admin.from("feedback").delete().like("message", "attempt %");
+    await admin.from("feedback_rate_limits").delete().eq("key_hash", keyHash);
+  });
+});
+
+describe.skipIf(!canRun)(
+  "RLS: endpoint rate limiting for unauthenticated AI/heavy endpoints (M-9)",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+
+    it("only service_role may call check_endpoint_rate_limit", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { error } = await anon.rpc("check_endpoint_rate_limit", {
+        _bucket: "test",
+        _key_hash: "a".repeat(64),
+        _limit: 5,
+        _window_seconds: 60,
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("allows up to the limit then rejects, per bucket+key independently", async () => {
+      const keyHash = createHash("sha256").update(`m9-${suffix}`).digest("hex");
+      const otherKeyHash = createHash("sha256").update(`m9-other-${suffix}`).digest("hex");
+      const bucket = `m9-test-${suffix}`;
+
+      for (let i = 0; i < 3; i++) {
+        const { data: allowed, error } = await admin.rpc("check_endpoint_rate_limit", {
+          _bucket: bucket,
+          _key_hash: keyHash,
+          _limit: 3,
+          _window_seconds: 60,
+        });
+        expect(error).toBeNull();
+        expect(allowed).toBe(true);
+      }
+
+      const { data: fourth, error: fourthError } = await admin.rpc("check_endpoint_rate_limit", {
+        _bucket: bucket,
+        _key_hash: keyHash,
+        _limit: 3,
+        _window_seconds: 60,
+      });
+      expect(fourthError).toBeNull();
+      expect(fourth).toBe(false);
+
+      // A different key in the same bucket has its own budget.
+      const { data: otherAllowed, error: otherError } = await admin.rpc(
+        "check_endpoint_rate_limit",
+        { _bucket: bucket, _key_hash: otherKeyHash, _limit: 3, _window_seconds: 60 },
+      );
+      expect(otherError).toBeNull();
+      expect(otherAllowed).toBe(true);
+
+      await admin.from("endpoint_rate_limits").delete().eq("bucket", bucket);
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: an unverified organization cannot create or publish listings (M-4)",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-m4-owner-${suffix}@example.com`,
+      admin: `rls-m4-admin-${suffix}@example.com`,
+    };
+    const userIds: string[] = [];
+    let ownerId: string;
+    let organizationId: string;
+    let locationId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      ownerId = await mkUser(emails.owner);
+      await mkUser(emails.admin);
+      await admin.from("user_roles").insert({ user_id: userIds[1], role: "admin" });
+
+      const organizationNumber = 200_000_000 + (suffix % 700_000_000);
+      const { data: org, error: orgError } = await admin
+        .from("organizations")
+        .insert({
+          organization_number: String(organizationNumber),
+          legal_name: `RLS M-4 Bedrift ${suffix}`,
+          display_name: `RLS M-4 Bedrift ${suffix}`,
+          selected_plan: "proff",
+          proff_access_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          // No verification_status given — must default to 'unverified'.
+        })
+        .select("id, verification_status")
+        .single();
+      if (orgError) throw orgError;
+      organizationId = org.id;
+      expect(org.verification_status).toBe("unverified");
+
+      const { data: location, error: locationError } = await admin
+        .from("organization_locations")
+        .insert({
+          organization_id: organizationId,
+          name: "Hovedlokasjon",
+          address_line: "Testgata 1",
+          postal_code: "0001",
+          city: "Oslo",
+          is_default: true,
+        })
+        .select("id")
+        .single();
+      if (locationError) throw locationError;
+      locationId = location.id;
+
+      const { error: memberError } = await admin.from("organization_members").insert({
+        organization_id: organizationId,
+        user_id: ownerId,
+        role: "superuser",
+        status: "active",
+      });
+      if (memberError) throw memberError;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await admin.from("organizations").delete().eq("id", organizationId);
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("blocks even the organization's own superuser from creating a listing", async () => {
+      const owner = await signIn(emails.owner);
+      const { error } = await owner.from("listings").insert({
+        seller_id: ownerId,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+        title: "M-4 unverified org listing",
+        price_nok: 100,
+        status: "draft",
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("keeps direct listing insertion closed after organization verification", async () => {
+      const owner = await signIn(emails.owner);
+      const { error: selfVerifyError } = await owner.rpc("admin_verify_organization", {
+        _organization_id: organizationId,
+      });
+      expect(selfVerifyError).not.toBeNull();
+
+      const adminUser = await signIn(emails.admin);
+      const { error: verifyError } = await adminUser.rpc("admin_verify_organization", {
+        _organization_id: organizationId,
+      });
+      expect(verifyError).toBeNull();
+
+      const { data: org } = await admin
+        .from("organizations")
+        .select("verification_status, verified_by")
+        .eq("id", organizationId)
+        .single();
+      expect(org?.verification_status).toBe("verified");
+      expect(org?.verified_by).toBe(userIds[1]);
+
+      const { error: insertError } = await owner.from("listings").insert({
+        seller_id: ownerId,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+        title: "M-4 now-verified org listing",
+        price_nok: 100,
+        status: "draft",
+      });
+      expect(insertError).not.toBeNull();
+    });
+  },
+);

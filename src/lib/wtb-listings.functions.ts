@@ -83,7 +83,10 @@ export const createWtbListing = createServerFn({ method: "POST" })
         .eq("status", "draft")
         .select("id")
         .single();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
       return { id: row.id as string };
     }
 
@@ -107,7 +110,10 @@ export const createWtbListing = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { id: row.id as string };
   });
 
@@ -144,7 +150,10 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
         .eq("status", "draft")
         .select("id")
         .single();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
       return { id: row.id as string };
     }
 
@@ -162,7 +171,10 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       .insert({ user_id: context.userId, status: "draft", ...fields })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { id: row.id as string };
   });
 
@@ -178,7 +190,10 @@ export const getLatestWtbDraft = createServerFn({ method: "GET" })
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return data;
   });
 
@@ -193,7 +208,10 @@ export const discardWtbDraft = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", context.userId)
       .eq("status", "draft");
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });
 
 const wtbUpdateSchema = z.object({
@@ -234,7 +252,10 @@ export const updateWtbListing = createServerFn({ method: "POST" })
       .update(fields)
       .eq("id", data.id)
       .eq("user_id", userId);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });
 
 export const deleteWtbListing = createServerFn({ method: "POST" })
@@ -249,7 +270,10 @@ export const deleteWtbListing = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.id)
       .eq("user_id", userId);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });
 
 export const getMyWtbListings = createServerFn({ method: "GET" })
@@ -264,7 +288,10 @@ export const getMyWtbListings = createServerFn({ method: "GET" })
       .select("*, categories(name_nb, slug)")
       .eq("user_id", user!.id)
       .order("updated_at", { ascending: false });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     const rows = (data ?? []) as (WtbListing & {
       categories: { name_nb: string; slug: string } | null;
     })[];
@@ -308,7 +335,10 @@ export const listWtbListings = createServerFn({ method: "GET" })
     }
 
     const { data: rows, error, count } = await query;
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { rows: (rows ?? []) as WtbListingWithProfile[], total: count ?? 0 };
   });
 
@@ -334,7 +364,10 @@ export const countWtbListings = createServerFn({ method: "GET" })
     }
 
     const { count, error } = await query;
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return count ?? 0;
   });
 
@@ -370,7 +403,7 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
       _title: data.title,
       _description: data.description ?? null,
       _attributes: data.attributes ?? {},
-    });
+    } as never);
     if (error || !rows?.[0]) return { count: 0, maxPrice: null };
 
     return { count: rows[0].match_count ?? 0, maxPrice: rows[0].max_price ?? null };
@@ -394,7 +427,10 @@ export async function listWtbMatchNotifications(limit = 30, offset = 0) {
     .select("id, wtb_listing_id, listing_id, read_at, created_at")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   return (data ?? []) as WtbMatchNotification[];
 }
 
@@ -403,7 +439,10 @@ export async function markWtbMatchNotificationRead(id: string) {
     .from("wtb_match_notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
 }
 
 export async function markAllWtbMatchNotificationsRead() {
@@ -411,10 +450,16 @@ export async function markAllWtbMatchNotificationsRead() {
     .from("wtb_match_notifications")
     .update({ read_at: new Date().toISOString() })
     .is("read_at", null);
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
 }
 
 export async function deleteWtbMatchNotification(id: string) {
   const { error } = await supabase.from("wtb_match_notifications").delete().eq("id", id);
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
 }

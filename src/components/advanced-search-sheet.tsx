@@ -200,7 +200,7 @@ export function AdvancedSearchSheet({
             </Collapsible>
 
             {/* Kategori */}
-            <CategoryPicker
+            <CategorySlugPicker
               categories={categories}
               selected={v.categories}
               onChange={(slugs) => setV({ ...v, categories: slugs, catMode: "any" })}
@@ -315,7 +315,7 @@ export function AdvancedSearchSheet({
   );
 }
 
-export function CategoryPicker({
+export function CategorySlugPicker({
   categories,
   selected,
   onChange,

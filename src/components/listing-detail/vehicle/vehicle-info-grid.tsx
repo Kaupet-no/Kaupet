@@ -12,7 +12,31 @@
 } from "lucide-react";
 
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
-import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
+import {
+  BODY_TYPE_LABEL_NB,
+  COLOR_LABEL_NB,
+  DRIVE_TYPE_LABEL_NB,
+  FUEL_LABEL_NB,
+  TRANSMISSION_LABEL_NB,
+} from "./vehicle-labels";
+
+/** Seller-entered attributes take precedence over the SVV snapshot, which is
+ * null for every listing created via "Kjøretøyet er ikke registrert, eller jeg
+ * vil ikke oppgi registreringsnummer". Those sellers fill the same facts in by
+ * hand as required wizard fields; before this fallback existed the grid read
+ * only from `vehicleLookup` and silently dropped all of it. */
+const attrStr = (attributes: Attrs, key: string): string | null => {
+  const v = attributes[key];
+  return typeof v === "string" && v.trim() ? v : null;
+};
+const attrNum = (attributes: Attrs, key: string): number | null => {
+  const v = attributes[key];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) return Number(v);
+  return null;
+};
+
+type Attrs = Record<string, unknown>;
 
 function formatMileage(mileageKm: number): string {
   return `${mileageKm.toLocaleString("nb-NO")} km`;
@@ -43,17 +67,21 @@ export function VehicleInfoGrid({
   mileageKm,
   euControlExempt,
   driveType,
+  attributes,
 }: {
   vehicleLookup: VehicleLookupResult | null;
   mileageKm: number | null;
   /** Ikke en del av SVV-oppslaget — brukerens eget svar på om kjøretøyet er
    * fritatt for periodisk kjøretøykontroll (se `vehicle-tech-table.tsx`). */
   euControlExempt?: boolean | null;
+  /** The listing's own `attributes`, used wherever the SVV snapshot is null. */
+  attributes?: Attrs;
   /** Selgerens bekreftede verdi (`attributes.drive_type`), som har forrang
    * over `vehicleLookup.drive_type` — SVV eksponerer ofte ikke akseldata, så
    * SVV-snapshotet er `null` selv når selgeren har bekreftet hjuldriften. */
   driveType?: string | null;
 }) {
+  const attrs = attributes ?? {};
   const items: SpecItem[] = [];
 
   if (mileageKm != null) {
@@ -64,20 +92,22 @@ export function VehicleInfoGrid({
       value: formatMileage(mileageKm),
     });
   }
-  if (vehicleLookup?.fuel_type) {
+  const fuelType = vehicleLookup?.fuel_type ?? attrStr(attrs, "fuel_type");
+  if (fuelType) {
     items.push({
       key: "fuel",
       icon: Fuel,
       label: "Drivstoff",
-      value: FUEL_LABEL_NB[vehicleLookup.fuel_type] ?? vehicleLookup.fuel_type,
+      value: FUEL_LABEL_NB[fuelType] ?? fuelType,
     });
   }
-  if (vehicleLookup?.transmission) {
+  const transmission = vehicleLookup?.transmission ?? attrStr(attrs, "transmission");
+  if (transmission) {
     items.push({
       key: "transmission",
       icon: Cog,
       label: "Girkasse",
-      value: TRANSMISSION_LABEL_NB[vehicleLookup.transmission] ?? vehicleLookup.transmission,
+      value: TRANSMISSION_LABEL_NB[transmission] ?? transmission,
     });
   }
   if (driveType) {
@@ -88,21 +118,13 @@ export function VehicleInfoGrid({
       value: DRIVE_TYPE_LABEL_NB[driveType] ?? driveType,
     });
   }
-  if (vehicleLookup?.power_hk) {
-    items.push({
-      key: "power",
-      icon: Zap,
-      label: "Effekt",
-      value: `${vehicleLookup.power_hk} hk`,
-    });
+  const powerHk = vehicleLookup?.power_hk ?? attrNum(attrs, "power_hk");
+  if (powerHk) {
+    items.push({ key: "power", icon: Zap, label: "Effekt", value: `${powerHk} hk` });
   }
-  if (vehicleLookup?.seats) {
-    items.push({
-      key: "seats",
-      icon: Users,
-      label: "Seter",
-      value: `${vehicleLookup.seats} seter`,
-    });
+  const seats = vehicleLookup?.seats ?? attrNum(attrs, "seats");
+  if (seats) {
+    items.push({ key: "seats", icon: Users, label: "Seter", value: `${seats} seter` });
   }
   if (euControlExempt) {
     items.push({
@@ -111,13 +133,16 @@ export function VehicleInfoGrid({
       label: "EU-kontroll",
       value: "Fritatt for EU-kontroll",
     });
-  } else if (vehicleLookup?.next_eu_control) {
-    items.push({
-      key: "eu_control",
-      icon: CalendarCheck,
-      label: "Frist EU-kontroll",
-      value: formatDate(vehicleLookup.next_eu_control),
-    });
+  } else {
+    const nextEuControl = vehicleLookup?.next_eu_control ?? attrStr(attrs, "next_eu_control");
+    if (nextEuControl) {
+      items.push({
+        key: "eu_control",
+        icon: CalendarCheck,
+        label: "Frist EU-kontroll",
+        value: formatDate(nextEuControl),
+      });
+    }
   }
   if (vehicleLookup?.first_registration_date) {
     items.push({
@@ -127,15 +152,22 @@ export function VehicleInfoGrid({
       value: formatDate(vehicleLookup.first_registration_date),
     });
   }
-  if (vehicleLookup?.color) {
-    items.push({ key: "color", icon: Palette, label: "Farge", value: vehicleLookup.color });
+  const color = vehicleLookup?.color ?? attrStr(attrs, "color");
+  if (color) {
+    items.push({
+      key: "color",
+      icon: Palette,
+      label: "Farge",
+      value: COLOR_LABEL_NB[color] ?? color,
+    });
   }
-  if (vehicleLookup?.body_type_hint) {
+  const bodyType = vehicleLookup?.body_type_hint ?? attrStr(attrs, "body_type");
+  if (bodyType) {
     items.push({
       key: "body_type",
       icon: Car,
       label: "Karosseri",
-      value: vehicleLookup.body_type_hint,
+      value: BODY_TYPE_LABEL_NB[bodyType] ?? bodyType,
     });
   }
 

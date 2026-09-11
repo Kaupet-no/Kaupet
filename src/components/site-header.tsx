@@ -8,6 +8,8 @@ import { UserMenu } from "@/components/user-menu";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { useUnreadConversationsCount } from "@/hooks/use-unread";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { BusinessPlanLogo } from "@/features/business-account/business-plan-logo";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
 import { trackProductEvent } from "@/lib/product-analytics";
 
@@ -26,7 +28,10 @@ export function HeaderSearchPortal({ children }: { children: ReactNode }) {
 
 export function SiteHeader() {
   const { user } = useAuth();
+  const { data: businessMembership } = useBusinessMembership();
   const { openPanel } = useSearchPanel();
+  const businessPlan =
+    businessMembership?.status === "active" ? businessMembership.organization.selected_plan : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur pt-safe">
@@ -35,11 +40,17 @@ export function SiteHeader() {
         className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-4 px-4"
       >
         <Link to="/" className="flex shrink-0 items-baseline gap-1">
-          <span className="font-display text-2xl font-semibold tracking-tight text-primary">
-            kaupet
-          </span>
-          <span className="font-display text-2xl text-brand">.</span>
-          <span className="font-display text-xl text-muted-foreground">no</span>
+          {businessPlan ? (
+            <BusinessPlanLogo plan={businessPlan} />
+          ) : (
+            <>
+              <span className="font-display text-2xl font-semibold tracking-tight text-primary">
+                kaupet
+              </span>
+              <span className="font-display text-2xl text-brand">.</span>
+              <span className="font-display text-xl text-muted-foreground">no</span>
+            </>
+          )}
         </Link>
 
         <div id={HEADER_SEARCH_SLOT_ID} className="hidden flex-1 md:block" />

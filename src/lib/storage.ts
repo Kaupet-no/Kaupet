@@ -5,7 +5,10 @@ export const VEHICLE_360_BUCKET = "listing-360-frames";
 export const AVATAR_BUCKET = "avatars";
 export const MESSAGE_ATTACHMENTS_BUCKET = "message-attachments";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
-export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+export const MAX_LISTING_IMAGES = 20;
+export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/jxl"] as const;
+export const IMAGE_ACCEPT = `${ALLOWED_MIME.join(",")},.jxl`;
+export const ORGANIZATION_LOGOS_BUCKET = "organization-logos";
 
 export type ImageValidationError =
   | { kind: "too-large"; name: string; bytes: number }
@@ -28,7 +31,7 @@ export function describeImageError(err: ImageValidationError): string {
     case "too-large":
       return `"${err.name}" er for stor (maks ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB).`;
     case "bad-type":
-      return `"${err.name}" har ikke et støttet format (${err.type}). Bruk JPG, PNG eller WebP.`;
+      return `"${err.name}" har ikke et støttet format (${err.type}). Bruk JPG, PNG, WebP eller JPEG XL.`;
   }
 }
 
@@ -36,7 +39,36 @@ export function extFromMime(mime: string): string {
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
+  if (mime === "image/jxl") return "jxl";
   return "bin";
+}
+
+export async function uploadOrganizationLogo(opts: {
+  organizationId: string;
+  file: File;
+}): Promise<string> {
+  const validationError = validateImages([opts.file]);
+  if (validationError) throw new Error(describeImageError(validationError));
+  const ext = extFromMime(opts.file.type);
+  const path = `${opts.organizationId}/logo-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(ORGANIZATION_LOGOS_BUCKET).upload(path, opts.file, {
+    contentType: opts.file.type,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) throw error;
+  return path;
+}
+
+export async function deletePreviousOrganizationLogo(
+  previousPath: string | null | undefined,
+): Promise<void> {
+  if (!previousPath) return;
+  try {
+    await supabase.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([previousPath]);
+  } catch {
+    // best-effort cleanup after the database points to the new logo
+  }
 }
 
 export async function uploadListingImage(opts: {
@@ -121,17 +153,20 @@ export async function deletePreviousAvatarImage(previousPublicUrl: string | null
 
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
+let cacheGeneration = 0;
 let pendingBatch: { paths: Set<string>; promise: Promise<void> } | null = null;
 
 async function flushSignedUrlBatch(expiresInSeconds: number) {
   const batch = pendingBatch;
   pendingBatch = null;
   if (!batch) return;
+  const generation = cacheGeneration;
   const now = Date.now();
   const { data, error } = await supabase.storage
     .from(LISTING_BUCKET)
     .createSignedUrls(Array.from(batch.paths), expiresInSeconds);
   if (error) throw error;
+  if (generation !== cacheGeneration) return;
   for (const item of data ?? []) {
     if (item.signedUrl && item.path) {
       signedUrlCache.set(item.path, {
@@ -200,6 +235,7 @@ export async function signMessageAttachmentUrls(
   paths: string[],
   expiresInSeconds = 60 * 60,
 ): Promise<Record<string, string>> {
+  const generation = cacheGeneration;
   const now = Date.now();
   const result: Record<string, string> = {};
   const need: string[] = [];
@@ -217,6 +253,7 @@ export async function signMessageAttachmentUrls(
       .createSignedUrls(need, expiresInSeconds);
     if (error) throw error;
     for (const item of data ?? []) {
+      if (generation !== cacheGeneration) continue;
       if (item.signedUrl && item.path) {
         signedMessageAttachmentUrlCache.set(item.path, {
           url: item.signedUrl,
@@ -231,10 +268,20 @@ export async function signMessageAttachmentUrls(
 
 const signed360UrlCache = new Map<string, { url: string; expiresAt: number }>();
 
+/** Drop account-bound signed URLs when auth state changes. */
+export function clearSignedUrlCaches(): void {
+  signedUrlCache.clear();
+  signedMessageAttachmentUrlCache.clear();
+  signed360UrlCache.clear();
+  cacheGeneration += 1;
+  pendingBatch = null;
+}
+
 export async function signVehicle360FrameUrls(
   paths: string[],
   expiresInSeconds = 60 * 60,
 ): Promise<Record<string, string>> {
+  const generation = cacheGeneration;
   const now = Date.now();
   const result: Record<string, string> = {};
   const need: string[] = [];
@@ -252,6 +299,7 @@ export async function signVehicle360FrameUrls(
       .createSignedUrls(need, expiresInSeconds);
     if (error) throw error;
     for (const item of data ?? []) {
+      if (generation !== cacheGeneration) continue;
       if (item.signedUrl && item.path) {
         signed360UrlCache.set(item.path, {
           url: item.signedUrl,

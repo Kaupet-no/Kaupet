@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, FolderOpen, Search } from "lucide-react";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Autoplay from "embla-carousel-autoplay";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { HeaderSearchPortal } from "@/components/site-header";
 
@@ -16,6 +15,7 @@ import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IntentTitleLanding } from "@/components/intent-title-landing";
+import { CategorySuggestionDialog } from "@/components/category-suggestion-dialog";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { setAttributeFilterValue } from "@/lib/category-filters";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
-import { PopularCarousel } from "@/components/popular-carousel";
+import { DeferredPopularCarousel } from "@/components/deferred-popular-carousel";
 import { HowItWorksSection, OpenSourceCtaSection } from "@/components/landing-static-sections";
 import { ListingCard } from "@/components/listing-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -85,7 +85,6 @@ function WebLanding() {
   const navigate = useNavigate();
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const [qDraft, setQDraft] = useState("");
-  const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
   const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
   const { data: vehicleBrands } = useAllVehicleBrands();
@@ -326,8 +325,8 @@ function WebLanding() {
                   Opprett en annonse
                 </Button>
                 <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogTitle className="sr-only">Opprett annonse</DialogTitle>
+                  <DialogContent className="sm:max-w-4xl">
+                    <DialogTitle className="sr-only">Hva vil du gjøre?</DialogTitle>
                     <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
                   </DialogContent>
                 </Dialog>
@@ -357,13 +356,16 @@ function WebLanding() {
               Utforsk kategorier
             </h2>
           </div>
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="text-sm text-primary hover:underline"
-          >
-            Alle annonser →
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <CategorySuggestionDialog />
+            <Link
+              to="/annonser"
+              search={{ q: "", category: "", sort: "new" }}
+              className="text-sm text-primary hover:underline"
+            >
+              Alle annonser →
+            </Link>
+          </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -676,11 +678,10 @@ function WebLanding() {
           {/* Populært akkurat nå — egen seksjon, lenger ned slik at søkefeltet
               eier hero-seksjonen alene */}
           <section className="mx-auto max-w-6xl px-4 pb-16 pt-10">
-            <PopularCarousel
+            <DeferredPopularCarousel
               popular={popular}
               isError={popularIsError}
               onRetry={() => void refetchPopular()}
-              autoplay={autoplay}
               hasPopularitySignal={hasPopularitySignal}
             />
           </section>

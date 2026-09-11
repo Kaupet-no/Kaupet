@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { formatErrorMessage } from "@/lib/errors";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +49,7 @@ function VippsWebhooksPage() {
       const res = await list({ data: { mode: m } });
       setHooks(res.webhooks ?? []);
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : "Kunne ikke hente webhooks");
+      showErrorToast(formatErrorMessage(e, "Kunne ikke hente webhooks"));
     } finally {
       setBusy(false);
     }
@@ -68,7 +69,7 @@ function VippsWebhooksPage() {
       showSuccessToast("Webhook registrert og secret lagret automatisk i databasen.");
       await refresh(mode);
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : "Registrering feilet");
+      showErrorToast(formatErrorMessage(e, "Registrering feilet"));
     } finally {
       setBusy(false);
     }
@@ -81,7 +82,7 @@ function VippsWebhooksPage() {
       showSuccessToast("Webhook slettet");
       await refresh(mode);
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : "Sletting feilet");
+      showErrorToast(formatErrorMessage(e, "Sletting feilet"));
     } finally {
       setBusy(false);
     }

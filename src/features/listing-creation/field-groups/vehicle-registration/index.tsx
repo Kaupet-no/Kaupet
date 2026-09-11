@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AttributeFields, useAllCategoryFilters } from "@/components/attribute-fields";
-import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle/vehicle-lookup.types";
+import {
+  VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS,
+  VEHICLE_WIZARD_MANAGED_KEYS,
+} from "@/lib/vehicle/vehicle-lookup.types";
 import { getMissingRequiredFilters, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { matchBrandAndModelInTitle } from "@/lib/vehicle/vehicle-brand-match";
@@ -94,6 +97,14 @@ function ManualSpecSection({
   "categoryId" | "categories" | "attributes" | "onAttributesChange" | "attributesTouched"
 >) {
   const [open, setOpen] = useState(initialOpen);
+  const optionalKeys = visibleKeys.filter(
+    (key) =>
+      allKeys.includes(key) &&
+      (VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS as readonly string[]).includes(key),
+  );
+  const requiredKeys = visibleKeys.filter(
+    (key) => !(VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS as readonly string[]).includes(key),
+  );
 
   const errorId = `${sectionId}-error`;
   const contentId = `${sectionId}-content`;
@@ -131,24 +142,24 @@ function ManualSpecSection({
           value={props.attributes}
           onChange={props.onAttributesChange}
           showErrors={props.attributesTouched}
-          hiddenKeys={hiddenKeysForManualSection(allKeys, visibleKeys)}
+          hiddenKeys={hiddenKeysForManualSection(allKeys, requiredKeys)}
           required
         />
+        {optionalKeys.length > 0 && (
+          <AttributeFields
+            categoryId={props.categoryId}
+            categories={props.categories}
+            value={props.attributes}
+            onChange={props.onAttributesChange}
+            filterKeys={optionalKeys}
+            required={false}
+            heading="Valgfritt"
+          />
+        )}
       </div>
     </details>
   );
 }
-
-/** For registrerte kjøretøy dekker SVV-oppslaget resten av de tekniske
- * feltene selv (se confirmVehicleData) — men "Antall soveplasser"
- * (bobil/campingvogn) og "Fritatt for EU-kontroll" (tilhenger) er
- * påkrevde felt SVV aldri har data for, så de spørres i samme bekreftelse
- * som Merke/Modell. Disse to er de eneste feltene denne AttributeFields-
- * instansen skal rendre — alt annet skjules dynamisk (se
- * `hiddenKeysForRegisteredExtraSpecs` under) fremfor via en hardkodet
- * nøkkelliste, som tidligere ikke dekket alle SVV-utledede felt (f.eks.
- * årsmodell, førstegangsregistrering) og dermed spurte om dem på nytt. */
-const VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS = ["sleeping_places", "eu_control_exempt"];
 
 /**
  * Første steg i kjøretøyflyten etter at kategorien er bekreftet:
@@ -157,9 +168,9 @@ const VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS = ["sleeping_places", "eu_control_ex
  *
  * Merke/Modell forhåndsutfylles fra tittelen brukeren skrev på
  * landingsskjermen ("Porsche 911" → Porsche / 911, se
- * `matchBrandAndModelInTitle`). For registrerte kjøretøy vises feltene først
- * sammen med SVV-faktaene i bekreftelsen; uregistrerte kjøretøy fyller dem
- * manuelt på siden.
+ * `matchBrandAndModelInTitle`). For registrerte kjøretøy vises disse feltene
+ * først sammen med oppslagsbekreftelsen; manglende tekniske opplysninger
+ * redigeres på vehicle-facts. Uregistrerte kjøretøy fyller dem manuelt her.
  *
  * Registreringsnummeret brukes kun til å hente *tekniske* data fra SVV.
  * Oppslaget kjøres fra wizardens "Neste"-knapp (se `goToNextPage` i
@@ -198,18 +209,6 @@ export function VehicleRegistration(props: WizardSharedProps) {
   const categoryGroup =
     vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById) ?? "bil";
 
-  /** Skjuler alle kategoriens filtre bortsett fra de to som ikke kommer fra
-   * SVV — bygget fra de faktiske filtrene i stedet for en hardkodet
-   * nøkkelliste, slik at et nytt SVV-utledet felt (lagt til i
-   * confirmVehicleData) automatisk forblir skjult her uten en samtidig
-   * oppdatering to steder. */
-  const hiddenKeysForRegisteredExtraSpecs = useMemo(
-    () =>
-      (allFilters ?? [])
-        .map((f) => f.key)
-        .filter((k) => !VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS.includes(k)),
-    [allFilters],
-  );
   const manualSpecKeys = useMemo(
     () => [...new Set((allFilters ?? []).map((filter) => filter.key))],
     [allFilters],
@@ -231,13 +230,10 @@ export function VehicleRegistration(props: WizardSharedProps) {
   const missingManualSpecKeys = useMemo(() => {
     if (!props.attributesTouched) return new Set<string>();
     return new Set(
-      getMissingRequiredFilters(
-        categoryId,
-        allFilters ?? [],
-        categoriesById,
-        attributes,
-        HIDDEN_KEYS_FOR_MANUAL_SPECS,
-      ).map((filter) => filter.key),
+      getMissingRequiredFilters(categoryId, allFilters ?? [], categoriesById, attributes, [
+        ...HIDDEN_KEYS_FOR_MANUAL_SPECS,
+        ...VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS,
+      ]).map((filter) => filter.key),
     );
   }, [props.attributesTouched, categoryId, allFilters, categoriesById, attributes]);
   const leafBySlug = useMemo(() => vehicleLeafCategoriesBySlug(categories), [categories]);
@@ -329,12 +325,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
     : "";
   const confirmedBrand = brand ?? lookup?.brand ?? undefined;
   const confirmedModel = brand === undefined ? (model ?? lookup?.model ?? undefined) : model;
-  const registeredExtraSpecMissing =
-    ((selectedLeafSlug === "bobil" || selectedLeafSlug === "campingvogn") &&
-      (typeof attributes.sleeping_places !== "number" || !attributes.sleeping_places)) ||
-    (selectedLeafSlug === "tilhenger-leaf" && attributes.eu_control_exempt == null);
-  const lookupReadyToConfirm =
-    !!confirmedBrand?.trim() && !!confirmedModel?.trim() && !registeredExtraSpecMissing;
+  const lookupReadyToConfirm = !!confirmedBrand?.trim() && !!confirmedModel?.trim();
   function formatRegNr(v: string) {
     const m = /^([A-Z]{2,3})(\d{3,5})$/.exec(v);
     return m ? `${m[1]} ${m[2]}` : v;
@@ -567,15 +558,6 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 brandName={confirmedBrand}
                 value={confirmedModel}
                 onChange={(v) => setAttribute("model", v)}
-                required
-              />
-              <AttributeFields
-                categoryId={categoryId}
-                categories={categories}
-                value={attributes}
-                onChange={onAttributesChange}
-                showErrors
-                hiddenKeys={hiddenKeysForRegisteredExtraSpecs}
                 required
               />
               {!lookupReadyToConfirm && (

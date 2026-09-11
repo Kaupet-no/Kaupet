@@ -18,7 +18,7 @@ vi.mock("@/components/ui/native-sheet", () => ({
   }) => (open ? <div aria-label={title}>{children}</div> : null),
 }));
 vi.mock("@/components/advanced-search-sheet", () => ({
-  CategoryPicker: () => <div>kategorivelger</div>,
+  CategorySlugPicker: () => <div>kategorivelger</div>,
 }));
 vi.mock("@/lib/native", () => ({
   isNative: () => false,

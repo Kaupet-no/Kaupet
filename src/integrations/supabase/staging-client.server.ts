@@ -1,35 +1,32 @@
-// Server-side Supabase client pointed at the STAGING project, authenticated
-// with staging's service role key — bypasses staging's RLS. Used only by the
-// production admin panel's "Synkroniser fra staging"-knapp
-// (src/lib/category-sync.functions.ts) to read staging's category data.
-// SECURITY: server-only, never expose to client code.
+// Server-side Supabase client pointed at the STAGING project with its
+// publishable key. Category data is public-read; this must not hold a
+// service-role key because the client runs in the production Worker.
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-function createStagingAdminClient() {
-  const STAGING_SUPABASE_URL = process.env.STAGING_SUPABASE_URL;
-  const STAGING_SUPABASE_SERVICE_ROLE_KEY = process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY;
+function createStagingReadClient() {
+  const stagingUrl = process.env.STAGING_SUPABASE_URL;
+  const stagingPublishableKey = process.env.STAGING_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!STAGING_SUPABASE_URL || !STAGING_SUPABASE_SERVICE_ROLE_KEY) {
+  if (!stagingUrl || !stagingPublishableKey) {
     const missing = [
-      ...(!STAGING_SUPABASE_URL ? ["STAGING_SUPABASE_URL"] : []),
-      ...(!STAGING_SUPABASE_SERVICE_ROLE_KEY ? ["STAGING_SUPABASE_SERVICE_ROLE_KEY"] : []),
+      ...(!stagingUrl ? ["STAGING_SUPABASE_URL"] : []),
+      ...(!stagingPublishableKey ? ["STAGING_SUPABASE_PUBLISHABLE_KEY"] : []),
     ];
-    throw new Error(
-      `Mangler miljøvariabel for staging-synk: ${missing.join(", ")}. Sett dem i .env / som Worker-secrets.`,
-    );
+    throw new Error(`Mangler miljøvariabel for staging-synk: ${missing.join(", ")}.`);
   }
 
-  return createClient<Database>(STAGING_SUPABASE_URL, STAGING_SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient<Database>(stagingUrl, stagingPublishableKey, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
   });
 }
 
-let _stagingAdmin: ReturnType<typeof createStagingAdminClient> | undefined;
+let stagingReadClient: ReturnType<typeof createStagingReadClient> | undefined;
 
-export const stagingAdmin = new Proxy({} as ReturnType<typeof createStagingAdminClient>, {
+/** Read-only client used by the production admin category synchronizer. */
+export const stagingAdmin = new Proxy({} as ReturnType<typeof createStagingReadClient>, {
   get(_, prop, receiver) {
-    if (!_stagingAdmin) _stagingAdmin = createStagingAdminClient();
-    return Reflect.get(_stagingAdmin, prop, receiver);
+    if (!stagingReadClient) stagingReadClient = createStagingReadClient();
+    return Reflect.get(stagingReadClient, prop, receiver);
   },
 });

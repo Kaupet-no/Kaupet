@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { formatNok } from "@/lib/format";
 
 // The endpoint is invoked by an internal Postgres trigger via pg_net, which
 // sends a shared secret in the X-Push-Dispatch-Secret header (see the
@@ -44,10 +45,6 @@ const PayloadSchema = z.discriminatedUnion("type", [
     notification_id: z.string().uuid(),
   }),
 ]);
-
-function formatKr(n: number) {
-  return new Intl.NumberFormat("nb-NO").format(n) + " kr";
-}
 
 type SupabaseAdmin = Awaited<
   typeof import("@/integrations/supabase/client.server")
@@ -294,7 +291,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
 
           const pct = Number(drop.drop_pct).toFixed(0);
           title = `Prisfall: ${listing?.title ?? "Favoritten din"}`;
-          body = `Ned ${pct}% · ${formatKr(drop.old_price_nok)} → ${formatKr(drop.new_price_nok)}`;
+          body = `Ned ${pct}% · ${formatNok(drop.old_price_nok)} → ${formatNok(drop.new_price_nok)}`;
           url = `/annonse/${drop.listing_id}`;
           tag = `price-drop-${drop.listing_id}`;
         } else if (payload.type === "sold") {

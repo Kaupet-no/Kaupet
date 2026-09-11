@@ -22,9 +22,205 @@ import {
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
+import {
+  organizationListingLocation,
+  type OrganizationListingLocation,
+} from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const MAX_LISTINGS_PER_HOUR = 5;
+
+type ListingOwnership = {
+  seller_id: string;
+  organization_id: string | null;
+  organization_location_id: string | null;
+};
+
+type ListingMutationRow = {
+  id: string;
+  seller_id: string;
+  organization_id: string | null;
+  organization_location_id: string | null;
+  status: "disabled" | "active" | "expired" | "draft" | "sold" | "archived";
+  title: string | null;
+  description: string | null;
+  condition: string | null;
+  can_ship: boolean | null;
+  postal_code: string | null;
+  city: string | null;
+  is_free: boolean;
+  price_nok: number | null;
+  category_id: string | null;
+  attributes: unknown;
+};
+
+async function resolveListingOwnership(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  categoryId: string | null,
+  requestedLocationId?: string | null,
+): Promise<ListingOwnership> {
+  const { data: membership, error } = await supabaseAdmin
+    .from("organization_members")
+    .select("organization_id, role, status, can_create_listings, category_access")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
+  if (!membership) {
+    return { seller_id: userId, organization_id: null, organization_location_id: null };
+  }
+  if (membership.role === "member") {
+    const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
+      _organization_id: membership.organization_id,
+    });
+    if (syncError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", syncError);
+    }
+    const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc(
+      "organization_has_proff_access",
+      { _organization_id: membership.organization_id },
+    );
+    if (accessError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", accessError);
+    }
+    if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
+    if (!membership.can_create_listings) {
+      throw new Error("Du har ikke tilgang til å opprette annonser.");
+    }
+    if (membership.category_access === "restricted") {
+      if (!categoryId) throw new Error("Du har ikke tilgang til denne kategorien.");
+      const { data: allowed, error: categoryError } = await supabaseAdmin
+        .from("organization_member_categories")
+        .select("category_id")
+        .eq("organization_id", membership.organization_id)
+        .eq("user_id", userId)
+        .eq("category_id", categoryId)
+        .maybeSingle();
+      if (categoryError) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", categoryError);
+      }
+      if (!allowed) throw new Error("Du har ikke tilgang til denne kategorien.");
+    }
+  }
+  if (!requestedLocationId) throw new Error("Velg en lokasjon før annonsen opprettes.");
+  const { data: location, error: locationError } = await supabaseAdmin
+    .from("organization_locations")
+    .select("id")
+    .eq("id", requestedLocationId)
+    .eq("organization_id", membership.organization_id)
+    .eq("active", true)
+    .maybeSingle();
+  if (locationError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", locationError);
+  }
+  if (!location) throw new Error("Lokasjonen finnes ikke eller er ikke aktiv.");
+  if (membership.role !== "superuser") {
+    const { data: assignment, error: assignmentError } = await supabaseAdmin
+      .from("organization_location_members")
+      .select("location_id")
+      .eq("location_id", requestedLocationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (assignmentError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", assignmentError);
+    }
+    if (!assignment) throw new Error("Du har ikke tilgang til denne lokasjonen.");
+  }
+  return {
+    seller_id: userId,
+    organization_id: membership.organization_id,
+    organization_location_id: requestedLocationId,
+  };
+}
+
+async function organizationLocationOverride(
+  supabaseAdmin: SupabaseClient,
+  organizationId: string | null,
+  locationId: string | null,
+): Promise<OrganizationListingLocation | null> {
+  if (!organizationId || !locationId) return null;
+  return organizationListingLocation(supabaseAdmin, organizationId, locationId);
+}
+function listingLocationFields(location: OrganizationListingLocation | null) {
+  if (!location) return null;
+  return {
+    postal_code: location.postal_code,
+    city: location.city,
+    lat: location.lat,
+    lng: location.lng,
+  };
+}
+
+async function saveVisitingAddressSnapshot(
+  supabaseAdmin: SupabaseClient,
+  listingId: string,
+  location: OrganizationListingLocation | null,
+  showVisitingAddress: boolean,
+) {
+  await supabaseAdmin.from("listing_visiting_addresses").delete().eq("listing_id", listingId);
+  if (!showVisitingAddress || !location?.address_line || !location.postal_code || !location.city) {
+    return;
+  }
+  const { error } = await supabaseAdmin.from("listing_visiting_addresses").insert({
+    listing_id: listingId,
+    address_line: location.address_line,
+    postal_code: location.postal_code,
+    city: location.city,
+  });
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
+}
+
+async function authorizeListingMutation(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  listingId: string,
+): Promise<ListingMutationRow> {
+  const { data: listing, error } = await supabaseAdmin
+    .from("listings")
+    .select(
+      "id, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes",
+    )
+    .eq("id", listingId)
+    .maybeSingle();
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
+  if (!listing) throw new Error("Annonsen finnes ikke.");
+  if (listing.seller_id === userId && !listing.organization_id) return listing;
+  if (!listing.organization_id || !listing.organization_location_id) {
+    throw new Error("Du har ikke tilgang til denne annonsen");
+  }
+  const { data: allowed, error: permissionError } = await supabaseAdmin.rpc(
+    "can_update_organization_listing",
+    {
+      _organization_id: listing.organization_id,
+      _location_id: listing.organization_location_id,
+      _seller_id: listing.seller_id,
+      _status: listing.status,
+      _category_id: listing.category_id,
+      _user_id: userId,
+    },
+  );
+  if (permissionError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", permissionError);
+  }
+  if (!allowed) throw new Error("Du har ikke tilgang til denne annonsen");
+  return listing;
+}
 
 async function assertUnderHourlyListingLimit(
   supabaseAdmin: SupabaseClient,
@@ -74,6 +270,101 @@ function validatePartFitment(
     throw new Error("Årsmodell fra kan ikke være høyere enn årsmodell til.");
   }
 }
+async function validateExistingListingForPublish(
+  supabaseAdmin: SupabaseClient,
+  listing: ListingMutationRow,
+) {
+  const titleLength = listing.title?.trim().length ?? 0;
+  if (titleLength < 5) throw new Error("Tittelen må være minst 5 tegn.");
+  if (titleLength > 120) throw new Error("Tittelen kan ikke være lengre enn 120 tegn.");
+  const descriptionLength = listing.description?.trim().length ?? 0;
+  if (descriptionLength < 20) throw new Error("Beskrivelsen må være minst 20 tegn.");
+  if (descriptionLength > 4000) throw new Error("Beskrivelsen kan ikke være lengre enn 4000 tegn.");
+  if (!listing.category_id) throw new Error("Velg en kategori før annonsen publiseres.");
+  if (!listing.postal_code || !/^\d{4}$/.test(listing.postal_code)) {
+    throw new Error("Oppgi et gyldig postnummer før annonsen publiseres.");
+  }
+  if (!listing.city?.trim()) throw new Error("Oppgi sted før annonsen publiseres.");
+  if (
+    !listing.is_free &&
+    (listing.price_nok == null ||
+      !Number.isInteger(listing.price_nok) ||
+      listing.price_nok < 0 ||
+      listing.price_nok > 10_000_000)
+  ) {
+    throw new Error("Oppgi en gyldig pris før annonsen publiseres.");
+  }
+  if (
+    listing.condition !== null &&
+    !["new", "like_new", "good", "acceptable", "for_parts"].includes(listing.condition)
+  ) {
+    throw new Error("Annonsens tilstand er ugyldig.");
+  }
+
+  const [
+    { data: filterRows, error: filterError },
+    { data: categoryRows, error: categoryError },
+    { data: flowRows, error: flowError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("category_filters")
+      .select(
+        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+      ),
+    supabaseAdmin.from("categories").select("id, parent_id"),
+    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
+  ]);
+  if (filterError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("republishListing.filters", filterError);
+  }
+  if (categoryError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("republishListing.categories", categoryError);
+  }
+  if (flowError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("republishListing.flows", flowError);
+  }
+
+  const categoriesById = new Map<string, CategoryNode>(
+    (categoryRows ?? []).map((category) => [category.id as string, category as CategoryNode]),
+  );
+  const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
+  const categoryBehavior = getCategoryBehavior(
+    vehicleCategoryGroupFor(listing.category_id, normalizedFilters, categoriesById),
+    isBoatCategory(listing.category_id, normalizedFilters, categoriesById),
+  );
+  const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
+  if (!attributesResult.success) throw new Error("Annonsens attributter er ugyldige.");
+  const attributes = attributesResult.data;
+
+  if (categoryBehavior.requiresCategoryFilterValues) {
+    const missing = getMissingRequiredFilters(
+      listing.category_id,
+      normalizedFilters,
+      categoriesById,
+      attributes,
+      [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
+    );
+    if (missing.length > 0) {
+      throw new Error(`Fyll inn: ${missing.map((filter) => filter.label_nb).join(", ")}`);
+    }
+    validatePartFitment(listing.category_id, normalizedFilters, categoriesById, attributes);
+  }
+
+  const { fieldGroups } = effectiveFlowForCategory(
+    listing.category_id,
+    (flowRows ?? []) as CategoryFlowRow[],
+    categoriesById,
+  );
+  const fieldGroupError = validateRequiredFieldGroups(
+    fieldGroups,
+    { condition: listing.condition, can_ship: listing.can_ship },
+    categoryBehavior,
+  );
+  if (fieldGroupError) throw new Error(fieldGroupError);
+}
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -99,6 +390,8 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable().optional(),
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
+        organization_location_id: z.string().uuid().nullable().optional(),
+        show_visiting_address: z.boolean().optional(),
         can_ship: z.boolean().nullable().optional(),
         known_issues: z.string().trim().max(2000).nullable().optional(),
         no_known_issues: z.boolean().nullable().optional(),
@@ -123,6 +416,9 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ...(data.city !== undefined && { city: data.city }),
       ...(data.lat !== undefined && { lat: data.lat }),
       ...(data.lng !== undefined && { lng: data.lng }),
+      ...(data.show_visiting_address !== undefined && {
+        show_visiting_address: data.show_visiting_address,
+      }),
       ...(data.can_ship !== undefined && { can_ship: data.can_ship }),
       ...(data.known_issues !== undefined && { known_issues: data.known_issues }),
       ...(data.no_known_issues !== undefined && { no_known_issues: !!data.no_known_issues }),
@@ -133,21 +429,49 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
-      // Re-editing a draft that already got the "expires in 7 days" system
-      // message must reset the flag — otherwise a second dormancy period
-      // (edit, then go quiet again) would delete it without a fresh warning.
+      const existing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
+      const orgLocation = await organizationLocationOverride(
+        supabaseAdmin,
+        existing.organization_id,
+        existing.organization_location_id,
+      );
       const { data: updated, error } = await supabaseAdmin
         .from("listings")
-        .update({ ...fields, draft_expiry_notified_at: null })
+        .update({
+          ...fields,
+          ...(existing.organization_id
+            ? {
+                ...listingLocationFields(orgLocation),
+                organization_location_id: existing.organization_location_id,
+              }
+            : {
+                organization_location_id: null,
+                show_visiting_address: false,
+              }),
+          draft_expiry_notified_at: null,
+        })
         .eq("id", data.id)
-        .eq("seller_id", userId)
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("saveDraftListing.update", error, { listing_id: data.id });
+      }
       return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
     }
 
+    const ownership = await resolveListingOwnership(
+      supabaseAdmin,
+      userId,
+      data.category_id ?? null,
+      data.organization_location_id,
+    );
+    const orgLocation = await organizationLocationOverride(
+      supabaseAdmin,
+      ownership.organization_id,
+      ownership.organization_location_id,
+    );
     await assertUnderHourlyListingLimit(
       supabaseAdmin,
       userId,
@@ -156,10 +480,23 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
-      .insert({ seller_id: userId, status: "draft", ...fields })
+      .insert({
+        ...ownership,
+        ...(ownership.organization_id
+          ? {
+              ...listingLocationFields(orgLocation),
+              show_visiting_address: data.show_visiting_address ?? false,
+            }
+          : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
+        status: "draft",
+        ...fields,
+      })
       .select("id, kaupet_code")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 
@@ -168,13 +505,16 @@ export const discardDraftListing = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
     const { error } = await supabaseAdmin
       .from("listings")
       .delete()
       .eq("id", data.id)
-      .eq("seller_id", context.userId)
       .eq("status", "draft");
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });
 
 export const createListing = createServerFn({ method: "POST" })
@@ -197,6 +537,8 @@ export const createListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable(),
         lat: z.number().nullable(),
         lng: z.number().nullable(),
+        organization_location_id: z.string().uuid().nullable().optional(),
+        show_visiting_address: z.boolean().optional(),
         can_ship: z.boolean().nullable(),
         known_issues: z.string().trim().max(2000).nullable().optional(),
         no_known_issues: z.boolean().nullable().optional(),
@@ -218,28 +560,8 @@ export const createListing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
-
-    const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
-    if (!turnstileSecret) {
-      // Bot protection must be configured in production/staging; only skip it
-      // when running locally without the secret set. This fails closed rather
-      // than silently letting listings through unverified in a misconfigured
-      // deployed environment.
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("Serverfeil: bot-beskyttelse er ikke konfigurert.");
-      }
-    } else {
-      if (!data.turnstileToken) throw new Error("Turnstile-validering feilet. Prøv igjen.");
-      const cfRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        body: new URLSearchParams({
-          secret: turnstileSecret,
-          response: data.turnstileToken,
-        }),
-      });
-      const cfJson = (await cfRes.json()) as { success: boolean };
-      if (!cfJson.success) throw new Error("Turnstile-validering feilet. Prøv igjen.");
-    }
+    const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
+    await verifyTurnstileToken(data.turnstileToken);
 
     const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
       supabaseAdmin
@@ -248,25 +570,36 @@ export const createListing = createServerFn({ method: "POST" })
           "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
         ),
       supabaseAdmin.from("categories").select("id, parent_id"),
-      supabaseAdmin
-        .from("category_flows")
-        .select("id, category_id, field_groups, modules, sort_order"),
+      supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
     ]);
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
     );
     const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
-    const missing = getMissingRequiredFilters(
-      data.category_id,
-      normalizedFilters,
-      categoriesById,
-      data.attributes ?? {},
-      VEHICLE_EQUIPMENT_FILTER_KEYS,
+    const categoryBehavior = getCategoryBehavior(
+      vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
+      isBoatCategory(data.category_id, normalizedFilters, categoriesById),
     );
+    const missing = categoryBehavior.requiresCategoryFilterValues
+      ? getMissingRequiredFilters(
+          data.category_id,
+          normalizedFilters,
+          categoriesById,
+          data.attributes ?? {},
+          [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
+        )
+      : [];
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
-    validatePartFitment(data.category_id, normalizedFilters, categoriesById, data.attributes ?? {});
+    if (categoryBehavior.requiresCategoryFilterValues) {
+      validatePartFitment(
+        data.category_id,
+        normalizedFilters,
+        categoriesById,
+        data.attributes ?? {},
+      );
+    }
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
@@ -277,10 +610,7 @@ export const createListing = createServerFn({ method: "POST" })
         condition: data.condition,
         can_ship: data.can_ship,
       },
-      getCategoryBehavior(
-        vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
-        isBoatCategory(data.category_id, normalizedFilters, categoriesById),
-      ),
+      categoryBehavior,
     );
     if (fieldGroupError) throw new Error(fieldGroupError);
 
@@ -300,24 +630,57 @@ export const createListing = createServerFn({ method: "POST" })
       known_issues: data.known_issues ?? null,
       no_known_issues: !!data.no_known_issues,
       maintenance_history: data.maintenance_history ?? null,
+      show_visiting_address: data.show_visiting_address ?? false,
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
     };
-
     if (data.draftId) {
+      const existing = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
+      const orgLocation = await organizationLocationOverride(
+        supabaseAdmin,
+        existing.organization_id,
+        existing.organization_location_id,
+      );
       const { data: listing, error } = await supabaseAdmin
         .from("listings")
-        .update(listingFields)
+        .update({
+          ...listingFields,
+          ...(existing.organization_id
+            ? {
+                ...listingLocationFields(orgLocation),
+                organization_location_id: existing.organization_location_id,
+              }
+            : { organization_location_id: null, show_visiting_address: false }),
+        })
         .eq("id", data.draftId)
-        .eq("seller_id", userId)
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
+      await saveVisitingAddressSnapshot(
+        supabaseAdmin,
+        listing.id as string,
+        orgLocation,
+        existing.organization_id ? (data.show_visiting_address ?? false) : false,
+      );
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }
 
+    const ownership = await resolveListingOwnership(
+      supabaseAdmin,
+      userId,
+      data.category_id,
+      data.organization_location_id,
+    );
+    const orgLocation = await organizationLocationOverride(
+      supabaseAdmin,
+      ownership.organization_id,
+      ownership.organization_location_id,
+    );
     await assertUnderHourlyListingLimit(
       supabaseAdmin,
       userId,
@@ -326,40 +689,63 @@ export const createListing = createServerFn({ method: "POST" })
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
-      .insert({ seller_id: userId, ...listingFields })
+      .insert({
+        ...ownership,
+        ...(ownership.organization_id
+          ? listingLocationFields(orgLocation)
+          : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
+        ...listingFields,
+      })
       .select("id, kaupet_code")
       .single();
-
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
+    await saveVisitingAddressSnapshot(
+      supabaseAdmin,
+      listing.id as string,
+      orgLocation,
+      ownership.organization_id ? (data.show_visiting_address ?? false) : false,
+    );
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 
 export const republishListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        turnstileToken: z.string().nullable().optional(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
+    await verifyTurnstileToken(data.turnstileToken);
 
-    const { data: listing, error: fetchError } = await supabase
-      .from("listings")
-      .select("id, seller_id, status, is_free, price_nok")
-      .eq("id", data.id)
-      .single();
-    if (fetchError) throw fetchError;
-    if (!listing || listing.seller_id !== userId) {
-      throw new Error("Du har ikke tilgang til denne annonsen");
-    }
+    const { userId } = context;
+    const listing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
+
     if (listing.status === "disabled") {
       throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
     }
-    if (!listing.is_free && listing.price_nok == null) {
-      throw new Error("Oppgi en pris før annonsen publiseres på nytt");
+    if (!["draft", "archived", "sold", "expired"].includes(listing.status)) {
+      throw new Error("Annonsen kan ikke publiseres på nytt fra denne statusen.");
     }
+    await validateExistingListingForPublish(supabaseAdmin, listing);
+    await assertUnderHourlyListingLimit(
+      supabaseAdmin,
+      userId,
+      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
+    );
 
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await supabaseAdmin
       .from("listings")
       .update({
         status: "active",
@@ -367,10 +753,47 @@ export const republishListing = createServerFn({ method: "POST" })
         expires_at: expiresAt,
       })
       .eq("id", data.id)
+      .eq("status", listing.status)
       .select("id, status, published_at, expires_at")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("republishListing.update", error, { listing_id: data.id });
+    }
 
+    return updated;
+  });
+
+export const updateListingStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["archived", "sold"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const listing = await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
+    if (listing.status === "disabled") {
+      throw new Error("Denne annonsen er deaktivert av moderator");
+    }
+    if (listing.status !== "active") {
+      throw new Error("Bare aktive annonser kan endre status.");
+    }
+    const { data: updated, error } = await supabaseAdmin
+      .from("listings")
+      .update({ status: data.status })
+      .eq("id", data.id)
+      .eq("status", "active")
+      .select("id, status")
+      .single();
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("updateListingStatus", error, { listing_id: data.id });
+    }
     return updated;
   });
 
@@ -378,11 +801,19 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Unauthenticated (legacy /annonse/:id → /$kaupetCode redirect), so this
+    // must not use service-role to reveal a draft/disabled listing's code —
+    // same visibility RLS gives everyone else. See
+    // docs/SIKKERHETSVURDERING.md L-13.
     const { data: row, error } = await supabaseAdmin
       .from("listings")
       .select("kaupet_code")
       .eq("id", data.listing_id)
+      .eq("status", "active")
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { kaupet_code: row?.kaupet_code ?? null };
   });

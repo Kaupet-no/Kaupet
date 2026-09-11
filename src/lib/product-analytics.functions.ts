@@ -19,5 +19,8 @@ export const logProductEvent = createServerFn({ method: "POST" })
       _path: data.path,
       _properties: data.properties,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });

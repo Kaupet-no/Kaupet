@@ -27,8 +27,12 @@ export function useUnreadConversationsCount(): number {
     queryFn: async (): Promise<ConvSummary[]> => {
       const { data: convs, error } = await supabase
         .from("conversations")
-        .select("id, last_message_at, buyer_id, seller_id, buyer_last_read_at, seller_last_read_at")
-        .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`);
+        .select(
+          "id, last_message_at, buyer_id, seller_id, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at",
+        )
+        .or(
+          `and(buyer_id.eq.${user!.id},buyer_deleted_at.is.null),and(seller_id.eq.${user!.id},seller_deleted_at.is.null)`,
+        );
       if (error) throw error;
       const ids = (convs ?? []).map((c) => c.id);
       if (ids.length === 0) return [];

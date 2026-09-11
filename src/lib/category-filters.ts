@@ -6,7 +6,9 @@ export type CategoryNode = { id: string; parent_id: string | null };
 /** Free-form per-category attribute values keyed by category_filters.key. */
 export const attributesSchema = z.record(
   z.string(),
-  z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+  z.union([z.string(), z.number(), z.boolean(), z.array(z.string())], {
+    errorMap: () => ({ message: "Ugyldig attributtverdi." }),
+  }),
 );
 
 /** category_filters keys for the seks utstyr-gruppene (se

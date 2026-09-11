@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import type { ConvSummary } from "@/hooks/use-unread";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -9,12 +10,14 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  IMAGE_ACCEPT,
   signListingImageUrls,
   signMessageAttachmentUrls,
   uploadMessageAttachment,
   validateImages,
   describeImageError,
 } from "@/lib/storage";
+import { sendMessage } from "@/lib/messages.functions";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +26,7 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { displayPriceNok } from "@/lib/format";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { InboxPage } from "@/components/inbox-page";
@@ -32,12 +36,14 @@ import { ConversationErrorBoundary } from "@/components/meldinger/conversation-e
 import { Skeleton } from "@/components/ui/skeleton";
 import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
 import { SalePanel } from "@/components/meldinger/sale-panel";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({
     meta: [{ title: "Samtale — Kaupet.no" }],
   }),
+  validateSearch: z.object({ source: z.literal("business").optional() }),
   component: ConversationPage,
   errorComponent: ConversationErrorBoundary,
   notFoundComponent: () => (
@@ -53,10 +59,16 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
 });
 
 function ConversationPage() {
+  const { data: businessMembership } = useBusinessMembership();
+  const isBusinessSuperuser =
+    businessMembership?.status === "active" &&
+    (businessMembership.role === "superuser" ||
+      businessMembership.locations.some((location) => location.permissions.chatAccess === "all"));
   const native = useIsNative();
   const isTablet = useFormFactor() === "tablet";
   const keyboardVisible = useKeyboardVisible();
   const { id } = Route.useParams();
+  const { source } = Route.useSearch();
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
@@ -74,6 +86,7 @@ function ConversationPage() {
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendAttemptRef = useRef<{ clientId: string; attachmentPath: string | null } | null>(null);
 
   const { data: myBlocks } = useQuery({
     queryKey: ["my-blocks"],
@@ -85,29 +98,38 @@ function ConversationPage() {
     enabled: !!user,
     queryFn: () => listBlocksAgainstMeFn(),
   });
-
   const {
     data: conv,
     isLoading: convLoading,
     isError: convIsError,
     error: convError,
   } = useQuery({
-    queryKey: ["conversation", id],
+    queryKey: ["conversation", id, isBusinessSuperuser],
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id, buyer_last_read_at, seller_last_read_at,
-           listing:listings(id, kaupet_code, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
+           listing:listings(id, organization_id, kaupet_code, title, price_nok, is_free, attributes, listing_images(storage_path, sort_order), categories(slug))`,
         )
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Samtalen finnes ikke");
-      const rawListing = (data as { listing: unknown }).listing;
+      const rawListing = data.listing;
       const listing = Array.isArray(rawListing) ? rawListing[0] : rawListing;
-      const otherId = user!.id === data.seller_id ? data.buyer_id : data.seller_id;
+      const listingOrganizationId =
+        listing &&
+        typeof listing === "object" &&
+        "organization_id" in listing &&
+        typeof listing.organization_id === "string"
+          ? listing.organization_id
+          : null;
+      const isBusinessSeller =
+        isBusinessSuperuser && businessMembership?.organization.id === listingOrganizationId;
+      const viewerIsSeller = user!.id === data.seller_id || isBusinessSeller;
+      const otherId = viewerIsSeller ? data.buyer_id : data.seller_id;
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url, deleted_at")
@@ -118,10 +140,28 @@ function ConversationPage() {
       });
       const otherDeleted = !!profile?.deleted_at;
       const otherPending = !!pendingFlag;
+      // Buyers see who they are talking to on both levels: the person who
+      // answers *and* the business they answer for. The seller side doesn't
+      // need it — they know their own organisation.
+      //
+      // organizations_public, not organizations: the base table holds
+      // commercial columns that must not be publicly readable, so RLS returns
+      // null there for a buyer (see the same lookup in $kaupetCode.tsx).
+      let otherOrganizationName: string | null = null;
+      if (!viewerIsSeller && listingOrganizationId) {
+        const { data: organization } = await supabase
+          .from("organizations_public")
+          .select("display_name")
+          .eq("id", listingOrganizationId)
+          .maybeSingle();
+        otherOrganizationName = organization?.display_name ?? null;
+      }
       return {
         ...data,
         listing,
+        isBusinessSeller,
         other: profile,
+        otherOrganizationName,
         otherDeleted,
         otherPending,
       };
@@ -180,9 +220,9 @@ function ConversationPage() {
       if (lastMarkedRef.current && readAt <= lastMarkedRef.current) return;
       lastMarkedRef.current = readAt;
       const update =
-        conv.buyer_id === user.id
-          ? { buyer_last_read_at: readAt }
-          : { seller_last_read_at: readAt };
+        conv.seller_id === user.id || conv.isBusinessSeller
+          ? { seller_last_read_at: readAt }
+          : { buyer_last_read_at: readAt };
       const { error } = await supabase.from("conversations").update(update).eq("id", id);
       if (error) throw error;
     },
@@ -276,34 +316,43 @@ function ConversationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, id, conv, user]);
 
+  const sendMessageFn = useServerFn(sendMessage);
+
   const sendMutation = useMutation({
-    mutationFn: async ({ text, file }: { text: string; file: File | null }) => {
+    mutationFn: async ({
+      text,
+      file,
+      attempt,
+    }: {
+      text: string;
+      file: File | null;
+      attempt: { clientId: string; attachmentPath: string | null };
+    }) => {
       const trimmed = text.trim();
       if (!trimmed && !file) throw new Error("Tom melding");
       if (trimmed.length > 4000) throw new Error("Meldingen er for lang");
-      let attachmentPath: string | null = null;
-      if (file) {
+      if (file && !attempt.attachmentPath) {
         const compressed = await compressImage(file, "listing");
-        attachmentPath = await uploadMessageAttachment({ conversationId: id, file: compressed });
+        attempt.attachmentPath = await uploadMessageAttachment({
+          conversationId: id,
+          file: compressed,
+        });
       }
-      const { data, error } = await supabase
-        .from("messages")
-        .insert({
-          conversation_id: id,
-          sender_id: user!.id,
+      const data = await sendMessageFn({
+        data: {
+          conversationId: id,
           body: trimmed,
-          attachment_path: attachmentPath,
-        })
-        .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
-        .single();
-      if (error) throw error;
-      // conversations.last_message_at oppdateres nå atomisk av en
-      // databasetrigger (messages_bump_conversation_last_message_at_trg)
-      // for å unngå at feltet kan drifte fra faktisk siste melding.
+          attachmentPath: attempt.attachmentPath,
+          clientId: attempt.clientId,
+        },
+      });
       return data as Message;
     },
+    // conversations.last_message_at oppdateres nå atomisk av en
+    // databasetrigger (messages_bump_conversation_last_message_at_trg)
+    // for å unngå at feltet kan drifte fra faktisk siste melding.
     // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.
-    onMutate: ({ text, file }: { text: string; file: File | null }) => {
+    onMutate: ({ text, file }) => {
       const trimmed = text.trim();
       if ((!trimmed && !file) || trimmed.length > 4000) return {};
       const previewUrl = file ? URL.createObjectURL(file) : undefined;
@@ -324,7 +373,7 @@ function ConversationPage() {
       clearAttachment();
       return { optimisticId: optimistic.id, previousBody: text, previewUrl };
     },
-    onSuccess: (m, _vars, context) => {
+    onSuccess: (m, vars, context) => {
       queryClient.setQueryData<Message[]>(["messages", id], (prev) => {
         const withoutOptimistic = (prev ?? []).filter((x) => x.id !== context?.optimisticId);
         if (withoutOptimistic.some((x) => x.id === m.id)) return withoutOptimistic;
@@ -333,18 +382,38 @@ function ConversationPage() {
       if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
       void import("@/lib/haptics").then((m) => m.hapticSelection());
+      if (sendAttemptRef.current === vars.attempt) sendAttemptRef.current = null;
     },
-    onError: (e: Error, _vars, context) => {
+    onError: (e: Error, vars, context) => {
       if (context?.optimisticId) {
         queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
           prev?.filter((x) => x.id !== context.optimisticId),
         );
-        setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
+        if (sendAttemptRef.current === vars.attempt) {
+          setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
+          if (vars.file) {
+            setAttachment((current) => current ?? vars.file);
+            setAttachmentPreview((current) => current ?? URL.createObjectURL(vars.file!));
+          }
+        }
       }
       if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       showErrorToast(formatErrorMessage(e, "Meldingen ble ikke sendt. Prøv igjen."));
     },
   });
+
+  function sendCurrentMessage() {
+    const attempt = sendAttemptRef.current ?? {
+      clientId: crypto.randomUUID(),
+      attachmentPath: null,
+    };
+    sendAttemptRef.current = attempt;
+    sendMutation.mutate({
+      text: body,
+      file: personalSellerControlsDisabled ? null : attachment,
+      attempt,
+    });
+  }
 
   function clearAttachment() {
     setAttachment(null);
@@ -366,6 +435,7 @@ function ConversationPage() {
     }
     setAttachment(file);
     setAttachmentPreview(URL.createObjectURL(file));
+    sendAttemptRef.current = null;
   }
 
   const deleteMessageMutation = useMutation({
@@ -385,14 +455,32 @@ function ConversationPage() {
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette meldingen")),
   });
 
+  // Same number as the ad and the search cards: for a vehicle where the buyer
+  // pays the re-registration fee, every price shown to them is the total.
+  const conversationPriceKr = conv?.listing
+    ? displayPriceNok({
+        category_slug:
+          (Array.isArray(conv.listing.categories)
+            ? conv.listing.categories[0]
+            : conv.listing.categories
+          )?.slug ?? null,
+        price_nok: conv.listing.price_nok,
+        attributes: (conv.listing.attributes ?? null) as Record<string, unknown> | null,
+      })
+    : null;
   const priceLabel = conv?.listing?.is_free
     ? "Gis bort"
-    : conv?.listing?.price_nok != null
-      ? `${conv.listing.price_nok.toLocaleString("nb-NO")} kr`
+    : conversationPriceKr != null
+      ? `${conversationPriceKr.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
-
-  const otherId = conv ? (conv.buyer_id === user?.id ? conv.seller_id : conv.buyer_id) : null;
-  const isSeller = !!(conv && user && conv.seller_id === user.id);
+  const isBusinessSeller = !!conv?.isBusinessSeller;
+  const otherId = conv
+    ? conv.seller_id === user?.id || isBusinessSeller
+      ? conv.buyer_id
+      : conv.seller_id
+    : null;
+  const isSeller = !!(conv && user && (conv.seller_id === user.id || isBusinessSeller));
+  const personalSellerControlsDisabled = isBusinessSeller && conv?.seller_id !== user?.id;
   const listingId = conv?.listing_id ?? null;
 
   const { data: sale, refetch: refetchSale } = useQuery({
@@ -484,7 +572,7 @@ function ConversationPage() {
     >
       <NativePageHeader
         title={conv?.listing?.title ?? "Samtale"}
-        backTo="/meldinger"
+        backTo={source === "business" ? "/bedrift" : "/meldinger"}
         hideBack={isTablet}
       />
       <div
@@ -546,6 +634,9 @@ function ConversationPage() {
                     {conv.other?.display_name ?? "Ukjent bruker"}
                   </Link>
                 )}
+                {conv.otherOrganizationName ? (
+                  <span className="text-muted-foreground"> hos {conv.otherOrganizationName}</span>
+                ) : null}
               </p>
             </div>
             {otherId && !conv.otherDeleted ? (
@@ -571,7 +662,7 @@ function ConversationPage() {
                 <UserIcon className="size-4 text-muted-foreground" />
               </div>
             )}
-            {otherId && !conv.otherDeleted && !theyBlockedMe && (
+            {otherId && !conv.otherDeleted && !theyBlockedMe && !personalSellerControlsDisabled && (
               <BlockConversationMenu
                 targetUserId={otherId}
                 conversationId={id}
@@ -581,7 +672,7 @@ function ConversationPage() {
           </div>
         )}
 
-        {conv && !(native && keyboardVisible) && (
+        {conv && !(native && keyboardVisible) && !personalSellerControlsDisabled && (
           <SalePanel
             isSeller={isSeller}
             sale={sale ?? null}
@@ -641,7 +732,7 @@ function ConversationPage() {
           ) : (messages ?? []).length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               {conv?.other?.display_name
-                ? `Send den første meldingen til ${conv.other.display_name}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`
+                ? `Send den første meldingen til ${conv.other.display_name}${conv.otherOrganizationName ? ` hos ${conv.otherOrganizationName}` : ""}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`
                 : "Send den første meldingen for å starte samtalen."}
             </p>
           ) : (
@@ -662,7 +753,7 @@ function ConversationPage() {
           )}
         </div>
 
-        {attachmentPreview && (
+        {attachmentPreview && !personalSellerControlsDisabled && (
           <div className="relative mt-2 w-fit">
             <img
               src={attachmentPreview}
@@ -672,7 +763,10 @@ function ConversationPage() {
             <button
               type="button"
               aria-label="Fjern vedlegg"
-              onClick={clearAttachment}
+              onClick={() => {
+                sendAttemptRef.current = null;
+                clearAttachment();
+              }}
               className="absolute -right-2 -top-2 rounded-full bg-foreground/80 p-1 text-background"
             >
               <X className="size-3.5" />
@@ -684,32 +778,43 @@ function ConversationPage() {
           className="mt-3 flex items-stretch gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!sendMutation.isPending && !disabled && (body.trim() || attachment))
-              sendMutation.mutate({ text: body, file: attachment });
+            if (
+              !sendMutation.isPending &&
+              !disabled &&
+              (body.trim() || (!personalSellerControlsDisabled && attachment))
+            )
+              sendCurrentMessage();
           }}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={handleAttachmentChange}
-            disabled={disabled}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Legg ved bilde"
-            disabled={disabled || !!attachment}
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 self-end"
-          >
-            <Paperclip className="size-4" />
-          </Button>
+          {!personalSellerControlsDisabled && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={IMAGE_ACCEPT}
+                className="hidden"
+                onChange={handleAttachmentChange}
+                disabled={disabled}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Legg ved bilde"
+                disabled={disabled || !!attachment}
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0 self-end"
+              >
+                <Paperclip className="size-4" />
+              </Button>
+            </>
+          )}
           <Textarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              sendAttemptRef.current = null;
+              setBody(e.target.value);
+            }}
             onKeyDown={(e) => {
               // Enter-for-å-sende er en tastatursnarvei for fysisk tastatur
               // (desktop/web), der Shift+Enter gir linjeskift. Native
@@ -720,8 +825,12 @@ function ConversationPage() {
               if (native) return;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (!sendMutation.isPending && !disabled && (body.trim() || attachment)) {
-                  sendMutation.mutate({ text: body, file: attachment });
+                if (
+                  !sendMutation.isPending &&
+                  !disabled &&
+                  (body.trim() || (!personalSellerControlsDisabled && attachment))
+                ) {
+                  sendCurrentMessage();
                 }
               }
             }}
@@ -733,7 +842,11 @@ function ConversationPage() {
           />
           <Button
             type="submit"
-            disabled={sendMutation.isPending || (!body.trim() && !attachment) || disabled}
+            disabled={
+              sendMutation.isPending ||
+              (!body.trim() && (personalSellerControlsDisabled || !attachment)) ||
+              disabled
+            }
             className="h-auto gap-2 self-stretch"
           >
             <Send className="size-4" /> Send

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Pencil, Trash2, Plus } from "lucide-react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -163,22 +164,6 @@ function MyListingsPage() {
     },
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: Row["status"] }) => {
-      const { error } = await supabase.from("listings").update({ status }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
-      void hapticNotification("success");
-      showSuccessToast("Status oppdatert");
-    },
-    onError: (e: Error) => {
-      void hapticNotification("error");
-      showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere status"));
-    },
-  });
-
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("listings").delete().eq("id", id);
@@ -194,11 +179,16 @@ function MyListingsPage() {
       showErrorToast(formatErrorMessage(e, "Kunne ikke slette annonsen"));
     },
   });
+  const turnstileEnabled = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   const doRepublish = useServerFn(republishListing);
   const republish = useMutation({
     mutationFn: async (id: string) => {
-      return doRepublish({ data: { id } });
+      const turnstileToken = turnstileEnabled
+        ? await turnstileRef.current?.getResponsePromise()
+        : null;
+      return doRepublish({ data: { id, turnstileToken: turnstileToken ?? null } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
@@ -209,7 +199,16 @@ function MyListingsPage() {
       void hapticNotification("error");
       showErrorToast(formatErrorMessage(e, "Kunne ikke publisere annonsen på nytt"));
     },
+    onSettled: () => turnstileRef.current?.reset(),
   });
+
+  const statusCounts = {
+    active: rows?.filter((r) => r.status === "active").length ?? 0,
+    sold:
+      rows?.filter((r) => r.status === "sold" || r.status === "archived" || r.status === "expired")
+        .length ?? 0,
+    draft: rows?.filter((r) => r.status === "draft").length ?? 0,
+  };
 
   const filtered = (rows ?? []).filter((r) => {
     if (tab === "all") return true;
@@ -249,15 +248,15 @@ function MyListingsPage() {
                   { value: "all", label: `Alle (${rows?.length ?? 0})` },
                   {
                     value: "active",
-                    label: `Aktive (${rows?.filter((r) => r.status === "active").length ?? 0})`,
+                    label: `Aktive (${statusCounts.active})`,
                   },
                   {
                     value: "sold",
-                    label: `Solgt / utløpt (${rows?.filter((r) => r.status === "sold" || r.status === "archived" || r.status === "expired").length ?? 0})`,
+                    label: `Solgt / utløpt (${statusCounts.sold})`,
                   },
                   {
                     value: "draft",
-                    label: `Utkast (${rows?.filter((r) => r.status === "draft").length ?? 0})`,
+                    label: `Utkast (${statusCounts.draft})`,
                   },
                   {
                     value: "wtb",
@@ -283,10 +282,13 @@ function MyListingsPage() {
             </div>
           ) : (
             <TabsList>
+              {/* Alle fanene teller, ikke bare "Alle" — den native varianten
+                  under gjorde det allerede, og en fane uten tall leste som om
+                  den var tom. */}
               <TabsTrigger value="all">Alle ({rows?.length ?? 0})</TabsTrigger>
-              <TabsTrigger value="active">Aktive</TabsTrigger>
-              <TabsTrigger value="sold">Solgt / utløpt</TabsTrigger>
-              <TabsTrigger value="draft">Utkast</TabsTrigger>
+              <TabsTrigger value="active">Aktive ({statusCounts.active})</TabsTrigger>
+              <TabsTrigger value="sold">Solgt / utløpt ({statusCounts.sold})</TabsTrigger>
+              <TabsTrigger value="draft">Utkast ({statusCounts.draft})</TabsTrigger>
               <TabsTrigger value="wtb">
                 Ønskes kjøpt{wtbRows.length > 0 ? ` (${wtbRows.length})` : ""}
               </TabsTrigger>
@@ -324,7 +326,7 @@ function MyListingsPage() {
                       activePromotion={activePromoByListing.get(r.id) ?? null}
                       onPromote={() => setPromoteId(r.id)}
                       onMarkSold={() => setMarkSoldId(r.id)}
-                      onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
+                      onReactivate={() => republish.mutate(r.id)}
                       onRepublish={() => republish.mutate(r.id)}
                       onPublishDraft={() => {
                         const missingTitle = !r.title?.trim();
@@ -356,9 +358,7 @@ function MyListingsPage() {
                         }
                       }}
                       onDelete={() => deleteListing.mutate(r.id)}
-                      busy={
-                        updateStatus.isPending || deleteListing.isPending || republish.isPending
-                      }
+                      busy={deleteListing.isPending || republish.isPending}
                     />
                   ))}
                 </ul>
@@ -462,6 +462,13 @@ function MyListingsPage() {
             )}
           </TabsContent>
         </Tabs>
+        {turnstileEnabled && (
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+            options={{ size: "invisible", action: "kaupet" }}
+          />
+        )}
 
         {promoteId && (
           <PromoteListingDialog

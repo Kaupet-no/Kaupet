@@ -46,7 +46,14 @@ if (!Object.values(localEnv).every(Boolean)) {
 
 const result = spawnSync(
   "bunx",
-  ["vitest", "run", "-c", "vitest.integration.config.ts", "src/lib/rls.integration.test.ts"],
+  [
+    "vitest",
+    "run",
+    "-c",
+    "vitest.integration.config.ts",
+    "src/lib/rls.integration.test.ts",
+    "src/features/listing-bulk-import/listing-bulk-import.integration.test.ts",
+  ],
   { stdio: "inherit", env: { ...process.env, ...localEnv } },
 );
 process.exit(result.status ?? 1);

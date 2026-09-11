@@ -25,7 +25,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { saveListingField } from "./save-listing-field";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsDemo } from "@/hooks/use-user-roles";
 
 /**
  * Modal for changing the listing's category — not inline, since switching

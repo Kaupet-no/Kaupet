@@ -13,20 +13,26 @@ import {
   Shield,
   FlaskConical,
   Moon,
+  Building2,
 } from "lucide-react";
 
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
+import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
+import { clearSignedUrlCaches } from "@/lib/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { NewListingDialog } from "@/components/new-listing-dialog";
+import {
+  isActiveBusinessMember,
+  useBusinessMembership,
+} from "@/features/business-account/use-business-membership";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +59,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
   const [newListingOpen, setNewListingOpen] = useState(false);
   const callSetTestMode = useServerFn(setTestMode);
   const { resolvedTheme, setTheme } = useTheme();
+  const { data: businessMembership } = useBusinessMembership();
 
   async function handleToggleTest(next: boolean) {
     if (toggling) return;
@@ -62,7 +69,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
       showSuccessToast(next ? "Test-modus aktivert" : "Test-modus deaktivert");
       window.location.reload();
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
+      showErrorToast(formatErrorMessage(e, "Kunne ikke endre test-modus"));
       setToggling(false);
     }
   }
@@ -136,6 +143,13 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <User className="size-4" /> Min profil
           </Link>
         </DropdownMenuItem>
+        {isActiveBusinessMember(businessMembership) && (
+          <DropdownMenuItem asChild>
+            <Link to="/bedrift" search={{ tab: "oversikt" }} className="cursor-pointer">
+              <Building2 className="size-4" /> Bedriftskonsoll
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link to="/profil" search={{ tab: "konto" }} className="cursor-pointer">
             <Settings className="size-4" /> Kontoinnstillinger
@@ -189,6 +203,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
         <DropdownMenuItem
           className="cursor-pointer text-destructive focus:text-destructive"
           onSelect={async () => {
+            clearSignedUrlCaches();
             await supabase.auth.signOut();
             navigate({ to: "/" });
           }}

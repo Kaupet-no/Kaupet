@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
-import { CategoryPicker } from "@/components/advanced-search-sheet";
+import { CategorySlugPicker } from "@/components/advanced-search-sheet";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupRow } from "@/components/term-group-editor";
 import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
@@ -455,7 +455,7 @@ export function SearchFilterSections({
       <section data-section="categories" className={`${sectionClass} space-y-3`}>
         {categoryEditOpen || !isCategorySelectionComplete(v.categories, categoryTree) ? (
           <>
-            <CategoryPicker
+            <CategorySlugPicker
               categories={categories}
               selected={v.categories}
               onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
@@ -550,7 +550,7 @@ export function SearchFilterSections({
         className="overflow-y-auto"
       >
         <div className="mt-4">
-          <CategoryPicker
+          <CategorySlugPicker
             categories={categories}
             selected={v.categories}
             onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}

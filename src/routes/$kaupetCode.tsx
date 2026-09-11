@@ -8,8 +8,7 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 import { useIsNative } from "@/hooks/use-is-native";
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsModerator } from "@/hooks/use-is-moderator";
+import { useIsAdmin, useIsModerator } from "@/hooks/use-user-roles";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -18,14 +17,20 @@ import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
+import { displayPriceNok } from "@/lib/format";
 
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
+import type { SellerIdentity } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
+import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
+import { ProffRelatedListings } from "@/components/listing-detail/proff-listing-presentation";
+import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { formatErrorMessage } from "@/lib/errors";
 import {
   genericBrandFilterFor,
   isBoatCategory,
@@ -44,6 +49,7 @@ import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth
 import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
+import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: searchSchema.extend({
@@ -65,7 +71,11 @@ export const Route = createFileRoute("/$kaupetCode")({
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+          // attributes + categories(slug) are only here for displayPriceNok:
+          // a vehicle's meta title, og:title and schema.org price have to be
+          // the same number the page and the search cards show, or Google
+          // advertises a price the buyer never sees.
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status, attributes, categories(slug)",
         )
         .eq("kaupet_code", params.kaupetCode)
         .maybeSingle();
@@ -138,10 +148,15 @@ export const Route = createFileRoute("/$kaupetCode")({
         meta: [{ title: "Annonse — Kaupet.no" }, { name: "robots", content: "noindex" }],
       };
     }
+    const displayPrice = displayPriceNok({
+      category_slug: (Array.isArray(l.categories) ? l.categories[0] : l.categories)?.slug ?? null,
+      price_nok: l.price_nok,
+      attributes: (l.attributes ?? null) as Record<string, unknown> | null,
+    });
     const priceLabel = l.is_free
       ? "Gis bort gratis"
-      : l.price_nok != null
-        ? `${l.price_nok.toLocaleString("nb-NO")} kr`
+      : displayPrice != null
+        ? `${displayPrice.toLocaleString("nb-NO")} kr`
         : "Pris ved henvendelse";
     const place = l.city ? ` i ${l.city}` : "";
     const rawTitle = `${l.title} — ${priceLabel}${place} | Kaupet.no`;
@@ -181,7 +196,7 @@ export const Route = createFileRoute("/$kaupetCode")({
             offers: {
               "@type": "Offer",
               priceCurrency: "NOK",
-              price: l.is_free ? 0 : (l.price_nok ?? undefined),
+              price: l.is_free ? 0 : (displayPrice ?? undefined),
               availability: isActive
                 ? "https://schema.org/InStock"
                 : "https://schema.org/OutOfStock",
@@ -232,10 +247,13 @@ function RootSlugPage() {
 
 function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+  console.error(error);
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {formatErrorMessage(error, "Prøv på nytt eller gå tilbake til forsiden.")}
+      </p>
       <Button
         className="mt-6"
         onClick={() => {
@@ -339,12 +357,49 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, show_visiting_address, listing_visiting_addresses(address_line, postal_code, city), listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
+
+      // organizations has commercial columns (selected_plan, proff_access_until,
+      // ...) that must not be publicly readable — organizations_public is a
+      // view exposing only the branding columns this page needs. See
+      // docs/SIKKERHETSVURDERING.md M-5.
+      const organization = data.organization_id
+        ? (
+            await supabase
+              .from("organizations_public")
+              .select(
+                "id, display_name, organization_number, created_at, website_url, logo_path, brand_palette, listing_concept, listing_font, listing_overtitle, has_active_proff",
+              )
+              .eq("id", data.organization_id)
+              .maybeSingle()
+          ).data
+        : null;
+      const visitingAddress = Array.isArray(data.listing_visiting_addresses)
+        ? data.listing_visiting_addresses[0]
+        : data.listing_visiting_addresses;
+      if (organization) {
+        return {
+          ...data,
+          organization,
+          seller: {
+            kind: "business" as const,
+            displayName: organization.display_name,
+            organizationNumber: organization.organization_number,
+            visitingAddress: visitingAddress
+              ? [visitingAddress.address_line, visitingAddress.postal_code, visitingAddress.city]
+                  .filter(Boolean)
+                  .join(", ")
+              : null,
+            createdAt: organization.created_at,
+          } satisfies SellerIdentity,
+        };
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("display_name, avatar_url, created_at")
@@ -358,14 +413,42 @@ function ListingDetailPage() {
       const ratingRow = Array.isArray(ratingRows) ? ratingRows[0] : ratingRows;
       return {
         ...data,
+        organization: null,
         seller: profile
           ? {
+              kind: "private" as const,
               ...profile,
               avg_rating: Number(ratingRow?.avg_rating ?? 0),
               review_count: Number(ratingRow?.review_count ?? 0),
             }
           : null,
       };
+    },
+  });
+  const organization = data?.organization ?? null;
+  const hasEffectiveOrganizationProff = organization?.has_active_proff ?? false;
+  const {
+    data: otherOrganizationListings,
+    isLoading: otherListingsLoading,
+    isError: otherListingsError,
+  } = useQuery({
+    queryKey: ["organization-listings", organization?.id, data?.id],
+    enabled: hasEffectiveOrganizationProff && !!organization?.id && !!data?.id,
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("listings")
+        .select(
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
+        )
+        .eq("organization_id", organization!.id)
+        .eq("status", "active")
+        .neq("id", data!.id)
+        .order("created_at", { ascending: false })
+        .limit(4);
+      if (error) throw error;
+      return (rows ?? []).map((row) =>
+        toListingCardData(row as Parameters<typeof toListingCardData>[0]),
+      );
     },
   });
 
@@ -591,6 +674,31 @@ function ListingDetailPage() {
         })),
     ];
   })();
+  const organizationBrand: ListingOrganizationBrand | undefined =
+    hasEffectiveOrganizationProff && organization
+      ? {
+          id: organization.id,
+          displayName: organization.display_name,
+          organizationNumber: organization.organization_number,
+          logoUrl: organization.logo_path
+            ? supabase.storage.from("organization-logos").getPublicUrl(organization.logo_path).data
+                .publicUrl
+            : null,
+          websiteUrl: organization.website_url,
+          palette: organization.brand_palette,
+          concept: organization.listing_concept as ProffOrganizationPresentation["concept"],
+          font: organization.listing_font as ProffOrganizationPresentation["font"],
+          overtitle: organization.listing_overtitle as ProffOrganizationPresentation["overtitle"],
+        }
+      : undefined;
+  const relatedListingsSlot =
+    organizationBrand && !otherListingsError ? (
+      <ProffRelatedListings
+        organization={organizationBrand}
+        listings={otherOrganizationListings}
+        loading={otherListingsLoading}
+      />
+    ) : undefined;
 
   return (
     <ListingDetailView
@@ -614,6 +722,9 @@ function ListingDetailPage() {
       categoryId={data.category_id}
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
+      listingStatus={data.status}
+      organizationBrand={organizationBrand}
+      relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}
       enableBackToSearch
       images={images}
@@ -678,6 +789,7 @@ function ListingDetailPage() {
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
           hasRegistryData={parseVehicleLookup(attributes.vehicle_lookup) != null}
+          hideBusinessIdentity={!!organizationBrand}
         />
       }
       stickyContactSlot={

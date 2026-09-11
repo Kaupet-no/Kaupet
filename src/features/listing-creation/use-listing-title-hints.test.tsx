@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useListingTitleHints } from "./use-listing-title-hints";
@@ -24,6 +24,7 @@ vi.mock("@/lib/wtb-listings.functions", () => ({
   matchWtbListingsForListing: (...args: unknown[]) => matchWtbListingsForListingMock(...args),
 }));
 
+const neqMock = vi.fn();
 const textSearchMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -31,6 +32,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       select: () => ({
         eq: () => ({
           eq: () => ({
+            neq: (...args: unknown[]) => {
+              neqMock(...args);
+              return { textSearch: (...a: unknown[]) => textSearchMock(...a) };
+            },
             textSearch: (...args: unknown[]) => textSearchMock(...args),
           }),
         }),
@@ -47,6 +52,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 beforeEach(() => {
+  neqMock.mockReset();
   suggestCategoryForTitleMock.mockReset();
   suggestKeywordsForListingMock.mockReset();
   matchWtbListingsForListingMock.mockReset();
@@ -152,5 +158,95 @@ describe("useListingTitleHints", () => {
     expect(setCategoryTouchedManually).toHaveBeenCalledWith(true);
     expect(result.current.categorySuggestions).toEqual([]);
     vi.useRealTimers();
+  });
+
+  it("does not exclude any listing when excludeListingId is omitted (create flow)", async () => {
+    renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Fin sofa til salgs",
+          description: "",
+          categoryId: "cat-1",
+          categoryTouchedManually: true,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(textSearchMock).toHaveBeenCalled(), { timeout: 3000 });
+    expect(neqMock).not.toHaveBeenCalled();
+  });
+
+  it("excludes the given listing id when excludeListingId is provided (edit flow)", async () => {
+    renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Fin sofa til salgs",
+          description: "",
+          categoryId: "cat-1",
+          excludeListingId: "listing-1",
+          categoryTouchedManually: true,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(neqMock).toHaveBeenCalledWith("id", "listing-1"), { timeout: 3000 });
+  });
+
+  it("appendTagToDescription appends the tag with a leading space", () => {
+    const setValue = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useListingTitleHints({
+          title: "",
+          description: "Fin sofa",
+          categoryId: "cat-1",
+          categoryTouchedManually: true,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue,
+        }),
+      { wrapper },
+    );
+
+    act(() => result.current.appendTagToDescription("#sofa"));
+
+    expect(setValue).toHaveBeenCalledWith("description", "Fin sofa #sofa", { shouldTouch: false });
+  });
+
+  it("fetches a WTB match once the debounced title reaches 3 characters", async () => {
+    matchWtbListingsForListingMock.mockResolvedValue({ id: "wtb-1" });
+    const { result } = renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Sof",
+          description: "",
+          categoryId: "cat-1",
+          categoryTouchedManually: true,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.wtbMatch).toEqual({ id: "wtb-1" }), {
+      timeout: 3000,
+    });
+    expect(matchWtbListingsForListingMock).toHaveBeenCalledWith({
+      data: {
+        title: "Sof",
+        description: "",
+        category_id: "cat-1",
+        price_nok: null,
+        is_free: false,
+        attributes: {},
+      },
+    });
   });
 });

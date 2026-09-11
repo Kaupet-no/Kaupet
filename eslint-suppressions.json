@@ -79,11 +79,6 @@
       "count": 1
     }
   },
-  "src/features/listing-creation/use-listing-title-hints.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/features/listing-edit/editable-field.tsx": {
     "react-hooks/refs": {
       "count": 1

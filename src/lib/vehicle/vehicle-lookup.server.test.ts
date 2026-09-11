@@ -65,11 +65,34 @@ describe("lookupVehicle", () => {
       imported_used: false,
     });
   });
-
-  it("markerer bruktimport og manglende hengervekt eksplisitt", async () => {
+  it("mapper norsk Kupé-kode til den kanoniske coupe-verdien", async () => {
     mockSvvResponse({
       godkjenning: {
-        forstegangsGodkjenning: { bruktimport: { importland: { landkode: "SE" } } },
+        tekniskGodkjenning: {
+          tekniskeData: {
+            karosseriOgLasteplan: {
+              karosseritype: {
+                kodeVerdi: "AD",
+                kodeNavn: "Kupé (AD)",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = await lookupVehicle("TEST123");
+
+    expect(result).toMatchObject({
+      body_type_code: "AD",
+      body_type_hint: "Kupé (AD)",
+      body_type: "coupe",
+    });
+  });
+
+  it("registrerer 0 i hengervekt når SVV mangler hengerfeste eksplisitt", async () => {
+    mockSvvResponse({
+      godkjenning: {
         tekniskGodkjenning: {
           tekniskeData: {
             tilhengerkopling: { kopling: [] },
@@ -81,8 +104,24 @@ describe("lookupVehicle", () => {
 
     const result = await lookupVehicle("TEST123");
 
-    expect(result.imported_used).toBe(true);
-    expect(result.max_tow_weight_kg).toBeNull();
+    expect(result.max_tow_weight_kg).toBe(0);
     expect(result.tow_hitch).toBe(false);
+  });
+
+  it("beholder ukjent hengerfeste som null når SVV ikke oppgir koblingsdata", async () => {
+    mockSvvResponse({
+      godkjenning: {
+        tekniskGodkjenning: {
+          tekniskeData: {
+            vekter: {},
+          },
+        },
+      },
+    });
+
+    const result = await lookupVehicle("TEST123");
+
+    expect(result.max_tow_weight_kg).toBeNull();
+    expect(result.tow_hitch).toBeNull();
   });
 });

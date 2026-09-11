@@ -4,9 +4,10 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // android-jobben i .github/workflows/ci.yml. Lokal `cap sync` uten
 // variabelen faller tilbake til produksjon.
 const isStaging = process.env.CAPACITOR_ENV === "staging";
+const appId = isStaging ? "no.kaupet.app.staging" : "no.kaupet.app";
 
 const config: CapacitorConfig = {
-  appId: "no.kaupet.app",
+  appId,
   appName: "Kaupet",
   webDir: "capacitor-shell",
   // Matches the app's --background (src/styles.css). Without this, the
@@ -21,15 +22,34 @@ const config: CapacitorConfig = {
     // staging.kaupet.no eller en lokal IP før WebViewen navigerer dit.
     url: isStaging ? undefined : "https://kaupet.no",
     errorPath: "offline.html",
-    // Kun staging: lar kaldstart-velgeren (capacitor-shell/index.html) og
-    // "Meg"-siden sin dev-server-bryter (DevServerSwitch) navigere
-    // WebViewen til staging.kaupet.no, Cloudflare Access sin login-side,
-    // eller en http://-adresse på lokalt nettverk. allowNavigation må
-    // matche siden vertsnavnet ikke er kjent på forhånd —
-    // usesCleartextTraffic er satt tilsvarende kun for staging-flavoren,
-    // se android/app/src/staging/AndroidManifest.xml.
+    // Staging may connect to a local private-network dev server, but never
+    // grants the production app a wildcard navigation target.
     cleartext: isStaging,
-    allowNavigation: isStaging ? ["*"] : undefined,
+    allowNavigation: isStaging
+      ? [
+          "staging.kaupet.no",
+          "*.cloudflareaccess.com",
+          "localhost",
+          "10.*",
+          "172.16.*",
+          "172.17.*",
+          "172.18.*",
+          "172.19.*",
+          "172.20.*",
+          "172.21.*",
+          "172.22.*",
+          "172.23.*",
+          "172.24.*",
+          "172.25.*",
+          "172.26.*",
+          "172.27.*",
+          "172.28.*",
+          "172.29.*",
+          "172.30.*",
+          "172.31.*",
+          "192.168.*",
+        ]
+      : undefined,
     androidScheme: "https",
   },
   ios: {

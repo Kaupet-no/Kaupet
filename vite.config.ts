@@ -13,10 +13,11 @@ const SECURITY_HEADERS = {
   "x-frame-options": "SAMEORIGIN",
   "referrer-policy": "strict-origin-when-cross-origin",
   "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
-  // Report-only first: the app has intentional inline bootstrap/JSON-LD and
-  // third-party Turnstile/map/Supabase traffic. Promote to enforcement after
-  // production reports confirm this source inventory is complete.
-  "content-security-policy-report-only": [
+  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+  // Enforce the policy. Keep the explicit inline allowance until SSR
+  // hydration/bootstrap has been migrated to nonces; report-only provided no
+  // protection at all.
+  "content-security-policy": [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
@@ -29,7 +30,10 @@ const SECURITY_HEADERS = {
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
     "frame-src https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
+    "upgrade-insecure-requests",
+    "report-to csp",
   ].join("; "),
+  "reporting-endpoints": 'csp="/api/public/csp-report"',
 };
 
 // Server-only secrets that features silently need at runtime. Warn early in

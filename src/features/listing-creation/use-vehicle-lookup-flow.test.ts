@@ -200,6 +200,23 @@ describe("useVehicleLookupFlow", () => {
     expect(goNext).toHaveBeenCalled();
   });
 
+  it("confirmVehicleData lagrer 0 som hengervekt når oppslaget bekrefter manglende hengerfeste", async () => {
+    window.scrollTo = vi.fn();
+    lookupVehicleByRegNumberMock.mockResolvedValue({
+      lookup: { ...lookupResult, tow_hitch: false, max_tow_weight_kg: 0 },
+      previousClassificationMismatch: null,
+    });
+    const setAttributes = vi.fn();
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams({ setAttributes })));
+    await act(() => result.current.runVehicleLookup("EK12345"));
+
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
+
+    expect(setAttributes).toHaveBeenCalledWith(
+      expect.objectContaining({ tow_hitch: false, max_tow_weight_kg: 0 }),
+    );
+  });
+
   it("confirmVehicleData stores both the exact first-registration date and the searchable year", async () => {
     window.scrollTo = vi.fn();
     lookupVehicleByRegNumberMock.mockResolvedValue({

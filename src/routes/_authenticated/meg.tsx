@@ -12,21 +12,26 @@ import {
   Shield,
   ShieldCheck,
   User,
+  Building2,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
+import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
+import {
+  isActiveBusinessMember,
+  useBusinessMembership,
+} from "@/features/business-account/use-business-membership";
 import { NativePageHeader } from "@/components/native-page-header";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { DevServerSwitch } from "@/components/dev-server-switch";
@@ -59,6 +64,7 @@ function initials(name: string | null | undefined, fallback: string) {
 
 function MegPage() {
   const { user } = useAuth();
+  const { data: businessMembership } = useBusinessMembership();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
@@ -80,7 +86,7 @@ function MegPage() {
       showSuccessToast(next ? "Test-modus aktivert" : "Test-modus deaktivert");
       window.location.reload();
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
+      showErrorToast(formatErrorMessage(e, "Kunne ikke endre test-modus"));
       setToggling(false);
     }
   }
@@ -165,6 +171,13 @@ function MegPage() {
               label="Min profil"
               onClick={() => void navigate({ to: "/profil" })}
             />
+            {isActiveBusinessMember(businessMembership) && (
+              <NavRow
+                icon={<Building2 className="size-5 text-primary" />}
+                label="Bedriftskonsoll"
+                onClick={() => void navigate({ to: "/bedrift", search: { tab: "oversikt" } })}
+              />
+            )}
             {isAdmin && (
               <NavRow
                 icon={<Shield className="size-5 text-primary" />}

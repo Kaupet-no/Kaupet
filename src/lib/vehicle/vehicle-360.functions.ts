@@ -37,7 +37,10 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
       .eq("id", data.listingId)
       .eq("seller_id", userId)
       .maybeSingle();
-    if (listingError) throw listingError;
+    if (listingError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", listingError);
+    }
     if (!listing) throw new Error("Fant ikke annonseutkastet");
 
     const { data: existing, error: existingError } = await supabaseAdmin
@@ -45,7 +48,10 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
       .select("token, expires_at, used_at")
       .eq("listing_id", data.listingId)
       .maybeSingle();
-    if (existingError) throw existingError;
+    if (existingError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", existingError);
+    }
     if (
       existing &&
       !existing.used_at &&
@@ -74,7 +80,10 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
           created_by: userId,
           expires_at: expiresAt,
         });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
 
     return { token, expiresAt };
   });
@@ -91,7 +100,10 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
       .is("used_at", null)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!session) throw new Error("Fant ikke QR-koden. Be selger vise en ny på annonsen.");
 
     const { data: existingFrames, error: framesError } = await supabaseAdmin
@@ -100,7 +112,10 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
       .eq("listing_id", session.listing_id)
       .order("frame_order", { ascending: false })
       .limit(1);
-    if (framesError) throw framesError;
+    if (framesError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", framesError);
+    }
 
     const listing = Array.isArray(session.listings) ? session.listings[0] : session.listings;
 
@@ -168,7 +183,10 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       "consume_vehicle_360_upload_slot",
       { _token: data.token, _ip_hash: await hashRequestIp() },
     );
-    if (quotaError) throw quotaError;
+    if (quotaError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", quotaError);
+    }
     if (!listingId) {
       throw new Error("Opptaksøkten er utløpt eller har for mange opplastingsforsøk.");
     }
@@ -189,7 +207,10 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       .eq("listing_id", listingId)
       .eq("frame_order", data.frameOrder)
       .maybeSingle();
-    if (previousError) throw previousError;
+    if (previousError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", previousError);
+    }
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from("listing-360-frames")
@@ -198,7 +219,10 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
         cacheControl: "31536000",
         upsert: true,
       });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", uploadError);
+    }
 
     const { error } = await supabaseAdmin.from("listing_360_frames").upsert(
       {
@@ -233,14 +257,20 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
       .is("used_at", null)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
-    if (sessionError) throw sessionError;
+    if (sessionError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", sessionError);
+    }
     if (!session) throw new Error("Opptaksøkten er utløpt eller allerede fullført");
 
     const { count, error: countError } = await supabaseAdmin
       .from("listing_360_frames")
       .select("id", { count: "exact", head: true })
       .eq("listing_id", session.listing_id);
-    if (countError) throw countError;
+    if (countError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", countError);
+    }
     if ((count ?? 0) < MIN_360_FRAMES) {
       throw new Error(`Ta minst ${MIN_360_FRAMES} bilder før opptaket fullføres`);
     }
@@ -252,7 +282,10 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
       .is("used_at", null)
       .select("id")
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!completed) throw new Error("Opptaksøkten er allerede fullført");
     return { ok: true as const };
   });
@@ -270,7 +303,10 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
       .eq("id", data.listingId)
       .eq("seller_id", userId)
       .maybeSingle();
-    if (listingError) throw listingError;
+    if (listingError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", listingError);
+    }
     if (!listing) throw new Error("Fant ikke annonseutkastet");
 
     const { data: frames, error } = await supabaseAdmin
@@ -278,7 +314,10 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
       .select("storage_path, frame_order")
       .eq("listing_id", data.listingId)
       .order("frame_order", { ascending: true });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return frames ?? [];
   });
 
@@ -295,14 +334,20 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       .eq("id", data.listingId)
       .eq("seller_id", userId)
       .maybeSingle();
-    if (listingError) throw listingError;
+    if (listingError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", listingError);
+    }
     if (!listing) throw new Error("Fant ikke annonseutkastet");
 
     const { data: frames, error: framesError } = await supabaseAdmin
       .from("listing_360_frames")
       .select("storage_path")
       .eq("listing_id", data.listingId);
-    if (framesError) throw framesError;
+    if (framesError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", framesError);
+    }
     if (frames && frames.length > 0) {
       await supabaseAdmin.storage
         .from("listing-360-frames")
@@ -312,13 +357,19 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       .from("listing_360_frames")
       .delete()
       .eq("listing_id", data.listingId);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
 
     const { error: expireError } = await supabaseAdmin
       .from("listing_360_capture_sessions")
       .update({ used_at: new Date().toISOString() })
       .eq("listing_id", data.listingId)
       .is("used_at", null);
-    if (expireError) throw expireError;
+    if (expireError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", expireError);
+    }
     return { ok: true as const };
   });

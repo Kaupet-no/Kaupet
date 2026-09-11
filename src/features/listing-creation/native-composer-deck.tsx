@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { composerSwipeDirection, type ComposerNavigationResult } from "./composer-navigation";
 
@@ -26,19 +27,7 @@ export function NativeComposerDeck({
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [navigating, setNavigating] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-  );
-
-  useEffect(() => {
-    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!query?.addEventListener) return;
-    const onChange = () => setReduceMotion(query.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+  const reduceMotion = useReducedMotion();
 
   if (!enabled) return children;
 

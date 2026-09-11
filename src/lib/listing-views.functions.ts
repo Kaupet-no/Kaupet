@@ -13,5 +13,8 @@ export const logListingView = createServerFn({ method: "POST" })
       _listing_id: data.listingId,
       _key_hash: await hashRequestIp(),
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });

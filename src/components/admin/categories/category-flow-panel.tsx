@@ -24,10 +24,8 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { formatErrorMessage } from "@/lib/errors";
 import {
   DEFAULT_FIELD_GROUPS,
-  DEFAULT_MODULES,
   normalizeFieldGroupKeys,
   resolveWizardPages,
-  toStoredFieldGroupKeys,
 } from "@/features/listing-creation/category-flows";
 import {
   FIELD_GROUP_LABELS_NB,
@@ -98,7 +96,7 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_flows")
-        .select("id, category_id, field_groups, modules, sort_order")
+        .select("id, category_id, field_groups, sort_order")
         .eq("category_id", category.id)
         .maybeSingle();
       if (error) throw error;
@@ -106,8 +104,6 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     },
   });
 
-  const [modules, setModules] = useState<string[] | null>(null);
-  const activeModules = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
   const hasCustomFlow = !!flowRow;
 
   const [fieldGroups, setFieldGroups] = useState<string[] | null>(null);
@@ -162,21 +158,13 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     qc.invalidateQueries({ queryKey: ["admin", "category-flow", category.id] });
 
   const save = useMutation({
-    mutationFn: async ({
-      nextModules,
-      nextFieldGroups,
-    }: {
-      nextModules: string[];
-      nextFieldGroups: string[];
-    }) => {
-      const { error } = await supabase.from("category_flows").upsert(
-        {
-          category_id: category.id,
-          field_groups: toStoredFieldGroupKeys(nextFieldGroups),
-          modules: nextModules,
-        },
-        { onConflict: "category_id" },
-      );
+    mutationFn: async ({ nextFieldGroups }: { nextFieldGroups: string[] }) => {
+      const { error } = await supabase
+        .from("category_flows")
+        .upsert(
+          { category_id: category.id, field_groups: nextFieldGroups },
+          { onConflict: "category_id" },
+        );
       if (error) throw error;
     },
     onSuccess: () => {
@@ -196,19 +184,12 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     },
     onSuccess: () => {
       showSuccessToast("Tilbakestilt til standardflyt");
-      setModules(null);
       setFieldGroups(null);
       invalidate();
     },
     onError: (e: Error) =>
       showErrorToast(formatErrorMessage(e, "Kunne ikke tilbakestille annonseflyten")),
   });
-
-  function toggle(key: string) {
-    const current = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
-    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
-    setModules(next);
-  }
 
   function toggleFieldGroup(key: string) {
     if (LOCKED_FIELD_GROUP_KEYS.includes(key)) return;
@@ -374,21 +355,6 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
               pages={resolveWizardPages(activeFieldGroups, { native: true })}
             />
           </div>
-
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Moduler</p>
-            <ul className="space-y-2">
-              <li>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={activeModules.includes("generic-attributes")}
-                    onCheckedChange={() => toggle("generic-attributes")}
-                  />
-                  Kategoriegenskaper
-                </label>
-              </li>
-            </ul>
-          </div>
         </div>
       )}
 
@@ -410,9 +376,7 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
         <Button
           type="button"
           disabled={save.isPending || isLoading}
-          onClick={() =>
-            save.mutate({ nextModules: activeModules, nextFieldGroups: activeFieldGroups })
-          }
+          onClick={() => save.mutate({ nextFieldGroups: activeFieldGroups })}
         >
           {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
         </Button>

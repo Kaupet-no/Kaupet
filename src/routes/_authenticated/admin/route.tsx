@@ -8,9 +8,11 @@ import {
   Webhook,
   Car,
   MessageSquareHeart,
+  Receipt,
+  BadgeCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsAdmin } from "@/hooks/use-user-roles";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -68,6 +70,16 @@ function AdminLayout() {
               label="Fremhevinger"
             />
             <NavTab
+              to="/admin/proff-abonnement"
+              icon={<Receipt className="size-4" />}
+              label="Proff-abonnement"
+            />
+            <NavTab
+              to="/admin/bedrifter"
+              icon={<BadgeCheck className="size-4" />}
+              label="Bedrifter"
+            />
+            <NavTab
               to="/admin/vipps-webhooks"
               icon={<Webhook className="size-4" />}
               label="Vipps webhooks"
@@ -75,7 +87,7 @@ function AdminLayout() {
             <NavTab
               to="/admin/tilbakemeldinger"
               icon={<MessageSquareHeart className="size-4" />}
-              label="Ris og Ros"
+              label="Tilbakemeldinger"
             />
           </>
         )}

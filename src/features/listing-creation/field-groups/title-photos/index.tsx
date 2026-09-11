@@ -105,12 +105,9 @@ export function PhotosGroup({
 }: Pick<WizardSharedProps, "images" | "setImages" | "uploadProgress">) {
   return (
     <section className="space-y-2">
-      <Label>Bilder</Label>
+      <Label>Legg til bilder</Label>
       <p className="text-sm text-muted-foreground">
-        Annonser med bilder får mer oppmerksomhet. Vi anbefaler minst 3 bilder.
-      </p>
-      <p className="text-xs text-muted-foreground">
-        Tips: Godt lys, nøytral bakgrunn og bilde av eventuelle feil.
+        Gode bilder gjør det enklere å vurdere annonsen.
       </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
     </section>

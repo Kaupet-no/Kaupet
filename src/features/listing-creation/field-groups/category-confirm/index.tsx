@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CategoryPicker } from "@/components/category-picker";
-import { useCategorySuggestionLoadingMessage } from "@/features/listing-creation/use-category-suggestion-loading-message";
+import { CATEGORY_SUGGESTION_LOADING_MESSAGE } from "@/features/listing-creation/use-category-suggestion-loading-message";
 
 import type { WizardSharedProps } from "../types";
 
@@ -82,9 +82,7 @@ export function CategoryConfirm({
   const confirmedName =
     clickedName ??
     (motorsportCategory && categoryId === motorsportCategory.id ? "Motorsport" : null);
-  const isWaitingForSuggestion =
-    !confirmedName && !showPicker && categorySuggestionLoading && categorySuggestions.length === 0;
-  const loadingMessage = useCategorySuggestionLoadingMessage(isWaitingForSuggestion);
+  const loadingMessage = CATEGORY_SUGGESTION_LOADING_MESSAGE;
 
   if (
     !confirmedName &&
@@ -92,7 +90,10 @@ export function CategoryConfirm({
   ) {
     return (
       <section className="space-y-3">
-        <p className="text-lg font-semibold">Velg kategori</p>
+        <p className="text-lg font-semibold">Vi fant ingen sikker kategori</p>
+        <p className="text-sm text-muted-foreground">
+          Velg kategorien som passer best for annonsen.
+        </p>
         <CategoryPicker
           inline
           open={false}
@@ -134,7 +135,7 @@ export function CategoryConfirm({
     );
   }
 
-  const names = categorySuggestions.map(suggestionLabel);
+  const names = categorySuggestions.slice(0, 3).map(suggestionLabel);
   // Underkategorien modellen/stemme-RPC-en foreslår (Bil vs. MC vs.
   // Tilhenger, ...) er ikke pålitelig nok til å spørre om direkte — se
   // isUnderBilOgMc over. Når alle forslagene ligger under Bil og MC,
@@ -150,11 +151,11 @@ export function CategoryConfirm({
   const question = isVehicleSuggestion
     ? `Denne annonsen blir opprettet i kategori ${bilOgMcName}. Er det riktig?`
     : categorySuggestions.length > 1
-      ? `Er denne annonsen i kategori ${names.join(" eller ")}?`
+      ? "Velg kategorien som passer best for annonsen."
       : `Denne annonsen blir opprettet i kategori ${names[0]}. Er det riktig?`;
   const primaryButtons = isVehicleSuggestion
     ? categorySuggestions.slice(0, 1)
-    : categorySuggestions;
+    : categorySuggestions.slice(0, 3);
 
   return (
     <section className="space-y-4 py-4 text-center">
@@ -169,11 +170,11 @@ export function CategoryConfirm({
               applyCategorySuggestion(suggestion.category_id);
             }}
           >
-            {isVehicleSuggestion ? "Ja" : categorySuggestions.length > 1 ? names[i] : "Ja"}
+            {isVehicleSuggestion ? bilOgMcName : suggestionLabel(suggestion)}
           </Button>
         ))}
         <Button type="button" variant="outline" onClick={() => setShowPicker(true)}>
-          Nei
+          Velg en annen kategori
         </Button>
       </div>
     </section>

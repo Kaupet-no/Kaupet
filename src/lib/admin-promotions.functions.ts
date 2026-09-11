@@ -14,7 +14,10 @@ export const adminListPromotionPricing = createServerFn({ method: "GET" })
       .from("promotion_pricing")
       .select("id, duration_days, price_nok, active, updated_at")
       .order("duration_days");
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return data ?? [];
   });
 
@@ -40,7 +43,10 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
       },
       { onConflict: "duration_days" },
     );
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -78,7 +84,10 @@ export const adminListPromotions = createServerFn({ method: "GET" })
       q = q.or(`vipps_reference.ilike.%${term}%,vipps_psp_reference.ilike.%${term}%`);
     }
     const { data: rows, error } = await q;
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id).filter(Boolean)));
     let profilesById = new Map<string, { display_name: string | null }>();
     if (userIds.length > 0) {
@@ -86,7 +95,10 @@ export const adminListPromotions = createServerFn({ method: "GET" })
         .from("profiles")
         .select("id, display_name")
         .in("id", userIds);
-      if (perr) throw perr;
+      if (perr) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", perr);
+      }
       profilesById = new Map((profs ?? []).map((p) => [p.id, { display_name: p.display_name }]));
     }
     return (rows ?? []).map((r) => ({
@@ -103,20 +115,23 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
-      .select("id, status, price_nok, vipps_reference, is_gift")
+      .select("id, status, price_nok, vipps_reference, vipps_mode, is_gift")
       .eq("id", data.promotion_id)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!promo) throw new Error("Fant ikke fremheving");
     if (promo.is_gift || !promo.vipps_reference) {
       return { hasVipps: false as const };
     }
-    const { getVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
+    const { getVippsPayment } = await import("@/lib/vipps.server");
     const { getRequest } = await import("@tanstack/react-start/server");
     const host = getRequest().headers.get("host");
-    const mode = getVippsMode(host);
+    const mode = promo.vipps_mode as "test" | "production";
     try {
-      const result = await getVippsPayment(promo.vipps_reference, host);
+      const result = await getVippsPayment(promo.vipps_reference, host, mode);
       const captured = result.state === "CAPTURED" || result.state === "AUTHORIZED";
       const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED", "FAILED"];
       const mismatch =
@@ -150,10 +165,13 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
-      .select("id, price_nok, vipps_reference, status, is_gift")
+      .select("id, price_nok, vipps_reference, vipps_mode, status, is_gift")
       .eq("id", data.promotion_id)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!promo) throw new Error("Fant ikke fremheving");
     if (promo.is_gift) throw new Error("Gratis fremheving kan ikke refunderes");
     if (!promo.vipps_reference) throw new Error("Mangler Vipps-referanse");
@@ -167,6 +185,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       promo.price_nok,
       `r-${promo.id.replace(/-/g, "")}-${Date.now().toString(36)}`,
       host,
+      promo.vipps_mode as "test" | "production",
     );
 
     const { error: refundErr } = await supabaseAdmin
@@ -209,7 +228,10 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
       .select("id, seller_id, status")
       .eq("id", data.listing_id)
       .maybeSingle();
-    if (lerr) throw lerr;
+    if (lerr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", lerr);
+    }
     if (!listing) throw new Error("Annonsen finnes ikke");
     if (listing.status !== "active") throw new Error("Annonsen må være aktiv");
 
@@ -236,7 +258,10 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
       starts_at: now.toISOString(),
       expires_at: expires.toISOString(),
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
 
     const { error: logErr } = await supabaseAdmin.from("admin_moderation_log").insert({
       admin_id: context.userId,
@@ -265,7 +290,10 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
       .eq("status", "active")
       .ilike("title", `%${data.q}%`)
       .limit(20);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     const sellerIds = Array.from(new Set((rows ?? []).map((r) => r.seller_id).filter(Boolean)));
     let profilesById = new Map<string, { display_name: string | null }>();
     if (sellerIds.length > 0) {
@@ -273,7 +301,10 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
         .from("profiles")
         .select("id, display_name")
         .in("id", sellerIds);
-      if (perr) throw perr;
+      if (perr) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", perr);
+      }
       profilesById = new Map((profs ?? []).map((p) => [p.id, { display_name: p.display_name }]));
     }
     return (rows ?? []).map((r) => ({

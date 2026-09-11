@@ -22,7 +22,10 @@ export const getSaleForListing = createServerFn({ method: "POST" })
       .select("listing_id, seller_id, buyer_id, conversation_id, confirmed_at")
       .eq("listing_id", data.listingId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return sale ?? null;
   });
 
@@ -36,7 +39,10 @@ export const confirmBuyer = createServerFn({ method: "POST" })
       .select("id, listing_id, seller_id, buyer_id")
       .eq("id", data.conversationId)
       .maybeSingle();
-    if (convErr) throw new Error(convErr.message);
+    if (convErr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", convErr);
+    }
     if (!conv) throw new Error("Samtalen finnes ikke");
     if (conv.seller_id !== userId) {
       throw new Error("Bare selger kan markere en kjøper");
@@ -54,7 +60,8 @@ export const confirmBuyer = createServerFn({ method: "POST" })
       if (insErr.code === "23505") {
         throw new Error("Det finnes allerede en bekreftet kjøper for denne annonsen");
       }
-      throw new Error(insErr.message);
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", insErr);
     }
     return { ok: true };
   });
@@ -90,6 +97,9 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
       .from("listing_sales")
       .delete()
       .eq("listing_id", data.listingId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });

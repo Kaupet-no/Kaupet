@@ -27,17 +27,25 @@ export async function login(page: Page, email: string, password: string) {
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord", { exact: true }).fill(password);
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-  await expect(page).toHaveURL("/", { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/(?:bedrift)?(?:\?.*)?$/, { timeout: 10_000 });
 }
 
 /** type=sell is required — without it the route redirects to "/". */
 export async function goToNewListing(page: Page, title?: string) {
   const suffix = title ? `&title=${encodeURIComponent(title)}` : "";
   await page.goto(`/ny-annonse?type=sell${suffix}`);
+  // See goToNewWantListing: the category search box is present pre-hydration,
+  // so filling it too early can be silently discarded once React hydrates.
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
 export async function goToNewWantListing(page: Page, native = false) {
   await page.goto(`/ny-ok-annonse${native ? "?forcenative=1" : ""}`);
+  // The "Kort beskrivelse" input is present in the pre-hydration SSR markup,
+  // so a fill() right after goto() can land before React attaches its
+  // listeners — the value (and the following click) is then silently lost
+  // once hydration commits and re-renders from still-empty form state.
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
 export function composerPage(page: Page, pageKey: string) {
@@ -192,15 +200,11 @@ export async function fillDescriptionAndAdvance(
  * by the time this assertion ran, even though publishing had succeeded).
  */
 export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
-  // Root cause of the flake this retry logic was papering over (see trace
-  // from the 2026-08-31 CI run): the publish button stays disabled until the
-  // invisible Turnstile widget resolves (`turnstileEnabled && !turnstileToken`
-  // in review-publish/index.tsx), and loading Turnstile's challenge iframe
-  // from Cloudflare can take longer than clickAndWaitFor's per-attempt
-  // budget (5s click + 8s wait, x3 = 39s, already over the 30s test
-  // timeout). Waiting for the button to actually become enabled first — on
-  // its own, generous budget — means the click-retry loop below only has to
-  // absorb an actual missed click, not Turnstile's network-bound solve time.
+  // Publiseringsknappen låses ikke lenger av Turnstile — tokenet ventes ut
+  // inne i publiseringsmutasjonen (se review-publish/index.tsx og
+  // ny-annonse.tsx). Ekstra tidsbudsjett beholdes fordi den ventingen nå
+  // skjer etter klikket, og Turnstiles utfordringsiframe fortsatt kan være
+  // nettverkstreg i CI.
   testInfo.setTimeout(testInfo.timeout + 20_000);
   await expect(page.getByTestId("publish-listing-button")).toBeEnabled({ timeout: 20_000 });
   await clickAndWaitFor(

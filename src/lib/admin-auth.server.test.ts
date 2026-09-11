@@ -21,9 +21,12 @@ describe("requireAdminRole", () => {
     await expect(requireAdminRole(supabase, "user-1")).rejects.toThrow("Ikke autorisert");
   });
 
-  it("propagates a Supabase query error instead of swallowing it", async () => {
+  it("sanitizes Supabase query errors before returning them", async () => {
     const dbError = new Error("connection lost");
     const supabase = mockSupabase({ data: null, error: dbError });
-    await expect(requireAdminRole(supabase, "user-1")).rejects.toThrow("connection lost");
+    await expect(requireAdminRole(supabase, "user-1")).rejects.toThrow(
+      "Noe gikk galt. Prøv igjen senere.",
+    );
+    await expect(requireAdminRole(supabase, "user-1")).rejects.not.toThrow("connection lost");
   });
 });

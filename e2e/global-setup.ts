@@ -36,6 +36,7 @@ export default async function globalSetup() {
   const runId = Date.now();
   const password = "e2e-test-password-12345";
   const userIds: string[] = [];
+  let businessOrganizationId: string | null = null;
 
   async function createTestUser(suffix: string, displayName: string, needsDemoRole = false) {
     const email = `e2e-${runId}-${suffix}@example.com`;
@@ -69,6 +70,67 @@ export default async function globalSetup() {
     for (const project of PUBLISH_PROJECTS) {
       users[project] = await createTestUser(project, `E2E Test ${project}`, true);
     }
+    const desktopUser = users["desktop-web"];
+    const { data: businessOrganization, error: businessOrganizationError } = await admin
+      .from("organizations")
+      .insert({
+        organization_number: `9${String(runId).slice(-8)}`,
+        legal_name: "E2E Proff AS",
+        display_name: "E2E Proff",
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 86_400_000).toISOString(),
+        // New organizations default to 'unverified' and can't publish (or
+        // update/republish) listings until admin-approved — see
+        // 20260902200000_organization_verification.sql. The E2E fixture org
+        // needs to actually publish, so mark it pre-verified.
+        verification_status: "verified",
+        verified_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (businessOrganizationError) throw businessOrganizationError;
+    businessOrganizationId = businessOrganization.id;
+    const { error: businessBillingProfileError } = await admin
+      .from("organization_billing_profiles")
+      .insert({
+        organization_id: businessOrganization.id,
+        billing_email: `faktura-${runId}@example.com`,
+      });
+    if (businessBillingProfileError) throw businessBillingProfileError;
+
+    const { data: businessLocation, error: businessLocationError } = await admin
+      .from("organization_locations")
+      .insert({
+        organization_id: businessOrganization.id,
+        name: "Hovedlokasjon",
+        address_line: "Storgata 1",
+        postal_code: "0001",
+        city: "Oslo",
+        is_default: true,
+      })
+      .select("id")
+      .single();
+    if (businessLocationError) throw businessLocationError;
+    if (!businessLocation) throw new Error("E2E-lokasjon ble ikke opprettet.");
+    const { error: businessMemberError } = await admin.from("organization_members").insert({
+      organization_id: businessOrganization.id,
+      user_id: desktopUser.userId,
+      role: "superuser",
+      status: "active",
+    });
+    if (businessMemberError) throw businessMemberError;
+    const { error: businessLocationMemberError } = await admin
+      .from("organization_location_members")
+      .insert({
+        organization_id: businessOrganization.id,
+        location_id: businessLocation.id,
+        user_id: desktopUser.userId,
+        role: "manager",
+        listing_access: "all",
+        listing_edit_scope: "all",
+        chat_access: "all",
+      });
+    if (businessLocationMemberError) throw businessLocationMemberError;
 
     const { data: category, error: categoryError } = await admin
       .from("categories")
@@ -147,10 +209,14 @@ export default async function globalSetup() {
       JSON.stringify({
         users,
         userIds,
+        businessOrganizationId,
         filterFixture: { query: FILTER_FIXTURE_QUERY, total: 3, paid: 2 },
       }),
     );
   } catch (setupError) {
+    if (businessOrganizationId) {
+      await admin.from("organizations").delete().eq("id", businessOrganizationId);
+    }
     for (const userId of userIds) await admin.auth.admin.deleteUser(userId);
     throw setupError;
   }

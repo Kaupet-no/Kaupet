@@ -27,12 +27,8 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Samme applicationId for begge — appen krasjer ikke og lar seg
-    // installere over den andre, men de kan ikke stå installert side ved
-    // side samtidig. Et eget applicationId for staging (for sidestilt
-    // installasjon) krever en egen Firebase Android-app registrert for
-    // den id-en, siden google-services-pluginet feiler bygget hvis
-    // package_name ikke finnes i google-services.json.
+    // Staging is a separate install and must never share production's app
+    // identity, storage, cookies, or deep-link trust boundary.
     flavorDimensions "env"
     productFlavors {
         production {
@@ -41,6 +37,7 @@ android {
         }
         staging {
             dimension "env"
+            applicationIdSuffix ".staging"
             resValue "string", "app_name", "Kaupet Staging"
         }
     }
@@ -58,7 +55,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 }

@@ -31,10 +31,12 @@ function SuggestingAttributeInput({
   attributes,
   onAttributesChange,
   extraFieldError,
+  required,
 }: Pick<WizardSharedProps, "attributes" | "onAttributesChange" | "extraFieldError"> & {
   categoryId: string | null;
   attrKey: string;
   label: string;
+  required: boolean;
 }) {
   const fieldError = extraFieldError?.field === attrKey ? extraFieldError.message : null;
   const raw = attributes[attrKey];
@@ -70,7 +72,7 @@ function SuggestingAttributeInput({
     <div className="space-y-2">
       <Label htmlFor={fieldId}>
         {label}
-        <RequiredMark />
+        {required && <RequiredMark />}
       </Label>
       <Popover open={showSuggestions}>
         <PopoverAnchor asChild>
@@ -78,7 +80,7 @@ function SuggestingAttributeInput({
             id={fieldId}
             value={value}
             autoComplete="off"
-            aria-required="true"
+            aria-required={required}
             aria-invalid={!!fieldError}
             aria-describedby={fieldError ? `${fieldId}-error` : undefined}
             onFocus={() => setOpen(true)}
@@ -245,13 +247,21 @@ export function BoatFactsGroup(props: WizardSharedProps) {
   );
   const missingKeys = useMemo(
     () =>
-      getMissingRequiredFilters(
-        props.categoryId,
-        allFilters ?? [],
-        categoriesById,
-        props.attributes,
-      ).map((filter) => filter.key),
-    [props.categoryId, allFilters, categoriesById, props.attributes],
+      props.behavior.requiresCategoryFilterValues
+        ? getMissingRequiredFilters(
+            props.categoryId,
+            allFilters ?? [],
+            categoriesById,
+            props.attributes,
+          ).map((filter) => filter.key)
+        : [],
+    [
+      props.behavior.requiresCategoryFilterValues,
+      props.categoryId,
+      allFilters,
+      categoriesById,
+      props.attributes,
+    ],
   );
   const [openSections, setOpenSections] = useState<Record<BoatSectionKey, boolean>>({
     basic: true,
@@ -271,7 +281,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
     categories: props.categories,
     value: props.attributes,
     onChange: props.onAttributesChange,
-    required: true,
+    required: props.behavior.requiresCategoryFilterValues,
     showErrors: props.attributesTouched,
     heading: null,
   } as const;
@@ -290,6 +300,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
           attrKey="brand"
           label="Merke"
           attributes={props.attributes}
+          required={props.behavior.requiresCategoryFilterValues}
           onAttributesChange={props.onAttributesChange}
           extraFieldError={props.extraFieldError}
         />
@@ -300,6 +311,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
           attributes={props.attributes}
           onAttributesChange={props.onAttributesChange}
           extraFieldError={props.extraFieldError}
+          required={props.behavior.requiresCategoryFilterValues}
         />
         <AttributeFields {...attributeProps} filterKeys={BASIC_KEYS} />
       </BoatDetailsSection>

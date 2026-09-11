@@ -14,6 +14,8 @@ import {
   X,
   ShieldAlert,
   ChevronUp,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
@@ -23,10 +25,11 @@ import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { isUnread } from "@/lib/unread";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
-
 type ConversationRow = {
   id: string;
   buyer_id: string;
@@ -35,6 +38,8 @@ type ConversationRow = {
   last_message_at: string;
   buyer_last_read_at: string | null;
   seller_last_read_at: string | null;
+  buyer_deleted_at: string | null;
+  seller_deleted_at: string | null;
   listing: {
     id: string;
     title: string;
@@ -82,6 +87,8 @@ type RawConv = {
   last_message_at: string;
   buyer_last_read_at: string | null;
   seller_last_read_at: string | null;
+  buyer_deleted_at: string | null;
+  seller_deleted_at: string | null;
   listing: RawListingRel | RawListingRel[] | null;
   buyer?: RawProfile | RawProfile[] | null;
   seller?: RawProfile | RawProfile[] | null;
@@ -94,12 +101,11 @@ type SystemMessage = {
   read_at: string | null;
 };
 
-/** Innboksen. Brukes både som egen rute (`meldinger.index`) og som venstre
- * spalte i nettbrettoppsettet i `meldinger.$id` (fase 10). */
 export function InboxPage() {
   const native = useIsNative();
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [view, setView] = useState<"inbox" | "trash">("inbox");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [systemOpen, setSystemOpen] = useState(true);
@@ -113,28 +119,32 @@ export function InboxPage() {
   });
 
   const { data: conversations, isLoading } = useQuery({
-    queryKey: ["my-conversations", user?.id],
+    queryKey: ["my-conversations", user?.id, view],
     enabled: !!user,
     queryFn: async (): Promise<ConversationRow[]> => {
+      const trashCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      const visibility =
+        view === "inbox"
+          ? `and(buyer_id.eq.${user!.id},buyer_deleted_at.is.null),and(seller_id.eq.${user!.id},seller_deleted_at.is.null)`
+          : `and(buyer_id.eq.${user!.id},buyer_deleted_at.gte.${trashCutoff}),and(seller_id.eq.${user!.id},seller_deleted_at.gte.${trashCutoff})`;
       const { data, error } = await supabase
         .from("conversations")
         .select(
-          `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at,
+          `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
            listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order)),
            buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url, deleted_at),
            seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url, deleted_at)`,
         )
-        .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
+        .or(visibility)
         .order("last_message_at", { ascending: false });
       if (error) {
-        // Fall back if FK alias join fails: fetch profiles separately
         const { data: convs, error: e2 } = await supabase
           .from("conversations")
           .select(
-            `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at,
+            `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
              listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order))`,
           )
-          .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
+          .or(visibility)
           .order("last_message_at", { ascending: false });
         if (e2) throw e2;
         const rawConvs = (convs ?? []) as unknown as RawConv[];
@@ -184,6 +194,28 @@ export function InboxPage() {
         .is("read_at", null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["system-messages"] }),
+  });
+  const trashMut = useMutation({
+    mutationFn: async ({ row, restore }: { row: ConversationRow; restore: boolean }) => {
+      if (!user) throw new Error("Ikke innlogget");
+      const field = user.id === row.buyer_id ? "buyer_deleted_at" : "seller_deleted_at";
+      const update =
+        field === "buyer_deleted_at"
+          ? { buyer_deleted_at: restore ? null : new Date().toISOString() }
+          : { seller_deleted_at: restore ? null : new Date().toISOString() };
+      const { error } = await supabase.from("conversations").update(update).eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, { restore }) => {
+      void qc.invalidateQueries({ queryKey: ["my-conversations"] });
+      void qc.invalidateQueries({ queryKey: ["messages-preview"] });
+      void qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+      showSuccessToast(
+        restore ? "Samtalen er gjenopprettet" : "Samtalen er flyttet til papirkurven",
+      );
+    },
+    onError: (error: Error) =>
+      showErrorToast(formatErrorMessage(error, "Kunne ikke oppdatere samtalen")),
   });
 
   const unreadSystemCount = systemMessages?.filter((m) => !m.read_at).length ?? 0;
@@ -260,183 +292,244 @@ export function InboxPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         Samtalene dine er gruppert etter annonse.
       </p>
+      <Tabs
+        value={view}
+        onValueChange={(value) => setView(value as "inbox" | "trash")}
+        className="mt-6"
+      >
+        <TabsList aria-label="Meldingsvisning">
+          <TabsTrigger value="inbox">Innboks</TabsTrigger>
+          <TabsTrigger value="trash">Papirkurv</TabsTrigger>
+        </TabsList>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Samtaler i papirkurven tømmes automatisk etter 14 dager.
+        </p>
 
-      {systemMessages && systemMessages.length > 0 && (
-        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
-          <button
-            type="button"
-            onClick={() => setSystemOpen((o) => !o)}
-            className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
-          >
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <ShieldAlert className="size-5 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">Kaupet-teamet</p>
-              <p className="text-xs text-muted-foreground">
-                {systemMessages.length} {systemMessages.length === 1 ? "melding" : "meldinger"}
-              </p>
-            </div>
-            {unreadSystemCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground">
-                {unreadSystemCount}
-              </span>
-            )}
-            {systemOpen ? (
-              <ChevronUp className="size-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="size-4 text-muted-foreground" />
-            )}
-          </button>
-          {systemOpen && (
-            <ul className="divide-y divide-border border-t border-border">
-              {systemMessages.map((msg) => (
-                <li key={msg.id}>
-                  <SystemMessageRow msg={msg} onRead={() => markReadMut.mutate(msg.id)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      <PushHintForMessages />
-
-      <div className="mt-8 space-y-3">
-        {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-20" />
-            ))}
-          </div>
-        ) : groups.length === 0 ? (
-          <EmptyState
-            icon={MessageCircle}
-            title="Ingen samtaler enda"
-            description="Når du eller noen andre starter en samtale om en annonse, dukker den opp her."
-            action={
-              <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-                <Button>Utforsk annonser</Button>
-              </Link>
-            }
-          />
-        ) : (
-          groups.map((g) => {
-            const isExpanded = expanded[g.listingId] ?? true;
-            const cover = (g.listing?.listing_images ?? [])
-              .slice()
-              .sort((a, b) => a.sort_order - b.sort_order)[0];
-            const coverUrl = cover ? imgUrls[cover.storage_path] : undefined;
-            const priceLabel = g.listing?.is_free
-              ? "Gis bort"
-              : g.listing?.price_nok != null
-                ? `${g.listing.price_nok.toLocaleString("nb-NO")} kr`
-                : "Pris ved henvendelse";
-            return (
-              <div
-                key={g.listingId}
-                className="overflow-hidden rounded-xl border border-border bg-card"
+        <TabsContent value="inbox">
+          {systemMessages && systemMessages.length > 0 && (
+            <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
+              <button
+                type="button"
+                onClick={() => setSystemOpen((o) => !o)}
+                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
               >
-                <button
-                  type="button"
-                  onClick={() => setExpanded((p) => ({ ...p, [g.listingId]: !isExpanded }))}
-                  className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
-                >
-                  <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
-                    {coverUrl ? (
-                      <img src={coverUrl} alt="" className="size-full object-cover" />
-                    ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{g.listing?.title ?? "Slettet annonse"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {priceLabel} · {g.conversations.length}{" "}
-                      {g.conversations.length === 1 ? "samtale" : "samtaler"}
-                    </p>
-                  </div>
-                  {g.unreadCount > 0 && (
-                    <span
-                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground"
-                      aria-label={`${g.unreadCount} uleste`}
-                    >
-                      {g.unreadCount}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    {formatRelative(g.lastActivity)}
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <ShieldAlert className="size-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">Kaupet-teamet</p>
+                  <p className="text-xs text-muted-foreground">
+                    {systemMessages.length} {systemMessages.length === 1 ? "melding" : "meldinger"}
+                  </p>
+                </div>
+                {unreadSystemCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground">
+                    {unreadSystemCount}
                   </span>
-                  {isExpanded ? (
-                    <ChevronDown className="size-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  )}
-                </button>
-
-                {isExpanded && (
-                  <ul className="divide-y divide-border border-t border-border">
-                    {g.conversations
-                      .slice()
-                      .sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1))
-                      .map((c) => {
-                        const other = user?.id === c.seller_id ? c.buyer : c.seller;
-                        const lastFromMe = c.last_message?.sender_id === user?.id;
-                        const unread = unreadByConv.get(c.id) ?? false;
-                        return (
-                          <li key={c.id}>
-                            <Link
-                              to="/meldinger/$id"
-                              params={{ id: c.id }}
-                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 data-[status=active]:bg-accent/10 ${unread ? "bg-brand/5" : ""}`}
-                            >
-                              {other?.avatar_url ? (
-                                <img
-                                  src={other.avatar_url}
-                                  alt=""
-                                  className="size-9 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                                  {(other?.deleted_at ? "S" : (other?.display_name ?? "?"))
-                                    .slice(0, 1)
-                                    .toUpperCase()}
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p
-                                  className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"} ${other?.deleted_at ? "italic text-muted-foreground" : ""}`}
-                                >
-                                  {other?.deleted_at
-                                    ? "Slettet bruker"
-                                    : (other?.display_name ?? "Ukjent bruker")}
-                                </p>
-                                <p
-                                  className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}
-                                >
-                                  {c.last_message
-                                    ? `${lastFromMe ? "Du: " : ""}${c.last_message.body}`
-                                    : "Ingen meldinger enda"}
-                                </p>
-                              </div>
-                              {unread && (
-                                <span
-                                  className="size-2 shrink-0 rounded-full bg-brand"
-                                  aria-label="Ulest"
-                                />
-                              )}
-                              <span className="text-xs text-muted-foreground">
-                                {formatRelative(c.last_message_at)}
-                              </span>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                  </ul>
                 )}
+                {systemOpen ? (
+                  <ChevronUp className="size-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                )}
+              </button>
+              {systemOpen && (
+                <ul className="divide-y divide-border border-t border-border">
+                  {systemMessages.map((msg) => (
+                    <li key={msg.id}>
+                      <SystemMessageRow msg={msg} onRead={() => markReadMut.mutate(msg.id)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {view === "inbox" && <PushHintForMessages />}
+
+        <TabsContent value={view}>
+          <div className="mt-8 space-y-3">
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20" />
+                ))}
               </div>
-            );
-          })
-        )}
-      </div>
+            ) : groups.length === 0 ? (
+              <EmptyState
+                icon={view === "trash" ? Trash2 : MessageCircle}
+                title={view === "trash" ? "Papirkurven er tom" : "Ingen samtaler enda"}
+                description={
+                  view === "trash"
+                    ? "Samtaler i papirkurven tømmes automatisk etter 14 dager."
+                    : "Når du eller noen andre starter en samtale om en annonse, dukker den opp her."
+                }
+                action={
+                  view === "inbox" ? (
+                    <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+                      <Button>Utforsk annonser</Button>
+                    </Link>
+                  ) : undefined
+                }
+              />
+            ) : (
+              groups.map((g) => {
+                const isExpanded = expanded[g.listingId] ?? true;
+                const cover = (g.listing?.listing_images ?? [])
+                  .slice()
+                  .sort((a, b) => a.sort_order - b.sort_order)[0];
+                const coverUrl = cover ? imgUrls[cover.storage_path] : undefined;
+                const priceLabel = g.listing?.is_free
+                  ? "Gis bort"
+                  : g.listing?.price_nok != null
+                    ? `${g.listing.price_nok.toLocaleString("nb-NO")} kr`
+                    : "Pris ved henvendelse";
+                return (
+                  <div
+                    key={g.listingId}
+                    className="overflow-hidden rounded-xl border border-border bg-card"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpanded((p) => ({ ...p, [g.listingId]: !isExpanded }))}
+                      className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
+                    >
+                      <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+                        {coverUrl ? (
+                          <img src={coverUrl} alt="" className="size-full object-cover" />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">
+                          {g.listing?.title ?? "Slettet annonse"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {priceLabel} · {g.conversations.length}{" "}
+                          {g.conversations.length === 1 ? "samtale" : "samtaler"}
+                        </p>
+                      </div>
+                      {g.unreadCount > 0 && (
+                        <span
+                          className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground"
+                          aria-label={`${g.unreadCount} uleste`}
+                        >
+                          {g.unreadCount}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {formatRelative(g.lastActivity)}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronDown className="size-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      )}
+                    </button>
+
+                    {isExpanded && (
+                      <ul className="divide-y divide-border border-t border-border">
+                        {g.conversations
+                          .slice()
+                          .sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1))
+                          .map((c) => {
+                            const other = user?.id === c.seller_id ? c.buyer : c.seller;
+                            const lastFromMe = c.last_message?.sender_id === user?.id;
+                            const unread = unreadByConv.get(c.id) ?? false;
+                            const row = (
+                              <div className="flex items-center">
+                                <Link
+                                  to="/meldinger/$id"
+                                  params={{ id: c.id }}
+                                  className={`flex min-w-0 flex-1 items-center gap-3 p-3 hover:bg-muted/40 data-[status=active]:bg-accent/10 ${unread ? "bg-brand/5" : ""}`}
+                                >
+                                  {other?.avatar_url ? (
+                                    <img
+                                      src={other.avatar_url}
+                                      alt=""
+                                      className="size-9 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                                      {(other?.deleted_at ? "S" : (other?.display_name ?? "?"))
+                                        .slice(0, 1)
+                                        .toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <p
+                                      className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"} ${other?.deleted_at ? "italic text-muted-foreground" : ""}`}
+                                    >
+                                      {other?.deleted_at
+                                        ? "Slettet bruker"
+                                        : (other?.display_name ?? "Ukjent bruker")}
+                                    </p>
+                                    <p
+                                      className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}
+                                    >
+                                      {c.last_message
+                                        ? `${lastFromMe ? "Du: " : ""}${c.last_message.body}`
+                                        : "Ingen meldinger enda"}
+                                    </p>
+                                  </div>
+                                  {unread && (
+                                    <span
+                                      className="size-2 shrink-0 rounded-full bg-brand"
+                                      aria-label="Ulest"
+                                    />
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatRelative(c.last_message_at)}
+                                  </span>
+                                </Link>
+                                {(!native || view === "trash") && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="mr-1 size-11 shrink-0"
+                                    aria-label={
+                                      view === "trash"
+                                        ? "Gjenopprett samtale"
+                                        : "Flytt samtale til papirkurven"
+                                    }
+                                    onClick={() =>
+                                      trashMut.mutate({ row: c, restore: view === "trash" })
+                                    }
+                                  >
+                                    {view === "trash" ? (
+                                      <RotateCcw className="size-4" />
+                                    ) : (
+                                      <Trash2 className="size-4" />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                            return (
+                              <li key={c.id}>
+                                {native && view === "inbox" ? (
+                                  <SwipeToDeleteRow
+                                    onDelete={() => trashMut.mutate({ row: c, restore: false })}
+                                    deleteLabel="Slett"
+                                  >
+                                    {row}
+                                  </SwipeToDeleteRow>
+                                ) : (
+                                  row
+                                )}
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

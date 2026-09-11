@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { saveWtbDraftMock } = vi.hoisted(() => ({
+  saveWtbDraftMock: vi.fn(),
+}));
 
 vi.mock("@/lib/wtb-listings.functions", () => ({
-  saveWtbDraft: vi.fn().mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001" }),
+  saveWtbDraft: saveWtbDraftMock,
   getLatestWtbDraft: vi.fn().mockResolvedValue(null),
   discardWtbDraft: vi.fn().mockResolvedValue(undefined),
 }));
@@ -23,11 +27,18 @@ describe("useWtbDraftAutosave", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.useFakeTimers();
+    saveWtbDraftMock.mockReset();
+    saveWtbDraftMock.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+    });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it("lagrer et versjonert kjøpsønske uten å berøre salgsutkastet", () => {
     localStorage.setItem("kaupet_draft_ny_annonse", "sell-draft");
-    renderHook(() => useWtbDraftAutosave(fields));
+    renderHook(() => useWtbDraftAutosave(fields, true));
 
     act(() => vi.advanceTimersByTime(2_001));
 
@@ -43,6 +54,18 @@ describe("useWtbDraftAutosave", () => {
     });
     expect(localStorage.getItem("kaupet_draft_ny_annonse")).toBe("sell-draft");
   });
+  it("lagrer gjestedraft lokalt når Supabase ikke er tilgjengelig", () => {
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, false));
+
+    act(() => {
+      result.current.flushLocalDraft();
+    });
+
+    expect(JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}")).toMatchObject({
+      draft_kind: "want",
+      title: "Ønsker sykkel",
+    });
+  });
 
   it("tilbyr et gyldig lagret utkast for gjenoppretting", async () => {
     localStorage.setItem(
@@ -54,10 +77,23 @@ describe("useWtbDraftAutosave", () => {
         ...fields,
       }),
     );
-    const { result } = renderHook(() => useWtbDraftAutosave(fields));
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true));
 
     await act(() => vi.advanceTimersByTimeAsync(1));
 
     expect(result.current.restorableDraft?.title).toBe("Ønsker sykkel");
+  });
+
+  it("stopper lokal og serverbasert autolagring etter publisering", async () => {
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true));
+    await act(() => vi.advanceTimersByTimeAsync(2_001));
+    expect(localStorage.getItem("kaupet_draft_want_listing")).not.toBeNull();
+
+    act(() => result.current.clearAfterPublish());
+    expect(localStorage.getItem("kaupet_draft_want_listing")).toBeNull();
+
+    await act(() => vi.advanceTimersByTimeAsync(30_001));
+    expect(localStorage.getItem("kaupet_draft_want_listing")).toBeNull();
+    expect(saveWtbDraftMock).not.toHaveBeenCalled();
   });
 });

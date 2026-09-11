@@ -14,6 +14,10 @@ import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BedriftsinvitasjonRouteImport } from './routes/bedriftsinvitasjon'
+import { Route as BekreftEpostRouteImport } from './routes/bekreft-epost'
+import { Route as NyAnnonseRouteImport } from './routes/ny-annonse'
+import { Route as NyOkAnnonseRouteImport } from './routes/ny-ok-annonse'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TilbakestillPassordRouteImport } from './routes/tilbakestill-passord'
@@ -21,30 +25,36 @@ import { Route as VilkarRouteImport } from './routes/vilkar'
 import { Route as KaupetCodeSubRouteImport } from './routes/$kaupetCode_.$sub'
 import { Route as R360OpptakTokenRouteImport } from './routes/360-opptak.$token'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
+import { Route as AuthenticatedBedriftRouteRouteImport } from './routes/_authenticated/bedrift/route'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
-import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
-import { Route as AuthenticatedNyOkAnnonseRouteImport } from './routes/_authenticated/ny-ok-annonse'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
+import { Route as BedriftOrganizationIdRouteImport } from './routes/bedrift.$organizationId'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
+import { Route as DesignBedriftPlanerRouteImport } from './routes/design/bedrift-planer'
 import { Route as OkIdRouteImport } from './routes/ok.$id'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminBedrifterRouteImport } from './routes/_authenticated/admin/bedrifter'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
+import { Route as AuthenticatedAdminProffAbonnementRouteImport } from './routes/_authenticated/admin/proff-abonnement'
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminTilbakemeldingerRouteImport } from './routes/_authenticated/admin/tilbakemeldinger'
 import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
+import { Route as AuthenticatedBedriftIndexRouteImport } from './routes/_authenticated/bedrift/index'
+import { Route as AuthenticatedBedriftVelgPlanRouteImport } from './routes/_authenticated/bedrift/velg-plan'
 import { Route as AuthenticatedBekrefterPromoIdRouteImport } from './routes/_authenticated/bekrefter.$promoId'
 import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_authenticated/kvittering.$promoId'
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
+import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
 
@@ -70,6 +80,26 @@ const AnnonserRoute = AnnonserRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BedriftsinvitasjonRoute = BedriftsinvitasjonRouteImport.update({
+  id: '/bedriftsinvitasjon',
+  path: '/bedriftsinvitasjon',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BekreftEpostRoute = BekreftEpostRouteImport.update({
+  id: '/bekreft-epost',
+  path: '/bekreft-epost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NyAnnonseRoute = NyAnnonseRouteImport.update({
+  id: '/ny-annonse',
+  path: '/ny-annonse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NyOkAnnonseRoute = NyOkAnnonseRouteImport.update({
+  id: '/ny-ok-annonse',
+  path: '/ny-ok-annonse',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PersonvernRoute = PersonvernRouteImport.update({
@@ -107,6 +137,12 @@ const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBedriftRouteRoute =
+  AuthenticatedBedriftRouteRouteImport.update({
+    id: '/bedrift',
+    path: '/bedrift',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
   id: '/favoritter',
   path: '/favoritter',
@@ -122,17 +158,6 @@ const AuthenticatedMineSokRoute = AuthenticatedMineSokRouteImport.update({
   path: '/mine-sok',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
-  id: '/ny-annonse',
-  path: '/ny-annonse',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedNyOkAnnonseRoute =
-  AuthenticatedNyOkAnnonseRouteImport.update({
-    id: '/ny-ok-annonse',
-    path: '/ny-ok-annonse',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
   id: '/profil',
   path: '/profil',
@@ -153,9 +178,19 @@ const AnnonserFilterRoute = AnnonserFilterRouteImport.update({
   path: '/annonser/filter',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BedriftOrganizationIdRoute = BedriftOrganizationIdRouteImport.update({
+  id: '/bedrift/$organizationId',
+  path: '/bedrift/$organizationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BrukerIdRoute = BrukerIdRouteImport.update({
   id: '/bruker/$id',
   path: '/bruker/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignBedriftPlanerRoute = DesignBedriftPlanerRouteImport.update({
+  id: '/design/bedrift-planer',
+  path: '/design/bedrift-planer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OkIdRoute = OkIdRouteImport.update({
@@ -168,6 +203,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const AuthenticatedAdminBedrifterRoute =
+  AuthenticatedAdminBedrifterRouteImport.update({
+    id: '/bedrifter',
+    path: '/bedrifter',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminBrukereRoute =
   AuthenticatedAdminBrukereRouteImport.update({
     id: '/brukere',
@@ -192,6 +233,12 @@ const AuthenticatedAdminModerasjonRoute =
     path: '/moderasjon',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminProffAbonnementRoute =
+  AuthenticatedAdminProffAbonnementRouteImport.update({
+    id: '/proff-abonnement',
+    path: '/proff-abonnement',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminPromoteringerRoute =
   AuthenticatedAdminPromoteringerRouteImport.update({
     id: '/promoteringer',
@@ -209,6 +256,18 @@ const AuthenticatedAdminVippsWebhooksRoute =
     id: '/vipps-webhooks',
     path: '/vipps-webhooks',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedBedriftIndexRoute =
+  AuthenticatedBedriftIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedBedriftRouteRoute,
+  } as any)
+const AuthenticatedBedriftVelgPlanRoute =
+  AuthenticatedBedriftVelgPlanRouteImport.update({
+    id: '/velg-plan',
+    path: '/velg-plan',
+    getParentRoute: () => AuthenticatedBedriftRouteRoute,
   } as any)
 const AuthenticatedBekrefterPromoIdRoute =
   AuthenticatedBekrefterPromoIdRouteImport.update({
@@ -240,6 +299,11 @@ const AuthenticatedMineAnnonserIndexRoute =
     path: '/mine-annonser/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
+  id: '/api/public/csp-report',
+  path: '/api/public/csp-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
   id: '/api/public/push/dispatch',
   path: '/api/public/push/dispatch',
@@ -256,35 +320,45 @@ export interface FileRoutesByFullPath {
   '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
+  '/bekreft-epost': typeof BekreftEpostRoute
+  '/ny-annonse': typeof NyAnnonseRoute
+  '/ny-ok-annonse': typeof NyOkAnnonseRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/bedrift': typeof AuthenticatedBedriftRouteRouteWithChildren
   '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
   '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
-  '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
+  '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
+  '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/admin/proff-abonnement': typeof AuthenticatedAdminProffAbonnementRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/bedrift/velg-plan': typeof AuthenticatedBedriftVelgPlanRoute
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
@@ -295,6 +369,10 @@ export interface FileRoutesByTo {
   '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
+  '/bekreft-epost': typeof BekreftEpostRoute
+  '/ny-annonse': typeof NyAnnonseRoute
+  '/ny-ok-annonse': typeof NyOkAnnonseRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
@@ -304,25 +382,30 @@ export interface FileRoutesByTo {
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
-  '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
+  '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
+  '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/admin/proff-abonnement': typeof AuthenticatedAdminProffAbonnementRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/bedrift/velg-plan': typeof AuthenticatedBedriftVelgPlanRoute
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/bedrift': typeof AuthenticatedBedriftIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
@@ -335,35 +418,45 @@ export interface FileRoutesById {
   '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
+  '/bekreft-epost': typeof BekreftEpostRoute
+  '/ny-annonse': typeof NyAnnonseRoute
+  '/ny-ok-annonse': typeof NyOkAnnonseRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/bedrift': typeof AuthenticatedBedriftRouteRouteWithChildren
   '/$kaupetCode_/$sub': typeof KaupetCodeSubRoute
   '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
-  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
-  '/_authenticated/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser_/filter': typeof AnnonserFilterRoute
+  '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
+  '/_authenticated/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/_authenticated/admin/proff-abonnement': typeof AuthenticatedAdminProffAbonnementRoute
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/_authenticated/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/_authenticated/bedrift/velg-plan': typeof AuthenticatedBedriftVelgPlanRoute
   '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
@@ -376,35 +469,45 @@ export interface FileRouteTypes {
     | '/$kaupetCode'
     | '/annonser'
     | '/auth'
+    | '/bedriftsinvitasjon'
+    | '/bekreft-epost'
+    | '/ny-annonse'
+    | '/ny-ok-annonse'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/admin'
+    | '/bedrift'
     | '/$kaupetCode/$sub'
     | '/360-opptak/$token'
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
-    | '/ny-annonse'
-    | '/ny-ok-annonse'
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
     | '/annonser/filter'
+    | '/bedrift/$organizationId'
     | '/bruker/$id'
+    | '/design/bedrift-planer'
     | '/ok/$id'
+    | '/admin/bedrifter'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
+    | '/admin/proff-abonnement'
     | '/admin/promoteringer'
     | '/admin/tilbakemeldinger'
     | '/admin/vipps-webhooks'
+    | '/bedrift/velg-plan'
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
+    | '/api/public/csp-report'
     | '/admin/'
+    | '/bedrift/'
     | '/meldinger/'
     | '/mine-annonser/'
     | '/api/public/push/dispatch'
@@ -415,6 +518,10 @@ export interface FileRouteTypes {
     | '/$kaupetCode'
     | '/annonser'
     | '/auth'
+    | '/bedriftsinvitasjon'
+    | '/bekreft-epost'
+    | '/ny-annonse'
+    | '/ny-ok-annonse'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
@@ -424,25 +531,30 @@ export interface FileRouteTypes {
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
-    | '/ny-annonse'
-    | '/ny-ok-annonse'
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
     | '/annonser/filter'
+    | '/bedrift/$organizationId'
     | '/bruker/$id'
+    | '/design/bedrift-planer'
     | '/ok/$id'
+    | '/admin/bedrifter'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
+    | '/admin/proff-abonnement'
     | '/admin/promoteringer'
     | '/admin/tilbakemeldinger'
     | '/admin/vipps-webhooks'
+    | '/bedrift/velg-plan'
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
+    | '/api/public/csp-report'
     | '/admin'
+    | '/bedrift'
     | '/meldinger'
     | '/mine-annonser'
     | '/api/public/push/dispatch'
@@ -454,35 +566,45 @@ export interface FileRouteTypes {
     | '/$kaupetCode'
     | '/annonser'
     | '/auth'
+    | '/bedriftsinvitasjon'
+    | '/bekreft-epost'
+    | '/ny-annonse'
+    | '/ny-ok-annonse'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/_authenticated/admin'
+    | '/_authenticated/bedrift'
     | '/$kaupetCode_/$sub'
     | '/360-opptak/$token'
     | '/_authenticated/favoritter'
     | '/_authenticated/meg'
     | '/_authenticated/mine-sok'
-    | '/_authenticated/ny-annonse'
-    | '/_authenticated/ny-ok-annonse'
     | '/_authenticated/profil'
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
     | '/annonser_/filter'
+    | '/bedrift/$organizationId'
     | '/bruker/$id'
+    | '/design/bedrift-planer'
     | '/ok/$id'
+    | '/_authenticated/admin/bedrifter'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/kjoretoy'
     | '/_authenticated/admin/moderasjon'
+    | '/_authenticated/admin/proff-abonnement'
     | '/_authenticated/admin/promoteringer'
     | '/_authenticated/admin/tilbakemeldinger'
     | '/_authenticated/admin/vipps-webhooks'
+    | '/_authenticated/bedrift/velg-plan'
     | '/_authenticated/bekrefter/$promoId'
     | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
+    | '/api/public/csp-report'
     | '/_authenticated/admin/'
+    | '/_authenticated/bedrift/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/api/public/push/dispatch'
@@ -495,6 +617,10 @@ export interface RootRouteChildren {
   KaupetCodeRoute: typeof KaupetCodeRoute
   AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
+  BedriftsinvitasjonRoute: typeof BedriftsinvitasjonRoute
+  BekreftEpostRoute: typeof BekreftEpostRoute
+  NyAnnonseRoute: typeof NyAnnonseRoute
+  NyOkAnnonseRoute: typeof NyOkAnnonseRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TilbakestillPassordRoute: typeof TilbakestillPassordRoute
@@ -503,8 +629,11 @@ export interface RootRouteChildren {
   R360OpptakTokenRoute: typeof R360OpptakTokenRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   AnnonserFilterRoute: typeof AnnonserFilterRoute
+  BedriftOrganizationIdRoute: typeof BedriftOrganizationIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
+  DesignBedriftPlanerRoute: typeof DesignBedriftPlanerRoute
   OkIdRoute: typeof OkIdRoute
+  ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
@@ -544,6 +673,34 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bedriftsinvitasjon': {
+      id: '/bedriftsinvitasjon'
+      path: '/bedriftsinvitasjon'
+      fullPath: '/bedriftsinvitasjon'
+      preLoaderRoute: typeof BedriftsinvitasjonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bekreft-epost': {
+      id: '/bekreft-epost'
+      path: '/bekreft-epost'
+      fullPath: '/bekreft-epost'
+      preLoaderRoute: typeof BekreftEpostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ny-annonse': {
+      id: '/ny-annonse'
+      path: '/ny-annonse'
+      fullPath: '/ny-annonse'
+      preLoaderRoute: typeof NyAnnonseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ny-ok-annonse': {
+      id: '/ny-ok-annonse'
+      path: '/ny-ok-annonse'
+      fullPath: '/ny-ok-annonse'
+      preLoaderRoute: typeof NyOkAnnonseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/personvern': {
@@ -595,6 +752,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bedrift': {
+      id: '/_authenticated/bedrift'
+      path: '/bedrift'
+      fullPath: '/bedrift'
+      preLoaderRoute: typeof AuthenticatedBedriftRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/favoritter': {
       id: '/_authenticated/favoritter'
       path: '/favoritter'
@@ -614,20 +778,6 @@ declare module '@tanstack/react-router' {
       path: '/mine-sok'
       fullPath: '/mine-sok'
       preLoaderRoute: typeof AuthenticatedMineSokRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ny-annonse': {
-      id: '/_authenticated/ny-annonse'
-      path: '/ny-annonse'
-      fullPath: '/ny-annonse'
-      preLoaderRoute: typeof AuthenticatedNyAnnonseRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ny-ok-annonse': {
-      id: '/_authenticated/ny-ok-annonse'
-      path: '/ny-ok-annonse'
-      fullPath: '/ny-ok-annonse'
-      preLoaderRoute: typeof AuthenticatedNyOkAnnonseRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profil': {
@@ -658,11 +808,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnnonserFilterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bedrift/$organizationId': {
+      id: '/bedrift/$organizationId'
+      path: '/bedrift/$organizationId'
+      fullPath: '/bedrift/$organizationId'
+      preLoaderRoute: typeof BedriftOrganizationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bruker/$id': {
       id: '/bruker/$id'
       path: '/bruker/$id'
       fullPath: '/bruker/$id'
       preLoaderRoute: typeof BrukerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/bedrift-planer': {
+      id: '/design/bedrift-planer'
+      path: '/design/bedrift-planer'
+      fullPath: '/design/bedrift-planer'
+      preLoaderRoute: typeof DesignBedriftPlanerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ok/$id': {
@@ -677,6 +841,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/bedrifter': {
+      id: '/_authenticated/admin/bedrifter'
+      path: '/bedrifter'
+      fullPath: '/admin/bedrifter'
+      preLoaderRoute: typeof AuthenticatedAdminBedrifterRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/brukere': {
@@ -707,6 +878,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminModerasjonRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/proff-abonnement': {
+      id: '/_authenticated/admin/proff-abonnement'
+      path: '/proff-abonnement'
+      fullPath: '/admin/proff-abonnement'
+      preLoaderRoute: typeof AuthenticatedAdminProffAbonnementRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/promoteringer': {
       id: '/_authenticated/admin/promoteringer'
       path: '/promoteringer'
@@ -727,6 +905,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/vipps-webhooks'
       preLoaderRoute: typeof AuthenticatedAdminVippsWebhooksRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/bedrift/': {
+      id: '/_authenticated/bedrift/'
+      path: '/'
+      fullPath: '/bedrift/'
+      preLoaderRoute: typeof AuthenticatedBedriftIndexRouteImport
+      parentRoute: typeof AuthenticatedBedriftRouteRoute
+    }
+    '/_authenticated/bedrift/velg-plan': {
+      id: '/_authenticated/bedrift/velg-plan'
+      path: '/velg-plan'
+      fullPath: '/bedrift/velg-plan'
+      preLoaderRoute: typeof AuthenticatedBedriftVelgPlanRouteImport
+      parentRoute: typeof AuthenticatedBedriftRouteRoute
     }
     '/_authenticated/bekrefter/$promoId': {
       id: '/_authenticated/bekrefter/$promoId'
@@ -763,6 +955,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineAnnonserIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/csp-report': {
+      id: '/api/public/csp-report'
+      path: '/api/public/csp-report'
+      fullPath: '/api/public/csp-report'
+      preLoaderRoute: typeof ApiPublicCspReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/push/dispatch': {
       id: '/api/public/push/dispatch'
       path: '/api/public/push/dispatch'
@@ -781,10 +980,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteRouteChildren {
+  AuthenticatedAdminBedrifterRoute: typeof AuthenticatedAdminBedrifterRoute
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
   AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
+  AuthenticatedAdminProffAbonnementRoute: typeof AuthenticatedAdminProffAbonnementRoute
   AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
   AuthenticatedAdminTilbakemeldingerRoute: typeof AuthenticatedAdminTilbakemeldingerRoute
   AuthenticatedAdminVippsWebhooksRoute: typeof AuthenticatedAdminVippsWebhooksRoute
@@ -793,10 +994,13 @@ interface AuthenticatedAdminRouteRouteChildren {
 
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
+    AuthenticatedAdminBedrifterRoute: AuthenticatedAdminBedrifterRoute,
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
     AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
+    AuthenticatedAdminProffAbonnementRoute:
+      AuthenticatedAdminProffAbonnementRoute,
     AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
     AuthenticatedAdminTilbakemeldingerRoute:
       AuthenticatedAdminTilbakemeldingerRoute,
@@ -809,13 +1013,28 @@ const AuthenticatedAdminRouteRouteWithChildren =
     AuthenticatedAdminRouteRouteChildren,
   )
 
+interface AuthenticatedBedriftRouteRouteChildren {
+  AuthenticatedBedriftVelgPlanRoute: typeof AuthenticatedBedriftVelgPlanRoute
+  AuthenticatedBedriftIndexRoute: typeof AuthenticatedBedriftIndexRoute
+}
+
+const AuthenticatedBedriftRouteRouteChildren: AuthenticatedBedriftRouteRouteChildren =
+  {
+    AuthenticatedBedriftVelgPlanRoute: AuthenticatedBedriftVelgPlanRoute,
+    AuthenticatedBedriftIndexRoute: AuthenticatedBedriftIndexRoute,
+  }
+
+const AuthenticatedBedriftRouteRouteWithChildren =
+  AuthenticatedBedriftRouteRoute._addFileChildren(
+    AuthenticatedBedriftRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedBedriftRouteRoute: typeof AuthenticatedBedriftRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedMegRoute: typeof AuthenticatedMegRoute
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
-  AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
-  AuthenticatedNyOkAnnonseRoute: typeof AuthenticatedNyOkAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedVarslerRoute: typeof AuthenticatedVarslerRoute
   AuthenticatedBekrefterPromoIdRoute: typeof AuthenticatedBekrefterPromoIdRoute
@@ -827,11 +1046,10 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedBedriftRouteRoute: AuthenticatedBedriftRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedMegRoute: AuthenticatedMegRoute,
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
-  AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
-  AuthenticatedNyOkAnnonseRoute: AuthenticatedNyOkAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedVarslerRoute: AuthenticatedVarslerRoute,
   AuthenticatedBekrefterPromoIdRoute: AuthenticatedBekrefterPromoIdRoute,
@@ -850,6 +1068,10 @@ const rootRouteChildren: RootRouteChildren = {
   KaupetCodeRoute: KaupetCodeRoute,
   AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
+  BedriftsinvitasjonRoute: BedriftsinvitasjonRoute,
+  BekreftEpostRoute: BekreftEpostRoute,
+  NyAnnonseRoute: NyAnnonseRoute,
+  NyOkAnnonseRoute: NyOkAnnonseRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TilbakestillPassordRoute: TilbakestillPassordRoute,
@@ -858,8 +1080,11 @@ const rootRouteChildren: RootRouteChildren = {
   R360OpptakTokenRoute: R360OpptakTokenRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   AnnonserFilterRoute: AnnonserFilterRoute,
+  BedriftOrganizationIdRoute: BedriftOrganizationIdRoute,
   BrukerIdRoute: BrukerIdRoute,
+  DesignBedriftPlanerRoute: DesignBedriftPlanerRoute,
   OkIdRoute: OkIdRoute,
+  ApiPublicCspReportRoute: ApiPublicCspReportRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }

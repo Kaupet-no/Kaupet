@@ -1,4 +1,6 @@
-﻿import type {
+﻿import type { RefObject } from "react";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
+import type {
   UseFormRegister,
   UseFormSetValue,
   UseFormWatch,
@@ -21,15 +23,16 @@ export type ListingFormShape = {
   category_id: string;
   condition?: "new" | "like_new" | "good" | "acceptable" | "for_parts" | null;
   is_free: boolean;
-  can_ship?: "pickup" | "ship" | "both" | null;
+  can_ship?: "pickup" | "ship" | null;
   price_nok?: number | "" | undefined;
   postal_code?: string | undefined;
   city?: string | undefined;
+  organization_location_id?: string | null;
+  show_visiting_address?: boolean;
   known_issues?: string | undefined;
   no_known_issues?: boolean;
   maintenance_history?: string | undefined;
 };
-
 export type ComposerReviewClassification =
   "requiredToPublish" | "recommendedForTrust" | "optionalEnhancement";
 
@@ -140,16 +143,11 @@ export type WizardSharedProps = {
   /** Applies whichever of `categorySuggestions` has this category_id. */
   applyCategorySuggestion: (categoryId: string) => void;
   setSuggestionDismissed: (v: boolean) => void;
-  setCategorySuggestions: (v: []) => void;
 
   // category attributes
   attributes: AttributeMap;
   onAttributesChange: (next: AttributeMap) => void;
   attributesTouched: boolean;
-  /** Whether the category's flow includes generic (non-vehicle) category
-   * attributes — false when boat/vehicle-specific field groups already own
-   * category attributes for this category. */
-  genericAttributesActive: boolean;
   /** True when the boat-specific facts group owns category attributes. */
   boatFactsActive: boolean;
   /** category_filters keys already reviewed/edited in vehicle-confirm — hidden
@@ -243,8 +241,7 @@ export type WizardSharedProps = {
   previewPrice: string | null;
   mutationIsPending: boolean;
   turnstileEnabled: boolean;
-  turnstileToken: string | null;
-  setTurnstileToken: (token: string | null) => void;
+  turnstileRef: RefObject<TurnstileInstance | null>;
   onCancel: () => void;
   onEditReviewSection: (
     section: "category" | "content" | "details" | "location",

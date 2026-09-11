@@ -4,11 +4,9 @@ import type { CategoryNode } from "@/lib/category-filters";
 
 import {
   DEFAULT_FIELD_GROUPS,
-  DEFAULT_MODULES,
   effectiveFlowForCategory,
   resolveWizardPages,
   withRuntimeFieldGroups,
-  toStoredFieldGroupKeys,
   type CategoryFlowRow,
 } from "./category-flows";
 
@@ -23,7 +21,6 @@ function row(partial: Partial<CategoryFlowRow> & { category_id: string }): Categ
   return {
     id: partial.category_id,
     field_groups: DEFAULT_FIELD_GROUPS,
-    modules: DEFAULT_MODULES,
     sort_order: 0,
     ...partial,
   };
@@ -33,72 +30,49 @@ describe("effectiveFlowForCategory", () => {
   it("returns the default flow for a null category", () => {
     expect(effectiveFlowForCategory(null, [], byId)).toEqual({
       fieldGroups: ["category-select", ...DEFAULT_FIELD_GROUPS],
-      modules: DEFAULT_MODULES,
     });
   });
 
   it("returns the default flow when no category in the chain has a row", () => {
     expect(effectiveFlowForCategory("cars", [], byId)).toEqual({
       fieldGroups: ["category-select", ...DEFAULT_FIELD_GROUPS],
-      modules: DEFAULT_MODULES,
     });
   });
 
   it("uses the category's own row when present", () => {
-    const flows = [row({ category_id: "cars", modules: ["vehicle-lookup", "generic-attributes"] })];
-    expect(effectiveFlowForCategory("cars", flows, byId).modules).toEqual([
-      "vehicle-lookup",
-      "generic-attributes",
-    ]);
-  });
-
-  it("inherits the nearest ancestor's row when the category itself has none", () => {
-    const flows = [
-      row({ category_id: "vehicles", modules: ["vehicle-lookup", "generic-attributes"] }),
-    ];
-    expect(effectiveFlowForCategory("cars", flows, byId).modules).toEqual([
-      "vehicle-lookup",
-      "generic-attributes",
-    ]);
-  });
-
-  it("does not inherit a flow from an unrelated category", () => {
-    const flows = [row({ category_id: "other", modules: ["vehicle-lookup"] })];
-    expect(effectiveFlowForCategory("cars", flows, byId).modules).toEqual(DEFAULT_MODULES);
-  });
-
-  it("lets a child row override an inherited parent row wholesale (no merging)", () => {
-    const flows = [
-      row({ category_id: "vehicles", modules: ["vehicle-lookup", "generic-attributes"] }),
-      row({ category_id: "cars", modules: ["generic-attributes"] }),
-    ];
-    expect(effectiveFlowForCategory("cars", flows, byId).modules).toEqual(["generic-attributes"]);
-  });
-
-  it("normalizes legacy compound field groups from stored rows", () => {
-    const flows = [
-      row({
-        category_id: "cars",
-        field_groups: ["title-photos", "category-attributes", "review-publish"],
-      }),
-    ];
+    const flows = [row({ category_id: "cars", field_groups: ["photos", "review-publish"] })];
     expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
       "category-select",
       "photos",
-      "title",
-      "category-attributes",
       "review-publish",
     ]);
   });
 
-  it("keeps the legacy database format when saving atomic field groups", () => {
-    expect(toStoredFieldGroupKeys(DEFAULT_FIELD_GROUPS)).toEqual([
-      "title-photos",
-      "category-attributes",
-      "condition",
-      "price",
-      "description-keywords",
-      "delivery-location",
+  it("inherits the nearest ancestor's row when the category itself has none", () => {
+    const flows = [row({ category_id: "vehicles", field_groups: ["photos", "review-publish"] })];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      "photos",
+      "review-publish",
+    ]);
+  });
+
+  it("does not inherit a flow from an unrelated category", () => {
+    const flows = [row({ category_id: "other", field_groups: ["photos"] })];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      ...DEFAULT_FIELD_GROUPS,
+    ]);
+  });
+
+  it("lets a child row override an inherited parent row wholesale (no merging)", () => {
+    const flows = [
+      row({ category_id: "vehicles", field_groups: ["photos", "condition", "review-publish"] }),
+      row({ category_id: "cars", field_groups: ["photos", "review-publish"] }),
+    ];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      "photos",
       "review-publish",
     ]);
   });
@@ -109,9 +83,11 @@ describe("effectiveFlowForCategory", () => {
         category_id: "cars",
         field_groups: [
           "vehicle-registration",
-          "title-photos",
+          "photos",
+          "title",
           "vehicle-facts",
-          "delivery-location",
+          "delivery",
+          "location",
           "review-publish",
         ],
       }),
@@ -133,7 +109,8 @@ describe("effectiveFlowForCategory", () => {
         field_groups: [
           "photos",
           "category-attributes",
-          "title-photos",
+          "photos",
+          "title",
           "description-keywords",
           "review-publish",
         ],
@@ -169,11 +146,13 @@ describe("effectiveFlowForCategory", () => {
         field_groups: [
           "vehicle-registration",
           "category-attributes",
-          "title-photos",
+          "photos",
+          "title",
           "vehicle-facts",
           "vehicle-condition",
           "description-keywords",
-          "delivery-location",
+          "delivery",
+          "location",
           "review-publish",
         ],
       }),
@@ -197,12 +176,14 @@ describe("effectiveFlowForCategory", () => {
         category_id: "cars",
         field_groups: [
           "vehicle-registration",
-          "title-photos",
+          "photos",
+          "title",
           "vehicle-facts",
           "vehicle-condition",
           "description-keywords",
           "vehicle-equipment",
-          "delivery-location",
+          "delivery",
+          "location",
           "review-publish",
         ],
       }),

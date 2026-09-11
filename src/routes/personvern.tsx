@@ -32,7 +32,7 @@ function PersonvernPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Personvernerklæring
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 29. august 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 1. september 2026</p>
         </header>
       )}
 
@@ -64,6 +64,17 @@ function PersonvernPage() {
                 <strong>Brukerprofil</strong>: navn og eventuelt profilbilde. Visningsnavn og
                 profilbilde er <strong>offentlig synlig</strong> for alle besøkende på din
                 profilside. E-postadressen er privat og vises ikke offentlig.
+              </li>
+              <li>
+                <strong>Bedriftskontoer</strong>: organisasjonsnummer, juridisk navn, visningsnavn
+                og bedriftens visningslokasjon (postnummer og by). Hvis du er medlem av en bedrift,
+                lagrer vi medlemskap, rolle og status. Vi lagrer også valgt plan og tidspunkt for
+                Proff-prøveperioden.
+              </li>
+              <li>
+                <strong>Bedriftsprofilering</strong>: logo, fargevalg og nettsidelenke når bedriften
+                bruker disse feltene. Opplysningene beholdes når Proff-tilgangen avsluttes, men
+                vises ikke på annonser uten effektiv Proff-tilgang.
               </li>
               <li>
                 <strong>Annonser</strong> du har lagt ut (salg eller «ønskes kjøpt»), med tilhørende

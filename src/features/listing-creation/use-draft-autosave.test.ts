@@ -42,12 +42,15 @@ const baseFields = {
   priceNok: "",
   postalCode: "",
   city: "",
+  organizationLocationId: "00000000-0000-4000-8000-000000000001",
+  showVisitingAddress: true,
   coords: null,
   isVehicle: false,
   attributes: {},
   images: [],
   setImages: vi.fn(),
   stepKey: "title-photos",
+  authenticated: true,
 };
 
 beforeEach(() => {
@@ -100,6 +103,34 @@ describe("useDraftAutosave", () => {
     expect(result.current.hasDraftData).toBeNull();
   });
 
+  it("flushes guest drafts locally without calling Supabase", async () => {
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, authenticated: false, title: "En fin sykkel" }),
+    );
+
+    await act(async () => {
+      expect(await result.current.flushLocalDraft()).toBe(true);
+      expect(await result.current.saveDraftToSupabase()).toBeNull();
+    });
+
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}")).toMatchObject({
+      title: "En fin sykkel",
+      draft_version: 1,
+    });
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
+  });
+  it("returnerer feil når bildedraft ikke kan flushes", async () => {
+    saveDraftImagesMock.mockRejectedValueOnce(new Error("IndexedDB unavailable"));
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, authenticated: false, title: "En fin sykkel" }),
+    );
+
+    await act(async () => {
+      expect(await result.current.flushLocalDraft()).toBe(false);
+    });
+    expect(result.current.draftSaveError).toBe(true);
+  });
+
   it("saveDraftToSupabase refuses to save when the effective title is under 5 characters", async () => {
     const { result } = renderHook(() => useDraftAutosave({ ...baseFields, title: "Hi" }));
 
@@ -123,7 +154,12 @@ describe("useDraftAutosave", () => {
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("new-draft-id");
     expect(saveDraftListingMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ title: "En fin sykkel", can_ship: null }),
+        data: expect.objectContaining({
+          title: "En fin sykkel",
+          can_ship: null,
+          organization_location_id: "00000000-0000-4000-8000-000000000001",
+          show_visiting_address: true,
+        }),
       }),
     );
   });
@@ -164,6 +200,68 @@ describe("useDraftAutosave", () => {
 
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+  });
+
+  it("stops saving after clearDraftStorage({ stopAutosave: true }) so publishing leaves no duplicate draft", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "published-draft", kaupet_code: "ABC123" });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "En fin sykkel" }),
+    );
+
+    // The wizard stays mounted behind the success dialog with the form still
+    // populated, so any later save would INSERT the published listing again.
+    act(() => result.current.clearDraftStorage({ stopAutosave: true }));
+    const id = await act(() => result.current.saveDraftToSupabase());
+
+    expect(id).toBeNull();
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps saving after a plain clearDraftStorage so 'start over' still autosaves", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "fresh-draft", kaupet_code: "ABC123" });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "En fin sykkel" }),
+    );
+
+    act(() => result.current.clearDraftStorage());
+    const id = await act(() => result.current.saveDraftToSupabase());
+
+    expect(id).toBe("fresh-draft");
+  });
+
+  it("sends an emptied description as a value, not undefined, so it overwrites the stored text", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-id", kaupet_code: "ABC123" });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "En fin sykkel", description: "   " }),
+    );
+
+    await act(() => result.current.saveDraftToSupabase());
+
+    const payload = saveDraftListingMock.mock.calls[0][0].data;
+    expect(payload).toHaveProperty("description", "");
+    expect(payload).toHaveProperty("condition", null);
+  });
+
+  it("normalises the legacy 'both' delivery value to 'ship' when restoring a draft", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Gammelt utkast", can_ship: "both", saved_at: Date.now() }),
+    );
+    const setValue = vi.fn();
+    const { result } = renderHook(() => useDraftAutosave(baseFields));
+
+    await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
+    await act(() =>
+      result.current.restoreDraft({
+        setValue,
+        setSelectedParentId: vi.fn(),
+        setLocationMethod: vi.fn(),
+        setAttributes: vi.fn(),
+        setCoords: vi.fn(),
+      }),
+    );
+
+    expect(setValue).toHaveBeenCalledWith("can_ship", "ship");
   });
 
   it("discards local and owned server draft state", async () => {

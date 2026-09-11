@@ -17,8 +17,10 @@
  * seter, bruktimport, sylindre/slagvolum/motorkode, girkasse) er kontrollert
  * mot et faktisk Enkeltoppslag-svar. `bruktimport` ligger under
  * `godkjenning.forstegangsGodkjenning`, og hengerfeste utledes fra positiv
- * tillatt hengervekt. Soveplasser finnes ikke i OpenAPI-skjemaet og må
- * fortsatt fylles inn manuelt for kjøretøy der feltet er påkrevd.
+ * tillatt hengervekt. En eksplisitt tom `tilhengerkopling.kopling` betyr
+ * manglende hengerfeste og lagres som 0 kg. Soveplasser finnes ikke i
+ * OpenAPI-skjemaet og må fortsatt fylles inn manuelt for kjøretøy der feltet
+ * er påkrevd.
  *
  * NB 3: `classification_code` og `body_type_hint`/`body_type_code` er
  * kontrollert mot faktiske svar. Karosserikoden/-navnet kommer fra
@@ -145,8 +147,12 @@ function mapBodyTypeOption(
   code: string | null | undefined,
   name: string | null | undefined,
 ): string | null {
-  const value = `${code ?? ""} ${name ?? ""}`.toLowerCase();
+  const value = `${code ?? ""} ${name ?? ""}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
   if (code?.toUpperCase() === "BB") return "varebil";
+  if (code?.toUpperCase() === "AD" || value.includes("kupe")) return "coupe";
   if (value.includes("suv")) return "suv";
   if (value.includes("stasjonsvogn")) return "stasjonsvogn";
   if (value.includes("sedan")) return "sedan";
@@ -342,10 +348,11 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   const firstRegYear = firstRegDate?.slice(0, 4);
   const motor = teknisk?.motorOgDrivverk?.motor?.[0];
   const fuelType = mapFuelType(motor?.drivstoff?.map((d) => d.drivstoffKode?.kodeNavn));
+  const trailerCouplings = teknisk?.tilhengerkopling?.kopling;
   const maxTowWeight =
     teknisk?.vekter?.tillattTilhengervektMedBrems ??
     teknisk?.vekter?.tekniskTillattVektPahengsvogn ??
-    null;
+    (Array.isArray(trailerCouplings) && trailerCouplings.length === 0 ? 0 : null);
   const klassifisering = vehicle.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering;
   const bodyTypeCode = nullifyPlaceholder(teknisk?.karosseriOgLasteplan?.karosseritype?.kodeVerdi);
   const bodyTypeHint = nullifyPlaceholder(
@@ -376,7 +383,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     })(),
     drive_type: driveTypeFromAxles(teknisk?.akslinger),
     axle_count: teknisk?.akslinger?.antallAksler ?? null,
-    tow_hitch: maxTowWeight != null && maxTowWeight > 0,
+    tow_hitch: maxTowWeight == null ? null : maxTowWeight > 0,
     max_tow_weight_kg: maxTowWeight,
     seats: teknisk?.persontall?.sitteplasserTotalt ?? null,
     imported_used: vehicle.godkjenning?.forstegangsGodkjenning?.bruktimport != null,

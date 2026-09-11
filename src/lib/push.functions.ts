@@ -41,7 +41,10 @@ export const savePushSubscription = createServerFn({ method: "POST" })
         },
         { onConflict: "endpoint" },
       );
-      if (error) throw new Error(error.message);
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
     } else {
       const { error } = await supabase.from("push_subscriptions").upsert(
         {
@@ -53,7 +56,10 @@ export const savePushSubscription = createServerFn({ method: "POST" })
         },
         { onConflict: "fcm_token" },
       );
-      if (error) throw new Error(error.message);
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
     }
     return { ok: true };
   });
@@ -74,7 +80,10 @@ export const deletePushSubscription = createServerFn({ method: "POST" })
         ? query.eq("endpoint", data.endpoint)
         : query.eq("fcm_token", data.fcm_token);
     const { error } = await query;
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -87,7 +96,10 @@ export const getUserPushSubscriptions = createServerFn({ method: "GET" })
       .select("id, platform, user_agent, created_at, last_used_at, endpoint, fcm_token")
       .eq("user_id", userId)
       .order("last_used_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return data ?? [];
   });
 
@@ -101,7 +113,10 @@ export const deletePushSubscriptionById = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.id)
       .eq("user_id", userId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -116,7 +131,10 @@ export const getNotificationPreferences = createServerFn({ method: "GET" })
       )
       .eq("user_id", userId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return {
       web_push_messages: data?.web_push_messages ?? true,
       web_push_saved_searches: data?.web_push_saved_searches ?? true,
@@ -165,6 +183,9 @@ export const updateNotificationPreferences = createServerFn({ method: "POST" })
       },
       { onConflict: "user_id" },
     );
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });

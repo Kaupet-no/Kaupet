@@ -77,7 +77,7 @@ export async function fetchSynonymMatches(
   if (ngrams.length === 0) return [];
 
   const { data, error } = await supabase.rpc("match_search_synonyms", {
-    p_category_id: categoryId,
+    p_category_id: categoryId as string,
     phrases: ngrams.map((n) => n.text),
   });
   if (error) throw error;

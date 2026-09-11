@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -108,30 +103,54 @@ export type Database = {
         }
         Relationships: []
       }
-      feedback: {
+      business_signup_intents: {
         Row: {
+          billing_address_line: string | null
+          billing_city: string | null
+          billing_postal_code: string | null
+          city: string | null
           created_at: string
-          id: string
-          message: string
-          page_url: string | null
-          type: string
-          user_id: string | null
+          email: string | null
+          expires_at: string
+          legal_name: string
+          organization_number: string
+          postal_code: string | null
+          signup_token: string
+          visiting_address_line: string | null
+          visiting_city: string | null
+          visiting_postal_code: string | null
         }
         Insert: {
+          billing_address_line?: string | null
+          billing_city?: string | null
+          billing_postal_code?: string | null
+          city?: string | null
           created_at?: string
-          id?: string
-          message: string
-          page_url?: string | null
-          type: string
-          user_id?: string | null
+          email?: string | null
+          expires_at?: string
+          legal_name: string
+          organization_number: string
+          postal_code?: string | null
+          signup_token?: string
+          visiting_address_line?: string | null
+          visiting_city?: string | null
+          visiting_postal_code?: string | null
         }
         Update: {
+          billing_address_line?: string | null
+          billing_city?: string | null
+          billing_postal_code?: string | null
+          city?: string | null
           created_at?: string
-          id?: string
-          message?: string
-          page_url?: string | null
-          type?: string
-          user_id?: string | null
+          email?: string | null
+          expires_at?: string
+          legal_name?: string
+          organization_number?: string
+          postal_code?: string | null
+          signup_token?: string
+          visiting_address_line?: string | null
+          visiting_city?: string | null
+          visiting_postal_code?: string | null
         }
         Relationships: []
       }
@@ -146,6 +165,7 @@ export type Database = {
           name_nb: string
           parent_id: string | null
           search_examples: string[]
+          search_synonyms: string[]
           slug: string
           sort_order: number
           title_example: string | null
@@ -161,6 +181,7 @@ export type Database = {
           name_nb: string
           parent_id?: string | null
           search_examples?: string[]
+          search_synonyms?: string[]
           slug: string
           sort_order?: number
           title_example?: string | null
@@ -176,6 +197,7 @@ export type Database = {
           name_nb?: string
           parent_id?: string | null
           search_examples?: string[]
+          search_synonyms?: string[]
           slug?: string
           sort_order?: number
           title_example?: string | null
@@ -198,8 +220,8 @@ export type Database = {
           depends_on_key: string | null
           depends_on_not_value: string | null
           depends_on_value: string | null
-          is_optional: boolean
           id: string
+          is_optional: boolean
           is_primary: boolean
           key: string
           label_nb: string
@@ -215,8 +237,8 @@ export type Database = {
           depends_on_key?: string | null
           depends_on_not_value?: string | null
           depends_on_value?: string | null
-          is_optional?: boolean
           id?: string
+          is_optional?: boolean
           is_primary?: boolean
           key: string
           label_nb: string
@@ -232,8 +254,8 @@ export type Database = {
           depends_on_key?: string | null
           depends_on_not_value?: string | null
           depends_on_value?: string | null
-          is_optional?: boolean
           id?: string
+          is_optional?: boolean
           is_primary?: boolean
           key?: string
           label_nb?: string
@@ -259,9 +281,7 @@ export type Database = {
           created_at: string
           field_groups: string[]
           id: string
-          modules: string[]
           sort_order: number
-          steps: string[]
           updated_at: string
         }
         Insert: {
@@ -269,9 +289,7 @@ export type Database = {
           created_at?: string
           field_groups?: string[]
           id?: string
-          modules?: string[]
           sort_order?: number
-          steps?: string[]
           updated_at?: string
         }
         Update: {
@@ -279,9 +297,7 @@ export type Database = {
           created_at?: string
           field_groups?: string[]
           id?: string
-          modules?: string[]
           sort_order?: number
-          steps?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -314,34 +330,40 @@ export type Database = {
       }
       conversations: {
         Row: {
+          buyer_deleted_at: string | null
           buyer_id: string
           buyer_last_read_at: string | null
           created_at: string
           id: string
           last_message_at: string
           listing_id: string | null
+          seller_deleted_at: string | null
           seller_id: string
           seller_last_read_at: string | null
           wtb_listing_id: string | null
         }
         Insert: {
+          buyer_deleted_at?: string | null
           buyer_id: string
           buyer_last_read_at?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id?: string | null
+          seller_deleted_at?: string | null
           seller_id: string
           seller_last_read_at?: string | null
           wtb_listing_id?: string | null
         }
         Update: {
+          buyer_deleted_at?: string | null
           buyer_id?: string
           buyer_last_read_at?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id?: string | null
+          seller_deleted_at?: string | null
           seller_id?: string
           seller_last_read_at?: string | null
           wtb_listing_id?: string | null
@@ -506,6 +528,39 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          category_description: string | null
+          category_name: string | null
+          created_at: string
+          id: string
+          message: string
+          page_url: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          category_description?: string | null
+          category_name?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          page_url?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          category_description?: string | null
+          category_name?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          page_url?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       filter_synonyms: {
         Row: {
           category_filter_id: string
@@ -578,7 +633,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
-          expires_at: string | null
+          expires_at: string
           id: string
           listing_id: string
           token: string
@@ -587,7 +642,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
-          expires_at?: string | null
+          expires_at?: string
           id?: string
           listing_id: string
           token: string
@@ -596,7 +651,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
-          expires_at?: string | null
+          expires_at?: string
           id?: string
           listing_id?: string
           token?: string
@@ -643,6 +698,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      listing_360_upload_rate_limits: {
+        Row: {
+          attempts: number
+          key_hash: string
+          scope: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          key_hash: string
+          scope: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          key_hash?: string
+          scope?: string
+          window_started_at?: string
+        }
+        Relationships: []
       }
       listing_category_word_stats: {
         Row: {
@@ -750,6 +826,7 @@ export type Database = {
           status: Database["public"]["Enums"]["promotion_status"]
           updated_at: string
           user_id: string
+          vipps_mode: string | null
           vipps_psp_reference: string | null
           vipps_reference: string | null
         }
@@ -768,6 +845,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
           user_id: string
+          vipps_mode?: string | null
           vipps_psp_reference?: string | null
           vipps_reference?: string | null
         }
@@ -786,12 +864,42 @@ export type Database = {
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
           user_id?: string
+          vipps_mode?: string | null
           vipps_psp_reference?: string | null
           vipps_reference?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "listing_promotions_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_status_history: {
+        Row: {
+          changed_at: string
+          id: string
+          listing_id: string
+          status: Database["public"]["Enums"]["listing_status"]
+        }
+        Insert: {
+          changed_at: string
+          id?: string
+          listing_id: string
+          status: Database["public"]["Enums"]["listing_status"]
+        }
+        Update: {
+          changed_at?: string
+          id?: string
+          listing_id?: string
+          status?: Database["public"]["Enums"]["listing_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_status_history_listing_id_fkey"
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
@@ -898,6 +1006,38 @@ export type Database = {
           },
         ]
       }
+      listing_visiting_addresses: {
+        Row: {
+          address_line: string
+          city: string
+          created_at: string
+          listing_id: string
+          postal_code: string
+        }
+        Insert: {
+          address_line: string
+          city: string
+          created_at?: string
+          listing_id: string
+          postal_code: string
+        }
+        Update: {
+          address_line?: string
+          city?: string
+          created_at?: string
+          listing_id?: string
+          postal_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_visiting_addresses_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listings: {
         Row: {
           attributes: Json
@@ -924,11 +1064,14 @@ export type Database = {
           lng: number | null
           maintenance_history: string | null
           no_known_issues: boolean
+          organization_id: string | null
+          organization_location_id: string | null
           postal_code: string | null
           price_nok: number | null
           published_at: string | null
           search_vector: unknown
           seller_id: string
+          show_visiting_address: boolean
           status: Database["public"]["Enums"]["listing_status"]
           subtitle: string | null
           title: string
@@ -959,11 +1102,14 @@ export type Database = {
           lng?: number | null
           maintenance_history?: string | null
           no_known_issues?: boolean
+          organization_id?: string | null
+          organization_location_id?: string | null
           postal_code?: string | null
           price_nok?: number | null
           published_at?: string | null
           search_vector?: unknown
           seller_id: string
+          show_visiting_address?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title: string
@@ -994,11 +1140,14 @@ export type Database = {
           lng?: number | null
           maintenance_history?: string | null
           no_known_issues?: boolean
+          organization_id?: string | null
+          organization_location_id?: string | null
           postal_code?: string | null
           price_nok?: number | null
           published_at?: string | null
           search_vector?: unknown
           seller_id?: string
+          show_visiting_address?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title?: string
@@ -1012,12 +1161,27 @@ export type Database = {
             referencedRelation: "categories"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "listings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_organization_location_id_fkey"
+            columns: ["organization_location_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       messages: {
         Row: {
           attachment_path: string | null
           body: string
+          client_id: string | null
           conversation_id: string
           created_at: string
           deleted_at: string | null
@@ -1027,6 +1191,7 @@ export type Database = {
         Insert: {
           attachment_path?: string | null
           body: string
+          client_id?: string | null
           conversation_id: string
           created_at?: string
           deleted_at?: string | null
@@ -1036,6 +1201,7 @@ export type Database = {
         Update: {
           attachment_path?: string | null
           body?: string
+          client_id?: string | null
           conversation_id?: string
           created_at?: string
           deleted_at?: string | null
@@ -1099,6 +1265,548 @@ export type Database = {
           web_push_wtb_matches?: boolean
         }
         Relationships: []
+      }
+      organization_billing_profiles: {
+        Row: {
+          address_line: string | null
+          billing_email: string
+          city: string | null
+          created_at: string
+          organization_id: string
+          postal_code: string | null
+          registry_refreshed_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line?: string | null
+          billing_email: string
+          city?: string | null
+          created_at?: string
+          organization_id: string
+          postal_code?: string | null
+          registry_refreshed_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line?: string | null
+          billing_email?: string
+          city?: string | null
+          created_at?: string
+          organization_id?: string
+          postal_code?: string | null
+          registry_refreshed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_billing_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_listing_imports: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          external_id: string
+          id: string
+          import_id: string
+          listing_id: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          external_id: string
+          id?: string
+          import_id: string
+          listing_id?: string | null
+          organization_id: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          external_id?: string
+          id?: string
+          import_id?: string
+          listing_id?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_listing_imports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_listing_imports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_location_charge_periods: {
+        Row: {
+          amount_ex_vat_nok: number
+          created_at: string
+          fiken_invoice_number: string | null
+          id: string
+          invoiced_at: string | null
+          period_end: string
+          period_start: string
+          subscription_id: string
+        }
+        Insert: {
+          amount_ex_vat_nok: number
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          invoiced_at?: string | null
+          period_end: string
+          period_start: string
+          subscription_id: string
+        }
+        Update: {
+          amount_ex_vat_nok?: number
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          invoiced_at?: string | null
+          period_end?: string
+          period_start?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_charge_periods_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "organization_location_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_location_members: {
+        Row: {
+          chat_access: string
+          created_at: string
+          listing_access: string
+          listing_edit_scope: string
+          location_id: string
+          organization_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_access?: string
+          created_at?: string
+          listing_access?: string
+          listing_edit_scope?: string
+          location_id: string
+          organization_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_access?: string
+          created_at?: string
+          listing_access?: string
+          listing_edit_scope?: string
+          location_id?: string
+          organization_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_members_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_location_members_location_organization_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "organization_location_members_organization_id_user_id_fkey"
+            columns: ["organization_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "organization_location_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      organization_location_subscriptions: {
+        Row: {
+          billing_interval_months: number
+          created_at: string
+          id: string
+          location_id: string
+          next_period_start: string
+          unit_price_ex_vat_nok: number
+          updated_at: string
+        }
+        Insert: {
+          billing_interval_months?: number
+          created_at?: string
+          id?: string
+          location_id: string
+          next_period_start: string
+          unit_price_ex_vat_nok?: number
+          updated_at?: string
+        }
+        Update: {
+          billing_interval_months?: number
+          created_at?: string
+          id?: string
+          location_id?: string
+          next_period_start?: string
+          unit_price_ex_vat_nok?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_subscriptions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_locations: {
+        Row: {
+          active: boolean
+          address_line: string | null
+          city: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          lat: number | null
+          lng: number | null
+          name: string
+          organization_id: string
+          postal_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address_line?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          lat?: number | null
+          lng?: number | null
+          name: string
+          organization_id: string
+          postal_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address_line?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          organization_id?: string
+          postal_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_member_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_member_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_member_categories_organization_id_user_id_fkey"
+            columns: ["organization_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          can_create_listings: boolean
+          category_access: string
+          created_at: string
+          organization_id: string
+          role: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_create_listings?: boolean
+          category_access?: string
+          created_at?: string
+          organization_id: string
+          role: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_create_listings?: boolean
+          category_access?: string
+          created_at?: string
+          organization_id?: string
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          brand_palette: string | null
+          created_at: string
+          display_name: string
+          id: string
+          legal_name: string
+          listing_concept: string
+          listing_font: string
+          listing_overtitle: string
+          logo_path: string | null
+          organization_number: string
+          proff_access_until: string | null
+          proff_trial_cancelled_at: string | null
+          proff_trial_ends_at: string | null
+          proff_trial_started_at: string | null
+          selected_plan: string | null
+          updated_at: string
+          verification_status: string
+          verified_at: string | null
+          verified_by: string | null
+          website_url: string | null
+        }
+        Insert: {
+          brand_palette?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          legal_name: string
+          listing_concept?: string
+          listing_font?: string
+          listing_overtitle?: string
+          logo_path?: string | null
+          organization_number: string
+          proff_access_until?: string | null
+          proff_trial_cancelled_at?: string | null
+          proff_trial_ends_at?: string | null
+          proff_trial_started_at?: string | null
+          selected_plan?: string | null
+          updated_at?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          brand_palette?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          legal_name?: string
+          listing_concept?: string
+          listing_font?: string
+          listing_overtitle?: string
+          logo_path?: string | null
+          organization_number?: string
+          proff_access_until?: string | null
+          proff_trial_cancelled_at?: string | null
+          proff_trial_ends_at?: string | null
+          proff_trial_started_at?: string | null
+          selected_plan?: string | null
+          updated_at?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      product_event_rate_limits: {
+        Row: {
+          attempts: number
+          key_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          key_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          key_hash?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      product_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: number
+          path: string
+          platform: string
+          properties: Json
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: never
+          path: string
+          platform: string
+          properties?: Json
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: never
+          path?: string
+          platform?: string
+          properties?: Json
+        }
+        Relationships: []
+      }
+      proff_orders: {
+        Row: {
+          admin_note: string | null
+          billing_email: string
+          billing_reference: string | null
+          created_at: string
+          fiken_invoice_number: string | null
+          id: string
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          price_ex_vat_nok: number
+          requested_by: string | null
+          status: string
+          term: string
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          billing_email: string
+          billing_reference?: string | null
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          price_ex_vat_nok: number
+          requested_by?: string | null
+          status?: string
+          term: string
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          billing_email?: string
+          billing_reference?: string | null
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          price_ex_vat_nok?: number
+          requested_by?: string | null
+          status?: string
+          term?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proff_orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1338,16 +2046,19 @@ export type Database = {
       }
       site_settings: {
         Row: {
+          category_suggestion_ai_enabled: boolean
           default_search_examples: string[]
           id: boolean
           updated_at: string
         }
         Insert: {
+          category_suggestion_ai_enabled?: boolean
           default_search_examples?: string[]
           id?: boolean
           updated_at?: string
         }
         Update: {
+          category_suggestion_ai_enabled?: boolean
           default_search_examples?: string[]
           id?: boolean
           updated_at?: string
@@ -1704,48 +2415,6 @@ export type Database = {
         }
         Relationships: []
       }
-      wtb_match_notifications: {
-        Row: {
-          created_at: string
-          id: string
-          listing_id: string
-          read_at: string | null
-          user_id: string
-          wtb_listing_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          listing_id: string
-          read_at?: string | null
-          user_id: string
-          wtb_listing_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          listing_id?: string
-          read_at?: string | null
-          user_id?: string
-          wtb_listing_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wtb_match_notifications_listing_id_fkey"
-            columns: ["listing_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wtb_match_notifications_wtb_listing_id_fkey"
-            columns: ["wtb_listing_id"]
-            isOneToOne: false
-            referencedRelation: "wtb_listings"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       wtb_listings: {
         Row: {
           attributes: Json
@@ -1815,65 +2484,69 @@ export type Database = {
           },
         ]
       }
+      wtb_match_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          read_at: string | null
+          user_id: string
+          wtb_listing_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          read_at?: string | null
+          user_id: string
+          wtb_listing_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          read_at?: string | null
+          user_id?: string
+          wtb_listing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wtb_match_notifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wtb_match_notifications_wtb_listing_id_fkey"
+            columns: ["wtb_listing_id"]
+            isOneToOne: false
+            referencedRelation: "wtb_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      organizations_public: {
+        Row: {
+          id: string
+          display_name: string
+          legal_name: string
+          organization_number: string
+          website_url: string | null
+          logo_path: string | null
+          brand_palette: string | null
+          listing_concept: string
+          listing_font: string
+          listing_overtitle: string
+          created_at: string
+          has_active_proff: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      consume_vehicle_360_upload_slot: {
-        Args: { _ip_hash: string; _token: string }
-        Returns: string | null
-      }
-      log_product_event_rate_limited: {
-        Args: {
-          _event_name: string
-          _key_hash: string
-          _path: string
-          _platform: string
-          _properties?: Json
-        }
-        Returns: undefined
-      }
-      listing_matches_attribute_filters: {
-        Args: { _attributes: Json; _filters: Json }
-        Returns: boolean
-      }
-      search_listings_page: {
-        Args: {
-          _attribute_filters?: Json
-          _category_ids?: string[] | null
-          _center_lat?: number | null
-          _center_lng?: number | null
-          _conditions?: Database["public"]["Enums"]["listing_condition"][] | null
-          _exclude_all_groups?: Json
-          _exclude_any_terms?: string[] | null
-          _include_free?: boolean
-          _include_groups?: Json
-          _limit?: number
-          _max_price?: number | null
-          _min_price?: number | null
-          _offset?: number
-          _radius_km?: number
-          _sort?: string
-        }
-        Returns: {
-          attributes: Json
-          category_slug: string | null
-          city: string | null
-          cover_path: string | null
-          created_at: string
-          display_lat: number | null
-          display_lng: number | null
-          id: string
-          is_free: boolean
-          kaupet_code: string
-          price_nok: number | null
-          relevance: number
-          subtitle: string | null
-          title: string
-          total_count: number
-        }[]
-      }
       admin_approve_vehicle_brand: { Args: { _id: string }; Returns: undefined }
       admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
       admin_approve_vehicle_model_class: {
@@ -2048,6 +2721,7 @@ export type Database = {
         Returns: {
           brand_name: string
           category_group: string
+          class_id: string
           created_at: string
           id: string
           kind: string
@@ -2086,38 +2760,6 @@ export type Database = {
           reason: string
           suspended_by: string
           user_id: string
-        }[]
-      }
-      attribute_value_suggestions: {
-        Args: { cat_id: string; attr_key: string; q: string }
-        Returns: {
-          value: string
-          cnt: number
-        }[]
-      }
-      attribute_range_bounds: {
-        Args: { cat_id: string }
-        Returns: {
-          key: string
-          min_val: number
-          max_val: number
-        }[]
-      }
-      listing_filter_facet_counts: {
-        Args: {
-          p_category_ids?: string[]
-          p_conditions?: string[]
-          p_price_min?: number
-          p_price_max?: number
-          p_include_free?: boolean
-          p_listing_ids?: string[]
-          p_active_attrs?: Json
-          p_facet_keys?: string[]
-        }
-        Returns: {
-          attr_key: string
-          attr_value: string
-          cnt: number
         }[]
       }
       admin_list_vehicle_brands_with_models: {
@@ -2201,6 +2843,7 @@ export type Database = {
       admin_unban_ip: { Args: { _id: string }; Returns: undefined }
       admin_unban_user: { Args: { _user_id: string }; Returns: undefined }
       admin_unsuspend_user: { Args: { _user_id: string }; Returns: undefined }
+      admin_verify_organization: { Args: { _organization_id: string }; Returns: undefined }
       admin_update_vehicle_brand: {
         Args: { _id: string; _name: string }
         Returns: {
@@ -2279,25 +2922,175 @@ export type Database = {
           views: number
         }[]
       }
+      attribute_range_bounds: {
+        Args: { cat_id: string }
+        Returns: {
+          key: string
+          max_val: number
+          min_val: number
+        }[]
+      }
+      attribute_value_suggestions: {
+        Args: { attr_key: string; cat_id: string; q: string }
+        Returns: {
+          cnt: number
+          value: string
+        }[]
+      }
+      can_access_organization_chat: {
+        Args: {
+          _location_id: string
+          _organization_id: string
+          _seller_id: string
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      can_act_for_organization: {
+        Args: { _organization_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      can_create_organization_listing: {
+        Args: {
+          _category_id: string
+          _location_id: string
+          _organization_id: string
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      can_manage_organization_location: {
+        Args: { _location_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      can_update_organization_listing: {
+        Args: {
+          _category_id: string
+          _location_id: string
+          _organization_id: string
+          _seller_id: string
+          _status: Database["public"]["Enums"]["listing_status"]
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      can_view_organization_listing: {
+        Args: {
+          _location_id: string
+          _organization_id: string
+          _seller_id: string
+          _user_id?: string
+        }
+        Returns: boolean
+      }
       cancel_account_deletion: { Args: never; Returns: boolean }
-      demo_activate_promotion: {
-        Args: { _duration_days: number; _listing_id: string }
+      check_endpoint_rate_limit: {
+        Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
+        Returns: boolean
+      }
+      compute_wtb_matches: {
+        Args: {
+          _attributes: Json
+          _category_id: string
+          _description: string
+          _is_free: boolean
+          _price_nok: number
+          _title: string
+        }
+        Returns: {
+          attributes: Json
+          category_id: string | null
+          created_at: string
+          description: string | null
+          draft_expiry_notified_at: string | null
+          expires_at: string
+          id: string
+          max_price_nok: number | null
+          notify_matches: boolean
+          search_vector: unknown
+          status: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wtb_listings"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      consume_vehicle_360_upload_slot: {
+        Args: { _ip_hash: string; _token: string }
         Returns: string
+      }
+      create_listing_from_import_row:
+        | {
+            Args: {
+              _external_id: string
+              _import_id: string
+              _listing: Json
+              _organization_id: string
+              _user_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _external_id: string
+              _import_id: string
+              _listing: Json
+              _location_id: string
+              _organization_id: string
+              _show_visiting_address?: boolean
+              _user_id: string
+            }
+            Returns: Json
+          }
+      create_organization_location: {
+        Args: {
+          _address_line: string
+          _city: string
+          _name: string
+          _organization_id: string
+          _postal_code: string
+        }
+        Returns: {
+          active: boolean
+          address_line: string | null
+          city: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          lat: number | null
+          lng: number | null
+          name: string
+          organization_id: string
+          postal_code: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_locations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
+      extend_proff_access: {
+        Args: { _months: number; _organization_id: string }
+        Returns: {
+          period_end: string
+          period_start: string
+        }[]
+      }
       generate_kaupet_code: { Args: never; Returns: string }
       get_featured_listing_ids: {
         Args: { _category_slug?: string; _limit?: number }
         Returns: {
           listing_id: string
-        }[]
-      }
-      get_listing_owner_location: {
-        Args: { _listing_id: string }
-        Returns: {
-          lat: number
-          lng: number
         }[]
       }
       has_role: {
@@ -2312,9 +3105,34 @@ export type Database = {
         Returns: boolean
       }
       is_ip_banned: { Args: { _ip: unknown }; Returns: boolean }
+      is_organization_superuser: {
+        Args: { _organization_id: string; _user_id?: string }
+        Returns: boolean
+      }
       is_user_banned: { Args: { _uid: string }; Returns: boolean }
       is_user_deletion_pending: { Args: { _user_id: string }; Returns: boolean }
       is_user_suspended: { Args: { _uid: string }; Returns: boolean }
+      listing_filter_facet_counts: {
+        Args: {
+          p_active_attrs?: Json
+          p_category_ids?: string[]
+          p_conditions?: string[]
+          p_facet_keys?: string[]
+          p_include_free?: boolean
+          p_listing_ids?: string[]
+          p_price_max?: number
+          p_price_min?: number
+        }
+        Returns: {
+          attr_key: string
+          attr_value: string
+          cnt: number
+        }[]
+      }
+      listing_matches_attribute_filters: {
+        Args: { _attributes: Json; _filters: Json }
+        Returns: boolean
+      }
       listing_stats: {
         Args: { _listing_id: string }
         Returns: {
@@ -2326,16 +3144,42 @@ export type Database = {
         Args: { search_vector: unknown; term: string; title: string }
         Returns: boolean
       }
-      listings_within_radius: {
-        Args: { center_lat: number; center_lng: number; radius_km: number }
-        Returns: {
-          distance_km: number
-          id: string
-        }[]
-      }
       log_listing_view_rate_limited: {
         Args: { _key_hash: string; _listing_id: string }
         Returns: boolean
+      }
+      log_product_event_rate_limited: {
+        Args: {
+          _event_name: string
+          _key_hash: string
+          _path: string
+          _platform: string
+          _properties?: Json
+        }
+        Returns: undefined
+      }
+      mark_organization_location_charge_invoiced: {
+        Args: {
+          _fiken_invoice_number: string
+          _period_start: string
+          _subscription_id: string
+        }
+        Returns: {
+          amount_ex_vat_nok: number
+          created_at: string
+          fiken_invoice_number: string | null
+          id: string
+          invoiced_at: string | null
+          period_end: string
+          period_start: string
+          subscription_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_location_charge_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
@@ -2345,47 +3189,8 @@ export type Database = {
         Args: { _listing_id: string }
         Returns: undefined
       }
-      compute_wtb_matches: {
-        Args: {
-          _category_id: string | null
-          _price_nok: number | null
-          _is_free: boolean
-          _title: string | null
-          _description: string | null
-          _attributes: Json
-        }
-        Returns: {
-          id: string
-          user_id: string
-          title: string
-          subtitle: string | null
-          description: string | null
-          category_id: string | null
-          max_price_nok: number | null
-          status: string
-          attributes: Json
-          search_vector: unknown
-          created_at: string
-          updated_at: string
-          expires_at: string
-        }[]
-      }
-      wtb_match_count: {
-        Args: {
-          _category_id: string | null
-          _price_nok: number | null
-          _is_free: boolean
-          _title: string | null
-          _description: string | null
-          _attributes: Json
-        }
-        Returns: {
-          match_count: number
-          max_price: number | null
-        }[]
-      }
       match_search_synonyms: {
-        Args: { p_category_id: string | null; phrases: string[] }
+        Args: { p_category_id: string; phrases: string[] }
         Returns: {
           category_id: string
           filter_key: string
@@ -2413,6 +3218,14 @@ export type Database = {
           suspension_expires_at: string
           suspension_reason: string
         }[]
+      }
+      organization_has_proff_access: {
+        Args: { _organization_id: string }
+        Returns: boolean
+      }
+      organization_is_verified: {
+        Args: { _organization_id: string }
+        Returns: boolean
       }
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
@@ -2454,7 +3267,35 @@ export type Database = {
       }
       purge_expired_accounts: { Args: never; Returns: number }
       purge_expired_personal_data: { Args: never; Returns: Json }
+      remove_organization_location_member: {
+        Args: { _location_id: string; _user_id: string }
+        Returns: undefined
+      }
+      remove_organization_member: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: undefined
+      }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
+      purge_endpoint_rate_limits: { Args: never; Returns: undefined }
+      send_message_rate_limited: {
+        Args: {
+          _attachment_path?: string | null
+          _body: string
+          _client_id: string
+          _conversation_id: string
+          _sender_id: string
+        }
+        Returns: {
+          attachment_path: string | null
+          body: string
+          client_id: string | null
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          sender_id: string
+        }
+      }
       saved_search_unread_counts: {
         Args: never
         Returns: {
@@ -2473,8 +3314,67 @@ export type Database = {
           rank: number
         }[]
       }
+      search_listings_page: {
+        Args: {
+          _attribute_filters?: Json
+          _category_ids?: string[]
+          _center_lat?: number
+          _center_lng?: number
+          _conditions?: Database["public"]["Enums"]["listing_condition"][]
+          _exclude_all_groups?: Json
+          _exclude_any_terms?: string[]
+          _include_free?: boolean
+          _include_groups?: Json
+          _limit?: number
+          _max_price?: number
+          _min_price?: number
+          _offset?: number
+          _radius_km?: number
+          _sort?: string
+        }
+        Returns: {
+          attributes: Json
+          category_slug: string
+          city: string
+          cover_path: string
+          created_at: string
+          display_lat: number
+          display_lng: number
+          id: string
+          is_free: boolean
+          kaupet_code: string
+          price_nok: number
+          relevance: number
+          subtitle: string
+          title: string
+          total_count: number
+        }[]
+      }
+      set_organization_location_member_permissions: {
+        Args: {
+          _chat_access: string
+          _listing_access: string
+          _listing_edit_scope: string
+          _location_id: string
+          _role: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      submit_feedback_rate_limited: {
+        Args: {
+          _category_description?: string | null
+          _category_name?: string | null
+          _key_hash: string
+          _message: string
+          _page_url?: string | null
+          _type: string
+          _user_id: string | null
+        }
+        Returns: undefined
+      }
       submit_listing_report: {
         Args: { _comment?: string; _listing_id: string; _reason: string }
         Returns: undefined
@@ -2519,11 +3419,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      sync_organization_entitlements: {
+        Args: { _organization_id: string }
+        Returns: undefined
+      }
       user_review_summary: {
         Args: { _user_id: string }
         Returns: {
           avg_rating: number
           review_count: number
+        }[]
+      }
+      wtb_match_count: {
+        Args: {
+          _attributes: Json
+          _category_id: string
+          _description: string
+          _is_free: boolean
+          _price_nok: number
+          _title: string
+        }
+        Returns: {
+          match_count: number
+          max_price: number
         }[]
       }
     }
@@ -2702,3 +3620,4 @@ export const Constants = {
     },
   },
 } as const
+

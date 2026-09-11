@@ -12,7 +12,12 @@ import {
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { showErrorToast } from "@/lib/toast";
-import { describeImageError, validateImages } from "@/lib/storage";
+import {
+  describeImageError,
+  IMAGE_ACCEPT,
+  MAX_LISTING_IMAGES,
+  validateImages,
+} from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhoto } from "@/lib/native";
@@ -140,6 +145,10 @@ export function ImageUploader({
     async (files: File[]) => {
       setProcessing(true);
       try {
+        if (images.length + files.length > MAX_LISTING_IMAGES) {
+          showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
+          return;
+        }
         const [compressed, thumbs] = await Promise.all([
           Promise.all(files.map((file) => compressImage(file, "listing"))),
           Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
@@ -237,9 +246,10 @@ export function ImageUploader({
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept={IMAGE_ACCEPT}
           multiple
           onChange={handleFileInput}
+          aria-label="Velg bilder"
           className="hidden"
         />
 

@@ -71,7 +71,7 @@ function FeedbackAdminPage() {
   const listFn = useServerFn(adminListFeedback);
   const deleteFn = useServerFn(adminDeleteFeedback);
 
-  const [typeFilter, setTypeFilter] = useState<"alle" | "ris" | "ros">("alle");
+  const [typeFilter, setTypeFilter] = useState<"alle" | "ris" | "ros" | "kategori">("alle");
   const [sortBy, setSortBy] = useState<SortBy>("created_at");
   const [ascending, setAscending] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -132,6 +132,7 @@ function FeedbackAdminPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="alle">Alle typer</SelectItem>
+              <SelectItem value="kategori">Kategoriforslag</SelectItem>
               <SelectItem value="ros">Ros</SelectItem>
               <SelectItem value="ris">Ris</SelectItem>
             </SelectContent>
@@ -197,12 +198,29 @@ function FeedbackAdminPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={r.type === "ros" ? "default" : "destructive"}>
-                      {r.type === "ros" ? "Ros" : "Ris"}
+                    <Badge
+                      variant={
+                        r.type === "ros"
+                          ? "default"
+                          : r.type === "kategori"
+                            ? "secondary"
+                            : "destructive"
+                      }
+                    >
+                      {r.type === "ros" ? "Ros" : r.type === "kategori" ? "Kategoriforslag" : "Ris"}
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-md whitespace-pre-wrap break-words text-sm">
-                    {r.message}
+                    {r.type === "kategori" ? (
+                      <>
+                        <strong>{r.category_name ?? r.message}</strong>
+                        {r.category_description && (
+                          <p className="mt-1 text-muted-foreground">{r.category_description}</p>
+                        )}
+                      </>
+                    ) : (
+                      r.message
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {r.user_id ? (

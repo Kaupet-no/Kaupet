@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   DEFAULT_FIELD_GROUPS,
   resolveWizardPages,
@@ -62,4 +63,79 @@ it.each(["price", "vehicle-price"])("krever pris for ikke-gratis annonser i %s",
   });
   expect(validate?.({ isFree: true, priceNok: "" } as never)).toBeNull();
   expect(validate?.({ isFree: false, priceNok: 0 } as never)).toBeNull();
+});
+
+it("blokkerer kjøretøyfakta når en påkrevd teknisk opplysning mangler", () => {
+  const validate = FIELD_GROUP_REGISTRY["vehicle-facts"].validateExtra;
+
+  expect(
+    validate?.({
+      showMileage: false,
+      categories: [{ id: "bil", slug: "bil" }],
+      categoryId: "bil",
+      attributes: { drive_type: "forhjulsdrift" },
+      missingFilters: [{ key: "fuel_type", label_nb: "Drivstoff" }],
+    } as never),
+  ).toEqual({
+    field: "fuel_type",
+    message: "Fyll inn drivstoff før du går videre.",
+  });
+});
+
+// Speiler VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS i lib/vehicle/vehicle-lookup.types.ts.
+it("unntar sylindre, slagvolum og motorkode fra kjøretøyets påkrevde filterfelt", () => {
+  expect(getCategoryBehavior("bil").requiredFilterExclusions).toEqual([
+    "cylinders",
+    "engine_displacement_cc",
+    "engine_code",
+  ]);
+});
+it("krever kategoriattributter for generiske kategorier og Bil/MC, men ikke Båt", () => {
+  expect(getCategoryBehavior("bil").requiresCategoryFilterValues).toBe(true);
+  expect(getCategoryBehavior(null, true).requiresCategoryFilterValues).toBe(false);
+  expect(getCategoryBehavior(null).requiresCategoryFilterValues).toBe(true);
+});
+
+it("sender registrerte kjøretøykrav til kjøretøyfakta-steget", () => {
+  const pages = [
+    { groups: [{ key: "vehicle-registration" }] },
+    { groups: [{ key: "vehicle-facts" }] },
+  ];
+
+  expect(getCategoryBehavior("bil").attributeReviewGroupKey(pages, true)).toBe("vehicle-facts");
+  expect(getCategoryBehavior("bil").attributeReviewGroupKey(pages, false)).toBe(
+    "vehicle-registration",
+  );
+  expect(getCategoryBehavior(null).attributeReviewGroupKey(pages, false)).toBe(
+    "vehicle-registration",
+  );
+});
+
+it("blokkerer ikke tomme båtattributter", () => {
+  const validate = FIELD_GROUP_REGISTRY["boat-facts"].validateExtra;
+
+  expect(
+    validate?.({
+      behavior: getCategoryBehavior(null, true),
+      attributes: {},
+      missingFilters: [{ key: "length_ft", label_nb: "Lengde" }],
+    } as never),
+  ).toBeNull();
+});
+
+it("krever leveringsmetode når kategorien krever det", () => {
+  const validate = FIELD_GROUP_REGISTRY.delivery.validateExtra;
+
+  expect(
+    validate?.({ behavior: { requiresDeliveryMethod: true }, canShip: null } as never),
+  ).toEqual({
+    field: "can_ship",
+    message: "Velg en leveringsmetode før du går videre.",
+  });
+  expect(
+    validate?.({ behavior: { requiresDeliveryMethod: true }, canShip: "pickup" } as never),
+  ).toBeNull();
+  expect(
+    validate?.({ behavior: { requiresDeliveryMethod: false }, canShip: null } as never),
+  ).toBeNull();
 });

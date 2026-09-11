@@ -42,6 +42,7 @@ export type ValidateCtx = {
   knownIssues: WizardSharedProps["knownIssues"];
   noKnownIssues: WizardSharedProps["noKnownIssues"];
   showMileage: WizardSharedProps["showMileage"];
+  canShip: WizardSharedProps["canShip"];
 };
 
 export type FieldGroup = {
@@ -108,8 +109,9 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         return { field: "model", message: "Velg modell før du går videre." };
       }
       // Bobil/campingvogn og tilhenger har hvert sitt påkrevde spørsmål SVV
-      // aldri kan svare på — spørres her, uansett registrert/ikke-registrert,
-      // siden reg.nr.-bekreftelsespopupen (vist av "Neste") ikke dekker dem.
+      // aldri kan svare på. Registrerte kjøretøy får feltene på vehicle-facts
+      // sammen med andre manglende tekniske opplysninger; manuelle kjøretøy
+      // fyller dem på vehicle-registration.
       const slug = ctx.categories.find((c) => c.id === ctx.categoryId)?.slug;
       if (
         (slug === "bobil" || slug === "campingvogn") &&
@@ -214,6 +216,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
           return { field: "axle_config", message: "Velg akselkombinasjon før du går videre." };
         }
       }
+      const firstMissingFilter = ctx.missingFilters[0];
+      if (firstMissingFilter) {
+        return {
+          field: firstMissingFilter.key,
+          message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
+        };
+      }
       return null;
     },
   },
@@ -233,6 +242,9 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: BoatFactsGroup,
     fieldsToValidate: ["subtitle", "description"],
     validateExtra: (ctx) => {
+      // Båtens kategoriattributter er frivillige; beskrivelse valideres fortsatt
+      // via fieldsToValidate.
+      if (!ctx.behavior.requiresCategoryFilterValues) return null;
       // Brand/model and every boat category filter are rendered by boat-facts;
       // category-attributes remains present in the stored flow but is a
       // category-picker-only shell for this vertical.
@@ -283,6 +295,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     key: "delivery",
     classification: "requiredToPublish",
     Component: DeliveryGroup,
+    fieldsToValidate: ["can_ship"],
+    validateExtra: (ctx) =>
+      ctx.behavior.requiresDeliveryMethod && ctx.canShip == null
+        ? { field: "can_ship", message: "Velg en leveringsmetode før du går videre." }
+        : null,
   },
   location: {
     key: "location",

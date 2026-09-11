@@ -43,12 +43,15 @@ function props(overrides: Partial<WizardSharedProps>): WizardSharedProps {
 }
 
 describe("CategoryConfirm", () => {
-  it("lets the user open the category picker while a suggestion is loading", () => {
+  it("viser eksplisitt status og manuell fallback mens kategori lastes", () => {
     render(<CategoryConfirm {...props({ categorySuggestionLoading: true })} />);
 
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByText("Finner passende kategori …")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Velg kategori selv" }));
 
-    expect(screen.getByText("Velg kategori")).toBeTruthy();
+    expect(screen.getByText("Vi fant ingen sikker kategori")).toBeTruthy();
   });
 
   it("collapses two vehicle-tree suggestions to a single Bil og MC question", () => {
@@ -71,7 +74,7 @@ describe("CategoryConfirm", () => {
     expect(
       screen.getByText("Denne annonsen blir opprettet i kategori Bil og MC. Er det riktig?"),
     ).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Ja" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Bil og MC" })).toHaveLength(1);
     expect(screen.queryByText("Bil")).toBeNull();
     expect(screen.queryByText("Motorsykkel")).toBeNull();
   });
@@ -95,7 +98,7 @@ describe("CategoryConfirm", () => {
       />,
     );
 
-    screen.getByRole("button", { name: "Ja" }).click();
+    screen.getByRole("button", { name: "Bil og MC" }).click();
     expect(applyCategorySuggestion).toHaveBeenCalledWith(BIL_ID);
   });
 
@@ -127,8 +130,7 @@ describe("CategoryConfirm", () => {
       />,
     );
 
-    expect(screen.getByText("Er denne annonsen i kategori Bil eller Sko?")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Bil" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Sko" })).toHaveLength(1);
+    expect(screen.getByText("Velg kategorien som passer best for annonsen.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Velg en annen kategori" })).toBeTruthy();
   });
 });

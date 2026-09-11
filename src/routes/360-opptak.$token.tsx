@@ -3,6 +3,7 @@
 import { getVehicle360CaptureSession } from "@/lib/vehicle/vehicle-360.functions";
 import { Vehicle360CaptureFlow } from "@/features/vehicle-360-capture/capture-flow";
 import { Button } from "@/components/ui/button";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/360-opptak/$token")({
   loader: async ({ params }) => {
@@ -29,10 +30,13 @@ function CapturePage() {
 }
 
 function CaptureError({ error }: { error: Error }) {
+  console.error(error);
   return (
     <div className="mx-auto max-w-md px-6 py-20 text-center">
       <h1 className="font-display text-xl">Kunne ikke starte opptaket</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {formatErrorMessage(error, "Lenken er ugyldig eller utløpt.")}
+      </p>
       <p className="mt-4 text-sm text-muted-foreground">
         Be selgeren vise 360°-QR-koden på annonsen på nytt.
       </p>

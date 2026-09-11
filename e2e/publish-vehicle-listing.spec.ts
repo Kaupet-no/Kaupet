@@ -84,8 +84,10 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
 
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
   await expect(page.getByText("Publiseringsklar")).toBeVisible();
-  await page.getByRole("button", { name: "Skriv inn postnummer" }).click();
-  await page.locator("#postal_code").fill("0150");
+  // desktop-web is also the shared Proff superuser fixture (see
+  // global-setup.ts) — LocationGroup shows the organization's own location
+  // picker for it instead of a personal postal-code input, and auto-selects
+  // its single location, so there's nothing to fill in here.
 
   await publishAndExpectSuccess(page, testInfo);
 });

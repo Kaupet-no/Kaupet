@@ -45,7 +45,6 @@ function fromZodIssue(issue: {
   type?: string;
 }): string {
   const label = labelFor(issue.path);
-  const prefix = label ? `${label}: ` : "";
 
   switch (issue.code) {
     case "too_small": {
@@ -72,13 +71,11 @@ function fromZodIssue(issue: {
       return `${label ?? "Feltet"} har ugyldig format`;
     case "invalid_enum_value":
       return `${label ?? "Feltet"} har en verdi som ikke er tillatt`;
-    case "custom":
-      return issue.message && !looksLikeJson(issue.message)
-        ? `${prefix}${issue.message}`
-        : `${label ?? "Feltet"} er ikke gyldig`;
     default:
+      // Skjemaer som selv oppgir en norsk melding (de fleste) faller hit;
+      // resten får den generiske teksten. Gjelder også `custom`.
       return issue.message && !looksLikeJson(issue.message)
-        ? `${prefix}${issue.message}`
+        ? `${label ? `${label}: ` : ""}${issue.message}`
         : `${label ?? "Feltet"} er ikke gyldig`;
   }
 }

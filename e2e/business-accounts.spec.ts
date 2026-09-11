@@ -19,10 +19,13 @@ test.describe("bedriftskonto", () => {
     await page.locator("html[data-kaupet-hydrated='true']").waitFor();
     await page.getByRole("tab", { name: "Bedrift" }).click();
 
-    await expect(page.getByRole("tabpanel")).toContainText("Finn bedriften");
+    const panel = page.getByRole("tabpanel");
+    await expect(panel).toContainText("Finn bedriften");
     await expect(page.getByRole("heading", { name: "Finn bedriften" })).toBeVisible();
     await page.getByLabel("Organisasjonsnummer").fill("123");
-    await page.getByRole("button", { name: "Søk" }).click();
+    // Scoped to the panel: on mobile, "Søk" also substring-matches the
+    // header's "Åpne søk" icon button.
+    await panel.getByRole("button", { name: "Søk", exact: true }).click();
 
     await expect(page.getByRole("alert")).toHaveText(
       "Skriv inn et gyldig organisasjonsnummer med kontrollsiffer.",

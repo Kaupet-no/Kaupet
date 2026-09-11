@@ -692,7 +692,7 @@ export const createListing = createServerFn({ method: "POST" })
       .insert({
         ...ownership,
         ...(ownership.organization_id
-          ? orgLocation
+          ? listingLocationFields(orgLocation)
           : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
         ...listingFields,
       })

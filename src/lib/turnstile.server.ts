@@ -34,11 +34,17 @@ export async function verifyTurnstileToken(
       action?: unknown;
       hostname?: unknown;
     };
+    // Cloudflare's documented testing sitekey/secret pair (used by E2E) always
+    // verifies with hostname "example.com" and no action, so the action/
+    // hostname allowlist check below can never pass against it — skip just
+    // that part in E2E, success/token validity is still exercised for real.
+    const isE2E = process.env.E2E_TEST === "1";
     if (
       result.success !== true ||
-      result.action !== expectedAction ||
-      typeof result.hostname !== "string" ||
-      !allowedHostnames.includes(result.hostname.toLowerCase())
+      (!isE2E &&
+        (result.action !== expectedAction ||
+          typeof result.hostname !== "string" ||
+          !allowedHostnames.includes(result.hostname.toLowerCase())))
     ) {
       throw new Error(TURNSTILE_ERROR);
     }

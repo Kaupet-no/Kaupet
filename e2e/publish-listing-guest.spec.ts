@@ -15,8 +15,11 @@ import {
   wizardStep,
 } from "./pages/listing-wizard";
 
-// Samme testeide kategori som publish-listing.spec.ts — se kommentaren der.
-const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
+// Egen, ikke-skjult utgave av publish-listing.spec.ts sin testkategori: en
+// utlogget bruker har ingen demo-rolle og kan derfor ikke se is_hidden-
+// kategorier (se visibleCategories/useIsDemo), så gjestetesten trenger sin
+// egen synlige kategori i stedet for "E2E-test (ikke bruk)".
+const TEST_CATEGORY_NAME = "E2E-test gjest (ikke bruk)";
 
 test("utlogget bruker sendes til innlogging med utkastet i behold", async ({ page }, testInfo) => {
   test.skip(

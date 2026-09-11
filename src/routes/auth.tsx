@@ -400,7 +400,11 @@ function AuthPage() {
             </p>
           </>
         ) : isSignUp && signupKind === "business" ? (
-          <div aria-labelledby="account-type-business-tab">
+          <div
+            id="account-type-business-panel"
+            role="tabpanel"
+            aria-labelledby="account-type-business-tab"
+          >
             <BusinessSignupFlow onAuthenticated={finishAuth} />
           </div>
         ) : (

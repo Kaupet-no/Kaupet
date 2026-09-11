@@ -5,7 +5,12 @@
 INSERT INTO public.categories (slug, name_nb, sort_order, icon, is_hidden)
 VALUES
   ('bil-og-mc', 'Bil og MC', 10, 'Car', false),
-  ('e2e-test-listing', 'E2E-test (ikke bruk)', 9999, 'FlaskConical', true)
+  ('e2e-test-listing', 'E2E-test (ikke bruk)', 9999, 'FlaskConical', true),
+  -- Samme som e2e-test-listing, men synlig for utlogget søk: brukes bare av
+  -- publish-listing-guest.spec.ts, som må kunne velge kategori uten
+  -- demo-rollen (bare innloggede brukere kan se is_hidden-kategorier, se
+  -- visibleCategories/useIsDemo).
+  ('e2e-test-listing-guest', 'E2E-test gjest (ikke bruk)', 9999, 'FlaskConical', false)
 ON CONFLICT (slug) DO UPDATE SET
   name_nb = EXCLUDED.name_nb,
   sort_order = EXCLUDED.sort_order,

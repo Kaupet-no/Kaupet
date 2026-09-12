@@ -105,6 +105,32 @@ function LightboxLoadingFallback() {
   );
 }
 
+export function getListingDateMeta(
+  listingStatus: string | null | undefined,
+  publishedAt: string | null,
+  createdAt: string,
+  updatedAt: string | null,
+) {
+  const fmt = (s: string) =>
+    new Date(s).toLocaleDateString("nb-NO", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  if (listingStatus === "draft") return { label: "Opprettet", dateStr: fmt(createdAt) };
+  const publishedDate = publishedAt ? new Date(publishedAt) : new Date(createdAt);
+  const updatedDate = updatedAt ? new Date(updatedAt) : null;
+  const isEditedLater =
+    updatedDate != null &&
+    (updatedDate.getFullYear() > publishedDate.getFullYear() ||
+      updatedDate.getMonth() > publishedDate.getMonth() ||
+      updatedDate.getDate() > publishedDate.getDate());
+  return {
+    label: isEditedLater ? "Sist redigert" : "Publisert",
+    dateStr: fmt(isEditedLater && updatedAt ? updatedAt : (publishedAt ?? createdAt)),
+  };
+}
+
 /** Link back to the last /annonser search this session, read from
  * sessionStorage (see last-search-context.ts) — rendered inside
  * `ClientOnly` since sessionStorage isn't available during SSR. Renders
@@ -1008,24 +1034,12 @@ function ListingDetailViewBody({
         <aside className="@container space-y-5">
           {organizationBrand && <ProffListingHeader organization={organizationBrand} />}
           {(() => {
-            const fmt = (s: string) =>
-              new Date(s).toLocaleDateString("nb-NO", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              });
-            const publishedDate = publishedAt ? new Date(publishedAt) : new Date(createdAt);
-            const updatedDate = updatedAt ? new Date(updatedAt) : null;
-
-            const isEditedLater =
-              updatedDate != null &&
-              (updatedDate.getFullYear() > publishedDate.getFullYear() ||
-                updatedDate.getMonth() > publishedDate.getMonth() ||
-                updatedDate.getDate() > publishedDate.getDate());
-
-            const label = isEditedLater ? "Sist redigert" : "Publisert";
-            const dateStr =
-              isEditedLater && updatedAt ? fmt(updatedAt) : fmt(publishedAt ?? createdAt);
+            const { label, dateStr } = getListingDateMeta(
+              listingStatus,
+              publishedAt,
+              createdAt,
+              updatedAt,
+            );
 
             return (
               <dl className="density-data grid grid-cols-2 gap-3 border-y border-border text-sm @sm:grid-cols-3">

@@ -175,7 +175,6 @@ export function IntentTitleLanding({
           <Input
             ref={titleInputRef}
             id="listing-title"
-            autoFocus
             value={title}
             onChange={(e) => {
               setTitle(e.target.value);

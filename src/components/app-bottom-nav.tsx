@@ -8,6 +8,7 @@ import { useUnreadNotificationsCount } from "@/hooks/use-unread";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,7 +26,7 @@ function initials(name: string | null | undefined, fallback: string) {
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
-export function AppBottomNav() {
+export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -62,11 +63,15 @@ export function AppBottomNav() {
   return (
     <nav
       aria-label={rail ? "Hovednavigasjon" : "Bunnavigasjon"}
-      className={
+      className={cn(
         rail
           ? "pointer-events-none fixed inset-y-0 left-0 z-50"
-          : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
-      }
+          : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none",
+        // Skjules i stedet for å avmontere når tastaturet er synlig: sheeten
+        // (ResponsiveOverlay) er rendret inni denne <nav>-en, og avmontering
+        // rev den ned igjen sammen med adPickerOpen-tilstanden.
+        hidden && "hidden",
+      )}
       style={rail ? undefined : { paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
       <div

@@ -107,6 +107,18 @@ describe("HeaderSearchPortal", () => {
 });
 
 describe("SiteHeader", () => {
+  it("bruker kompakt spacing på smale skjermer uten å fjerne navigasjonshandlinger", () => {
+    render(<SiteHeader />);
+
+    const nav = screen.getByRole("navigation", { name: "Hovednavigasjon" });
+    expect(nav.className).toContain("gap-1");
+    expect(nav.className).toContain("px-2");
+    expect(nav.className).toContain("md:gap-4");
+    expect(nav.className).toContain("md:px-4");
+    expect(screen.getByRole("button", { name: "Åpne søk" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Meldinger" })).toBeTruthy();
+  });
+
   it("viser Proff basis-logoen for en aktiv bedrift med Proff basis", () => {
     headerMocks.membership = {
       status: "active",

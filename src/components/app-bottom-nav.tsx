@@ -4,10 +4,11 @@ import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useUnreadNotificationsCount } from "@/hooks/use-unread";
+import { useUnreadNotificationsCount, useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,7 +26,7 @@ function initials(name: string | null | undefined, fallback: string) {
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
-export function AppBottomNav() {
+export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -62,11 +63,15 @@ export function AppBottomNav() {
   return (
     <nav
       aria-label={rail ? "Hovednavigasjon" : "Bunnavigasjon"}
-      className={
+      className={cn(
         rail
           ? "pointer-events-none fixed inset-y-0 left-0 z-50"
-          : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
-      }
+          : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none",
+        // Skjules i stedet for å avmontere når tastaturet er synlig: sheeten
+        // (ResponsiveOverlay) er rendret inni denne <nav>-en, og avmontering
+        // rev den ned igjen sammen med adPickerOpen-tilstanden.
+        hidden && "hidden",
+      )}
       style={rail ? undefined : { paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
       <div
@@ -173,7 +178,10 @@ export function AppBottomNav() {
           ) : (
             <button
               type="button"
-              onClick={() => navigate({ to: "/auth" })}
+              onClick={() => {
+                void hapticImpact("light");
+                navigate({ to: "/auth" });
+              }}
               className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Meldinger (logg inn)"
               aria-current={isOnMeldinger ? "page" : undefined}
@@ -195,6 +203,7 @@ export function AppBottomNav() {
           ) : (
             <Link
               to="/auth"
+              onClick={() => void hapticImpact("light")}
               className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Logg inn"
               aria-current={isOnMeg ? "page" : undefined}
@@ -233,7 +242,11 @@ export function UserAvatarButton({
   isActive?: boolean;
 }) {
   const navigate = useNavigate();
-  const unreadCount = useUnreadNotificationsCount();
+  // Meg-fanen er den eneste inngangen til varsler i den native
+  // informasjonsarkitekturen, så systemmeldinger («Kaupet-teamet») telles inn
+  // her i stedet for å få en egen badge ved siden av — se
+  // useUnreadSystemMessagesCount i use-unread.ts.
+  const unreadCount = useUnreadNotificationsCount() + useUnreadSystemMessagesCount();
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
     queryFn: async () => {
@@ -254,7 +267,10 @@ export function UserAvatarButton({
       type="button"
       aria-label={unreadCount > 0 ? `Meg, ${unreadCount} nye varsler` : "Meg"}
       aria-current={isActive ? "page" : undefined}
-      onClick={() => void navigate({ to: "/meg" })}
+      onClick={() => {
+        void hapticImpact("light");
+        void navigate({ to: "/meg" });
+      }}
       className="relative flex h-12 w-12 items-center justify-center"
     >
       <Avatar className="size-8">

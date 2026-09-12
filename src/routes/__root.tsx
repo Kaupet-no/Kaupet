@@ -382,7 +382,7 @@ function RootBody({ native }: { native: boolean }) {
           </div>
         </footer>
       )}
-      {native && !keyboardVisible && !bottomNavHidden && <AppBottomNav />}
+      {native && !bottomNavHidden && <AppBottomNav hidden={keyboardVisible} />}
       <FeedbackTag />
     </div>
   );

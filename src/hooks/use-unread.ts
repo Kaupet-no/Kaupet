@@ -88,7 +88,7 @@ export function useUnreadConversationsCount(): number {
     if (isNative()) {
       void import("@capacitor/app").then(({ App }) => {
         void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+          if (isActive) onFocus();
         }).then((handle) => {
           removeAppStateListener = () => void handle.remove();
         });
@@ -102,11 +102,22 @@ export function useUnreadConversationsCount(): number {
     };
   }, [user, qc]);
 
-  const conversationUnread = (data ?? []).filter((c) =>
+  return (data ?? []).filter((c) =>
     isUnread(c.last_message_at, c.last_sender_id, user?.id, c.my_last_read_at),
   ).length;
+}
 
-  const { data: systemUnread } = useQuery({
+/**
+ * Antall uleste systemmeldinger («Kaupet-teamet»). Egen telling, adskilt fra
+ * samtale-uleste — en fane-badge skal love at fanen inneholder noe uåpnet av
+ * den typen fanen heter, og systemmeldinger er ikke samtaler. Vises i stedet
+ * på Meg-fanen sammen med varsler, se useUnreadNotificationsCount.
+ */
+export function useUnreadSystemMessagesCount(): number {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const { data } = useQuery({
     queryKey: ["system-messages-unread", user?.id],
     enabled: !!user,
     queryFn: async () => {
@@ -119,7 +130,35 @@ export function useUnreadConversationsCount(): number {
     },
   });
 
-  return conversationUnread + (systemUnread ?? 0);
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => qc.invalidateQueries({ queryKey: ["system-messages-unread"] });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
+    let removeAppStateListener: (() => void) | undefined;
+    if (isNative()) {
+      void import("@capacitor/app").then(({ App }) => {
+        void App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) onFocus();
+        }).then((handle) => {
+          removeAppStateListener = () => void handle.remove();
+        });
+      });
+    }
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      removeAppStateListener?.();
+    };
+  }, [user, qc]);
+
+  return data ?? 0;
 }
 
 /**

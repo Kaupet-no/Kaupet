@@ -1,12 +1,15 @@
 import { toast, type ExternalToast } from "sonner";
 
-import { hapticImpact, hapticNotification } from "./haptics";
+import { hapticNotification } from "./haptics";
 import { isNative } from "./native";
 
+// Haptikk kun på error/warning — en vellykket bakgrunnsoperasjon (success,
+// info) skal ikke vibrere brukeren. Se docs/UI-GUIDE.md.
 function hapticForType(type: "success" | "error" | "warning" | "info") {
   if (!isNative()) return;
-  if (type === "success" || type === "info") void hapticImpact("light");
-  else void hapticNotification(type === "warning" ? "warning" : "error");
+  if (type === "error" || type === "warning") {
+    void hapticNotification(type === "warning" ? "warning" : "error");
+  }
 }
 
 export function showToast(

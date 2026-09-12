@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useUnreadConversationsCount } from "@/hooks/use-unread";
 import { isUnread } from "@/lib/unread";
+import { hapticImpact } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NativeSheet } from "@/components/ui/native-sheet";
@@ -193,6 +194,7 @@ export function MessagesButton({ isActive }: { isActive?: boolean } = {}) {
     <Button
       variant="ghost"
       size="icon"
+      onClick={() => void hapticImpact("light")}
       aria-label={unreadCount > 0 ? `Meldinger, ${unreadCount} uleste` : "Meldinger"}
       aria-current={isActive ? "page" : undefined}
       className="native-touch-target relative"

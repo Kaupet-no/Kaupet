@@ -159,7 +159,15 @@ const SheetContent = React.forwardRef<
             <Drawer.Overlay className="fixed inset-0 z-[10000] bg-black/80" />
             <Drawer.Content
               ref={ref}
-              className={cn(drawerContentClass, expandable && "h-[97dvh] max-h-[97dvh]")}
+              // Høydetak også uten `expandable`: uten det får sheeten ingen
+              // høydebegrensning i det hele tatt når innholdet er høyere enn
+              // viewporten, og stikker utenfor skjermen i stedet for å scrolle
+              // (målt: negativ `top`, drag-handle/lukkekryss/tittel utilgjengelig).
+              // `dvh` fordi WebView-viewporten krymper når tastaturet åpner seg.
+              className={cn(
+                drawerContentClass,
+                expandable ? "h-[97dvh] max-h-[97dvh]" : "max-h-[92dvh]",
+              )}
               {...(expandable ? dragGate.dragCaptureProps : {})}
               {...props}
             >
@@ -171,7 +179,7 @@ const SheetContent = React.forwardRef<
                 <span className="sr-only">Lukk</span>
               </SheetPrimitive.Close>
               <div
-                className={cn("min-h-0 flex-1 overscroll-contain", className)}
+                className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", className)}
                 style={{
                   touchAction: "pan-y",
                   maxHeight: expandable ? "calc(97dvh - var(--snap-point-height, 0px))" : undefined,

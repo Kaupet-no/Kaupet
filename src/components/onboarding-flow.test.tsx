@@ -62,8 +62,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("OnboardingFlow", () => {
-  it("lar utlogget bruker utforske eller logge inn uten tillatelsesforespørsler", () => {
+  it("gir utlogget bruker 3 kort, med utforsk/logg inn-knapper først på siste", () => {
     render(<OnboardingFlow onComplete={vi.fn()} />);
+
+    expect(screen.getAllByRole("button", { name: `Gå til kort ${1}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Gå til kort 3" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Gå til kort 4" })).toBeNull();
+
+    // Knappene for å fullføre onboarding vises ikke før siste kort
+    expect(screen.queryByRole("button", { name: "Utforsk Kaupet" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Kom i gang" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Gå til kort 3" }));
 
     expect(screen.getByRole("button", { name: "Utforsk Kaupet" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Logg inn og hent lagrede søk" })).toBeTruthy();
@@ -71,6 +81,21 @@ describe("OnboardingFlow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Utforsk Kaupet" }));
     expect(mocks.enableOnThisDevice).not.toHaveBeenCalled();
+  });
+
+  it("lar innlogget bruker uten push-tilbud fullføre onboarding fra siste kort", () => {
+    mocks.user = { id: "user-1" };
+    mocks.searches = [];
+
+    render(<OnboardingFlow onComplete={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Gå til kort 4" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Gå til kort 3" }));
+
+    // Siste kort for innlogget bruker uten push-tilbud: chevronen fullfører direkte.
+    expect(screen.getByRole("button", { name: "Kom i gang" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Kom i gang" }));
   });
 
   it("utsetter push når innlogget bruker ikke har varslende lagrede søk", () => {
@@ -89,10 +114,11 @@ describe("OnboardingFlow", () => {
 
     render(<OnboardingFlow onComplete={vi.fn()} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Gå til kort 4" }));
+
     expect(screen.getByText(/Du har 3 lagrede søk med varsling/)).toBeTruthy();
     expect(mocks.enableOnThisDevice).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Kom i gang" }));
     fireEvent.click(screen.getByRole("button", { name: "Ja, varsle meg" }));
 
     await waitFor(() => expect(mocks.enableOnThisDevice).toHaveBeenCalledWith("saved_searches"));
@@ -136,7 +162,7 @@ describe("OnboardingFlow", () => {
         ?.hasAttribute("inert"),
     ).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Gå til kort 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Gå til kort 4" }));
 
     expect(screen.getByRole("button", { name: "Ja, varsle meg" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Kom i gang" })).toBeNull();

@@ -8,6 +8,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // SoftHapticsPlugin lives in this app module, not an npm package, so
+        // Capacitor's plugin autodiscovery (which scans node_modules) never
+        // finds it — it must be registered manually, before super.onCreate().
+        registerPlugin(SoftHapticsPlugin.class);
         super.onCreate(savedInstanceState);
         // Cloudflare Access is only used by the isolated staging flavor.
         // Production must not accept third-party cookies from arbitrary

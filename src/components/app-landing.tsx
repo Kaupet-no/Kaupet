@@ -1,4 +1,4 @@
-import { LayoutGrid, MapPin, Search as SearchIcon } from "lucide-react";
+import { ChevronDown, LayoutGrid, MapPin, Search as SearchIcon } from "lucide-react";
 
 import { ListingCard } from "@/components/listing-card";
 import { usePopularListings } from "@/features/landing/use-popular-listings";
@@ -24,13 +24,17 @@ export function AppLanding() {
 
   return (
     <div className="pb-3">
-      <AppHeroLogo />
-
-      {/* Handel før merkevare: søk er første handling brukeren møter, og
-          hero/luft over er bevisst redusert (fase B1) slik at minst ett
-          troverdig annonsekort under er lesbart innen første skjermbilde
-          ved standard tekststørrelse på en vanlig telefon. */}
-      <section className="flex flex-col items-center gap-3 px-5 pb-4 pt-1 density-task">
+      {/* Hero er en egen first-screen-seksjon: logo, søk og piller sentreres
+          vertikalt i ledig rom over bunnnavigasjonen, og "Populært
+          nå"/"Nye annonser" starter under folden. Brukeren skal scrolle for
+          å se annonser — det er en bevisst prioritering av søk foran
+          annonsekarusellen på forsiden. */}
+      <section
+        className={`flex flex-col items-center justify-center gap-3 px-5 pb-4 pt-safe density-task ${
+          isTablet ? "max-w-xl mx-auto" : "min-h-[calc(100dvh-var(--app-bottom-nav-h))]"
+        }`}
+      >
+        <AppHeroLogo />
         <h1 className="text-center font-display text-xl tracking-tight">
           Hva leter du etter i dag?
         </h1>
@@ -87,6 +91,13 @@ export function AppLanding() {
             </button>
           }
         />
+
+        {!isTablet && (
+          <ChevronDown
+            className="mt-1 size-5 animate-bounce text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
       </section>
 
       <section className="mt-2 pl-5" aria-labelledby="popular-heading">

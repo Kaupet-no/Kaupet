@@ -1,14 +1,21 @@
-import type { RefObject } from "react";
+import { useMemo, type RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { formatAttributeValue } from "@/components/listing-detail/format-attribute-value";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   ComposerReview,
   ComposerReviewStatuses,
 } from "@/features/listing-creation/composer-review";
+import { useAllCategoryFilters } from "@/hooks/use-category-filters";
+import {
+  effectiveFiltersForCategory,
+  filterDependencyMet,
+  type CategoryNode,
+} from "@/lib/category-filters";
 
 import type { WizardSharedProps, ComposerReviewStatus } from "../types";
 import { Vehicle360Group } from "../vehicle-360";
@@ -132,6 +139,31 @@ type PublishActionsProps = {
  * renders it explicitly on the last page instead of via this wrapper.
  */
 export function ReviewPublishGroup(props: WizardSharedProps) {
+  const { data: categoryFilters = [] } = useAllCategoryFilters();
+  const categoriesById = useMemo(
+    () => new Map(props.categories.map((category) => [category.id, category as CategoryNode])),
+    [props.categories],
+  );
+  const attributeSummary = effectiveFiltersForCategory(
+    props.categoryId,
+    categoryFilters,
+    categoriesById,
+  )
+    .filter((filter) => filterDependencyMet(filter, props.attributes))
+    .map((filter) => {
+      const value = formatAttributeValue(filter, props.attributes[filter.key]);
+      return value ? `${filter.label_nb}: ${value}` : null;
+    })
+    .filter((value): value is string => value !== null)
+    .join(" · ");
+  const deliverySummary = props.behavior.requiresDeliveryMethod
+    ? props.canShip === "ship"
+      ? "Levering: Kan sendes"
+      : props.canShip === "pickup"
+        ? "Levering: Må hentes"
+        : "Levering: Ikke oppgitt"
+    : null;
+  const placeSummary = [props.postalCode, props.city].filter(Boolean).join(" ");
   const improvementGroups =
     props.improvementGroups ??
     props.improvementGroupKeys.map((key) => ({
@@ -250,13 +282,22 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
             key: "details",
             label: "Pris og detaljer",
             value:
-              [props.previewPrice, props.subtitle].filter(Boolean).join(" · ") || "Ikke oppgitt",
+              [
+                props.previewPrice && `Pris: ${props.previewPrice}`,
+                props.subtitle && `Undertittel: ${props.subtitle}`,
+                props.description && `Beskrivelse: ${props.description}`,
+                attributeSummary,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "Ikke oppgitt",
             onEdit: () => props.onEditReviewSection("details"),
           },
           {
             key: "location",
-            label: "Sted",
-            value: [props.postalCode, props.city].filter(Boolean).join(" ") || "Ikke oppgitt",
+            label: "Sted og levering",
+            value: [`Sted: ${placeSummary || "Ikke oppgitt"}`, deliverySummary]
+              .filter(Boolean)
+              .join(" · "),
             onEdit: () => props.onEditReviewSection("location"),
           },
         ]}

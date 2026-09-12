@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { getListingDateMeta } from "./listing-detail-view";
+import { getListingDateMeta } from "./listing-date-meta";
 
 describe("annonse-dato på detaljsiden", () => {
   it("viser opprettelsesdato for kladd, ikke publiseringsdato", () => {

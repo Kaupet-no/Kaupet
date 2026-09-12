@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MessagesButton } from "./messages-button";
+import { hapticImpact } from "@/lib/haptics";
 
 let queryResult: Record<string, unknown>;
 const refetch = vi.fn();
@@ -27,6 +28,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     removeChannel: vi.fn(),
   },
 }));
+vi.mock("@/lib/haptics", () => ({ hapticImpact: vi.fn() }));
 vi.mock("@/components/ui/native-sheet", () => ({
   NativeSheet: ({
     open,
@@ -52,6 +54,7 @@ vi.mock("@/components/ui/native-sheet", () => ({
 afterEach(() => {
   cleanup();
   refetch.mockReset();
+  vi.mocked(hapticImpact).mockClear();
 });
 
 describe("MessagesButton", () => {
@@ -104,5 +107,15 @@ describe("MessagesButton", () => {
     expect(getByRole("button", { name: "Meldinger, 3 uleste" })).toBeTruthy();
     expect(getByRole("link", { name: "Se alle meldinger" }).className).toContain("h-14");
     expect(getByRole("status").textContent).toBe("Oppdaterer meldinger");
+  });
+
+  it("gir nøyaktig ett haptikk-signal per trykk på Meldinger-knappen", () => {
+    queryResult = { data: [], refetch, isLoading: false, isError: false, isFetching: false };
+    const { getByRole } = render(<MessagesButton />);
+
+    fireEvent.click(getByRole("button", { name: "Meldinger, 3 uleste" }));
+
+    expect(hapticImpact).toHaveBeenCalledOnce();
+    expect(hapticImpact).toHaveBeenCalledWith("light");
   });
 });

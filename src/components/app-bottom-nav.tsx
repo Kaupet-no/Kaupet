@@ -178,7 +178,10 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           ) : (
             <button
               type="button"
-              onClick={() => navigate({ to: "/auth" })}
+              onClick={() => {
+                void hapticImpact("light");
+                navigate({ to: "/auth" });
+              }}
               className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Meldinger (logg inn)"
               aria-current={isOnMeldinger ? "page" : undefined}
@@ -200,6 +203,7 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           ) : (
             <Link
               to="/auth"
+              onClick={() => void hapticImpact("light")}
               className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Logg inn"
               aria-current={isOnMeg ? "page" : undefined}
@@ -259,7 +263,10 @@ export function UserAvatarButton({
       type="button"
       aria-label={unreadCount > 0 ? `Meg, ${unreadCount} nye varsler` : "Meg"}
       aria-current={isActive ? "page" : undefined}
-      onClick={() => void navigate({ to: "/meg" })}
+      onClick={() => {
+        void hapticImpact("light");
+        void navigate({ to: "/meg" });
+      }}
       className="relative flex h-12 w-12 items-center justify-center"
     >
       <Avatar className="size-8">

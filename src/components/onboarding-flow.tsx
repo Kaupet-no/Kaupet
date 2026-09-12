@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Bell, ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, MessageCircle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { hapticImpact } from "@/lib/haptics";
 import { setBackOverride } from "@/lib/native-offline";
@@ -16,7 +16,65 @@ type Props = {
   onComplete: () => void;
 };
 
-type Card = "welcome" | "notifications";
+type Card = "welcome" | "how" | "trust" | "notifications";
+
+const infoCards: Record<"how" | "trust", { icon: typeof Bell; title: string; body: string }> = {
+  how: {
+    icon: MessageCircle,
+    title: "Direkte kontakt med selger",
+    body: "Ingen mellomledd — du snakker med den som eier tingen.",
+  },
+  trust: {
+    icon: ShieldCheck,
+    title: "Ingen reklame, minst mulig sporing",
+    body: "100 % åpen kildekode.",
+  },
+};
+
+function CardNav({
+  isLast,
+  user,
+  authLoading,
+  onNext,
+  onFinish,
+  reduceMotion,
+}: {
+  isLast: boolean;
+  user: unknown;
+  authLoading: boolean;
+  onNext: () => void;
+  onFinish: () => void;
+  reduceMotion: boolean;
+}) {
+  if (!isLast || user) {
+    return (
+      <button
+        type="button"
+        onClick={isLast ? onFinish : onNext}
+        className="mt-12 flex flex-col items-center gap-2 text-sm text-muted-foreground"
+      >
+        <span>Kom i gang</span>
+        <ChevronRight
+          className={`size-5 ${reduceMotion ? "" : "animate-[swipe-hint_1.2s_ease-in-out_infinite]"}`}
+        />
+      </button>
+    );
+  }
+  return (
+    <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
+      <Button onClick={onFinish} disabled={authLoading} className="w-full">
+        Utforsk Kaupet
+      </Button>
+      {!authLoading && (
+        <Button variant="ghost" asChild className="w-full text-muted-foreground">
+          <Link to="/auth" search={{ mode: "signin", returnTo: "/" }}>
+            Logg inn og hent lagrede søk
+          </Link>
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function OnboardingFlow({ onComplete }: Props) {
   const { user, loading: authLoading } = useAuth();
@@ -35,7 +93,7 @@ export function OnboardingFlow({ onComplete }: Props) {
     push.permission === "default";
   const [pushOfferVisited, setPushOfferVisited] = useState(false);
   const showPushOffer = !!user && (pushOfferEligible || pushOfferVisited);
-  const cards: Card[] = ["welcome"];
+  const cards: Card[] = ["welcome", "how", "trust"];
   if (showPushOffer) cards.push("notifications");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -98,7 +156,9 @@ export function OnboardingFlow({ onComplete }: Props) {
 
   const next = () => {
     if (currentIndex < cards.length - 1) {
-      if (currentIndex === 0 && pushOfferEligible) setPushOfferVisited(true);
+      if (cards[currentIndex + 1] === "notifications" && pushOfferEligible) {
+        setPushOfferVisited(true);
+      }
       scrollTo(currentIndex + 1);
     } else {
       finish();
@@ -109,7 +169,7 @@ export function OnboardingFlow({ onComplete }: Props) {
     if (finishing) return;
     setFinishing(true);
     trackProductEvent("onboarding_completed", { signedIn: !!user });
-    finishTimer.current = window.setTimeout(onComplete, reduceMotion ? 500 : 2200);
+    finishTimer.current = window.setTimeout(onComplete, reduceMotion ? 500 : 1200);
   };
 
   const completeNow = () => {
@@ -169,38 +229,46 @@ export function OnboardingFlow({ onComplete }: Props) {
               <h1 className="font-display text-3xl font-semibold tracking-tight">
                 Finn, kjøp og selg brukt
               </h1>
-              <p className="mt-4 max-w-xs text-base text-muted-foreground">
-                Enkelt og lokalt: gode annonser, direkte kontakt med selger og konkret informasjon
-                om det du kjøper. Ingen reklame, minst mulig sporing og 100% åpen kildekode.
-              </p>
-              {user ? (
-                <button
-                  type="button"
-                  onClick={next}
-                  className="mt-12 flex flex-col items-center gap-2 text-sm text-muted-foreground"
-                >
-                  <span>Kom i gang</span>
-                  <ChevronRight
-                    className={`size-5 ${reduceMotion ? "" : "animate-[swipe-hint_1.2s_ease-in-out_infinite]"}`}
-                  />
-                </button>
-              ) : (
-                <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
-                  <Button onClick={finish} disabled={authLoading} className="w-full">
-                    Utforsk Kaupet
-                  </Button>
-                  {!authLoading && (
-                    <Button variant="ghost" asChild className="w-full text-muted-foreground">
-                      <Link to="/auth" search={{ mode: "signin", returnTo: "/" }}>
-                        Logg inn og hent lagrede søk
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              )}
+              <p className="mt-4 max-w-xs text-base text-muted-foreground">Enkelt og lokalt.</p>
+              <CardNav
+                isLast={false}
+                user={user}
+                authLoading={authLoading}
+                onNext={next}
+                onFinish={finish}
+                reduceMotion={reduceMotion}
+              />
             </div>
 
-            {/* Card 2: Notifications */}
+            {/* Card 2 & 3: Info (how it works, trust) */}
+            {(["how", "trust"] as const).map((card) => {
+              const index = cards.indexOf(card);
+              const { icon: Icon, title, body } = infoCards[card];
+              return (
+                <div
+                  key={card}
+                  className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
+                  aria-hidden={activeCard !== card}
+                  inert={activeCard !== card}
+                >
+                  <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Icon className="size-10" />
+                  </div>
+                  <h2 className="font-display text-2xl font-semibold tracking-tight">{title}</h2>
+                  <p className="mt-3 max-w-xs text-sm text-muted-foreground">{body}</p>
+                  <CardNav
+                    isLast={index === cards.length - 1}
+                    user={user}
+                    authLoading={authLoading}
+                    onNext={next}
+                    onFinish={finish}
+                    reduceMotion={reduceMotion}
+                  />
+                </div>
+              );
+            })}
+
+            {/* Card 4: Notifications */}
             {showPushOffer && (
               <div
                 className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"

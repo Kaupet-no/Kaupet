@@ -193,7 +193,10 @@ export function InboxPage() {
         .eq("id", id)
         .is("read_at", null);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["system-messages"] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["system-messages"] });
+      void qc.invalidateQueries({ queryKey: ["system-messages-unread"] });
+    },
   });
   const trashMut = useMutation({
     mutationFn: async ({ row, restore }: { row: ConversationRow; restore: boolean }) => {

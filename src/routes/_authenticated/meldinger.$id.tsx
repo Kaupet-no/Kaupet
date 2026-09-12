@@ -215,12 +215,17 @@ function ConversationPage() {
     lastMarkedRef.current = null;
   }, [id]);
   const markReadMutation = useMutation({
-    mutationFn: async (readAt: string) => {
-      if (!conv || !user) return;
-      if (lastMarkedRef.current && readAt <= lastMarkedRef.current) return;
-      lastMarkedRef.current = readAt;
+    mutationFn: async ({
+      readAt,
+      conv: readConv,
+      user: readUser,
+    }: {
+      readAt: string;
+      conv: NonNullable<typeof conv>;
+      user: NonNullable<typeof user>;
+    }) => {
       const update =
-        conv.seller_id === user.id || conv.isBusinessSeller
+        readConv.seller_id === readUser.id || readConv.isBusinessSeller
           ? { seller_last_read_at: readAt }
           : { buyer_last_read_at: readAt };
       const { error } = await supabase.from("conversations").update(update).eq("id", id);
@@ -265,7 +270,10 @@ function ConversationPage() {
             return [...prev, m];
           });
           // Markér som lest når brukeren er inne i samtalen
-          markReadMutation.mutate(m.created_at);
+          if (conv && user && !(lastMarkedRef.current && m.created_at <= lastMarkedRef.current)) {
+            lastMarkedRef.current = m.created_at;
+            markReadMutation.mutate({ readAt: m.created_at, conv, user });
+          }
         },
       )
       .on(
@@ -311,7 +319,10 @@ function ConversationPage() {
     if (messages && conv && user) {
       const readAt =
         messages.length > 0 ? messages[messages.length - 1].created_at : new Date().toISOString();
-      markReadMutation.mutate(readAt);
+      if (!(lastMarkedRef.current && readAt <= lastMarkedRef.current)) {
+        lastMarkedRef.current = readAt;
+        markReadMutation.mutate({ readAt, conv, user });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, id, conv, user]);

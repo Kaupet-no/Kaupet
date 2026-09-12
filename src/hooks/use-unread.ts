@@ -76,6 +76,7 @@ export function useUnreadConversationsCount(): number {
     if (!user) return;
     const onFocus = () => {
       qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+      qc.invalidateQueries({ queryKey: ["system-messages-unread"] });
     };
     const onVisibility = () => {
       if (document.visibilityState === "visible") onFocus();
@@ -88,7 +89,7 @@ export function useUnreadConversationsCount(): number {
     if (isNative()) {
       void import("@capacitor/app").then(({ App }) => {
         void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+          if (isActive) onFocus();
         }).then((handle) => {
           removeAppStateListener = () => void handle.remove();
         });

@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { isUnread } from "@/lib/unread";
 import { usePushStatus } from "@/hooks/use-push-status";
+import { useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { formatErrorMessage } from "@/lib/errors";
 type ConversationRow = {
   id: string;
@@ -221,7 +222,7 @@ export function InboxPage() {
       showErrorToast(formatErrorMessage(error, "Kunne ikke oppdatere samtalen")),
   });
 
-  const unreadSystemCount = systemMessages?.filter((m) => !m.read_at).length ?? 0;
+  const unreadSystemCount = useUnreadSystemMessagesCount();
 
   // Last opp signerte bilde-URLer for omslagsbilder
   useEffect(() => {

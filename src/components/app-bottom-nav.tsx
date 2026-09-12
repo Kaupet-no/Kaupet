@@ -4,7 +4,7 @@ import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useUnreadNotificationsCount } from "@/hooks/use-unread";
+import { useUnreadNotificationsCount, useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
@@ -242,7 +242,11 @@ export function UserAvatarButton({
   isActive?: boolean;
 }) {
   const navigate = useNavigate();
-  const unreadCount = useUnreadNotificationsCount();
+  // Meg-fanen er den eneste inngangen til varsler i den native
+  // informasjonsarkitekturen, så systemmeldinger («Kaupet-teamet») telles inn
+  // her i stedet for å få en egen badge ved siden av — se
+  // useUnreadSystemMessagesCount i use-unread.ts.
+  const unreadCount = useUnreadNotificationsCount() + useUnreadSystemMessagesCount();
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
     queryFn: async () => {

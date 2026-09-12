@@ -6,6 +6,7 @@ import { UserAvatarButton } from "./app-bottom-nav";
 import { hapticImpact } from "@/lib/haptics";
 
 let unreadCount = 0;
+let unreadSystemCount = 0;
 const navigateMock = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigateMock }));
@@ -14,6 +15,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 vi.mock("@/hooks/use-unread", () => ({
   useUnreadNotificationsCount: () => unreadCount,
+  useUnreadSystemMessagesCount: () => unreadSystemCount,
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/lib/haptics", () => ({ hapticImpact: vi.fn() }));
@@ -21,6 +23,7 @@ vi.mock("@/lib/haptics", () => ({ hapticImpact: vi.fn() }));
 afterEach(() => {
   cleanup();
   unreadCount = 0;
+  unreadSystemCount = 0;
   navigateMock.mockReset();
   vi.mocked(hapticImpact).mockClear();
 });

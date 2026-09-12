@@ -427,6 +427,7 @@ export function ListingDetailView({
       createdAt={createdAt}
       updatedAt={updatedAt}
       publishedAt={publishedAt}
+      listingStatus={listingStatus}
       knownIssues={knownIssues}
       noKnownIssues={noKnownIssues}
       maintenanceHistory={maintenanceHistory}
@@ -503,6 +504,7 @@ function ListingDetailViewBody({
   createdAt,
   updatedAt,
   publishedAt,
+  listingStatus,
   knownIssues,
   noKnownIssues,
   maintenanceHistory,
@@ -559,6 +561,7 @@ function ListingDetailViewBody({
   createdAt: string;
   updatedAt: string | null;
   publishedAt: string | null;
+  listingStatus?: string | null;
   knownIssues: string | null;
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;

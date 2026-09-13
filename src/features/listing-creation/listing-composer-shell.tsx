@@ -96,11 +96,11 @@ export function ListingComposerShell({
   }, [native]);
 
   useEffect(() => {
-    if (previousPageRef.current === pageKey) return;
+    const pageChanged = previousPageRef.current !== pageKey;
     previousPageRef.current = pageKey;
     window.scrollTo({ top: 0 });
     requestAnimationFrame(() => pageHeadingRef.current?.focus());
-    if (native) void hapticSelection();
+    if (native && pageChanged) void hapticSelection();
   }, [native, pageKey]);
 
   useEffect(() => {

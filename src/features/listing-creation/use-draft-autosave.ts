@@ -111,7 +111,7 @@ export function useDraftAutosave(fields: DraftFields) {
   // INSERT, which resurrects the just-published listing as a duplicate draft.
   // One guard here covers all three save paths.
   const draftSavingStopped = useRef(false);
-  const draftSaveInProgress = useRef(false);
+  const draftSaveInProgress = useRef<Promise<string | null> | null>(null);
   const imageStoreReady = useRef(false);
   const restorableImages = useRef<PendingImage[]>([]);
   const latestImages = useRef(images);
@@ -290,7 +290,7 @@ export function useDraftAutosave(fields: DraftFields) {
       return null;
     }
     const currentDraftId = draftIdRef.current;
-    if (draftSaveInProgress.current) return currentDraftId;
+    if (draftSaveInProgress.current) return draftSaveInProgress.current;
     // For Bil/MC the title is generated from the vehicle lookup (Årsmodell/
     // Merke/Modell) and is only written into the form's `title` field once
     // the user reaches the description step (see VehicleTitleFields), which
@@ -298,74 +298,77 @@ export function useDraftAutosave(fields: DraftFields) {
     // this fallback a vehicle draft could not be saved before that step.
     const effectiveTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
     if (effectiveTitle.length < 5) return null;
-    draftSaveInProgress.current = true;
-    try {
-      const result = await saveDraftListing({
-        data: {
-          ...(currentDraftId ? { id: currentDraftId } : {}),
-          ...(currentDraftId && draftUpdatedAtRef.current
-            ? { expected_updated_at: draftUpdatedAtRef.current }
-            : {}),
-          title: effectiveTitle,
-          subtitle: (subtitle ?? "").trim() || null,
-          // Always send the value, never `undefined`: saveDraftListing strips
-          // undefined keys from the update payload, so an emptied description
-          // would keep whatever the row held before — which leaked the
-          // previous listing's text into the next one when the draft row is
-          // reused. Empty string rather than null: the column is NOT NULL.
-          description: (description ?? "").trim(),
-          category_id: categoryId || null,
-          condition: condition || null,
-          is_free: isFree,
-          price_nok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
-          postal_code: postalCode || null,
-          city: city || null,
-          organization_location_id: organizationLocationId || null,
-          show_visiting_address: showVisitingAddress ?? false,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
-          can_ship: canShip == null ? null : canShip !== "pickup",
-          known_issues: knownIssues?.trim() || null,
-          no_known_issues: !!noKnownIssues,
-          maintenance_history: maintenanceHistory?.trim() || null,
-          attributes,
-        },
-      });
-      if ("conflict" in result) {
-        draftConflictRef.current = true;
-        draftUpdatedAtRef.current = result.updated_at;
-        try {
-          localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
-        } catch {
-          // The current form was already persisted locally above.
-        }
-        setDraftSaveError(true);
-        setDraftSaveConflict(true);
-        return null;
-      }
-      draftIdRef.current = result.id;
-      if (result.updated_at) {
-        draftUpdatedAtRef.current = result.updated_at;
-      }
-      setDraftId(result.id);
-      setLastSaved(new Date());
-      setDraftSaveError(false);
-      draftConflictRef.current = false;
-      setDraftSaveConflict(false);
+    const save = (async () => {
       try {
-        localStorage.setItem(DRAFT_ID_KEY, result.id);
-        if (result.updated_at) localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
+        const result = await saveDraftListing({
+          data: {
+            ...(currentDraftId ? { id: currentDraftId } : {}),
+            ...(currentDraftId && draftUpdatedAtRef.current
+              ? { expected_updated_at: draftUpdatedAtRef.current }
+              : {}),
+            title: effectiveTitle,
+            subtitle: (subtitle ?? "").trim() || null,
+            // Always send the value, never `undefined`: saveDraftListing strips
+            // undefined keys from the update payload, so an emptied description
+            // would keep whatever the row held before — which leaked the
+            // previous listing's text into the next one when the draft row is
+            // reused. Empty string rather than null: the column is NOT NULL.
+            description: (description ?? "").trim(),
+            category_id: categoryId || null,
+            condition: condition || null,
+            is_free: isFree,
+            price_nok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
+            postal_code: postalCode || null,
+            city: city || null,
+            organization_location_id: organizationLocationId || null,
+            show_visiting_address: showVisitingAddress ?? false,
+            lat: coords?.lat ?? null,
+            lng: coords?.lng ?? null,
+            can_ship: canShip == null ? null : canShip !== "pickup",
+            known_issues: knownIssues?.trim() || null,
+            no_known_issues: !!noKnownIssues,
+            maintenance_history: maintenanceHistory?.trim() || null,
+            attributes,
+          },
+        });
+        if ("conflict" in result) {
+          draftConflictRef.current = true;
+          draftUpdatedAtRef.current = result.updated_at;
+          try {
+            localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
+          } catch {
+            // The current form was already persisted locally above.
+          }
+          setDraftSaveError(true);
+          setDraftSaveConflict(true);
+          return null;
+        }
+        draftIdRef.current = result.id;
+        if (result.updated_at) {
+          draftUpdatedAtRef.current = result.updated_at;
+        }
+        setDraftId(result.id);
+        setLastSaved(new Date());
+        setDraftSaveError(false);
+        draftConflictRef.current = false;
+        setDraftSaveConflict(false);
+        try {
+          localStorage.setItem(DRAFT_ID_KEY, result.id);
+          if (result.updated_at) localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
+        } catch {
+          // ignore
+        }
+        return result.id;
       } catch {
-        // ignore
+        setDraftSaveError(true);
+        setDraftSaveConflict(false);
+        return null;
+      } finally {
+        draftSaveInProgress.current = null;
       }
-      return result.id;
-    } catch {
-      setDraftSaveError(true);
-      setDraftSaveConflict(false);
-      return null;
-    } finally {
-      draftSaveInProgress.current = false;
-    }
+    })();
+    draftSaveInProgress.current = save;
+    return save;
   }
 
   async function ensureDraftId(): Promise<string | null> {
@@ -374,6 +377,7 @@ export function useDraftAutosave(fields: DraftFields) {
   }
 
   async function retryDraftAfterConflict(): Promise<string | null> {
+    if (draftSaveInProgress.current) await draftSaveInProgress.current;
     draftConflictRef.current = false;
     setDraftSaveConflict(false);
     return saveDraftToSupabase();

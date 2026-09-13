@@ -215,6 +215,48 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftSaveConflict).toBe(false);
   });
 
+  it("venter på konfliktkallet før en umiddelbar retry lagrer på nytt", async () => {
+    localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
+    localStorage.setItem(DRAFT_UPDATED_AT_KEY, "2026-09-13T18:00:00.000Z");
+    let resolveConflict!: (value: { conflict: true; updated_at: string }) => void;
+    const conflictResponse = new Promise<{ conflict: true; updated_at: string }>((resolve) => {
+      resolveConflict = resolve;
+    });
+    saveDraftListingMock.mockReturnValueOnce(conflictResponse).mockResolvedValueOnce({
+      id: "00000000-0000-4000-8000-000000000001",
+      kaupet_code: "ABC123",
+      updated_at: "2026-09-13T18:02:00.000Z",
+    });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Nyeste lokale versjon" }),
+    );
+    await waitFor(() => expect(result.current.draftId).not.toBeNull());
+
+    let firstSave!: Promise<string | null>;
+    let retry!: Promise<string | null>;
+    act(() => {
+      firstSave = result.current.saveDraftToSupabase();
+      retry = result.current.retryDraftAfterConflict();
+    });
+    expect(saveDraftListingMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveConflict({ conflict: true, updated_at: "2026-09-13T18:01:00.000Z" });
+      await Promise.all([firstSave, retry]);
+    });
+
+    expect(saveDraftListingMock).toHaveBeenCalledTimes(2);
+    expect(saveDraftListingMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          expected_updated_at: "2026-09-13T18:01:00.000Z",
+        }),
+      }),
+    );
+    expect(result.current.draftSaveConflict).toBe(false);
+    expect(result.current.draftSaveError).toBe(false);
+  });
+
   it("saveDraftToSupabase sets draftSaveError when the save fails", async () => {
     saveDraftListingMock.mockRejectedValue(new Error("network down"));
     const { result } = renderHook(() =>

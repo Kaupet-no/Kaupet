@@ -20,9 +20,11 @@ import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
 import { isWtbRangeValue, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
 import {
   categoryBreadcrumb,
+  effectiveFiltersForCategory,
   vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
+import { wtbCriteriaSummary } from "@/features/wtb/wtb-criteria-presentation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -322,6 +324,11 @@ function NewWtbPage() {
   }, [computedTitle, vehicleGroup, titleManualOverride]);
 
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+  const criteriaFilters = effectiveFiltersForCategory(
+    categoryId ?? null,
+    allFilters ?? [],
+    categoriesById,
+  );
   const parsedMaxPrice = maxPriceNok === "" ? null : Number(maxPriceNok);
 
   useEffect(() => {
@@ -1000,10 +1007,7 @@ function NewWtbPage() {
                   {
                     key: "criteria",
                     label: "Kriterier",
-                    value:
-                      Object.keys(attributes).length > 0
-                        ? `${Object.keys(attributes).length} valgt`
-                        : "Ingen begrensninger",
+                    value: wtbCriteriaSummary(criteriaFilters, attributes),
                     onEdit: () => {
                       returnToReviewRef.current = true;
                       setStepIndex(steps.indexOf("attributes"));

@@ -50,12 +50,12 @@ uventet duplikat. Et FAIL registreres etter DEF-mal i TESTSTRATEGI §9.
 
 ## J4 — Kjøpsønske (WTB-03, WTB-08)
 
-| Steg | Handling                                                                       | Forventet resultat                                                              | Bevis | Status |
-| ---- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ----- | ------ |
-| 1    | Start «Jeg ønsker å kjøpe» uten kategori.                                      | Kriterier kan fylles; mangler forklares ved «Fortsett» (WTB-03).                |       |        |
-| 2    | Fyll kategori, makspris og kriterier; prøv min > maks i et numerisk kriterium. | Ugyldig intervall blokkeres med feltfeil; gyldige verdier overlever navigasjon. |       |        |
-| 3    | Publiser med varsling aktivert.                                                | Ett kjøpsønske publiseres og varslingsvalg bekreftes (WTB-03).                  |       |        |
-| 4    | Opprett matchende testannonse fra annen testkonto.                             | Eieren får nøyaktig ett relevant varsel; ingen varsel til feil bruker (WTB-08). |       |        |
+| Steg | Handling                                                                       | Forventet resultat                                                                                          | Bevis | Status |
+| ---- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----- | ------ |
+| 1    | Start «Jeg ønsker å kjøpe» uten kategori.                                      | Kriterier kan fylles; mangler forklares ved «Fortsett» (WTB-03).                                            |       |        |
+| 2    | Fyll kategori, makspris og kriterier; prøv min > maks i et numerisk kriterium. | Omvendt intervall hindres eller normaliseres til et gyldig intervall; gyldige verdier overlever navigasjon. |       |        |
+| 3    | Publiser med varsling aktivert.                                                | Ett kjøpsønske publiseres og varslingsvalg bekreftes (WTB-03).                                              |       |        |
+| 4    | Opprett matchende testannonse fra annen testkonto.                             | Eieren får nøyaktig ett relevant varsel; ingen varsel til feil bruker (WTB-08).                             |       |        |
 
 ## J5 — Avbryt, utkast, tvangsavslutt, gjenopprett (CRE-35, CRE-36, CRE-11)
 

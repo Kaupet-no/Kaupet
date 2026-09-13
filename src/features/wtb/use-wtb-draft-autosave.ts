@@ -14,7 +14,8 @@ export type WtbDraftData = {
   title: string;
   description: string;
   category_id: string | null;
-  max_price_nok: number | "" | undefined;
+  max_price_nok: number | string | undefined;
+  notify_matches: boolean;
   attributes: WtbAttributeMap;
   checked_keys: string[];
 };
@@ -29,7 +30,9 @@ function loadRestorableDraft(): WtbDraftData | null {
       data.draft_kind === "want" &&
       data.draft_version === DRAFT_VERSION &&
       Date.now() - data.saved_at < 7 * 24 * 60 * 60 * 1000;
-    return valid && (data.title || data.description || data.category_id) ? data : null;
+    return valid && (data.title || data.description || data.category_id)
+      ? { ...data, notify_matches: data.notify_matches ?? false }
+      : null;
   } catch {
     return null;
   }
@@ -73,6 +76,7 @@ export function useWtbDraftAutosave(
             description: server.description ?? "",
             category_id: server.category_id,
             max_price_nok: server.max_price_nok ?? "",
+            notify_matches: server.notify_matches ?? false,
             attributes,
             checked_keys: Object.keys(attributes).filter((key) => key !== "__freetext"),
           });
@@ -123,6 +127,20 @@ export function useWtbDraftAutosave(
     if (saveInProgress.current) return saveInProgress.current;
     const currentFields = fieldsRef.current;
     if (currentFields.title.trim().length < 3) return draftId;
+    const rawMaxPrice = currentFields.max_price_nok;
+    const parsedMaxPrice =
+      typeof rawMaxPrice === "number"
+        ? rawMaxPrice
+        : typeof rawMaxPrice === "string" && rawMaxPrice.trim()
+          ? Number(rawMaxPrice)
+          : null;
+    const maxPriceNok =
+      parsedMaxPrice !== null &&
+      Number.isInteger(parsedMaxPrice) &&
+      parsedMaxPrice >= 0 &&
+      parsedMaxPrice <= 10_000_000
+        ? parsedMaxPrice
+        : null;
     setIsSaving(true);
     const promise = (async () => {
       try {
@@ -132,8 +150,8 @@ export function useWtbDraftAutosave(
             title: currentFields.title,
             description: currentFields.description || undefined,
             category_id: currentFields.category_id,
-            max_price_nok:
-              typeof currentFields.max_price_nok === "number" ? currentFields.max_price_nok : null,
+            max_price_nok: maxPriceNok,
+            notify_matches: currentFields.notify_matches,
             attributes: currentFields.attributes,
           },
         });

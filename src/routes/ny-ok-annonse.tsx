@@ -272,10 +272,11 @@ function NewWtbPage() {
       description: description ?? "",
       category_id: categoryId ?? null,
       max_price_nok: maxPriceNok,
+      notify_matches: notifyOnMatch,
       attributes,
       checked_keys: checkedKeys,
     }),
-    [title, description, categoryId, maxPriceNok, attributes, checkedKeys],
+    [title, description, categoryId, maxPriceNok, notifyOnMatch, attributes, checkedKeys],
   );
   const {
     draftId,
@@ -471,7 +472,19 @@ function NewWtbPage() {
     setValue("title", restorableDraft.title);
     setValue("description", restorableDraft.description);
     setValue("category_id", restorableDraft.category_id);
-    setValue("max_price_nok", restorableDraft.max_price_nok);
+    const restoredMaxPrice =
+      typeof restorableDraft.max_price_nok === "number"
+        ? restorableDraft.max_price_nok
+        : restorableDraft.max_price_nok?.trim()
+          ? Number(restorableDraft.max_price_nok)
+          : "";
+    setValue(
+      "max_price_nok",
+      typeof restoredMaxPrice === "number" && Number.isFinite(restoredMaxPrice)
+        ? restoredMaxPrice
+        : "",
+    );
+    setNotifyOnMatch(restorableDraft.notify_matches);
     setAttributes(restorableDraft.attributes);
     setCheckedKeys(restorableDraft.checked_keys);
     dismissRestore();

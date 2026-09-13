@@ -145,4 +145,23 @@ describe("useWtbDraftAutosave", () => {
       data: expect.objectContaining({ max_price_nok: null, notify_matches: true }),
     });
   });
+
+  it("overskriver ikke serverutkast mens restore-valget står åpent", async () => {
+    getLatestWtbDraftMock.mockResolvedValueOnce({
+      id: "00000000-0000-4000-8000-000000000003",
+      title: fields.title,
+      description: "Beskrivelse",
+      category_id: null,
+      max_price_nok: 10_000,
+      notify_matches: true,
+      attributes: {},
+      updated_at: new Date().toISOString(),
+    });
+    renderHook(() => useWtbDraftAutosave(fields, true));
+
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+
+    expect(saveWtbDraftMock).not.toHaveBeenCalled();
+  });
 });

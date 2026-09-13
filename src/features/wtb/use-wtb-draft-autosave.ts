@@ -49,10 +49,14 @@ export function useWtbDraftAutosave(
   const [isSaving, setIsSaving] = useState(false);
   const saveInProgress = useRef<Promise<string | null> | null>(null);
   const savingStopped = useRef(false);
+  const restorableDraftRef = useRef<WtbDraftData | null>(null);
   const fieldsRef = useRef(fields);
   useEffect(() => {
     fieldsRef.current = fields;
   }, [fields]);
+  useEffect(() => {
+    restorableDraftRef.current = restorableDraft;
+  }, [restorableDraft]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -119,6 +123,7 @@ export function useWtbDraftAutosave(
 
   async function saveToServer(): Promise<string | null> {
     if (savingStopped.current) return draftId;
+    if (restorableDraftRef.current) return draftId;
     saveLocal();
     if (!authenticated) return draftId;
     // share the in-flight promise instead of one of them bailing out with a

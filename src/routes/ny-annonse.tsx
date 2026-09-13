@@ -902,6 +902,7 @@ function NewListingPage() {
     draftChecked,
     flushLocalDraft,
     saveDraftToSupabase,
+    retryDraftAfterConflict,
     ensureDraftId,
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
@@ -1825,14 +1826,20 @@ function NewListingPage() {
           }
           status={
             draftSaveConflict ? (
-              <p
-                role="alert"
-                aria-live="assertive"
-                className="mt-1 text-right text-xs text-destructive"
-              >
-                Utkastet ble endret i en annen fane. Endringene dine er beholdt lokalt. Last siden
-                på nytt før du fortsetter.
-              </p>
+              <div className="mt-1 text-right text-xs">
+                <p role="alert" aria-live="assertive" className="text-destructive">
+                  Utkastet ble endret i en annen fane. Endringene dine er beholdt lokalt.
+                </p>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs"
+                  onClick={() => void retryDraftAfterConflict()}
+                >
+                  Lagre mine endringer
+                </Button>
+              </div>
             ) : draftSaveError ? (
               <p
                 role="alert"

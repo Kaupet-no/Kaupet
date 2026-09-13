@@ -173,10 +173,16 @@ describe("useDraftAutosave", () => {
   it("avviser foreldet tofanelagring og beholder endringene lokalt", async () => {
     localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
     localStorage.setItem(DRAFT_UPDATED_AT_KEY, "2026-09-13T18:00:00.000Z");
-    saveDraftListingMock.mockResolvedValue({
-      conflict: true,
-      updated_at: "2026-09-13T18:01:00.000Z",
-    });
+    saveDraftListingMock
+      .mockResolvedValueOnce({
+        conflict: true,
+        updated_at: "2026-09-13T18:01:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        id: "00000000-0000-4000-8000-000000000001",
+        kaupet_code: "ABC123",
+        updated_at: "2026-09-13T18:02:00.000Z",
+      });
     const { result } = renderHook(() =>
       useDraftAutosave({ ...baseFields, title: "Nyeste lokale versjon" }),
     );
@@ -197,6 +203,16 @@ describe("useDraftAutosave", () => {
 
     await act(() => result.current.saveDraftToSupabase());
     expect(saveDraftListingMock).toHaveBeenCalledTimes(1);
+
+    await act(() => result.current.retryDraftAfterConflict());
+    expect(saveDraftListingMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          expected_updated_at: "2026-09-13T18:01:00.000Z",
+        }),
+      }),
+    );
+    expect(result.current.draftSaveConflict).toBe(false);
   });
 
   it("saveDraftToSupabase sets draftSaveError when the save fails", async () => {

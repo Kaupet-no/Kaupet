@@ -373,6 +373,12 @@ export function useDraftAutosave(fields: DraftFields) {
     return saveDraftToSupabase();
   }
 
+  async function retryDraftAfterConflict(): Promise<string | null> {
+    draftConflictRef.current = false;
+    setDraftSaveConflict(false);
+    return saveDraftToSupabase();
+  }
+
   // Auto-save draft to Supabase every 30 seconds when form has enough data
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -513,6 +519,7 @@ export function useDraftAutosave(fields: DraftFields) {
     hasDraftData,
     flushLocalDraft,
     saveDraftToSupabase,
+    retryDraftAfterConflict,
     ensureDraftId,
     restoreDraft,
     clearDraftStorage,

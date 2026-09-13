@@ -897,6 +897,7 @@ function NewListingPage() {
     draftId,
     lastSaved,
     draftSaveError,
+    draftSaveConflict,
     hasDraftData,
     draftChecked,
     flushLocalDraft,
@@ -1823,7 +1824,16 @@ function NewListingPage() {
             )
           }
           status={
-            draftSaveError ? (
+            draftSaveConflict ? (
+              <p
+                role="alert"
+                aria-live="assertive"
+                className="mt-1 text-right text-xs text-destructive"
+              >
+                Utkastet ble endret i en annen fane. Endringene dine er beholdt lokalt. Last siden
+                på nytt før du fortsetter.
+              </p>
+            ) : draftSaveError ? (
               <p
                 role="alert"
                 aria-live="assertive"

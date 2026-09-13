@@ -57,7 +57,7 @@ uventet duplikat. Et FAIL registreres etter DEF-mal i TESTSTRATEGI §9.
 | 3    | Publiser med varsling aktivert.                                                | Ett kjøpsønske publiseres og varslingsvalg bekreftes (WTB-03).                                              |       |        |
 | 4    | Opprett matchende testannonse fra annen testkonto.                             | Eieren får nøyaktig ett relevant varsel; ingen varsel til feil bruker (WTB-08).                             |       |        |
 
-## J5 — Avbryt, utkast, tvangsavslutt, gjenopprett (CRE-35, CRE-36, CRE-11)
+## J5 — Avbryt, utkast, tvangsavslutt, gjenopprett (CRE-35, CRE-36, CRE-11, CRE-37)
 
 | Steg | Handling                                                       | Forventet resultat                                                           | Bevis | Status |
 | ---- | -------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----- | ------ |

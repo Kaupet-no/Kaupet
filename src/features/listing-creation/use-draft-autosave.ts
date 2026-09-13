@@ -12,6 +12,7 @@ import {
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
+const DRAFT_UPDATED_AT_KEY = "kaupet_draft_updated_at";
 
 type ListingCondition = "new" | "like_new" | "good" | "acceptable" | "for_parts";
 
@@ -91,6 +92,7 @@ export function useDraftAutosave(fields: DraftFields) {
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [draftSaveError, setDraftSaveError] = useState(false);
+  const [draftSaveConflict, setDraftSaveConflict] = useState(false);
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   // The localStorage read below happens in an effect, so `hasDraftData` is
@@ -99,6 +101,8 @@ export function useDraftAutosave(fields: DraftFields) {
   // the user off their own saved draft before it has been read.
   const [draftChecked, setDraftChecked] = useState(false);
   const draftIdRef = useRef<string | null>(null);
+  const draftUpdatedAtRef = useRef<string | null>(null);
+  const draftConflictRef = useRef(false);
   const draftRestorePending = useRef(false);
   // Set by clearDraftStorage({ stopAutosave: true }) on publish: the wizard
   // stays mounted (the success dialog renders on top of it) with the form
@@ -126,6 +130,7 @@ export function useDraftAutosave(fields: DraftFields) {
   useEffect(() => {
     try {
       const savedId = localStorage.getItem(DRAFT_ID_KEY);
+      draftUpdatedAtRef.current = localStorage.getItem(DRAFT_UPDATED_AT_KEY);
       if (savedId) {
         draftIdRef.current = savedId;
         setDraftId(savedId);
@@ -139,6 +144,7 @@ export function useDraftAutosave(fields: DraftFields) {
       ) {
         localStorage.removeItem(DRAFT_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
+        localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
         draftIdRef.current = null;
         setDraftId(null);
         return;
@@ -149,6 +155,7 @@ export function useDraftAutosave(fields: DraftFields) {
       } else {
         localStorage.removeItem(DRAFT_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
+        localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
         draftIdRef.current = null;
         setDraftId(null);
       }
@@ -273,7 +280,15 @@ export function useDraftAutosave(fields: DraftFields) {
   async function saveDraftToSupabase(): Promise<string | null> {
     if (!authenticated) return null;
     if (draftSavingStopped.current) return null;
+    if (draftConflictRef.current) return null;
     if (draftRestorePending.current) return null;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
+      setLastSaved(new Date());
+    } catch {
+      setDraftSaveError(true);
+      return null;
+    }
     const currentDraftId = draftIdRef.current;
     if (draftSaveInProgress.current) return currentDraftId;
     // For Bil/MC the title is generated from the vehicle lookup (Årsmodell/
@@ -288,6 +303,9 @@ export function useDraftAutosave(fields: DraftFields) {
       const result = await saveDraftListing({
         data: {
           ...(currentDraftId ? { id: currentDraftId } : {}),
+          ...(currentDraftId && draftUpdatedAtRef.current
+            ? { expected_updated_at: draftUpdatedAtRef.current }
+            : {}),
           title: effectiveTitle,
           subtitle: (subtitle ?? "").trim() || null,
           // Always send the value, never `undefined`: saveDraftListing strips
@@ -313,18 +331,37 @@ export function useDraftAutosave(fields: DraftFields) {
           attributes,
         },
       });
+      if ("conflict" in result) {
+        draftConflictRef.current = true;
+        draftUpdatedAtRef.current = result.updated_at;
+        try {
+          localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
+        } catch {
+          // The current form was already persisted locally above.
+        }
+        setDraftSaveError(true);
+        setDraftSaveConflict(true);
+        return null;
+      }
       draftIdRef.current = result.id;
+      if (result.updated_at) {
+        draftUpdatedAtRef.current = result.updated_at;
+      }
       setDraftId(result.id);
       setLastSaved(new Date());
       setDraftSaveError(false);
+      draftConflictRef.current = false;
+      setDraftSaveConflict(false);
       try {
         localStorage.setItem(DRAFT_ID_KEY, result.id);
+        if (result.updated_at) localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
       } catch {
         // ignore
       }
       return result.id;
     } catch {
       setDraftSaveError(true);
+      setDraftSaveConflict(false);
       return null;
     } finally {
       draftSaveInProgress.current = false;
@@ -443,6 +480,10 @@ export function useDraftAutosave(fields: DraftFields) {
     draftSavingStopped.current = stopAutosave;
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(DRAFT_ID_KEY);
+    localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
+    draftUpdatedAtRef.current = null;
+    draftConflictRef.current = false;
+    setDraftSaveConflict(false);
     draftRestorePending.current = false;
     draftIdRef.current = null;
     setHasDraftData(null);
@@ -468,6 +509,7 @@ export function useDraftAutosave(fields: DraftFields) {
     draftChecked,
     lastSaved,
     draftSaveError,
+    draftSaveConflict,
     hasDraftData,
     flushLocalDraft,
     saveDraftToSupabase,

@@ -2,6 +2,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
+import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 
 vi.mock("@tanstack/react-start", () => ({
   // The hook's tests call runVehicleLookup directly, so useServerFn just
@@ -100,6 +101,23 @@ beforeEach(() => {
 });
 
 describe("useVehicleLookupFlow", () => {
+  it.each(["AB12345", "AB 12345", "AB1234", "A123456", "123456", "CD12345", "MIN BIL"])(
+    "godtar norsk kjennemerkeformat %s",
+    (registrationNumber) => {
+      expect(isValidVehicleRegistrationNumber(registrationNumber)).toBe(true);
+    },
+  );
+
+  it("avviser ugyldig registreringsnummer før oppslagskallet", async () => {
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
+
+    const ok = await act(() => result.current.runVehicleLookup("??"));
+
+    expect(ok).toBe(false);
+    expect(lookupVehicleByRegNumberMock).not.toHaveBeenCalled();
+    expect(result.current.vehicleLookupError).toBe("Skriv inn et gyldig registreringsnummer.");
+  });
+
   it("starts with vehicleRegistered true and no lookup result", () => {
     const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
 

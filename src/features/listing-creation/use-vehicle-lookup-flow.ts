@@ -14,6 +14,7 @@ import {
 import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
+import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 import type { AttributeMap } from "@/components/attribute-fields";
 
 type CategoriesById = Map<string, CategoryNode & { name_nb: string; slug?: string }>;
@@ -127,8 +128,12 @@ export function useVehicleLookupFlow(params: {
   }
 
   async function runVehicleLookup(registrationNumber: string): Promise<boolean> {
-    setVehicleLookupLoading(true);
     setVehicleLookupError(null);
+    if (!isValidVehicleRegistrationNumber(registrationNumber)) {
+      setVehicleLookupError("Skriv inn et gyldig registreringsnummer.");
+      return false;
+    }
+    setVehicleLookupLoading(true);
     try {
       const { lookup, previousClassificationMismatch } = await lookupVehicleFn({
         data: { registrationNumber },

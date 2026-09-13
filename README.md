@@ -95,7 +95,7 @@ Layouten er responsiv og er tilpasset både tablet og mobiltelefoner av varieren
 
 Se [README-CAPACITOR.md](README-CAPACITOR.md) for hvordan du bygger en tilsvarende app selv.
 
-## Slik kjører du prosjektet lokalt på din egen PC
+## Slik kjører du Kaupet lokalt på din egen PC
 
 Du trenger [Bun](https://bun.sh) installert.
 

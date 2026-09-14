@@ -202,6 +202,7 @@ function NewListingPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
   const forwardAttemptPendingRef = useRef(false);
+  const publishAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftDiscardConfirmOpen, setDraftDiscardConfirmOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -1301,6 +1302,7 @@ function NewListingPage() {
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
+      publishAttemptPendingRef.current = false;
       trackProductEvent("listing_creation_step_completed", {
         kind: "sell",
         action: "publish_failed",
@@ -1313,6 +1315,12 @@ function NewListingPage() {
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
     },
   });
+
+  function publishOnce(values: ListingForm) {
+    if (publishAttemptPendingRef.current) return;
+    publishAttemptPendingRef.current = true;
+    mutation.mutate(values);
+  }
 
   // Kjøretøy-tilstandsetiketter (Ny bil/Bruktbil/...) har ingen beskrivelse —
   // selvforklarende, i motsetning til de generiske (Helt ny/Som ny/...).
@@ -1695,7 +1703,7 @@ function NewListingPage() {
         action: "publish_started",
         step: currentStepKey,
       });
-      mutation.mutate(v);
+      publishOnce(v);
     },
     // eslint-disable-next-line react-hooks/refs -- callback runs only on form submit
     (fields) => {
@@ -1984,7 +1992,7 @@ function NewListingPage() {
                     action: "publish_started",
                     step: currentStepKey,
                   });
-                  mutation.mutate(pendingSubmitValuesRef.current);
+                  publishOnce(pendingSubmitValuesRef.current);
                 }
               }}
               className="bg-secondary text-secondary-foreground hover:bg-secondary/80"

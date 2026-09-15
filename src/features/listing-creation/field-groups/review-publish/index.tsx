@@ -342,7 +342,7 @@ export function PublishActions({
           <Turnstile
             ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            options={{ size: "invisible", action: "kaupet" }}
+            options={{ appearance: "interaction-only", action: "kaupet" }}
           />
         )}
         <Button
@@ -368,7 +368,7 @@ export function PublishActions({
           <Turnstile
             ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            options={{ size: "invisible", action: "kaupet" }}
+            options={{ appearance: "interaction-only", action: "kaupet" }}
           />
         )}
         <Button type="submit" data-testid="publish-listing-button" disabled={mutationIsPending}>

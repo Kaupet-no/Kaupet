@@ -9,7 +9,16 @@ import { PublishActions, ReviewPreview, ReviewPublishGroup } from ".";
 const categoryFilters = vi.hoisted(() => ({
   current: [] as import("@/lib/category-filters").CategoryFilter[],
 }));
+const turnstileOptions = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}));
 
+vi.mock("@marsidev/react-turnstile", () => ({
+  Turnstile: ({ options }: { options: Record<string, unknown> }) => {
+    turnstileOptions.current = options;
+    return null;
+  },
+}));
 vi.mock("@tanstack/react-start", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-start")>()),
   useServerFn: () => vi.fn().mockResolvedValue({ token: "test-token" }),
@@ -183,6 +192,28 @@ describe("ReviewPublishGroup", () => {
     expect(screen.getByText(/Sted: 0001 Oslo/)).toBeTruthy();
     expect(screen.getByText(/Levering: Må hentes/)).toBeTruthy();
   });
+});
+
+describe("PublishActions", () => {
+  it.each([false, true])(
+    "viser Turnstile-utfordringen bare når brukerinteraksjon kreves",
+    (native) => {
+      render(
+        <PublishActions
+          native={native}
+          turnstileEnabled
+          turnstileRef={{ current: null }}
+          mutationIsPending={false}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(turnstileOptions.current).toEqual({
+        appearance: "interaction-only",
+        action: "kaupet",
+      });
+    },
+  );
 });
 
 describe("ReviewPreview", () => {

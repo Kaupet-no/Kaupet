@@ -257,6 +257,45 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftSaveError).toBe(false);
   });
 
+  it.each(["conflict", "success", "error"] as const)(
+    "beholder ny lokal leveringsmåte når en eldre server-save får %s",
+    async (outcome) => {
+      let resolveRequest!: (value: unknown) => void;
+      let rejectRequest!: (error: Error) => void;
+      const request = new Promise<unknown>((resolve, reject) => {
+        resolveRequest = resolve;
+        rejectRequest = reject;
+      });
+      saveDraftListingMock.mockReturnValueOnce(request);
+      const initialFields = {
+        ...baseFields,
+        title: "En fin sykkel",
+        canShip: null as string | null,
+      };
+      const { result, rerender } = renderHook((fields) => useDraftAutosave(fields), {
+        initialProps: initialFields,
+      });
+
+      let save!: Promise<string | null>;
+      act(() => {
+        save = result.current.saveDraftToSupabase();
+      });
+      rerender({ ...baseFields, title: "En fin sykkel", canShip: "ship" });
+      await act(async () => {
+        if (outcome === "conflict") {
+          resolveRequest({ conflict: true, updated_at: "2026-09-15T10:00:00.000Z" });
+        } else if (outcome === "success") {
+          resolveRequest({ id: "draft-id", updated_at: "2026-09-15T10:00:00.000Z" });
+        } else {
+          rejectRequest(new Error("network down"));
+        }
+        await save;
+      });
+
+      expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}").can_ship).toBe("ship");
+    },
+  );
+
   it("saveDraftToSupabase sets draftSaveError when the save fails", async () => {
     saveDraftListingMock.mockRejectedValue(new Error("network down"));
     const { result } = renderHook(() =>
@@ -309,6 +348,33 @@ describe("useDraftAutosave", () => {
 
     expect(id).toBeNull();
     expect(saveDraftListingMock).not.toHaveBeenCalled();
+  });
+
+  it("does not restore a draft after clearing while a save is pending", async () => {
+    let resolveSave!: (value: { id: string }) => void;
+    saveDraftListingMock.mockReturnValueOnce(
+      new Promise<{ id: string }>((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "En fin sykkel" }),
+    );
+
+    let save!: Promise<string | null>;
+    act(() => {
+      save = result.current.saveDraftToSupabase();
+      result.current.clearDraftStorage({ stopAutosave: true });
+    });
+    await act(async () => {
+      resolveSave({ id: "published-draft" });
+      await save;
+    });
+
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+    expect(localStorage.getItem(DRAFT_UPDATED_AT_KEY)).toBeNull();
+    expect(result.current.draftId).toBeNull();
   });
 
   it("keeps saving after a plain clearDraftStorage so 'start over' still autosaves", async () => {

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { showSuccessToast } from "@/lib/toast";
 import { discardDraftListing, saveDraftListing } from "@/lib/listings.functions";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
@@ -13,6 +13,7 @@ import {
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
 const DRAFT_UPDATED_AT_KEY = "kaupet_draft_updated_at";
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 type ListingCondition = "new" | "like_new" | "good" | "acceptable" | "for_parts";
 
@@ -112,9 +113,12 @@ export function useDraftAutosave(fields: DraftFields) {
   // One guard here covers all three save paths.
   const draftSavingStopped = useRef(false);
   const draftSaveInProgress = useRef<Promise<string | null> | null>(null);
+  const saveGeneration = useRef(0);
   const imageStoreReady = useRef(false);
   const restorableImages = useRef<PendingImage[]>([]);
   const latestImages = useRef(images);
+  const latestLocalDraft = useRef<Record<string, unknown> | null>(null);
+  const localDraftRevision = useRef(0);
   useEffect(() => {
     draftRestorePending.current = hasDraftData !== null;
   }, [hasDraftData]);
@@ -235,6 +239,11 @@ export function useDraftAutosave(fields: DraftFields) {
     ],
   );
 
+  useIsomorphicLayoutEffect(() => {
+    latestLocalDraft.current = buildLocalDraft();
+    localDraftRevision.current += 1;
+  }, [buildLocalDraft]);
+
   useEffect(() => {
     if (draftRestorePending.current) return;
     const t = window.setTimeout(() => {
@@ -282,6 +291,7 @@ export function useDraftAutosave(fields: DraftFields) {
     if (draftSavingStopped.current) return null;
     if (draftConflictRef.current) return null;
     if (draftRestorePending.current) return null;
+    const saveRevision = localDraftRevision.current;
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
       setLastSaved(new Date());
@@ -298,6 +308,7 @@ export function useDraftAutosave(fields: DraftFields) {
     // this fallback a vehicle draft could not be saved before that step.
     const effectiveTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
     if (effectiveTitle.length < 5) return null;
+    const generation = saveGeneration.current;
     const save = (async () => {
       try {
         const result = await saveDraftListing({
@@ -331,6 +342,7 @@ export function useDraftAutosave(fields: DraftFields) {
             attributes,
           },
         });
+        if (saveGeneration.current !== generation) return null;
         if ("conflict" in result) {
           draftConflictRef.current = true;
           draftUpdatedAtRef.current = result.updated_at;
@@ -360,10 +372,23 @@ export function useDraftAutosave(fields: DraftFields) {
         }
         return result.id;
       } catch {
-        setDraftSaveError(true);
-        setDraftSaveConflict(false);
+        if (saveGeneration.current === generation) {
+          setDraftSaveError(true);
+          setDraftSaveConflict(false);
+        }
         return null;
       } finally {
+        try {
+          if (
+            !draftSavingStopped.current &&
+            localDraftRevision.current > saveRevision &&
+            latestLocalDraft.current
+          ) {
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current));
+          }
+        } catch {
+          // The current form was already persisted locally above.
+        }
         draftSaveInProgress.current = null;
       }
     })();
@@ -488,6 +513,9 @@ export function useDraftAutosave(fields: DraftFields) {
    * autosaving a fresh draft right afterwards. */
   function clearDraftStorage({ stopAutosave = false }: { stopAutosave?: boolean } = {}) {
     draftSavingStopped.current = stopAutosave;
+    saveGeneration.current += 1;
+    latestLocalDraft.current = null;
+    localDraftRevision.current += 1;
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(DRAFT_ID_KEY);
     localStorage.removeItem(DRAFT_UPDATED_AT_KEY);

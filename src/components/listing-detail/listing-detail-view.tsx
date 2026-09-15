@@ -68,6 +68,7 @@ import { VehicleEquipmentPanel } from "@/components/listing-detail/edit-panels/v
 import { GenericAttributesPanel } from "@/components/listing-detail/edit-panels/generic-attributes-panel";
 import { GenericAttributesGrid } from "@/components/listing-detail/generic-attributes-grid";
 import { PartFitmentSummary } from "@/components/listing-detail/part-fitment-summary";
+import { getListingDateMeta } from "@/components/listing-detail/listing-date-meta";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -426,6 +427,7 @@ export function ListingDetailView({
       createdAt={createdAt}
       updatedAt={updatedAt}
       publishedAt={publishedAt}
+      listingStatus={listingStatus}
       knownIssues={knownIssues}
       noKnownIssues={noKnownIssues}
       maintenanceHistory={maintenanceHistory}
@@ -502,6 +504,7 @@ function ListingDetailViewBody({
   createdAt,
   updatedAt,
   publishedAt,
+  listingStatus,
   knownIssues,
   noKnownIssues,
   maintenanceHistory,
@@ -558,6 +561,7 @@ function ListingDetailViewBody({
   createdAt: string;
   updatedAt: string | null;
   publishedAt: string | null;
+  listingStatus?: string | null;
   knownIssues: string | null;
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;
@@ -1008,24 +1012,12 @@ function ListingDetailViewBody({
         <aside className="@container space-y-5">
           {organizationBrand && <ProffListingHeader organization={organizationBrand} />}
           {(() => {
-            const fmt = (s: string) =>
-              new Date(s).toLocaleDateString("nb-NO", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              });
-            const publishedDate = publishedAt ? new Date(publishedAt) : new Date(createdAt);
-            const updatedDate = updatedAt ? new Date(updatedAt) : null;
-
-            const isEditedLater =
-              updatedDate != null &&
-              (updatedDate.getFullYear() > publishedDate.getFullYear() ||
-                updatedDate.getMonth() > publishedDate.getMonth() ||
-                updatedDate.getDate() > publishedDate.getDate());
-
-            const label = isEditedLater ? "Sist redigert" : "Publisert";
-            const dateStr =
-              isEditedLater && updatedAt ? fmt(updatedAt) : fmt(publishedAt ?? createdAt);
+            const { label, dateStr } = getListingDateMeta(
+              listingStatus,
+              publishedAt,
+              createdAt,
+              updatedAt,
+            );
 
             return (
               <dl className="density-data grid grid-cols-2 gap-3 border-y border-border text-sm @sm:grid-cols-3">

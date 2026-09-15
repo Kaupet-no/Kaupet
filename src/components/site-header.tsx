@@ -37,7 +37,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur pt-safe">
       <nav
         aria-label="Hovednavigasjon"
-        className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-4 px-4"
+        className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-1 px-2 md:gap-4 md:px-4"
       >
         <Link to="/" className="flex shrink-0 items-baseline gap-1">
           {businessPlan ? (
@@ -55,7 +55,7 @@ export function SiteHeader() {
 
         <div id={HEADER_SEARCH_SLOT_ID} className="hidden flex-1 md:block" />
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-0 md:gap-2">
           <Button
             type="button"
             variant="ghost"

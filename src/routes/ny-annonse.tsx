@@ -202,6 +202,7 @@ function NewListingPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
   const forwardAttemptPendingRef = useRef(false);
+  const publishAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftDiscardConfirmOpen, setDraftDiscardConfirmOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -897,10 +898,12 @@ function NewListingPage() {
     draftId,
     lastSaved,
     draftSaveError,
+    draftSaveConflict,
     hasDraftData,
     draftChecked,
     flushLocalDraft,
     saveDraftToSupabase,
+    retryDraftAfterConflict,
     ensureDraftId,
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
@@ -1282,6 +1285,7 @@ function NewListingPage() {
       return listing;
     },
     onSuccess: (result) => {
+      publishAttemptPendingRef.current = false;
       // stopAutosave: the wizard stays mounted behind the success dialog with
       // the form still populated — without this the next autosave tick would
       // INSERT the published listing back as a duplicate draft.
@@ -1299,6 +1303,7 @@ function NewListingPage() {
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
+      publishAttemptPendingRef.current = false;
       trackProductEvent("listing_creation_step_completed", {
         kind: "sell",
         action: "publish_failed",
@@ -1311,6 +1316,12 @@ function NewListingPage() {
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
     },
   });
+
+  function publishOnce(values: ListingForm) {
+    if (publishAttemptPendingRef.current) return;
+    publishAttemptPendingRef.current = true;
+    mutation.mutate(values);
+  }
 
   // Kjøretøy-tilstandsetiketter (Ny bil/Bruktbil/...) har ingen beskrivelse —
   // selvforklarende, i motsetning til de generiske (Helt ny/Som ny/...).
@@ -1693,7 +1704,7 @@ function NewListingPage() {
         action: "publish_started",
         step: currentStepKey,
       });
-      mutation.mutate(v);
+      publishOnce(v);
     },
     // eslint-disable-next-line react-hooks/refs -- callback runs only on form submit
     (fields) => {
@@ -1823,7 +1834,22 @@ function NewListingPage() {
             )
           }
           status={
-            draftSaveError ? (
+            draftSaveConflict ? (
+              <div className="mt-1 text-right text-xs">
+                <p role="alert" aria-live="assertive" className="text-destructive">
+                  Utkastet ble endret i en annen fane. Endringene dine er beholdt lokalt.
+                </p>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs"
+                  onClick={() => void retryDraftAfterConflict()}
+                >
+                  Lagre mine endringer
+                </Button>
+              </div>
+            ) : draftSaveError ? (
               <p
                 role="alert"
                 aria-live="assertive"
@@ -1967,7 +1993,7 @@ function NewListingPage() {
                     action: "publish_started",
                     step: currentStepKey,
                   });
-                  mutation.mutate(pendingSubmitValuesRef.current);
+                  publishOnce(pendingSubmitValuesRef.current);
                 }
               }}
               className="bg-secondary text-secondary-foreground hover:bg-secondary/80"

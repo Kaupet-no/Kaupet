@@ -2,6 +2,7 @@ import type { CategoryFilter } from "@/lib/category-filters";
 import {
   isWtbDateMinValue,
   isWtbRangeValue,
+  WTB_FREETEXT_KEY,
   type WtbAttributeMap,
   type WtbAttributeValue,
 } from "./wtb-criteria-types";
@@ -25,4 +26,19 @@ export function criterionSummary(filter: CategoryFilter, value: WtbAttributeValu
   if (isWtbDateMinValue(value)) return `Fra ${value.minDate}`;
   if (typeof value === "boolean") return value ? "Ja" : "Ingen begrensning";
   return String(value);
+}
+
+export function wtbCriteriaSummary(filters: CategoryFilter[], value: WtbAttributeMap) {
+  const summaries = orderWtbCriteria(filters, value)
+    .filter((filter) => filter.key in value)
+    .map((filter) => {
+      const label =
+        filter.unit && filter.type !== "brand_select"
+          ? `${filter.label_nb} (${filter.unit})`
+          : filter.label_nb;
+      return `${label}: ${criterionSummary(filter, value[filter.key])}`;
+    });
+  const freetext = value[WTB_FREETEXT_KEY];
+  if (typeof freetext === "string" && freetext.trim()) summaries.push(`Fritekstsøk: ${freetext}`);
+  return summaries.join(" · ") || "Ingen begrensninger";
 }

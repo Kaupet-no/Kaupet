@@ -17,11 +17,17 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { updateWtbListing } from "@/lib/wtb-listings.functions";
 import { CategoryPicker } from "@/components/category-picker";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
-import { WTB_FREETEXT_KEY, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
+import type { WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
 import { WtbEditContext, type WtbEditContextValue } from "@/features/wtb/wtb-edit-mode-context";
 import { useWtbEditMutations } from "@/features/wtb/use-wtb-edit-mutations";
-import { categoryBreadcrumb, type CategoryNode } from "@/lib/category-filters";
+import {
+  categoryBreadcrumb,
+  effectiveFiltersForCategory,
+  type CategoryNode,
+} from "@/lib/category-filters";
+import { wtbCriteriaSummary } from "@/features/wtb/wtb-criteria-presentation";
 import { EditableField } from "@/features/listing-edit/editable-field";
 import { EditableRegion } from "@/features/listing-edit/editable-region";
 import { Button } from "@/components/ui/button";
@@ -54,7 +60,7 @@ function WtbListingPage() {
       const { data, error } = await supabase
         .from("wtb_listings")
         .select(
-          "id, user_id, title, description, category_id, max_price_nok, attributes, status, created_at",
+          "id, user_id, title, description, category_id, max_price_nok, attributes, status, published_at, updated_at",
         )
         .eq("id", id)
         .single();
@@ -64,6 +70,7 @@ function WtbListingPage() {
   });
 
   const { data: allCategories } = useCategories();
+  const { data: allFilters } = useAllCategoryFilters();
   const { data: isDemo = false } = useIsDemo();
   const categories = useMemo(
     () => visibleCategories(allCategories ?? [], isDemo),
@@ -157,7 +164,12 @@ function WtbListingPage() {
   }
 
   const attributes = (listing.attributes as WtbAttributeMap) ?? {};
-  const criteriaEntries = Object.entries(attributes).filter(([k]) => k !== WTB_FREETEXT_KEY);
+  const criteriaFilters = effectiveFiltersForCategory(
+    listing.category_id,
+    allFilters ?? [],
+    categoriesById,
+  );
+  const criteriaSummary = wtbCriteriaSummary(criteriaFilters, attributes);
 
   return (
     <WtbEditContext.Provider value={editContext ?? null}>
@@ -201,7 +213,10 @@ function WtbListingPage() {
 
         <p className="mt-1 text-sm text-muted-foreground">
           Publisert{" "}
-          {formatDistanceToNow(new Date(listing.created_at), { addSuffix: true, locale: nb })}
+          {formatDistanceToNow(new Date(listing.published_at ?? listing.updated_at), {
+            addSuffix: true,
+            locale: nb,
+          })}
         </p>
 
         {isOwner && listing.status !== "fulfilled" && (
@@ -253,16 +268,10 @@ function WtbListingPage() {
               context={WtbEditContext}
               className="p-3"
               render={() =>
-                criteriaEntries.length === 0 ? (
+                criteriaSummary === "Ingen begrensninger" ? (
                   <p className="text-sm text-muted-foreground">Ingen spesifikke krav satt</p>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {criteriaEntries.map(([k]) => (
-                      <Badge key={k} variant="outline">
-                        {k}
-                      </Badge>
-                    ))}
-                  </div>
+                  <p>{criteriaSummary}</p>
                 )
               }
               panel={() => (

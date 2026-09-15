@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { formatAttributeValue } from "@/components/listing-detail/format-attribute-value";
 import { useAllCategoryFilters } from "@/hooks/use-category-filters";
 import { useCategories } from "@/hooks/use-categories";
 import {
@@ -12,7 +13,6 @@ import {
   PART_FITMENT_YEAR_TO_KEY,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type AttributeValue,
-  type CategoryFilter,
   type CategoryNode,
 } from "@/lib/category-filters";
 
@@ -28,34 +28,6 @@ const RENDERED_ELSEWHERE = new Set<string>([
   PART_FITMENT_YEAR_FROM_KEY,
   PART_FITMENT_YEAR_TO_KEY,
 ]);
-
-function optionLabel(filter: CategoryFilter, value: string): string {
-  return filter.options?.find((o) => o.value === value)?.label_nb ?? value;
-}
-
-/** Norwegian display value for one attribute, or null when there is nothing
- * worth showing (unset, empty list, empty string). */
-function formatAttributeValue(filter: CategoryFilter, raw: unknown): string | null {
-  if (raw === null || raw === undefined) return null;
-  if (typeof raw === "boolean") return raw ? "Ja" : "Nei";
-  if (Array.isArray(raw)) {
-    const labels = raw
-      .filter((v): v is string => typeof v === "string" && v !== "")
-      .map((v) => optionLabel(filter, v));
-    return labels.length > 0 ? labels.join(", ") : null;
-  }
-  if (typeof raw === "number") {
-    if (!Number.isFinite(raw)) return null;
-    const n = raw.toLocaleString("nb-NO");
-    return filter.unit ? `${n} ${filter.unit}` : n;
-  }
-  if (typeof raw === "string") {
-    if (!raw.trim()) return null;
-    const label = optionLabel(filter, raw);
-    return filter.unit && label === raw ? `${raw} ${filter.unit}` : label;
-  }
-  return null;
-}
 
 /**
  * Read-only spec grid for generic (non-vehicle, non-boat) category

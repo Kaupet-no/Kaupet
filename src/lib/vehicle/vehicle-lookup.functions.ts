@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
+import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 
 const MAX_LOOKUPS_PER_HOUR = 20;
 
@@ -11,7 +12,10 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
-        registrationNumber: z.string().trim().min(2).max(10),
+        registrationNumber: z
+          .string()
+          .trim()
+          .refine(isValidVehicleRegistrationNumber, "Skriv inn et gyldig registreringsnummer."),
         // Optional: at the "Bil og MC"-first lookup, the leaf category (and
         // therefore the brand group) isn't known yet, so brand/model
         // matching below is skipped — brandMatch/modelMatch come back null.

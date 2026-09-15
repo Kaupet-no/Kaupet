@@ -571,7 +571,7 @@ function AuthPage() {
                 <Turnstile
                   ref={turnstileRef}
                   siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                  options={{ size: "invisible", action: "kaupet" }}
+                  options={{ appearance: "interaction-only", action: "kaupet" }}
                 />
               )}
               <Button

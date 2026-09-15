@@ -135,6 +135,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       description: data.description ?? null,
       category_id: data.category_id ?? null,
       max_price_nok: data.max_price_nok ?? null,
+      notify_matches: data.notify_matches ?? false,
       attributes: data.attributes ?? {},
     };
 
@@ -184,7 +185,9 @@ export const getLatestWtbDraft = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("wtb_listings")
-      .select("id, title, description, category_id, max_price_nok, attributes, updated_at")
+      .select(
+        "id, title, description, category_id, max_price_nok, notify_matches, attributes, updated_at",
+      )
       .eq("user_id", context.userId)
       .eq("status", "draft")
       .order("updated_at", { ascending: false })

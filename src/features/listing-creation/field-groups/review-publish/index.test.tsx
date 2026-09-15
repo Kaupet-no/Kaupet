@@ -6,6 +6,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WizardSharedProps } from "../types";
 import { PublishActions, ReviewPreview, ReviewPublishGroup } from ".";
 
+const categoryFilters = vi.hoisted(() => ({
+  current: [] as import("@/lib/category-filters").CategoryFilter[],
+}));
+const turnstileOptions = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}));
+
+vi.mock("@marsidev/react-turnstile", () => ({
+  Turnstile: ({ options }: { options: Record<string, unknown> }) => {
+    turnstileOptions.current = options;
+    return null;
+  },
+}));
 vi.mock("@tanstack/react-start", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-start")>()),
   useServerFn: () => vi.fn().mockResolvedValue({ token: "test-token" }),
@@ -13,12 +26,19 @@ vi.mock("@tanstack/react-start", async (importOriginal) => ({
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: [], refetch: vi.fn() }),
 }));
+vi.mock("@/hooks/use-category-filters", () => ({
+  useAllCategoryFilters: () => ({ data: categoryFilters.current }),
+}));
 vi.mock("@/features/vehicle-360-capture/capture-flow", () => ({
   Vehicle360CaptureFlow: () => <p>360°-opptaket er åpnet</p>,
 }));
 afterEach(cleanup);
 
 describe("ReviewPublishGroup", () => {
+  afterEach(() => {
+    categoryFilters.current = [];
+  });
+
   it("viser harde publiseringskrav separat og lar anbefalinger passeres når kravene er oppfylt", () => {
     const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
     const view = (publishingRequirementErrors: string[]) => (
@@ -27,6 +47,9 @@ describe("ReviewPublishGroup", () => {
           {...({
             native: true,
             isVehicle: false,
+            behavior: { requiresDeliveryMethod: false },
+            categories: [],
+            categoryId: "",
             images: [],
             title: "Kort",
             subtitle: undefined,
@@ -71,6 +94,9 @@ describe("ReviewPublishGroup", () => {
         {...({
           native: true,
           isVehicle: true,
+          behavior: { requiresDeliveryMethod: false },
+          categories: [],
+          categoryId: "",
           images: [],
           title: "Volvo V70",
           subtitle: undefined,
@@ -95,6 +121,99 @@ describe("ReviewPublishGroup", () => {
 
     expect(await screen.findByText("360°-opptaket er åpnet")).toBeTruthy();
   });
+
+  it("viser utfylt beskrivelse, kategoriattributter og levering i gjennomgangen", () => {
+    categoryFilters.current = [
+      {
+        id: "material",
+        category_id: "sofa",
+        key: "material",
+        label_nb: "Materiale",
+        type: "select",
+        unit: null,
+        options: [{ value: "leather", label_nb: "Skinn" }],
+        sort_order: 1,
+        is_primary: true,
+        depends_on_key: null,
+        depends_on_value: null,
+        depends_on_not_value: null,
+        is_optional: false,
+      },
+      {
+        id: "width",
+        category_id: "sofa",
+        key: "width_cm",
+        label_nb: "Bredde",
+        type: "number",
+        unit: "cm",
+        options: null,
+        sort_order: 2,
+        is_primary: false,
+        depends_on_key: null,
+        depends_on_value: null,
+        depends_on_not_value: null,
+        is_optional: true,
+      },
+    ];
+
+    render(
+      <ReviewPublishGroup
+        {...({
+          native: false,
+          isVehicle: false,
+          behavior: { requiresDeliveryMethod: true },
+          categories: [{ id: "sofa", parent_id: null, name_nb: "Sofa" }],
+          categoryId: "sofa",
+          categoryLabel: "Møbler / Sofa",
+          categorySlug: "sofa",
+          images: [],
+          title: "Brun skinnsofa",
+          subtitle: undefined,
+          description: "Pent brukt og uten skader.",
+          previewPrice: "5 000 kr",
+          priceNok: 5000,
+          isFree: false,
+          canShip: "pickup",
+          city: "Oslo",
+          postalCode: "0001",
+          attributes: { material: "leather", width_cm: 210 },
+          mutationIsPending: false,
+          uploadProgress: null,
+          improvementGroupKeys: [],
+          publishingRequirementErrors: [],
+          onEditReviewSection: vi.fn(),
+        } as unknown as WizardSharedProps)}
+      />,
+    );
+
+    expect(screen.getByText(/Beskrivelse: Pent brukt og uten skader\./)).toBeTruthy();
+    expect(screen.getByText(/Materiale: Skinn/)).toBeTruthy();
+    expect(screen.getByText(/Bredde: 210 cm/)).toBeTruthy();
+    expect(screen.getByText(/Sted: 0001 Oslo/)).toBeTruthy();
+    expect(screen.getByText(/Levering: Må hentes/)).toBeTruthy();
+  });
+});
+
+describe("PublishActions", () => {
+  it.each([false, true])(
+    "viser Turnstile-utfordringen bare når brukerinteraksjon kreves",
+    (native) => {
+      render(
+        <PublishActions
+          native={native}
+          turnstileEnabled
+          turnstileRef={{ current: null }}
+          mutationIsPending={false}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(turnstileOptions.current).toEqual({
+        appearance: "interaction-only",
+        action: "kaupet",
+      });
+    },
+  );
 });
 
 describe("ReviewPreview", () => {

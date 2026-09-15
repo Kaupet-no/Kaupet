@@ -2426,6 +2426,7 @@ export type Database = {
           id: string
           max_price_nok: number | null
           notify_matches: boolean
+          published_at: string | null
           search_vector: unknown
           status: string
           subtitle: string | null
@@ -2443,6 +2444,7 @@ export type Database = {
           id?: string
           max_price_nok?: number | null
           notify_matches?: boolean
+          published_at?: string | null
           search_vector?: unknown
           status?: string
           subtitle?: string | null
@@ -2460,6 +2462,7 @@ export type Database = {
           id?: string
           max_price_nok?: number | null
           notify_matches?: boolean
+          published_at?: string | null
           search_vector?: unknown
           status?: string
           subtitle?: string | null
@@ -3620,4 +3623,3 @@ export const Constants = {
     },
   },
 } as const
-

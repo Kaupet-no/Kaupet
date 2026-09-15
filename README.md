@@ -12,8 +12,6 @@ Kaupet er en bøyd form av det norrøne uttrykket _kaup_, som betyr _kjøp_ elle
 
 **Kaupet.no** finnes fordi en nasjonal markedsplass for brukte varer bør være grunnleggende infrastruktur i et moderne samfunn, og bør derfor være gratis å bruke, uten sporing eller salg av brukerdata. Opprettelse av annonser er en grunnleggende funksjon **alle** bør ha tilgang til, og skal **aldri** være en betalt tjeneste.
 
-Digital infrastruktur og forvaltning av tjenesten er riktignok ikke gratis. Betaling skal derimot **alltid** være frivillig, og skal gi merverdi utover tjenestens basisfunksjonalitet. Dette er en risiko **Kaupet.no** tar, og skal **aldri** gå på bekostning av tjenestens brukere.
-
 ## Funksjoner
 
 - **Ingen sporing.** Ingen tredjeparts analyseverktøy, ingen sporende informasjonskapsler, ingen lagring av adferds- eller markedsføringsdata av brukerne.
@@ -97,7 +95,7 @@ Layouten er responsiv og er tilpasset både tablet og mobiltelefoner av varieren
 
 Se [README-CAPACITOR.md](README-CAPACITOR.md) for hvordan du bygger en tilsvarende app selv.
 
-## Slik kjører du prosjektet lokalt på din egen PC
+## Slik kjører du Kaupet lokalt på din egen PC
 
 Du trenger [Bun](https://bun.sh) installert.
 

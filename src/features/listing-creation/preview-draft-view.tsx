@@ -37,6 +37,7 @@ export function PreviewDraftView({ draft, onClose }: { draft: PreviewDraft; onCl
           createdAt={new Date().toISOString()}
           updatedAt={null}
           publishedAt={null}
+          listingStatus="draft"
           knownIssues={draft.knownIssues}
           noKnownIssues={draft.noKnownIssues}
           maintenanceHistory={draft.maintenanceHistory}

@@ -2,13 +2,14 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { saveWtbDraftMock } = vi.hoisted(() => ({
+const { saveWtbDraftMock, getLatestWtbDraftMock } = vi.hoisted(() => ({
   saveWtbDraftMock: vi.fn(),
+  getLatestWtbDraftMock: vi.fn(),
 }));
 
 vi.mock("@/lib/wtb-listings.functions", () => ({
   saveWtbDraft: saveWtbDraftMock,
-  getLatestWtbDraft: vi.fn().mockResolvedValue(null),
+  getLatestWtbDraft: getLatestWtbDraftMock,
   discardWtbDraft: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -19,6 +20,7 @@ const fields = {
   description: "",
   category_id: null,
   max_price_nok: "" as const,
+  notify_matches: false,
   attributes: {},
   checked_keys: [],
 };
@@ -28,6 +30,7 @@ describe("useWtbDraftAutosave", () => {
     localStorage.clear();
     vi.useFakeTimers();
     saveWtbDraftMock.mockReset();
+    getLatestWtbDraftMock.mockReset().mockResolvedValue(null);
     saveWtbDraftMock.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000001",
     });
@@ -82,6 +85,7 @@ describe("useWtbDraftAutosave", () => {
     await act(() => vi.advanceTimersByTimeAsync(1));
 
     expect(result.current.restorableDraft?.title).toBe("Ønsker sykkel");
+    expect(result.current.restorableDraft?.notify_matches).toBe(false);
   });
 
   it("stopper lokal og serverbasert autolagring etter publisering", async () => {
@@ -94,6 +98,70 @@ describe("useWtbDraftAutosave", () => {
 
     await act(() => vi.advanceTimersByTimeAsync(30_001));
     expect(localStorage.getItem("kaupet_draft_want_listing")).toBeNull();
+    expect(saveWtbDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("gjenoppretter makspris og varsling fra serverutkast", async () => {
+    getLatestWtbDraftMock.mockResolvedValueOnce({
+      id: "00000000-0000-4000-8000-000000000002",
+      title: fields.title,
+      description: "Beskrivelse",
+      category_id: null,
+      max_price_nok: 10_000,
+      notify_matches: true,
+      attributes: { brand: "Trek" },
+      updated_at: new Date().toISOString(),
+    });
+
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+
+    expect(result.current.restorableDraft).toMatchObject({
+      max_price_nok: 10_000,
+      notify_matches: true,
+    });
+  });
+
+  it("normaliserer makspris fra input-streng før serverlagring", async () => {
+    const { result } = renderHook(() =>
+      useWtbDraftAutosave({ ...fields, max_price_nok: "10000", notify_matches: true }, true),
+    );
+
+    await act(async () => {
+      await result.current.saveToServer();
+    });
+
+    expect(saveWtbDraftMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ max_price_nok: 10000, notify_matches: true }),
+    });
+
+    const { result: invalidResult } = renderHook(() =>
+      useWtbDraftAutosave({ ...fields, max_price_nok: "10000001", notify_matches: true }, true),
+    );
+    await act(async () => {
+      await invalidResult.current.saveToServer();
+    });
+    expect(saveWtbDraftMock).toHaveBeenLastCalledWith({
+      data: expect.objectContaining({ max_price_nok: null, notify_matches: true }),
+    });
+  });
+
+  it("overskriver ikke serverutkast mens restore-valget står åpent", async () => {
+    getLatestWtbDraftMock.mockResolvedValueOnce({
+      id: "00000000-0000-4000-8000-000000000003",
+      title: fields.title,
+      description: "Beskrivelse",
+      category_id: null,
+      max_price_nok: 10_000,
+      notify_matches: true,
+      attributes: {},
+      updated_at: new Date().toISOString(),
+    });
+    renderHook(() => useWtbDraftAutosave(fields, true));
+
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+
     expect(saveWtbDraftMock).not.toHaveBeenCalled();
   });
 });

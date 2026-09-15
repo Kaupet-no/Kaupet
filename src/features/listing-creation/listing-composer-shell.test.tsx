@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ListingComposerShell } from "./listing-composer-shell";
 
@@ -51,12 +51,32 @@ function renderShell({
   return { onBack, onCancel, ...result };
 }
 
+beforeEach(() => {
+  window.scrollTo = vi.fn();
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
 
 describe("ListingComposerShell", () => {
+  it("flytter fokus til sidetittelen når første steg åpnes", () => {
+    const requestAnimationFrame = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        callback(0);
+        return 1;
+      });
+
+    renderShell();
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Tittel", hidden: true }),
+    );
+    requestAnimationFrame.mockRestore();
+  });
+
   it("skjuler Forrige på første native steg", () => {
     const { container } = renderShell({ firstStep: true });
     expect(container.querySelector('button[aria-hidden="true"]')?.getAttribute("tabindex")).toBe(

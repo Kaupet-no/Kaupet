@@ -20,9 +20,11 @@ import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
 import { isWtbRangeValue, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
 import {
   categoryBreadcrumb,
+  effectiveFiltersForCategory,
   vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
+import { wtbCriteriaSummary } from "@/features/wtb/wtb-criteria-presentation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -270,10 +272,11 @@ function NewWtbPage() {
       description: description ?? "",
       category_id: categoryId ?? null,
       max_price_nok: maxPriceNok,
+      notify_matches: notifyOnMatch,
       attributes,
       checked_keys: checkedKeys,
     }),
-    [title, description, categoryId, maxPriceNok, attributes, checkedKeys],
+    [title, description, categoryId, maxPriceNok, notifyOnMatch, attributes, checkedKeys],
   );
   const {
     draftId,
@@ -322,6 +325,11 @@ function NewWtbPage() {
   }, [computedTitle, vehicleGroup, titleManualOverride]);
 
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+  const criteriaFilters = effectiveFiltersForCategory(
+    categoryId ?? null,
+    allFilters ?? [],
+    categoriesById,
+  );
   const parsedMaxPrice = maxPriceNok === "" ? null : Number(maxPriceNok);
 
   useEffect(() => {
@@ -464,7 +472,19 @@ function NewWtbPage() {
     setValue("title", restorableDraft.title);
     setValue("description", restorableDraft.description);
     setValue("category_id", restorableDraft.category_id);
-    setValue("max_price_nok", restorableDraft.max_price_nok);
+    const restoredMaxPrice =
+      typeof restorableDraft.max_price_nok === "number"
+        ? restorableDraft.max_price_nok
+        : restorableDraft.max_price_nok?.trim()
+          ? Number(restorableDraft.max_price_nok)
+          : "";
+    setValue(
+      "max_price_nok",
+      typeof restoredMaxPrice === "number" && Number.isFinite(restoredMaxPrice)
+        ? restoredMaxPrice
+        : "",
+    );
+    setNotifyOnMatch(restorableDraft.notify_matches);
     setAttributes(restorableDraft.attributes);
     setCheckedKeys(restorableDraft.checked_keys);
     dismissRestore();
@@ -1000,10 +1020,7 @@ function NewWtbPage() {
                   {
                     key: "criteria",
                     label: "Kriterier",
-                    value:
-                      Object.keys(attributes).length > 0
-                        ? `${Object.keys(attributes).length} valgt`
-                        : "Ingen begrensninger",
+                    value: wtbCriteriaSummary(criteriaFilters, attributes),
                     onEdit: () => {
                       returnToReviewRef.current = true;
                       setStepIndex(steps.indexOf("attributes"));

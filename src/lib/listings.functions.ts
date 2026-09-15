@@ -52,6 +52,7 @@ type ListingMutationRow = {
   price_nok: number | null;
   category_id: string | null;
   attributes: unknown;
+  updated_at: string;
 };
 
 async function resolveListingOwnership(
@@ -190,7 +191,7 @@ async function authorizeListingMutation(
   const { data: listing, error } = await supabaseAdmin
     .from("listings")
     .select(
-      "id, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes",
+      "id, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes, updated_at",
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -372,6 +373,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid().optional(),
+        expected_updated_at: z.string().datetime({ offset: true }).optional(),
         title: z.string().trim().min(1).max(120),
         subtitle: z.string().trim().max(80).nullable().optional(),
         description: z.string().trim().max(4000).optional(),
@@ -435,7 +437,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         existing.organization_id,
         existing.organization_location_id,
       );
-      const { data: updated, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from("listings")
         .update({
           ...fields,
@@ -451,14 +453,29 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           draft_expiry_notified_at: null,
         })
         .eq("id", data.id)
-        .eq("status", "draft")
-        .select("id, kaupet_code")
-        .single();
+        .eq("status", "draft");
+      // No local version to check against yet (e.g. a draft saved before
+      // version tracking existed) — update unconditionally instead of
+      // reporting a conflict that never actually happened.
+      if (data.expected_updated_at) {
+        query = query.eq("updated_at", data.expected_updated_at);
+      }
+      const { data: updated, error } = await query
+        .select("id, kaupet_code, updated_at")
+        .maybeSingle();
       if (error) {
         const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("saveDraftListing.update", error, { listing_id: data.id });
       }
-      return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
+      if (!updated) {
+        const latest = await authorizeListingMutation(supabaseAdmin, userId, data.id);
+        return { conflict: true as const, updated_at: latest.updated_at };
+      }
+      return {
+        id: updated.id as string,
+        kaupet_code: updated.kaupet_code as string,
+        updated_at: updated.updated_at as string,
+      };
     }
 
     const ownership = await resolveListingOwnership(
@@ -491,13 +508,17 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         status: "draft",
         ...fields,
       })
-      .select("id, kaupet_code")
+      .select("id, kaupet_code, updated_at")
       .single();
     if (error) {
       const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
-    return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
+    return {
+      id: listing.id as string,
+      kaupet_code: listing.kaupet_code as string,
+      updated_at: listing.updated_at as string,
+    };
   });
 
 export const discardDraftListing = createServerFn({ method: "POST" })

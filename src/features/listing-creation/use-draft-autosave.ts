@@ -436,7 +436,13 @@ export function useDraftAutosave(fields: DraftFields) {
   // Save draft when tab becomes hidden (user switches away or closes tab)
   useEffect(() => {
     function handleVisibilityChange() {
-      if (!document.hidden || draftSavingStopped.current) return;
+      if (
+        !document.hidden ||
+        draftSavingStopped.current ||
+        draftRestorePending.current ||
+        hasDraftData !== null
+      )
+        return;
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
         setLastSaved(new Date());
@@ -446,7 +452,7 @@ export function useDraftAutosave(fields: DraftFields) {
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [buildLocalDraft]);
+  }, [buildLocalDraft, hasDraftData]);
 
   async function restoreDraft(target: RestoreTarget) {
     if (!hasDraftData) return;

@@ -1,5 +1,5 @@
 ﻿// @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDraftAutosave } from "./use-draft-autosave";
 
@@ -207,6 +207,34 @@ describe("useDraftAutosave", () => {
       can_ship: "ship",
     });
     expect(saveDraftListingMock).not.toHaveBeenCalled();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  });
+
+  it("overskriver ikke et lokalt utkast mens restore-kortet vises", async () => {
+    cleanup();
+    vi.useFakeTimers();
+    vi.clearAllTimers();
+    const oldDraft = {
+      title: "Gammelt utkast",
+      category_id: "old-category",
+      saved_at: Date.now(),
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(oldDraft));
+    localStorage.setItem(DRAFT_ID_KEY, "draft-id");
+    const { result } = renderHook(() => useDraftAutosave(baseFields));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.hasDraftData).not.toBeNull();
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(oldDraft));
+
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}")).toMatchObject(oldDraft);
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("draft-id");
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
   });
 

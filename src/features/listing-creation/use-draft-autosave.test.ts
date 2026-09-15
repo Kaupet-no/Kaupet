@@ -170,6 +170,30 @@ describe("useDraftAutosave", () => {
     );
   });
 
+  it("intervallet bruker siste leveringsmåte etter rerender", async () => {
+    vi.useFakeTimers();
+    saveDraftListingMock.mockResolvedValue({
+      id: "draft-id",
+      updated_at: "2026-09-15T10:00:00.000Z",
+    });
+    const initialFields = { ...baseFields, title: "En fin sykkel", canShip: null as string | null };
+    const { result, rerender } = renderHook((fields) => useDraftAutosave(fields), {
+      initialProps: initialFields,
+    });
+
+    rerender({ ...baseFields, title: "En fin sykkel", canShip: "ship" });
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+
+    expect(saveDraftListingMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ can_ship: true }) }),
+    );
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}").can_ship).toBe("ship");
+    expect(result.current.draftId).toBe("draft-id");
+  });
+
   it("avviser foreldet tofanelagring og beholder endringene lokalt", async () => {
     localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
     localStorage.setItem(DRAFT_UPDATED_AT_KEY, "2026-09-13T18:00:00.000Z");

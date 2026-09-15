@@ -113,6 +113,7 @@ export function useDraftAutosave(fields: DraftFields) {
   // One guard here covers all three save paths.
   const draftSavingStopped = useRef(false);
   const draftSaveInProgress = useRef<Promise<string | null> | null>(null);
+  const saveDraftToSupabaseRef = useRef<() => Promise<string | null>>(() => Promise.resolve(null));
   const saveGeneration = useRef(0);
   const imageStoreReady = useRef(false);
   const restorableImages = useRef<PendingImage[]>([]);
@@ -401,6 +402,10 @@ export function useDraftAutosave(fields: DraftFields) {
     return saveDraftToSupabase();
   }
 
+  useIsomorphicLayoutEffect(() => {
+    saveDraftToSupabaseRef.current = saveDraftToSupabase;
+  });
+
   async function retryDraftAfterConflict(): Promise<string | null> {
     if (draftSaveInProgress.current) await draftSaveInProgress.current;
     draftConflictRef.current = false;
@@ -411,10 +416,9 @@ export function useDraftAutosave(fields: DraftFields) {
   // Auto-save draft to Supabase every 30 seconds when form has enough data
   useEffect(() => {
     const interval = window.setInterval(() => {
-      void saveDraftToSupabase();
+      void saveDraftToSupabaseRef.current();
     }, 30_000);
     return () => window.clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     title,
     description,
@@ -432,11 +436,10 @@ export function useDraftAutosave(fields: DraftFields) {
   // Save draft when tab becomes hidden (user switches away or closes tab)
   useEffect(() => {
     function handleVisibilityChange() {
-      if (document.hidden) void saveDraftToSupabase();
+      if (document.hidden) void saveDraftToSupabaseRef.current();
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     title,
     description,

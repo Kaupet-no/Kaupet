@@ -194,6 +194,22 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftId).toBe("draft-id");
   });
 
+  it("lagrer lokalt ved hidden uten å starte server-save", () => {
+    localStorage.setItem(DRAFT_ID_KEY, "draft-id");
+    localStorage.setItem(DRAFT_UPDATED_AT_KEY, "old-version");
+    renderHook(() => useDraftAutosave({ ...baseFields, title: "En fin sykkel", canShip: "ship" }));
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}")).toMatchObject({
+      title: "En fin sykkel",
+      can_ship: "ship",
+    });
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  });
+
   it("avviser foreldet tofanelagring og beholder endringene lokalt", async () => {
     localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
     localStorage.setItem(DRAFT_UPDATED_AT_KEY, "2026-09-13T18:00:00.000Z");

@@ -26,7 +26,7 @@ const SECURITY_HEADERS = {
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
-    "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org",
+    "img-src 'self' data: blob: https://*.supabase.co https://cache.kartverket.no",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
     "frame-src https://challenges.cloudflare.com",
     "worker-src 'self' blob:",

@@ -1285,6 +1285,7 @@ function NewListingPage() {
       return listing;
     },
     onSuccess: (result) => {
+      publishAttemptPendingRef.current = false;
       // stopAutosave: the wizard stays mounted behind the success dialog with
       // the form still populated — without this the next autosave tick would
       // INSERT the published listing back as a duplicate draft.

@@ -432,15 +432,12 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     if (data.id) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
-      if (!data.expected_updated_at) {
-        return { conflict: true as const, updated_at: existing.updated_at };
-      }
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
         existing.organization_location_id,
       );
-      const { data: updated, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from("listings")
         .update({
           ...fields,
@@ -456,8 +453,14 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           draft_expiry_notified_at: null,
         })
         .eq("id", data.id)
-        .eq("status", "draft")
-        .eq("updated_at", data.expected_updated_at)
+        .eq("status", "draft");
+      // No local version to check against yet (e.g. a draft saved before
+      // version tracking existed) — update unconditionally instead of
+      // reporting a conflict that never actually happened.
+      if (data.expected_updated_at) {
+        query = query.eq("updated_at", data.expected_updated_at);
+      }
+      const { data: updated, error } = await query
         .select("id, kaupet_code, updated_at")
         .maybeSingle();
       if (error) {

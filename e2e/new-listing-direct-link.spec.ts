@@ -23,7 +23,7 @@ test("direktelenke til /ny-annonse uten utkast åpner typevelgeren på forsiden"
 }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop-web",
-    "Typevelger-dialogen på forsiden er bare bygget for web-landingssiden",
+    "Native-skallet er Capacitor-basert og dekkes ikke av Playwright-prosjektene — dekkes i stedet av komponenttesten i src/routes/-index.test.tsx",
   );
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);

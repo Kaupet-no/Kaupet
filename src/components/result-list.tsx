@@ -57,6 +57,11 @@ type Props = {
   onApplyZeroResultExpansion?: (expansion: ZeroResultExpansion) => void;
   hasActiveCriteria?: boolean;
   onBrowseCategories?: () => void;
+  /** Set when the search text matches an existing category name (F8) — offered
+   * as a "Gå til <kategori>" suggestion on zero results, since a plain-text
+   * query that happens to be a category name usually means the user wants
+   * that category. See matchCategoryPhrase in search-category-match.ts. */
+  categorySuggestion?: { categoryName: string; onApply: () => void };
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -97,6 +102,7 @@ export function ResultList({
   onApplyZeroResultExpansion,
   hasActiveCriteria,
   onBrowseCategories,
+  categorySuggestion,
   mapListings,
   mapCenter,
   onMapApplyViewport,
@@ -212,8 +218,9 @@ export function ResultList({
       : zeroResultExpansion
         ? [zeroResultExpansion]
         : [];
-  const criteriaActive =
-    hasActiveCriteria ?? (q.trim().length > 0 || effectiveCategories.length > 0);
+  // Free-text alone isn't a "filter" that Nullstill alle filtre can undo —
+  // only an actual category/attribute/price/etc. selection is (F8).
+  const criteriaActive = hasActiveCriteria ?? effectiveCategories.length > 0;
 
   return (
     <>
@@ -415,25 +422,30 @@ export function ResultList({
                 q && effectiveCategories.length > 0
                   ? `Ingen treff for «${q}» i valgt kategori. Prøv å søke i alle kategorier eller bruk andre søkeord.`
                   : q
-                    ? `Ingen treff for «${q}». Prøv andre søkeord eller fjern filtre.`
+                    ? criteriaActive
+                      ? `Ingen treff for «${q}». Prøv andre søkeord eller fjern filtre.`
+                      : `Ingen treff for «${q}». Prøv andre søkeord.`
                     : effectiveCategories.length > 0
                       ? "Ingen annonser i valgt kategori. Prøv å velge en bredere kategori."
                       : "Prøv et bredere søk eller øk radiusen."
               }
               action={
-                <>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {categorySuggestion && (
+                    <Button variant="outline" onClick={categorySuggestion.onApply}>
+                      Gå til {categorySuggestion.categoryName}
+                    </Button>
+                  )}
                   {expansionOptions.length > 0 && onApplyZeroResultExpansion ? (
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {expansionOptions.map((option) => (
-                        <Button
-                          key={option.key}
-                          variant="outline"
-                          onClick={() => onApplyZeroResultExpansion(option)}
-                        >
-                          Vis {option.count.toLocaleString("nb-NO")} treff uten «{option.label}»
-                        </Button>
-                      ))}
-                    </div>
+                    expansionOptions.map((option) => (
+                      <Button
+                        key={option.key}
+                        variant="outline"
+                        onClick={() => onApplyZeroResultExpansion(option)}
+                      >
+                        Vis {option.count.toLocaleString("nb-NO")} treff uten «{option.label}»
+                      </Button>
+                    ))
                   ) : zeroResultExpansionPending ? (
                     <span
                       role="status"
@@ -451,7 +463,7 @@ export function ResultList({
                       Utforsk kategorier
                     </Button>
                   ) : null}
-                </>
+                </div>
               }
             />
           ) : (

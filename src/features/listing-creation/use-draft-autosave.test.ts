@@ -238,6 +238,64 @@ describe("useDraftAutosave", () => {
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
   });
 
+  it("flusher en endring innenfor debounce-vinduet til localStorage ved pagehide (F2)", () => {
+    vi.useFakeTimers();
+    const initialFields = { ...baseFields, title: "En fin sykkel", canShip: null as string | null };
+    const { rerender } = renderHook((fields) => useDraftAutosave(fields), {
+      initialProps: initialFields,
+    });
+
+    // Brukeren velger "Må hentes" og laster/lukker siden under to sekunder
+    // senere — før den debouncede localStorage-lagringen rekker å fyre.
+    act(() => {
+      rerender({ ...initialFields, canShip: "pickup" });
+      vi.advanceTimersByTime(500);
+    });
+    act(() => window.dispatchEvent(new Event("pagehide")));
+
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}").can_ship).toBe("pickup");
+  });
+
+  it("flusher en endring gjort etter en fullført gjenoppretting ved pagehide (J5)", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Gammelt utkast", saved_at: Date.now() }),
+    );
+    localStorage.setItem(DRAFT_ID_KEY, "draft-id");
+    const initialFields = { ...baseFields, canShip: null as string | null };
+    const { result, rerender } = renderHook((fields) => useDraftAutosave(fields), {
+      initialProps: initialFields,
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.hasDraftData).not.toBeNull();
+
+    await act(() =>
+      result.current.restoreDraft({
+        setValue: vi.fn(),
+        setSelectedParentId: vi.fn(),
+        setLocationMethod: vi.fn(),
+        setAttributes: vi.fn(),
+        setCoords: vi.fn(),
+      }),
+    );
+    expect(result.current.hasDraftData).toBeNull();
+
+    // Rett etter gjenoppretting endrer brukeren leveringsvalget og lukker
+    // appen (tvangsavslutt) før debounce-vinduet på to sekunder er ute.
+    act(() => {
+      rerender({ ...initialFields, canShip: "pickup" });
+      vi.advanceTimersByTime(500);
+    });
+    act(() => window.dispatchEvent(new Event("pagehide")));
+
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}").can_ship).toBe("pickup");
+  });
+
   it("avviser foreldet tofanelagring og beholder endringene lokalt", async () => {
     localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
     localStorage.setItem(DRAFT_UPDATED_AT_KEY, "2026-09-13T18:00:00.000Z");

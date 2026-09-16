@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { getCategoryIcon } from "@/lib/category-icons";
 
@@ -255,9 +256,22 @@ export function CategoryPicker({
               : "hover:bg-muted"
         }`}
       >
-        <span>
-          {opts.parentLabel && <span className="text-muted-foreground">{opts.parentLabel} / </span>}
-          {cat.name_nb}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">
+            {opts.parentLabel && (
+              <span className="text-muted-foreground">{opts.parentLabel} / </span>
+            )}
+            {cat.name_nb}
+          </span>
+          {/* Skiller f.eks. «Sport og friluft / Sykkel» (hovedkategori, har
+              underkategorier) fra «Sport og friluft / Sykkel / Sykkel»
+              (bladkategori) i søketreff, der etikettene ellers er nesten
+              identiske og brukeren ikke kan se hvilken som er «riktig». */}
+          {!isPending && !isSelected && hasChildren(cat.id) && (
+            <Badge variant="secondary" className="shrink-0 font-normal">
+              Hovedkategori
+            </Badge>
+          )}
         </span>
         {isPending || isSelected ? (
           <Check

@@ -24,6 +24,14 @@ const SERVICE_ROLE_KEY = process.env.LOCAL_SUPABASE_SERVICE_ROLE_KEY;
 const canRun = Boolean(URL && ANON_KEY && SERVICE_ROLE_KEY);
 const PASSWORD = "test-password-12345";
 
+// Categories created by createTestCategory() across all describe blocks below,
+// deleted once in the module-level afterAll at the bottom of this file. A
+// block-local afterAll runs first (vitest runs afterAll hooks in the reverse
+// order they were registered, and block-local ones register before this
+// module-level one), so any child rows (word stats, etc.) a block cleans up
+// itself are already gone by the time we delete the category here.
+const testCategoryIds: string[] = [];
+
 async function createTestCategory(admin: SupabaseClient, suffix: number | string) {
   const { data, error } = await admin
     .from("categories")
@@ -31,6 +39,7 @@ async function createTestCategory(admin: SupabaseClient, suffix: number | string
     .select("id")
     .single();
   if (error) throw error;
+  testCategoryIds.push(data.id);
   return data.id;
 }
 
@@ -1304,10 +1313,16 @@ describe.skipIf(!canRun)(
       await mkUser(emails.other);
       await grantAdmin(admin, adminId);
 
+      const ipAddress = `203.0.113.${suffix % 255}`;
+      // ip_bans.banned_by has no FK, so a row from an interrupted prior run
+      // can still be sitting on this ip_address and collide with the insert
+      // below (ip_address is unique).
+      await admin.from("ip_bans").delete().eq("ip_address", ipAddress);
+
       const { data, error } = await admin
         .from("ip_bans")
         .insert({
-          ip_address: `203.0.113.${suffix % 255}`,
+          ip_address: ipAddress,
           reason: "RLS test ip ban",
           banned_by: adminId,
         })
@@ -1319,6 +1334,7 @@ describe.skipIf(!canRun)(
 
     afterAll(async () => {
       if (!canRun) return;
+      await admin.from("ip_bans").delete().eq("id", ipBanId);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
@@ -4782,3 +4798,14 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+// Shared cleanup for every createTestCategory() call above, so each of the
+// call sites doesn't need its own category teardown. Runs after all
+// block-local afterAll hooks (see comment at testCategoryIds above), so any
+// child rows those blocks own (word stats, etc.) are gone first.
+afterAll(async () => {
+  if (!canRun || testCategoryIds.length === 0) return;
+  const admin = createClient(URL!, SERVICE_ROLE_KEY!);
+  const { error } = await admin.from("categories").delete().in("id", testCategoryIds);
+  if (error) throw error;
+});

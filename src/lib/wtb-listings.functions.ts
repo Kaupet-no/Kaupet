@@ -318,31 +318,50 @@ export const listWtbListings = createServerFn({ method: "GET" })
   .validator((input: unknown) => listWtbSchema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let query = supabaseAdmin
+    const q = data.q?.trim() || undefined;
+
+    // websearch_to_tsquery('norwegian', …) stemmer ikke sammensatte norske
+    // ord ("sykkel" i "search_vector" finner ikke "Ønsker terrengsykkel"),
+    // og PostgREST sin .textSearch()-builder kan ikke uttrykke den
+    // OR word_similarity(...)-fallbacken F1/J4-fiksen legger til. Slå derfor
+    // opp id-ene for denne siden (i riktig rekkefølge, med totalt antall
+    // treff) via wtb_listings_match_page (se migrasjon
+    // 20260915110000_add_wtb_compound_word_search.sql), og hent de fulle
+    // radene — med profiles/categories-joinet — separat.
+    const { data: page, error: pageError } = await supabaseAdmin.rpc(
+      "wtb_listings_match_page" as never,
+      {
+        _q: q ?? null,
+        _category_ids: data.categories?.length ? data.categories : null,
+        _limit: data.limit,
+        _offset: data.offset,
+      } as never,
+    );
+    if (pageError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", pageError);
+    }
+    const matches = (page ?? []) as { id: string; total_count: number }[];
+    if (matches.length === 0) return { rows: [], total: 0 };
+
+    const ids = matches.map((m) => m.id);
+    const { data: rows, error } = await supabaseAdmin
       .from("wtb_listings")
-      .select("*, profiles(display_name, avatar_url), categories(name_nb, slug)", {
-        count: "exact",
-      })
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .range(data.offset, data.offset + data.limit - 1);
-
-    if (data.q?.trim()) {
-      query = query.textSearch("search_vector", data.q.trim(), {
-        type: "websearch",
-        config: "norwegian",
-      });
-    }
-    if (data.categories?.length) {
-      query = query.in("category_id", data.categories);
-    }
-
-    const { data: rows, error, count } = await query;
+      .select("*, profiles(display_name, avatar_url), categories(name_nb, slug)")
+      .in("id", ids);
     if (error) {
       const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
-    return { rows: (rows ?? []) as WtbListingWithProfile[], total: count ?? 0 };
+    // .in() does not preserve the id list's order, so re-sort into the order
+    // wtb_listings_match_page already resolved (newest first) rather than
+    // paginating/sorting a second time here.
+    const byId = new Map((rows ?? []).map((row) => [row.id as string, row]));
+    const orderedRows = ids.map((id) => byId.get(id)).filter((row) => row !== undefined);
+    return {
+      rows: orderedRows as WtbListingWithProfile[],
+      total: matches[0]?.total_count ?? 0,
+    };
   });
 
 export const countWtbListings = createServerFn({ method: "GET" })
@@ -351,27 +370,18 @@ export const countWtbListings = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let query = supabaseAdmin
-      .from("wtb_listings")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "active");
-
-    if (data.q?.trim()) {
-      query = query.textSearch("search_vector", data.q.trim(), {
-        type: "websearch",
-        config: "norwegian",
-      });
-    }
-    if (data.categories?.length) {
-      query = query.in("category_id", data.categories);
-    }
-
-    const { count, error } = await query;
+    const { data: count, error } = await supabaseAdmin.rpc(
+      "wtb_listings_match_count" as never,
+      {
+        _q: data.q?.trim() || null,
+        _category_ids: data.categories?.length ? data.categories : null,
+      } as never,
+    );
     if (error) {
       const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
-    return count ?? 0;
+    return (count as number | null) ?? 0;
   });
 
 /** Fase 4 av ØK-matching: brukes av prisstegets "N brukere ønsker å kjøpe

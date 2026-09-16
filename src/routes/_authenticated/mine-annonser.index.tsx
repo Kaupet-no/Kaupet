@@ -125,7 +125,7 @@ function MyListingsPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, category_id, status, price_nok, is_free, city, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, description, category_id, status, price_nok, is_free, attributes, city, created_at, expires_at, listing_images(storage_path, sort_order), categories(slug)",
         )
         .eq("seller_id", userId)
         .order("created_at", { ascending: false });
@@ -144,6 +144,7 @@ function MyListingsPage() {
           (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
             ?.storage_path ?? null;
         const c = countMap.get(l.id);
+        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -153,6 +154,8 @@ function MyListingsPage() {
           is_free: l.is_free,
           city: l.city,
           category_id: l.category_id ?? null,
+          category_slug: category?.slug ?? null,
+          attributes: (l.attributes ?? null) as Record<string, unknown> | null,
           description: l.description ?? null,
           view_count: c?.views ?? 0,
           favorite_count: c?.favs ?? 0,

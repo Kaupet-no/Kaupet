@@ -166,7 +166,7 @@ export function useListingTitleHints(params: {
       if (significantWords.length === 0) return [];
       let q = supabase
         .from("listings")
-        .select("id, title, price_nok, is_free, city")
+        .select("id, title, price_nok, is_free, city, attributes, categories(slug)")
         .eq("category_id", categoryId)
         .eq("status", "active");
       if (excludeListingId) q = q.neq("id", excludeListingId);
@@ -176,7 +176,18 @@ export function useListingTitleHints(params: {
           type: "plain",
         })
         .limit(3);
-      return data ?? [];
+      return (data ?? []).map((l) => {
+        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
+        return {
+          id: l.id,
+          title: l.title,
+          price_nok: l.price_nok,
+          is_free: l.is_free,
+          city: l.city,
+          category_slug: category?.slug ?? null,
+          attributes: (l.attributes ?? null) as Record<string, unknown> | null,
+        };
+      });
     },
   });
 

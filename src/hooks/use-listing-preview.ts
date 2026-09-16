@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
+import { displayPriceNok } from "@/lib/format";
 
 export type ListingPreviewData = {
   title: string;
@@ -26,7 +27,7 @@ export function useListingPreview(listingId: string, enabled: boolean) {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "title, price_nok, is_free, city, kaupet_code, listing_images(storage_path, sort_order)",
+          "title, price_nok, is_free, city, kaupet_code, attributes, categories(slug), listing_images(storage_path, sort_order)",
         )
         .eq("id", listingId)
         .maybeSingle();
@@ -35,9 +36,17 @@ export function useListingPreview(listingId: string, enabled: boolean) {
       const cover =
         (data.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
           ?.storage_path ?? null;
+      const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
       return {
         title: data.title,
-        price_nok: data.price_nok,
+        // Same total the ad, search cards and message list show — not the
+        // seller's bare price_nok (F4: raw price_nok leaks omregistrerings-
+        // avgift-free numbers into "just published"/"promote" previews).
+        price_nok: displayPriceNok({
+          category_slug: category?.slug ?? null,
+          price_nok: data.price_nok,
+          attributes: (data.attributes ?? null) as Record<string, unknown> | null,
+        }),
         is_free: data.is_free,
         city: data.city,
         cover_path: cover,

@@ -29,6 +29,35 @@ vi.mock("@/lib/toast", () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn
 
 const updateEq = vi.fn(() => ({ is: vi.fn(async () => ({ data: null, error: null })) }));
 
+// Kjøretøyannonse med 690 000 kr selgerpris + 7 505 kr omregistreringsavgift
+// (override) — samme oppsett som produserte F4: meldingslisten viste
+// 690 000 kr mens annonsekortet/detaljsiden viste totalen 697 505 kr.
+const vehicleConversation = {
+  id: "conv-1",
+  buyer_id: "user-1",
+  seller_id: "seller-1",
+  listing_id: "listing-1",
+  last_message_at: "2026-09-10T10:00:00Z",
+  buyer_last_read_at: null,
+  seller_last_read_at: null,
+  buyer_deleted_at: null,
+  seller_deleted_at: null,
+  listing: {
+    id: "listing-1",
+    title: "2026 Mercedes-benz Amg c 63",
+    price_nok: 690_000,
+    is_free: false,
+    status: "active",
+    attributes: { omregistreringsavgift_override_kr: 7_505 },
+    categories: { slug: "bil" },
+    listing_images: [],
+  },
+  buyer: { id: "user-1", display_name: "Kjøper", avatar_url: null, deleted_at: null },
+  seller: { id: "seller-1", display_name: "Selger", avatar_url: null, deleted_at: null },
+};
+
+let conversationsData: unknown[] = [];
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
@@ -54,10 +83,13 @@ vi.mock("@/integrations/supabase/client", () => ({
         return {
           select: () => ({
             or: () => ({
-              order: async () => ({ data: [], error: null }),
+              order: async () => ({ data: conversationsData, error: null }),
             }),
           }),
         };
+      }
+      if (table === "messages") {
+        return { select: () => ({ in: () => ({ order: async () => ({ data: [] }) }) }) };
       }
       return { select: () => ({ order: async () => ({ data: [], error: null }) }) };
     },
@@ -67,6 +99,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 afterEach(() => {
   cleanup();
   updateEq.mockClear();
+  conversationsData = [];
 });
 
 describe("InboxPage – systemmelding merket som lest", () => {
@@ -88,5 +121,23 @@ describe("InboxPage – systemmelding merket som lest", () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["system-messages-unread"] }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["system-messages"] });
+  });
+});
+
+describe("InboxPage – pris for kjøretøyannonse (F4)", () => {
+  it("viser samme totalpris (inkl. omregistreringsavgift) som annonsekortet, ikke selgers bare price_nok", async () => {
+    conversationsData = [vehicleConversation];
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const { getByText, queryByText } = render(
+      <QueryClientProvider client={qc}>
+        <InboxPage />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => getByText("2026 Mercedes-benz Amg c 63"));
+
+    expect(getByText(/697 505 kr/)).toBeTruthy();
+    expect(queryByText(/690 000 kr/)).toBeNull();
   });
 });

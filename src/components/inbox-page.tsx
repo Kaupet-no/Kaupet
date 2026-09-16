@@ -22,6 +22,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
+import { displayPriceNok, formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -47,6 +48,8 @@ type ConversationRow = {
     price_nok: number | null;
     is_free: boolean;
     status: string;
+    attributes: Record<string, unknown> | null;
+    categories: { slug: string } | { slug: string }[] | null;
     listing_images: { storage_path: string; sort_order: number }[];
   } | null;
   buyer: {
@@ -78,6 +81,8 @@ type RawListingRel = {
   price_nok: number | null;
   is_free: boolean;
   status: string;
+  attributes: Record<string, unknown> | null;
+  categories: { slug: string } | { slug: string }[] | null;
   listing_images: { storage_path: string; sort_order: number }[];
 };
 type RawConv = {
@@ -132,7 +137,7 @@ export function InboxPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
-           listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order)),
+           listing:listings(id, title, price_nok, is_free, status, attributes, categories(slug), listing_images(storage_path, sort_order)),
            buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url, deleted_at),
            seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url, deleted_at)`,
         )
@@ -143,7 +148,7 @@ export function InboxPage() {
           .from("conversations")
           .select(
             `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
-             listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order))`,
+             listing:listings(id, title, price_nok, is_free, status, attributes, categories(slug), listing_images(storage_path, sort_order))`,
           )
           .or(visibility)
           .order("last_message_at", { ascending: false });
@@ -384,11 +389,23 @@ export function InboxPage() {
                   .slice()
                   .sort((a, b) => a.sort_order - b.sort_order)[0];
                 const coverUrl = cover ? imgUrls[cover.storage_path] : undefined;
-                const priceLabel = g.listing?.is_free
-                  ? "Gis bort"
-                  : g.listing?.price_nok != null
-                    ? `${g.listing.price_nok.toLocaleString("nb-NO")} kr`
-                    : "Pris ved henvendelse";
+                // Same total as the listing card and detail page: for a
+                // vehicle where the buyer pays the re-registration fee, this
+                // must not show the seller's bare price_nok (F4).
+                const priceLabel = g.listing
+                  ? formatPrice({
+                      price_nok: displayPriceNok({
+                        category_slug:
+                          (Array.isArray(g.listing.categories)
+                            ? g.listing.categories[0]
+                            : g.listing.categories
+                          )?.slug ?? null,
+                        price_nok: g.listing.price_nok,
+                        attributes: g.listing.attributes,
+                      }),
+                      is_free: g.listing.is_free,
+                    })
+                  : "Pris ved henvendelse";
                 return (
                   <div
                     key={g.listingId}

@@ -23,6 +23,8 @@ const row: Row = {
   is_free: false,
   city: "Oslo",
   category_id: null,
+  category_slug: null,
+  attributes: null,
   description: null,
   view_count: 0,
   favorite_count: 0,

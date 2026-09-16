@@ -28,7 +28,7 @@ afterEach(cleanup);
 
 describe("AppLanding", () => {
   it("åpner søk, lokasjon og kategorier gjennom samme panel", () => {
-    render(<AppLanding />);
+    render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Åpne søk i annonser" }));
     fireEvent.click(screen.getByRole("button", { name: "Velg lokasjon: Hele Norge" }));

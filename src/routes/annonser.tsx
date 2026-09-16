@@ -789,12 +789,18 @@ function BrowsePage() {
                 isFetchingNextPage={isFetchingNextPage}
                 fetchNextPage={() => void fetchNextPage()}
                 resetFilters={resetFilters}
-                hasActiveCriteria={
-                  activeFilterCount > 0 ||
-                  qDraft.trim().length > 0 ||
-                  effectiveCategories.length > 0
-                }
+                // Free text alone isn't a filter "Nullstill alle filtre" can
+                // undo — only show it when a real filter/category is set (F8).
+                hasActiveCriteria={activeFilterCount > 0 || effectiveCategories.length > 0}
                 onBrowseCategories={() => openPanel("categories")}
+                categorySuggestion={
+                  cards.length === 0 &&
+                  !isLoading &&
+                  categoryMatch &&
+                  effectiveCategories.length === 0
+                    ? { categoryName: categoryMatch.categoryName, onApply: applyCategoryMatch }
+                    : undefined
+                }
                 zeroResultExpansion={zeroResultExpansion}
                 zeroResultExpansionPending={zeroResultExpansionPending}
                 zeroResultExpansions={zeroResultExpansions}

@@ -433,26 +433,52 @@ export function useDraftAutosave(fields: DraftFields) {
     draftId,
   ]);
 
-  // Save draft when tab becomes hidden (user switches away or closes tab)
+  // Flush the newest form snapshot straight into localStorage, synchronously
+  // and unconditionally except for the two real guards below. Reads
+  // everything through refs (latestLocalDraft/draftRestorePending, updated
+  // synchronously by the layout effect above and by restoreDraft/
+  // clearDraftStorage) instead of closing over `hasDraftData` state, so this
+  // can be wired up once on mount and still always see the latest answer —
+  // no stale closure, no need to tear the listeners down and rebuild them
+  // every time a draft is detected or restored.
+  //
+  // `draftRestorePending.current` alone is the "don't overwrite the
+  // not-yet-restored draft on disk with blank form state" guard (added in
+  // 7138667, see the "overskriver ikke et lokalt utkast..." test below): it
+  // is true for exactly as long as an unrestored draft is being offered to
+  // the user. Checking `hasDraftData !== null` in addition to it was a wider
+  // version of the same condition that read component state instead of the
+  // ref — since `restoreDraft`/`clearDraftStorage` flip the ref synchronously
+  // but `setHasDraftData` only takes effect on the next render, a hide/
+  // pagehide firing in that gap would see the ref already cleared but the
+  // stale `hasDraftData` state still non-null, and wrongly stay blocked.
+  const flushLocalDraftSync = useCallback(() => {
+    if (draftSavingStopped.current || draftRestorePending.current) return;
+    if (!latestLocalDraft.current) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current));
+      setLastSaved(new Date());
+    } catch {
+      setDraftSaveError(true);
+    }
+  }, []);
+
+  // Save draft when the tab is hidden (switch away, close, or reload) and on
+  // pagehide — the reliable unload signal on mobile/iOS Safari, where
+  // visibilitychange can fire too late or not at all. Both matter: a change
+  // made just before the tab disappears must not wait for the 2s debounce
+  // above.
   useEffect(() => {
     function handleVisibilityChange() {
-      if (
-        !document.hidden ||
-        draftSavingStopped.current ||
-        draftRestorePending.current ||
-        hasDraftData !== null
-      )
-        return;
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
-        setLastSaved(new Date());
-      } catch {
-        setDraftSaveError(true);
-      }
+      if (document.hidden) flushLocalDraftSync();
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [buildLocalDraft, hasDraftData]);
+    window.addEventListener("pagehide", flushLocalDraftSync);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushLocalDraftSync);
+    };
+  }, [flushLocalDraftSync]);
 
   async function restoreDraft(target: RestoreTarget) {
     if (!hasDraftData) return;

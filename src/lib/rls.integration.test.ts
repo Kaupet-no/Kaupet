@@ -24,6 +24,14 @@ const SERVICE_ROLE_KEY = process.env.LOCAL_SUPABASE_SERVICE_ROLE_KEY;
 const canRun = Boolean(URL && ANON_KEY && SERVICE_ROLE_KEY);
 const PASSWORD = "test-password-12345";
 
+// Categories created by createTestCategory() across all describe blocks below,
+// deleted once in the module-level afterAll at the bottom of this file. A
+// block-local afterAll runs first (vitest runs afterAll hooks in the reverse
+// order they were registered, and block-local ones register before this
+// module-level one), so any child rows (word stats, etc.) a block cleans up
+// itself are already gone by the time we delete the category here.
+const testCategoryIds: string[] = [];
+
 async function createTestCategory(admin: SupabaseClient, suffix: number | string) {
   const { data, error } = await admin
     .from("categories")
@@ -31,6 +39,7 @@ async function createTestCategory(admin: SupabaseClient, suffix: number | string
     .select("id")
     .single();
   if (error) throw error;
+  testCategoryIds.push(data.id);
   return data.id;
 }
 
@@ -1304,10 +1313,16 @@ describe.skipIf(!canRun)(
       await mkUser(emails.other);
       await grantAdmin(admin, adminId);
 
+      const ipAddress = `203.0.113.${suffix % 255}`;
+      // ip_bans.banned_by has no FK, so a row from an interrupted prior run
+      // can still be sitting on this ip_address and collide with the insert
+      // below (ip_address is unique).
+      await admin.from("ip_bans").delete().eq("ip_address", ipAddress);
+
       const { data, error } = await admin
         .from("ip_bans")
         .insert({
-          ip_address: `203.0.113.${suffix % 255}`,
+          ip_address: ipAddress,
           reason: "RLS test ip ban",
           banned_by: adminId,
         })
@@ -1319,6 +1334,7 @@ describe.skipIf(!canRun)(
 
     afterAll(async () => {
       if (!canRun) return;
+      await admin.from("ip_bans").delete().eq("id", ipBanId);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
@@ -3234,6 +3250,7 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
           seller_id: user.user!.id,
           category_id: categoryId,
           title: "Volvo rimelig testbil",
+          is_free: false,
           price_nok: 100_000,
           status: "active",
           condition: "good",
@@ -3245,6 +3262,7 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
           seller_id: user.user!.id,
           category_id: categoryId,
           title: "Volvo kraftig testbil",
+          is_free: false,
           price_nok: 200_000,
           status: "active",
           condition: "good",
@@ -3256,12 +3274,43 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
           seller_id: user.user!.id,
           category_id: categoryId,
           title: "Toyota utenfor søket",
+          is_free: false,
           price_nok: 50_000,
           status: "active",
           condition: "good",
           lat: 59.91,
           lng: 10.75,
           attributes: { horsepower: 90 },
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Testsykkel 26 tommer",
+          price_nok: 1_500,
+          is_free: false,
+          status: "active",
+          condition: "good",
+          attributes: {},
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Fin terrengsykkel til salgs",
+          price_nok: 2_500,
+          is_free: false,
+          status: "active",
+          condition: "good",
+          attributes: {},
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Erfaren sykepleier søker hybel",
+          price_nok: 0,
+          is_free: true,
+          status: "active",
+          condition: "good",
+          attributes: {},
         },
       ])
       .select("id");
@@ -3303,6 +3352,21 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
     expect(second.data?.[0]?.price_nok).toBe(200_000);
   });
 
+  it("finner sammensatte ord der søkeordet er siste ledd i tittelen (F1)", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { data, error } = await anon.rpc("search_listings_page", {
+      _include_groups: [{ mode: "any", terms: ["sykkel"] }],
+      _category_ids: [categoryId],
+      _sort: "new",
+    });
+    expect(error).toBeNull();
+    const titles = data?.map((listing: { title: string }) => listing.title).sort();
+    expect(titles).toEqual(["Fin terrengsykkel til salgs", "Testsykkel 26 tommer"]);
+    // Negativt tilfelle: "sykkel" skal ikke tilfeldig matche et urelatert ord
+    // som starter likt ("sykepleier").
+    expect(titles).not.toContain("Erfaren sykepleier søker hybel");
+  });
+
   it("applies numeric JSON attribute ranges before pagination", async () => {
     const anon = createClient(URL!, ANON_KEY!);
     const { data, error } = await anon.rpc("search_listings_page", {
@@ -3314,6 +3378,85 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
     expect(data?.[0]?.price_nok).toBe(200_000);
+  });
+});
+
+describe.skipIf(!canRun)("WTB search RPC: finds compound words (J4, twin of F1)", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const userIds: string[] = [];
+  let categoryId: string;
+  const wtbIds: string[] = [];
+
+  beforeAll(async () => {
+    const { data: user, error: userError } = await admin.auth.admin.createUser({
+      email: `rls-wtb-search-page-${suffix}@example.com`,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (userError) throw userError;
+    userIds.push(user.user!.id);
+    categoryId = await createTestCategory(admin, `wtb-search-page-${suffix}`);
+
+    const { data, error } = await admin
+      .from("wtb_listings")
+      .insert([
+        {
+          user_id: user.user!.id,
+          category_id: categoryId,
+          title: "Ønsker terrengsykkel",
+          status: "active",
+        },
+        {
+          user_id: user.user!.id,
+          category_id: categoryId,
+          title: "Ser etter testsykkel til barnet",
+          status: "active",
+        },
+        {
+          user_id: user.user!.id,
+          category_id: categoryId,
+          title: "Erfaren sykepleier tilbyr hjemmehjelp",
+          status: "active",
+        },
+      ])
+      .select("id");
+    if (error) throw error;
+    wtbIds.push(...data.map((row) => row.id));
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("wtb_listings").delete().in("id", wtbIds);
+    await admin.from("categories").delete().eq("id", categoryId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("finner sammensatte ord der søkeordet er siste ledd i tittelen (J4)", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { data, error } = await anon.rpc(
+      "wtb_listings_match_page" as never,
+      {
+        _q: "sykkel",
+        _category_ids: [categoryId],
+        _limit: 20,
+        _offset: 0,
+      } as never,
+    );
+    expect(error).toBeNull();
+    const matchedIds = new Set((data as { id: string }[] | null)?.map((row) => row.id));
+    expect(matchedIds.has(wtbIds[0])).toBe(true); // "Ønsker terrengsykkel"
+    expect(matchedIds.has(wtbIds[1])).toBe(true); // "Ser etter testsykkel til barnet"
+    // Negativt tilfelle: "sykkel" skal ikke tilfeldig matche et urelatert ord
+    // som starter likt ("sykepleier").
+    expect(matchedIds.has(wtbIds[2])).toBe(false);
+
+    const { data: countData, error: countError } = await anon.rpc(
+      "wtb_listings_match_count" as never,
+      { _q: "sykkel", _category_ids: [categoryId] } as never,
+    );
+    expect(countError).toBeNull();
+    expect(countData).toBe(2);
   });
 });
 
@@ -4655,3 +4798,14 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+// Shared cleanup for every createTestCategory() call above, so each of the
+// call sites doesn't need its own category teardown. Runs after all
+// block-local afterAll hooks (see comment at testCategoryIds above), so any
+// child rows those blocks own (word stats, etc.) are gone first.
+afterAll(async () => {
+  if (!canRun || testCategoryIds.length === 0) return;
+  const admin = createClient(URL!, SERVICE_ROLE_KEY!);
+  const { error } = await admin.from("categories").delete().in("id", testCategoryIds);
+  if (error) throw error;
+});

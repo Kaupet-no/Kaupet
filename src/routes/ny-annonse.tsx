@@ -1413,10 +1413,13 @@ function NewListingPage() {
   // effect, so on a direct visit to /ny-annonse this would otherwise fire on
   // the first commit — while hasDraftData is still null — and bounce the user
   // off a draft they do have.
+  // `opprett: true` tells the homepage to open that same picker dialog
+  // immediately instead of landing on a silent homepage — see the matching
+  // comment on `/` 's searchSchema.
   useEffect(() => {
     if (!draftChecked) return;
     if (listingType === null && !hasDraftData) {
-      void navigate({ to: "/" });
+      void navigate({ to: "/", search: { opprett: true } });
     }
   }, [draftChecked, listingType, hasDraftData, navigate]);
 

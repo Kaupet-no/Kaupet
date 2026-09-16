@@ -8,8 +8,15 @@ import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { NewListingDialog } from "@/components/new-listing-dialog";
 
-export function AppLanding() {
+export function AppLanding({
+  adPickerOpen,
+  onAdPickerOpenChange,
+}: {
+  adPickerOpen: boolean;
+  onAdPickerOpenChange: (open: boolean) => void;
+}) {
   const { openPanel, savedLocation } = useSearchPanel();
   const { popular, hasPopularitySignal } = usePopularListings(10);
   const isTablet = useFormFactor() === "tablet";
@@ -140,6 +147,8 @@ export function AppLanding() {
           </div>
         )}
       </section>
+
+      <NewListingDialog open={adPickerOpen} onOpenChange={onAdPickerOpenChange} />
     </div>
   );
 }

@@ -6,7 +6,7 @@ name: Dependabot lockfile update
 # back onto the PR branch before the verify job runs.
 on:
   pull_request_target:
-    branches: [main]
+    branches: [main, staging]
 
 permissions: {}
 

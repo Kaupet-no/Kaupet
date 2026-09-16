@@ -9,7 +9,15 @@ import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/$kaupetCode_/$sub")({
-  validateSearch: searchSchema.extend({
+  // Every two-segment address matches this route, valid category or not.
+  // `.partial()` keeps genuinely absent search params absent instead of
+  // filling in searchSchema's defaults (q: "", sort: "new", ...) for them —
+  // see the longer explanation on the sibling "/$kaupetCode" route, which
+  // has the exact same catch-all-plus-full-search-schema shape and used to
+  // 307-redirect any unknown address to itself with nine empty params
+  // appended. SubcategoryPage below fills the defaults back in for
+  // CategoryLandingPage, which needs the full shape.
+  validateSearch: searchSchema.partial().extend({
     // Slug of a descendant of `sub` to scope the page to, without leaving
     // this URL.
     sub2: z.string().optional(),
@@ -111,7 +119,7 @@ function SubcategoryPage() {
       breadcrumb={[main, sub]}
       subSlug={search.sub2}
       subSlugParam="sub2"
-      search={search}
+      search={searchSchema.parse(search)}
       navigate={navigate}
     />
   );

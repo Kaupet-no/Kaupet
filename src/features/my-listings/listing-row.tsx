@@ -37,7 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { formatPrice } from "@/lib/format";
+import { displayPriceNok, formatPrice } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -51,6 +51,8 @@ export type Row = {
   is_free: boolean;
   city: string | null;
   category_id: string | null;
+  category_slug: string | null;
+  attributes: Record<string, unknown> | null;
   description: string | null;
   view_count: number;
   favorite_count: number;
@@ -121,6 +123,17 @@ export function ListingRow({
       cancelled = true;
     };
   }, [row.cover_path]);
+
+  // Same total the ad, search cards and message list show — not the
+  // seller's bare price_nok (F4).
+  const priceLabel = formatPrice({
+    price_nok: displayPriceNok({
+      category_slug: row.category_slug,
+      price_nok: row.price_nok,
+      attributes: row.attributes,
+    }),
+    is_free: row.is_free,
+  });
 
   const d = daysLeft(row.expires_at);
   const expiryTone =
@@ -200,7 +213,7 @@ export function ListingRow({
           >
             {row.title}
           </Link>
-          <p className="mt-0.5 font-display text-sm">{formatPrice(row)}</p>
+          <p className="mt-0.5 font-display text-sm">{priceLabel}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">{statusBadges}</div>
           <p className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             {row.city && <span>{row.city}</span>}
@@ -317,7 +330,7 @@ export function ListingRow({
           </Link>
           {statusBadges}
         </div>
-        <p className="mt-1 font-display text-sm">{formatPrice(row)}</p>
+        <p className="mt-1 font-display text-sm">{priceLabel}</p>
         <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
           {row.city && <span>{row.city}</span>}
           {!readOnly && (

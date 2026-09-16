@@ -40,6 +40,8 @@ type RawListing = {
   is_free: boolean;
   city: string | null;
   category_id: string | null;
+  attributes: Record<string, unknown> | null;
+  categories: { slug: string } | { slug: string }[] | null;
   created_at: string;
   expires_at: string | null;
   listing_images: { storage_path: string; sort_order: number }[] | null;
@@ -60,7 +62,7 @@ export function BusinessListingsPanel({
       let baseQuery = supabase
         .from("listings")
         .select(
-          "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, attributes, categories(slug), created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("organization_id", organization.id);
       if (locationId !== "all") {
@@ -76,25 +78,32 @@ export function BusinessListingsPanel({
               .in("status", ["active", "draft"])
               .order("created_at", { ascending: false });
       if (error) throw error;
-      return ((data ?? []) as unknown as RawListing[]).map((listing) => ({
-        id: listing.id,
-        seller_id: listing.seller_id,
-        kaupet_code: listing.kaupet_code,
-        title: listing.title,
-        status: listing.status as Row["status"],
-        price_nok: listing.price_nok,
-        is_free: listing.is_free,
-        city: listing.city,
-        category_id: listing.category_id,
-        description: null,
-        view_count: 0,
-        favorite_count: 0,
-        created_at: listing.created_at,
-        expires_at: listing.expires_at,
-        cover_path:
-          listing.listing_images?.slice().sort((a, b) => a.sort_order - b.sort_order)[0]
-            ?.storage_path ?? null,
-      }));
+      return ((data ?? []) as unknown as RawListing[]).map((listing) => {
+        const category = Array.isArray(listing.categories)
+          ? listing.categories[0]
+          : listing.categories;
+        return {
+          id: listing.id,
+          seller_id: listing.seller_id,
+          kaupet_code: listing.kaupet_code,
+          title: listing.title,
+          status: listing.status as Row["status"],
+          price_nok: listing.price_nok,
+          is_free: listing.is_free,
+          city: listing.city,
+          category_id: listing.category_id,
+          category_slug: category?.slug ?? null,
+          attributes: listing.attributes ?? null,
+          description: null,
+          view_count: 0,
+          favorite_count: 0,
+          created_at: listing.created_at,
+          expires_at: listing.expires_at,
+          cover_path:
+            listing.listing_images?.slice().sort((a, b) => a.sort_order - b.sort_order)[0]
+              ?.storage_path ?? null,
+        };
+      });
     },
   });
   const [search, setSearch] = useState("");

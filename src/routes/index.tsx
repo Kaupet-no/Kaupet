@@ -40,6 +40,11 @@ import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 
 const searchSchema = z.object({
   q: z.string().optional(),
+  // Set by /ny-annonse when it's opened directly (bookmark, shared link,
+  // manual address) with no draft and no type chosen — entry to the wizard
+  // always goes through this page's "Opprett en annonse" picker, so this
+  // flag opens it here instead of landing the user on a silent homepage.
+  opprett: z.coerce.boolean().optional(),
 });
 
 export const Route = createFileRoute("/")({
@@ -65,6 +70,24 @@ function LandingPage() {
       : localStorage.getItem("kaupet_onboarding_completed_v1") === "true",
   );
 
+  // `opprett` is handled here — the shared boundary between the web and
+  // native shells — rather than inside either shell, so both react to it the
+  // same way. See the searchSchema comment above for why this exists.
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { opprett } = Route.useSearch();
+  const [adPickerOpen, setAdPickerOpen] = useState(false);
+
+  // Synchronous so the dialog is open on the very first paint after
+  // redirecting here, not one tick later (mirrors ny-ok-annonse.tsx's same
+  // pattern).
+  useEffect(() => {
+    if (!opprett || authLoading) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (user) setAdPickerOpen(true);
+    void navigate({ to: "/", search: {}, replace: true });
+  }, [opprett, authLoading, user, navigate]);
+
   if (native && !onboardingDone) {
     return (
       <OnboardingFlow
@@ -76,14 +99,21 @@ function LandingPage() {
     );
   }
 
-  if (native) return <AppLanding />;
-  return <WebLanding />;
+  if (native) {
+    return <AppLanding adPickerOpen={adPickerOpen} onAdPickerOpenChange={setAdPickerOpen} />;
+  }
+  return <WebLanding adPickerOpen={adPickerOpen} onAdPickerOpenChange={setAdPickerOpen} />;
 }
 
-function WebLanding() {
+function WebLanding({
+  adPickerOpen,
+  onAdPickerOpenChange,
+}: {
+  adPickerOpen: boolean;
+  onAdPickerOpenChange: (open: boolean) => void;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [adPickerOpen, setAdPickerOpen] = useState(false);
   const [qDraft, setQDraft] = useState("");
 
   const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
@@ -321,13 +351,13 @@ function WebLanding() {
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             {user ? (
               <>
-                <Button size="lg" variant="outline" onClick={() => setAdPickerOpen(true)}>
+                <Button size="lg" variant="outline" onClick={() => onAdPickerOpenChange(true)}>
                   Opprett en annonse
                 </Button>
-                <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+                <Dialog open={adPickerOpen} onOpenChange={onAdPickerOpenChange}>
                   <DialogContent className="sm:max-w-4xl">
                     <DialogTitle className="sr-only">Hva vil du gjøre?</DialogTitle>
-                    <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
+                    <IntentTitleLanding onNavigate={() => onAdPickerOpenChange(false)} />
                   </DialogContent>
                 </Dialog>
                 <KaupetCodeDialog />

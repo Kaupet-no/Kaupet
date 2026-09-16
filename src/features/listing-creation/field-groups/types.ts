@@ -206,6 +206,11 @@ export type WizardSharedProps = {
         price_nok: number | null;
         is_free: boolean;
         city: string | null;
+        // Trengs av displayPriceNok (src/lib/format.ts) for å vise samme
+        // totalpris (inkl. omregistreringsavgift for kjøretøy) som andre
+        // prisflater — se similar-listings.tsx.
+        category_slug: string | null;
+        attributes: Record<string, unknown> | null;
       }[]
     | undefined;
 

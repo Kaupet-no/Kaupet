@@ -40,6 +40,11 @@ import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 
 const searchSchema = z.object({
   q: z.string().optional(),
+  // Set by /ny-annonse when it's opened directly (bookmark, shared link,
+  // manual address) with no draft and no type chosen — entry to the wizard
+  // always goes through this page's "Opprett en annonse" picker, so this
+  // flag opens it here instead of landing the user on a silent homepage.
+  opprett: z.coerce.boolean().optional(),
 });
 
 export const Route = createFileRoute("/")({
@@ -81,10 +86,21 @@ function LandingPage() {
 }
 
 function WebLanding() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { opprett } = Route.useSearch();
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const [qDraft, setQDraft] = useState("");
+
+  // See the `opprett` comment on searchSchema above. Synchronous so the
+  // dialog is open on the very first paint after redirecting here, not one
+  // tick later (mirrors ny-ok-annonse.tsx's same pattern).
+  useEffect(() => {
+    if (!opprett || authLoading) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (user) setAdPickerOpen(true);
+    void navigate({ to: "/", search: {}, replace: true });
+  }, [opprett, authLoading, user, navigate]);
 
   const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
   const { data: vehicleBrands } = useAllVehicleBrands();

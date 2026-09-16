@@ -1,4 +1,11 @@
-import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  isNotFound,
+  Link,
+  notFound,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
@@ -51,17 +58,35 @@ import { logListingView } from "@/lib/listing-views.functions";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 import { toListingCardData } from "@/lib/listing-card-data";
 
+// This route serves two very different pages behind one dynamic segment: a
+// listing (8-digit kaupet-koder) and a main-category landing page (any other
+// slug) — see the loader below. Only the category branch needs the full
+// /annonser search schema (it renders the same filter UI as /annonser); the
+// listing branch and any address that matches neither only read `promotion`,
+// `promo_id`, `sub` and `edit`. `searchSchema` itself fills in a default for
+// every optional field (q: "", sort: "new", ...), and TanStack Router
+// canonicalizes the URL to match whatever validateSearch returns — so
+// extending the full schema here made *every* unknown address (not just
+// categories) redirect once to itself with all nine defaults appended as
+// query params. `.partial()` re-wraps each field in an outer optional that
+// short-circuits on a genuinely absent param, so those defaults are only
+// filled in where a category page actually needs them (see
+// `searchSchema.parse(search)` in RootSlugPage below), not written into the
+// URL of pages that never asked for them.
+// Exported for -kaupetCode.test.ts — see the comment above.
+export const kaupetCodeSearchSchema = searchSchema.partial().extend({
+  promotion: z.string().optional(),
+  promo_id: z.string().optional(),
+  // Slug of a descendant category to scope the page to, without leaving
+  // this URL — e.g. Interiør > Møbler > Sofa still lands on /interiør.
+  sub: z.string().optional(),
+  // Owner inline-editing toggle — a search param (not local state) so it
+  // survives a reload while editing.
+  edit: z.coerce.boolean().optional(),
+});
+
 export const Route = createFileRoute("/$kaupetCode")({
-  validateSearch: searchSchema.extend({
-    promotion: z.string().optional(),
-    promo_id: z.string().optional(),
-    // Slug of a descendant category to scope the page to, without leaving
-    // this URL — e.g. Interiør > Møbler > Sofa still lands on /interiør.
-    sub: z.string().optional(),
-    // Owner inline-editing toggle — a search param (not local state) so it
-    // survives a reload while editing.
-    edit: z.coerce.boolean().optional(),
-  }),
+  validateSearch: kaupetCodeSearchSchema,
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
     // always a listing (kaupet-koder are numeric by construction), anything
@@ -80,7 +105,7 @@ export const Route = createFileRoute("/$kaupetCode")({
         .eq("kaupet_code", params.kaupetCode)
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw notFound();
+      if (!data) throw notFound({ data: { reason: "listing" } });
       return { kind: "listing" as const, listing: data };
     }
 
@@ -94,10 +119,12 @@ export const Route = createFileRoute("/$kaupetCode")({
     const normalizedSlug = normalizeSlugForMatch(params.kaupetCode);
     const category =
       exact ?? (mains ?? []).find((c) => normalizeSlugForMatch(c.slug) === normalizedSlug);
-    if (!category) throw notFound();
+    // Neither an 8-digit code nor a known category slug — this is any
+    // unknown address, e.g. a typo'd link or a route that never existed.
+    if (!category) throw notFound({ data: { reason: "unknown" } });
     return { kind: "category" as const, category: category as Category };
   },
-  head: ({ params, loaderData }) => {
+  head: ({ params, loaderData, match }) => {
     if (loaderData?.kind === "category") {
       const c = loaderData.category;
       const title = `${c.name_nb} — kjøp og selg brukt på Kaupet.no`;
@@ -144,8 +171,15 @@ export const Route = createFileRoute("/$kaupetCode")({
     }
     const l = loaderData?.kind === "listing" ? loaderData.listing : undefined;
     if (!l) {
+      const notFoundReason = isNotFound(match.error)
+        ? (match.error.data as { reason?: "listing" | "unknown" } | undefined)?.reason
+        : undefined;
+      const title =
+        notFoundReason === "listing"
+          ? "Annonsen finnes ikke — Kaupet.no"
+          : "Siden finnes ikke — Kaupet.no";
       return {
-        meta: [{ title: "Annonse — Kaupet.no" }, { name: "robots", content: "noindex" }],
+        meta: [{ title }, { name: "robots", content: "noindex" }],
       };
     }
     const displayPrice = displayPriceNok({
@@ -212,19 +246,31 @@ export const Route = createFileRoute("/$kaupetCode")({
   pendingMs: 200,
   pendingMinMs: 300,
   errorComponent: ListingErrorBoundary,
-  notFoundComponent: () => (
-    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-      <h1 className="font-display text-2xl">Fant ikke siden</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Annonsen kan ha blitt fjernet eller solgt, eller kategorien finnes ikke.
-      </p>
-      <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-        <Button className="mt-6" variant="outline">
-          Se flere annonser
-        </Button>
-      </Link>
-    </div>
-  ),
+  notFoundComponent: ({ data }) => {
+    // Set via `notFound({ data: { reason } })` above: "listing" is an
+    // 8-digit kaupet-kode that no longer resolves to an ad; "unknown" is
+    // every other address this catch-all route sees, which was never an ad
+    // to begin with (a typo, a stale link, a route that doesn't exist).
+    const reason = (data as { reason?: "listing" | "unknown" } | undefined)?.reason;
+    const isListing = reason === "listing";
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="font-display text-2xl">
+          {isListing ? "Fant ikke annonsen" : "Fant ikke siden"}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {isListing
+            ? "Annonsen kan ha blitt fjernet eller solgt."
+            : "Siden du prøvde å åpne finnes ikke."}
+        </p>
+        <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+          <Button className="mt-6" variant="outline">
+            Se flere annonser
+          </Button>
+        </Link>
+      </div>
+    );
+  },
 });
 
 function RootSlugPage() {
@@ -238,7 +284,11 @@ function RootSlugPage() {
         breadcrumb={[loaderData.category]}
         subSlug={search.sub}
         subSlugParam="sub"
-        search={search}
+        // CategoryLandingPage expects the full, defaulted /annonser search
+        // shape (e.g. search.q.trim()). The route itself only validates the
+        // fields present in the URL (see the validateSearch comment above),
+        // so fill in the rest here rather than back on every other address.
+        search={searchSchema.parse(search)}
         navigate={navigate}
       />
     );

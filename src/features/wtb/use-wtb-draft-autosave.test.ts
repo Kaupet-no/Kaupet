@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { saveWtbDraftMock, getLatestWtbDraftMock } = vi.hoisted(() => ({
@@ -19,7 +19,7 @@ const fields = {
   title: "Ønsker sykkel",
   description: "",
   category_id: null,
-  max_price_nok: "" as const,
+  max_price_nok: "" as number | string,
   notify_matches: false,
   attributes: {},
   checked_keys: [],
@@ -37,6 +37,11 @@ describe("useWtbDraftAutosave", () => {
   });
 
   afterEach(() => {
+    // Unmounts hooks between tests so a leftover visibilitychange/pagehide
+    // listener from a previous test's still-mounted hook doesn't also fire
+    // (and overwrite localStorage) when a later test dispatches the same
+    // window/document event — bit us once, see the two pagehide tests below.
+    cleanup();
     vi.useRealTimers();
   });
   it("lagrer et versjonert kjøpsønske uten å berøre salgsutkastet", () => {
@@ -144,6 +149,55 @@ describe("useWtbDraftAutosave", () => {
     expect(saveWtbDraftMock).toHaveBeenLastCalledWith({
       data: expect.objectContaining({ max_price_nok: null, notify_matches: true }),
     });
+  });
+
+  it("flusher en endring innenfor debounce-vinduet til localStorage ved pagehide (J4)", () => {
+    const { rerender } = renderHook((f) => useWtbDraftAutosave(f, true), {
+      initialProps: fields,
+    });
+
+    // Brukeren endrer maks pris og lukker/laster siden under to sekunder
+    // senere — før den debouncede localStorage-lagringen rekker å fyre.
+    act(() => {
+      rerender({ ...fields, max_price_nok: 15_000 });
+      vi.advanceTimersByTime(500);
+    });
+    act(() => window.dispatchEvent(new Event("pagehide")));
+
+    expect(JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}")).toMatchObject({
+      max_price_nok: 15_000,
+    });
+  });
+
+  it("overskriver ikke et lokalt utkast mens restore-kortet vises, ved pagehide", async () => {
+    const oldDraft = {
+      draft_kind: "want",
+      draft_version: 1,
+      saved_at: Date.now(),
+      title: "Gammelt kjøpsønske",
+      description: "",
+      category_id: null,
+      max_price_nok: "",
+      notify_matches: false,
+      attributes: {},
+      checked_keys: [],
+    };
+    localStorage.setItem("kaupet_draft_want_listing", JSON.stringify(oldDraft));
+    const { result, rerender } = renderHook((f) => useWtbDraftAutosave(f, true), {
+      initialProps: fields,
+    });
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(result.current.restorableDraft).not.toBeNull();
+
+    act(() => {
+      rerender({ ...fields, max_price_nok: 15_000 });
+      vi.advanceTimersByTime(500);
+    });
+    act(() => window.dispatchEvent(new Event("pagehide")));
+
+    expect(JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}")).toMatchObject(
+      oldDraft,
+    );
   });
 
   it("overskriver ikke serverutkast mens restore-valget står åpent", async () => {

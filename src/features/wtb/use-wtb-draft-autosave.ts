@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { discardWtbDraft, getLatestWtbDraft, saveWtbDraft } from "@/lib/wtb-listings.functions";
 import type { WtbAttributeMap } from "./wtb-criteria-types";
@@ -120,6 +120,42 @@ export function useWtbDraftAutosave(
     const timeout = window.setTimeout(saveLocal, 2_000);
     return () => window.clearTimeout(timeout);
   }, [fields, restorableDraft]);
+
+  // Flush the newest fields straight into localStorage, synchronously and
+  // unconditionally except for the two guards below — mirrors
+  // flushLocalDraftSync in listing-creation/use-draft-autosave.ts (F2). Reads
+  // through fieldsRef, which saveLocal already uses, so there is no stale
+  // closure to worry about from wiring this up once on mount.
+  //
+  // Gate on `restorableDraftRef.current`, not the `restorableDraft` state:
+  // dismissRestore/discardDraft/the draft-load effect flip the ref via a
+  // plain effect one render after the state setter, so a hide/pagehide
+  // firing in that one-render gap would see a stale non-null `restorableDraft`
+  // and wrongly stay blocked. The ref is exactly "an unrestored draft is
+  // currently being offered to the user" — same role `draftRestorePending`
+  // plays on the sell side.
+  const flushLocalDraftSync = useCallback(() => {
+    if (savingStopped.current || restorableDraftRef.current) return;
+    saveLocal();
+  }, []);
+
+  // Save locally when the tab is hidden (switch away, close, or reload) and
+  // on pagehide — the reliable unload signal on mobile/iOS Safari, where
+  // visibilitychange can fire too late or not at all. Both matter: an edit
+  // made just before the tab disappears must not wait for the 2s debounce
+  // above. This is in addition to the saveToServer() call below, not a
+  // replacement for it.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.hidden) flushLocalDraftSync();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", flushLocalDraftSync);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushLocalDraftSync);
+    };
+  }, [flushLocalDraftSync]);
 
   async function saveToServer(): Promise<string | null> {
     if (savingStopped.current) return draftId;

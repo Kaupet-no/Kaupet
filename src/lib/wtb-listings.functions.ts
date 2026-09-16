@@ -328,15 +328,12 @@ export const listWtbListings = createServerFn({ method: "GET" })
     // treff) via wtb_listings_match_page (se migrasjon
     // 20260915110000_add_wtb_compound_word_search.sql), og hent de fulle
     // radene — med profiles/categories-joinet — separat.
-    const { data: page, error: pageError } = await supabaseAdmin.rpc(
-      "wtb_listings_match_page" as never,
-      {
-        _q: q ?? null,
-        _category_ids: data.categories?.length ? data.categories : null,
-        _limit: data.limit,
-        _offset: data.offset,
-      } as never,
-    );
+    const { data: page, error: pageError } = await supabaseAdmin.rpc("wtb_listings_match_page", {
+      _q: q ?? undefined,
+      _category_ids: data.categories?.length ? data.categories : undefined,
+      _limit: data.limit,
+      _offset: data.offset,
+    });
     if (pageError) {
       const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", pageError);
@@ -370,13 +367,10 @@ export const countWtbListings = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: count, error } = await supabaseAdmin.rpc(
-      "wtb_listings_match_count" as never,
-      {
-        _q: data.q?.trim() || null,
-        _category_ids: data.categories?.length ? data.categories : null,
-      } as never,
-    );
+    const { data: count, error } = await supabaseAdmin.rpc("wtb_listings_match_count", {
+      _q: data.q?.trim() || undefined,
+      _category_ids: data.categories?.length ? data.categories : undefined,
+    });
     if (error) {
       const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);

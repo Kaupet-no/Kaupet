@@ -399,6 +399,27 @@ export type Database = {
           },
         ]
       }
+      endpoint_rate_limits: {
+        Row: {
+          attempts: number
+          bucket: string
+          key_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          bucket: string
+          key_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          bucket?: string
+          key_hash?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       error_log: {
         Row: {
           context: Json | null
@@ -558,6 +579,24 @@ export type Database = {
           page_url?: string | null
           type?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      feedback_rate_limits: {
+        Row: {
+          attempts: number
+          key_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          key_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          key_hash?: string
+          window_started_at?: string
         }
         Relationships: []
       }
@@ -3431,6 +3470,22 @@ export type Database = {
         Returns: {
           avg_rating: number
           review_count: number
+        }[]
+      }
+      wtb_listings_match_count: {
+        Args: { _category_ids?: string[]; _q?: string }
+        Returns: number
+      }
+      wtb_listings_match_page: {
+        Args: {
+          _category_ids?: string[]
+          _limit?: number
+          _offset?: number
+          _q?: string
+        }
+        Returns: {
+          id: string
+          total_count: number
         }[]
       }
       wtb_match_count: {

@@ -44,6 +44,14 @@ BEGIN
   JOIN public.categories gp ON gp.id = p.parent_id
   WHERE c.slug = 'stasjonaer-pc' AND p.slug = 'data' AND gp.slug = 'elektronikk';
 
+  -- En tom lokal/CI-database får referansedata først fra seed.sql, etter at
+  -- migrasjonene er kjørt. Hosted miljøer har kategoriene allerede. Behold
+  -- den strenge radtallskontrollen dersom bare deler av strukturen finnes.
+  IF v_bater_id IS NULL AND v_tv_id IS NULL AND v_pc_id IS NULL THEN
+    RAISE NOTICE 'F7a: målkategoriene finnes ikke ennå — hopper over i tom bootstrap-database';
+    RETURN;
+  END IF;
+
   -- Radtallskontroll uavhengig av nåværende is_optional-verdi, slik at
   -- migrasjonen er trygg å kjøre to ganger (andre kjøring finner de samme 8
   -- radene, men UPDATE under blir en no-op siden is_optional allerede er

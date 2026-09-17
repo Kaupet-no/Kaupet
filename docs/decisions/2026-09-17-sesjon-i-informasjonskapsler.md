@@ -105,6 +105,16 @@ den aksen. Ved XSS er sesjonen kompromittert, som før.
   `androidScheme: "https"`, så kapselen er same-origin.
   `MainActivity.java:69` skrur på tredjepartskapsler kun for staging; den
   avveiningen er ikke rørt.
+- Native, Android: WebView holder kapsler i minnet til `CookieManager.flush()`
+  kalles — localStorage persisterte selv. Uten flush mistet appen en fersk
+  innlogging ved omstart, og — verre — en utlogging festet seg ikke: kapselen
+  ble slettet i minnet, mens den gamle lå igjen på disk, så brukeren kom
+  tilbake som innlogget etter et forgrunnsdrap. På en delt enhet betyr det at
+  neste person åpner appen med forrige brukers sesjon. Derfor flusher vi både
+  i `onPause` og ved hver endring i auth-tilstanden (`AuthCookiesPlugin` +
+  `src/lib/native-cookies.ts`). Begge er verifisert i emulator. Dette er en
+  varig konsekvens av kapselvalget: sesjonslagring på Android må nå flushes
+  eksplisitt.
 
 **Reversering**
 

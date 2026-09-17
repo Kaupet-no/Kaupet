@@ -17,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
 import { getSessionUser } from "@/lib/current-user.functions";
+import { flushAuthCookies } from "@/lib/native-cookies";
 import { clearSignedUrlCaches } from "@/lib/storage";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { initOfflineWatcher } from "@/lib/native-offline";
@@ -241,6 +242,13 @@ function RootComponent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
+      // Sesjonskapselen er nettopp skrevet, fornyet eller slettet. På Android
+      // ligger den bare i minnet til WebViewen flusher, og onPause kjører
+      // ikke hvis prosessen dør i forgrunnen — da mistet vi en fersk
+      // innlogging, og en utlogging festet seg ikke. Se native-cookies.ts.
+      // INITIAL_SESSION endrer ingenting og trenger ingen flush.
+      if (event !== "INITIAL_SESSION") void flushAuthCookies();
+
       if (event === "SIGNED_OUT") clearSignedUrlCaches();
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();

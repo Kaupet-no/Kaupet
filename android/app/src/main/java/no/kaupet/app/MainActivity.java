@@ -37,6 +37,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SoftHapticsPlugin.class);
         registerPlugin(ServerTargetPlugin.class);
         registerPlugin(ShellThemePlugin.class);
+        registerPlugin(AuthCookiesPlugin.class);
 
         // Staging's "Velg server" screen (capacitor-shell/index.html) and
         // the in-app DevServerSwitch persist their choice via

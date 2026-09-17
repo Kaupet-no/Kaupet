@@ -1258,7 +1258,11 @@ function ListingDetailViewBody({
                 // trenger ikke egen safe-area-padding siden tab-baren
                 // allerede reserverer den.
                 { bottom: "var(--app-bottom-nav-h)" }
-              : { bottom: 0, paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }
+              : {
+                  bottom: 0,
+                  paddingBottom:
+                    "calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)",
+                }
           }
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">

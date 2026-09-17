@@ -72,7 +72,14 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
         // rev den ned igjen sammen med adPickerOpen-tilstanden.
         hidden && "hidden",
       )}
-      style={rail ? undefined : { paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+      style={
+        rail
+          ? undefined
+          : {
+              paddingBottom:
+                "calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 0.5rem)",
+            }
+      }
     >
       <div
         className={

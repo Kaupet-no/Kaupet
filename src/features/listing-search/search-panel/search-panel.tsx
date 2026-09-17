@@ -509,7 +509,7 @@ export function SearchPanel({
       )}
 
       {(results || launchFilterMode) && (
-        <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))]">
           <Button
             type="button"
             data-testid="search-filter-apply-button"
@@ -728,7 +728,7 @@ function QueryBrowseContent({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))]">
       <SearchSuggestionList groups={groups} variant="inline" />
     </div>
   );
@@ -751,7 +751,7 @@ function BrowseContent({
   onPickCategory: (cat: Category) => void;
 }) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))]">
       {!q && history.length > 0 && (
         <div className="mt-2">
           <div className="mb-2 flex items-center justify-between">

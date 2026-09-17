@@ -415,7 +415,7 @@ html.native body::before {
    (meldinger.$id: calc(100vh - var(--app-bottom-nav-h))). */
 .nav-rail {
   --app-bottom-nav-h: 0px;
-  --app-nav-rail-w: calc(5rem + env(safe-area-inset-left));
+  --app-nav-rail-w: calc(5rem + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
 }
 .nav-rail .pb-bottom-nav {
   padding-bottom: 0;

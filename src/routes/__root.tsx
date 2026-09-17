@@ -292,9 +292,13 @@ function RootBody({ native }: { native: boolean }) {
   useEffect(() => {
     // Runs after the browser has painted this render — by the time we get
     // here the native-layout DOM (bottom nav etc.) is already on screen, so
-    // removing the overlay now never re-exposes the web-layout flash.
-    if (native) hideNativeBootSplash();
-  }, [native]);
+    // removing the overlay now never re-exposes the web-layout flash
+    // (useIsNative leser plattformen allerede i første render). Kalles
+    // ubetinget: finnes overlayet uten at vi er native — boot.js' dev-flagg
+    // mot et miljø der isNative() er strippet — skal det også vekk her, ikke
+    // bli stående for alltid.
+    hideNativeBootSplash();
+  }, []);
 
   useEffect(() => {
     if (!isTest) return;

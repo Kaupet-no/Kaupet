@@ -190,7 +190,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="nb">
+    <html lang="nb" suppressHydrationWarning>
       <head>
         <HeadContent />
         {/* Runs synchronously during parsing, before anything paints (native-boot

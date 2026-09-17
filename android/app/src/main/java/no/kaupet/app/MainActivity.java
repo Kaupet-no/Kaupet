@@ -100,6 +100,7 @@ public class MainActivity extends BridgeActivity {
                     if (!isBridgeOrigin(url)) {
                         hideSplash();
                     }
+                    recoverFromDeadServerTarget(url);
                 }
             }
         );
@@ -187,6 +188,42 @@ public class MainActivity extends BridgeActivity {
             theme
         );
         view.evaluateJavascript(script, null);
+    }
+
+    // Redder appen ut av en død dev-server uten å røre UI. Når et servermål
+    // ligger lagret, er Bridge-en bygget mot DET målet (se onCreate), så
+    // "Velg server"-skjermen (capacitor-shell/index.html) lastes aldri igjen
+    // — den vises kun når INGEN mål er lagret. Slutter Vite-serveren å svare
+    // (utviklerens maskin sover, byttet nettverk), faller Capacitor tilbake
+    // på errorPath: capacitor-shell/offline.html, servert fra appens egen
+    // lokale origin. Der er window.Capacitor aldri injisert — plugin-dispatch
+    // er origin-scoped til origin-en Bridge-en ble opprettet med (server.url),
+    // ikke den lokale origin-en siden er servert fra — så offline.html kan
+    // ikke kalle ServerTarget.set({url: null}) for å rydde opp selv.
+    // DevServerSwitch, som ellers kunne løst det samme, ligger i SPA-en som
+    // aldri booter. Uten dette er eneste vei ut å slette appdata eller
+    // installere på nytt.
+    //
+    // Regelen er trygg: lagret mål ⇒ Bridge mot det målet ⇒ lokal shell-side
+    // kan kun nås via errorPath ⇒ målet er dødt. Etter recreate() er intet
+    // mål lagret lenger, så neste Bridge bygges mot den lokale origin-en, og
+    // DA er "siden er lokal shell" den NORMALE tilstanden — men betingelsen
+    // under er da false (ingenting er lagret), så det looper aldri.
+    //
+    // Bevisst avveining: en forbigående nettverksfeil mot et ellers GYLDIG
+    // staging-mål trigger det samme og sender utvikleren tilbake til
+    // velgeren. Det er akseptabelt for et rent utviklerverktøy — ikke "fiks"
+    // dette til å skille de to tilfellene.
+    private void recoverFromDeadServerTarget(String url) {
+        if (!isStaging() || !isLocalShellPage(url)) {
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences(ServerTargetPlugin.PREFS, MODE_PRIVATE);
+        if (!prefs.contains(ServerTargetPlugin.KEY_URL)) {
+            return;
+        }
+        prefs.edit().remove(ServerTargetPlugin.KEY_URL).apply();
+        runOnUiThread(this::recreate);
     }
 
     private boolean isStaging() {

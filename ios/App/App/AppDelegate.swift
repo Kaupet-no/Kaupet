@@ -47,6 +47,10 @@ final class ServerTargetPlugin: CAPPlugin, CAPBridgedPlugin {
         UserDefaults.standard.string(forKey: urlKey)
     }
 
+    static func clearStoredURL() {
+        UserDefaults.standard.removeObject(forKey: urlKey)
+    }
+
     private static func validate(_ value: String) -> String? {
         guard let components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
@@ -101,7 +105,19 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+
+        // Android's MainActivity gates its equivalent dev-server switch behind
+        // isStaging() (package name ending in ".staging"), so it never exists in
+        // the production build. iOS has no staging flavor to key off: a single
+        // bundle id (no.kaupet.app) and a single Xcode scheme cover both debug
+        // and release, so there is no ".staging" package name to check. DEBUG is
+        // the equivalent boundary here. Without this gate, JS running on the
+        // bridge origin in the shipped App Store build (e.g. an XSS on kaupet.no)
+        // could call ServerTarget.set() and repoint every future cold launch at
+        // an attacker-chosen origin over cleartext HTTP.
+#if DEBUG
         bridge?.registerPluginInstance(ServerTargetPlugin())
+#endif
 
         let handler = WeakScriptMessageHandler(delegate: self)
         messageHandler = handler
@@ -125,10 +141,16 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
 
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
+        // Same DEBUG-only boundary as capacitorDidLoad() above (see comment
+        // there): a release build must return the untouched descriptor even if
+        // a stored server target somehow exists in UserDefaults, since the
+        // plugin that could have written it is itself compiled out of Release.
+#if DEBUG
         guard descriptor.serverURL == nil,
               let target = ServerTargetPlugin.storedURL()
         else { return descriptor }
         descriptor.serverURL = target
+#endif
         return descriptor
     }
 
@@ -146,6 +168,41 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
         else { return }
 
         hideSplashScreen()
+
+#if DEBUG
+        // If a server target is stored, instanceDescriptor() above pointed the
+        // bridge's serverURL at that remote target, so loadedURL landing on
+        // the app's own local origin (bridge?.config.localURL) instead means
+        // Capacitor fell back to errorPath (capacitor-shell/offline.html)
+        // because the stored target stopped responding. offline.html is
+        // served from that local origin, where window.Capacitor is never
+        // injected -- Capacitor's plugin-dispatch bridge is scoped to the
+        // single origin it was created with (the stored target), the same
+        // reason hideSplashScreen() above has to be driven natively instead
+        // of over the bridge. So offline.html can never call
+        // ServerTarget.set({url: nil}) to clear itself, and the chooser
+        // (capacitor-shell/index.html) never loads again either, since it
+        // only shows up when NO target is stored. Without this, the only way
+        // out of a dead dev server is deleting the app.
+        //
+        // Clearing the stored target and reloading the bridge here drops the
+        // next launch on the chooser, and it cannot loop: once cleared,
+        // instanceDescriptor() leaves serverURL as the local origin, so
+        // "loadedURL is the local origin" becomes the NORMAL case -- but
+        // storedURL() is nil by then, so this block no longer fires.
+        //
+        // This also fires on a transient network failure against an
+        // otherwise valid staging target, bouncing the user back to the
+        // chooser. That is a deliberate, acceptable trade for a
+        // developer-only mechanism -- do not "fix" it to tell the two cases
+        // apart.
+        if let localURL = bridge?.config.localURL,
+           Self.hasSameOrigin(loadedURL, localURL),
+           ServerTargetPlugin.storedURL() != nil {
+            ServerTargetPlugin.clearStoredURL()
+            (UIApplication.shared.delegate as? AppDelegate)?.reloadBridge()
+        }
+#endif
     }
 
     private func hideSplashScreen() {

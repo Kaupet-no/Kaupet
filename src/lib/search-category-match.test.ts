@@ -33,7 +33,10 @@ const allFilters: CategoryFilter[] = [
     label_nb: "Karosseri",
     type: "select",
     unit: null,
-    options: [{ value: "stasjonsvogn", label_nb: "Stasjonsvogn" }],
+    options: [
+      { value: "stasjonsvogn", label_nb: "Stasjonsvogn" },
+      { value: "pickup", label_nb: "Pickup" },
+    ],
     sort_order: 0,
     is_primary: false,
     depends_on_key: null,
@@ -161,5 +164,34 @@ describe("suggestVehicleCategoryForTitle", () => {
       bilOgMc.id,
     );
     expect(result).toBeNull();
+  });
+
+  // Kodegjennomgangsfunn: "Pickup" er en karosserietikett, men også et vanlig
+  // norsk ord for gitar-/platespillerelement — ikke nok bevis alene for
+  // wizardens kostbare, ikke-ett-klikk-reverserbare forslag.
+  it("foreslår ingen kjøretøykategori for en tvetydig karosserietikett alene (Pickup til platespiller)", () => {
+    const result = suggestVehicleCategoryForTitle(
+      "Pickup til platespiller",
+      vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMc.id,
+    );
+    expect(result).toBeNull();
+  });
+
+  it("faller tilbake på merke+modell når karosserietiketten er tvetydig", () => {
+    const result = suggestVehicleCategoryForTitle(
+      "Volvo V70 pickup",
+      vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMc.id,
+    );
+    expect(result?.category_id).toBe("bil");
   });
 });

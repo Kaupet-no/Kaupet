@@ -165,6 +165,14 @@ export type TitleCategorySuggestion = {
   parent_name_nb: string | null;
 };
 
+/** Karosserietiketter som også er vanlige norske ord i helt andre
+ * varekategorier ("pickup" = gitar-/platespillerelement). I søkefeltet er
+ * et falskt treff et ett-klikk-reverserbart filter; her er det det
+ * CategoryConfirm ber selgeren godta, så disse alene er ikke nok bevis.
+ * ponytail: håndholdt liste mot dagens `body_type`-etiketter — vurder å
+ * flagge tvetydige alternativer i `category_filters` hvis den vokser. */
+const AMBIGUOUS_ATTRIBUTE_LABELS = new Set(["pickup", "kombi"]);
+
 /**
  * Client-side fallback for the "Ny annonse" wizard's title-to-category
  * suggestion (see use-listing-title-hints.ts): `suggest_category_for_title`
@@ -192,7 +200,10 @@ export type TitleCategorySuggestion = {
  * belonging to that brand. No matching model → return null (no suggestion),
  * which is strictly better than a confidently wrong one. The trade is a
  * missed suggestion for a legitimate model not yet in the catalog — vehicle
- * sellers normally go through the registration-number lookup anyway.
+ * sellers normally go through the registration-number lookup anyway. The
+ * same reasoning applies to the attribute branch: an ambiguous body-type
+ * label alone doesn't count as a match here, and falls back to the
+ * brand+model branch instead.
  */
 export function suggestVehicleCategoryForTitle<
   T extends { id: string; slug: string; name_nb: string; parent_id: string | null },
@@ -206,8 +217,13 @@ export function suggestVehicleCategoryForTitle<
   bilOgMcCategoryId: string | null,
 ): TitleCategorySuggestion | null {
   const attributeMatch = matchVehicleAttributeOptionPhrase(title, allFilters, categories);
-  const targetCategory = attributeMatch
-    ? (categories.find((c) => c.slug === attributeMatch.categorySlug) ?? null)
+  const usableAttributeMatch =
+    attributeMatch &&
+    AMBIGUOUS_ATTRIBUTE_LABELS.has(attributeMatch.matchedText.trim().toLowerCase())
+      ? null
+      : attributeMatch;
+  const targetCategory = usableAttributeMatch
+    ? (categories.find((c) => c.slug === usableAttributeMatch.categorySlug) ?? null)
     : (() => {
         const brandMatch = matchVehicleBrandPhrase(title, vehicleBrands);
         if (!brandMatch?.brandCategoryGroup) return null;

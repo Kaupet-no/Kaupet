@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Search, MessageCircle, Plus, X, LogIn } from "lucide-react";
+import { Search, MessageCircle, Plus, X, LogIn, Loader2 } from "lucide-react";
 import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { useEffect, useState } from "react";
 
@@ -27,7 +27,7 @@ function initials(name: string | null | undefined, fallback: string) {
 }
 
 export function AppBottomNav({ hidden }: { hidden?: boolean }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
@@ -133,7 +133,13 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
         {/* -mt-7 løfter FAB-en ut av bunnpillen. I railen står den i flyten
             som de andre — det er ingen kant å stikke opp av. */}
         <div className={rail ? itemClass : `-mt-7 ${itemClass}`}>
-          {user ? (
+          {authLoading ? (
+            <AuthPendingButton
+              label="Ny annonse"
+              className="h-16 w-16 bg-primary text-primary-foreground shadow-lg ring-4 ring-background"
+              iconClassName="size-8"
+            />
+          ) : user ? (
             <button
               type="button"
               aria-label={isOnNewAdPage ? "Avbryt" : "Ny annonse"}
@@ -171,7 +177,9 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
 
         {/* Meldinger */}
         <div className={itemClass}>
-          {user ? (
+          {authLoading ? (
+            <AuthPendingButton label="Meldinger" className="h-12 w-12 text-muted-foreground" />
+          ) : user ? (
             <div className="relative flex h-12 w-12 items-center justify-center">
               <MessagesButton isActive={isOnMeldinger} />
             </div>
@@ -198,7 +206,12 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
 
         {/* Bruker */}
         <div className={itemClass}>
-          {user ? (
+          {/* Se kommentaren i site-header.tsx: sesjonen er ikke kjent før
+              hydreringen har lest localStorage, og fram til da sa denne
+              fanen «Logg inn» til en innlogget bruker. */}
+          {authLoading ? (
+            <AuthPendingButton label="Konto" className="h-12 w-12 text-muted-foreground" />
+          ) : user ? (
             <UserAvatarButton userId={user.id} email={user.email ?? null} isActive={isOnMeg} />
           ) : (
             <Link
@@ -214,7 +227,10 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           <span
             className={`native-nav-label ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
-            {user ? "Meg" : "Logg inn"}
+            {/* Hardt mellomrom, ikke tom streng: etiketten skal reservere
+                linjehøyden sin, ellers blir kolonnen lavere enn naboene og
+                FAB-en flytter seg i de ~100 ms tilstanden varer. */}
+            {authLoading ? "\u00A0" : user ? "Meg" : "Logg inn"}
           </span>
         </div>
       </div>
@@ -229,6 +245,38 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
         </ResponsiveOverlayContent>
       </ResponsiveOverlay>
     </nav>
+  );
+}
+
+/** Plassholder for en bunnnav-knapp som ikke kan svare ennå.
+ *
+ * Sesjonen ligger i localStorage og er ukjent til hydreringen har lest den
+ * (~100 ms). Tidligere rendret disse knappene sin utloggede variant i det
+ * vinduet: «Logg inn»-fanen blinket for en innlogget bruker, og et trykk på
+ * «Ny annonse» eller «Meldinger» sendte henne til innloggingssiden i stedet
+ * for dit hun skulle. Her er knappen `disabled` — den fanger trykket uten å
+ * navigere feil — og spinneren sier at noe lastes, framfor å etterlate et
+ * tomt hull i menylinjen. Formen er identisk med den ferdige knappen, så
+ * ingenting hopper når svaret kommer. */
+export function AuthPendingButton({
+  label,
+  className,
+  iconClassName = "size-6",
+}: {
+  label: string;
+  className?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      aria-label={`${label} (laster)`}
+      aria-busy="true"
+      className={cn("flex items-center justify-center rounded-full", className)}
+    >
+      <Loader2 className={cn("animate-spin motion-reduce:animate-none", iconClassName)} />
+    </button>
   );
 }
 

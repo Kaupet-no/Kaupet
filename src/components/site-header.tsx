@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { useUnreadConversationsCount } from "@/hooks/use-unread";
@@ -27,7 +28,7 @@ export function HeaderSearchPortal({ children }: { children: ReactNode }) {
 }
 
 export function SiteHeader() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { data: businessMembership } = useBusinessMembership();
   const { openPanel } = useSearchPanel();
   const businessPlan =
@@ -75,7 +76,15 @@ export function SiteHeader() {
           >
             <Search className="size-5" />
           </Button>
-          {user ? (
+          {/* Sesjonen ligger i localStorage og kan ikke leses under SSR, så
+              serveren rendrer alltid den anonyme headeren. Uten denne
+              mellomtilstanden viste vi «Logg inn»/«Bli medlem» til en
+              innlogget bruker i ~100 ms etter første maling, helt til
+              hydreringen rakk å lese sesjonen — appen påsto altså at du var
+              logget ut. Vi venter heller med å svare til vi vet svaret. */}
+          {authLoading ? (
+            <Skeleton className="size-9 rounded-full" aria-hidden="true" />
+          ) : user ? (
             <>
               <NotificationsBell />
               <MessagesIconLink />

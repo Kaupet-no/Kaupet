@@ -793,7 +793,10 @@
     </script>
     <!-- Splashen skjules ikke lenger automatisk (launchAutoHide: false i
          capacitor.config.ts) — uten dette ville den blitt stående over
-         offline-siden når kaupet.no ikke svarer. -->
+         offline-siden når kaupet.no ikke svarer. Kallet under når kun fram
+         på iOS: window.Capacitor er undefined her på Android av samme grunn
+         som data-theme må injiseres nativt (se over). Android skjuler i
+         stedet splashen fra MainActivity.hideSplash(). -->
     <script>
       try {
         window.Capacitor &&

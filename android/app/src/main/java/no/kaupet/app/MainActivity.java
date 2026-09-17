@@ -8,12 +8,16 @@ import android.webkit.CookieManager;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.CapConfig;
+import com.capacitorjs.plugins.splashscreen.SplashScreenSettings;
+import com.getcapacitor.Logger;
+import com.getcapacitor.PluginHandle;
 import com.getcapacitor.WebViewListener;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.Locale;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -86,18 +90,56 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public void onPageCommitVisible(WebView view, String url) {
                     super.onPageCommitVisible(view, url);
-                    injectShellThemeIfLocal(view, url);
+                    if (!isLocalShellPage(url)) {
+                        return;
+                    }
+                    injectShellTheme(view);
+                    hideSplash();
                 }
             }
         );
     }
 
-    private void injectShellThemeIfLocal(WebView view, String url) {
+    private boolean isLocalShellPage(String url) {
         Uri uri = Uri.parse(url);
-        if (!getBridge().getScheme().equals(uri.getScheme()) || !getBridge().getHost().equals(uri.getHost())) {
-            return;
-        }
+        return getBridge().getScheme().equals(uri.getScheme()) && getBridge().getHost().equals(uri.getHost());
+    }
 
+    // The same origin-scoping hides the splash screen forever. With
+    // launchAutoHide: false the ONLY thing that ever dismisses the native
+    // splash is a SplashScreen.hide() call over the bridge — and the calls in
+    // offline.html and index.html are dead whenever the Bridge was created
+    // with a server.url, because these pages are on the local origin. A cold
+    // launch with no network then left the branded splash frozen on screen
+    // forever, over a correctly loaded offline page, with force-quit the only
+    // way out. Hiding here instead covers every local shell page: if one has
+    // painted, the splash has to go, bridge or no bridge.
+    private void hideSplash() {
+        try {
+            PluginHandle handle = getBridge().getPlugin("SplashScreen");
+            if (handle == null || handle.getInstance() == null) {
+                return;
+            }
+            // SplashScreenPlugin.hide() takes a PluginCall it reads settings
+            // from, and a PluginCall without a MessageHandler throws in
+            // resolve(). The underlying SplashScreen has an ordinary public
+            // hide(SplashScreenSettings), but the field holding it is private
+            // with no getter — one reflective lookup is the shortest way in.
+            // ponytail: tied to the field name in @capacitor/splash-screen;
+            // switch if the plugin ever gets a public native hide().
+            Field field = handle.getInstance().getClass().getDeclaredField("splashScreen");
+            field.setAccessible(true);
+            Object splashScreen = field.get(handle.getInstance());
+            if (splashScreen instanceof com.capacitorjs.plugins.splashscreen.SplashScreen) {
+                ((com.capacitorjs.plugins.splashscreen.SplashScreen) splashScreen).hide(new SplashScreenSettings());
+            }
+        } catch (Exception e) {
+            // Without this the splash stays up forever — log loudly.
+            Logger.error("Klarte ikke skjule splashen på en lokal shell-side", e);
+        }
+    }
+
+    private void injectShellTheme(WebView view) {
         SharedPreferences prefs = getSharedPreferences(ShellThemePlugin.PREFS, MODE_PRIVATE);
         if (!prefs.contains(ShellThemePlugin.KEY_DARK)) {
             // No known app choice yet (fresh install, theme never applied) —

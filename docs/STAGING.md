@@ -17,6 +17,22 @@ avsenderdomene, Resend-oppsett, redirect-lista under **Authentication → URL
 Configuration**, og applikasjonens egne varsel-e-poster. Staging og produksjon
 er separate Supabase-prosjekter og må konfigureres hver for seg.
 
+## Hvilket prosjekt peker nøkkelen på?
+
+Staging og produksjon er separate Supabase-prosjekter, og `.env` sier ikke
+selv hvilket den er satt opp mot — `VITE_ENVIRONMENT` og `PUBLIC_SITE_URL` kan
+stå tomme. Sjekk prosjektref-en i `SUPABASE_URL` før du kjører noe som
+skriver, og særlig før noe som sletter:
+
+| Miljø      | Prosjektref            |
+| ---------- | ---------------------- |
+| Staging    | `zpazmwzhvylptptygzlw` |
+| Produksjon | _fyll inn_             |
+
+Refsene er ikke hemmeligheter — de står i URL-en appen bruker. Poenget er at
+det skal være mulig å lese ut av repoet hvilken database man er koblet til,
+uten å måtte spørre noen.
+
 ## Auth security (produksjon)
 
 `supabase/config.toml` er kun lokal dev-config — de faktiske innstillingene

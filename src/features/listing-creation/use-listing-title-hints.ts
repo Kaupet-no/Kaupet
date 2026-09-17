@@ -72,7 +72,7 @@ export const SIMILAR_STOPWORDS = new Set([
   "pris",
 ]);
 
-type CategorySuggestion = {
+export type CategorySuggestion = {
   category_id: string;
   parent_id: string | null;
   name_nb: string;
@@ -103,6 +103,13 @@ export function useListingTitleHints(params: {
   attributes?: AttributeMap;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: (field: any, value: any, options?: any) => void;
+  /** Opaque, already-resolved category suggestion computed by the caller
+   * (e.g. a vehicle-brand/attribute match on the title — see
+   * suggestVehicleCategoryForTitle in search-category-match.ts) for when the
+   * `suggest_category_for_title` RPC below comes back empty. This hook stays
+   * vertical-agnostic: it only merges in whatever the caller already
+   * resolved, it never decides what a "vehicle" title looks like itself. */
+  clientCategoryHint?: CategorySuggestion | null;
 }) {
   const {
     title,
@@ -116,6 +123,7 @@ export function useListingTitleHints(params: {
     isFree,
     attributes,
     setValue,
+    clientCategoryHint,
   } = params;
 
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
@@ -134,7 +142,18 @@ export function useListingTitleHints(params: {
   // Avledet, ikke egen state: react-query beholder forrige `data` når spørringen
   // slås av, og et forslag skal forsvinne i samme øyeblikk brukeren velger
   // kategori selv eller lukker det.
-  const categorySuggestions = suggestionsMuted ? [] : (data ?? []);
+  const rpcSuggestions = data ?? [];
+  // `clientCategoryHint` er en siste utvei — RPC-ens stemme-/navnetreff får
+  // alltid forrang når de faktisk finner noe (f.eks. "sofa"-treffet mot
+  // kategorinavnet), og brukes kun når RPC-en kommer tilbake tom (f.eks.
+  // «Volvo V70 stasjonsvogn», der verken stemmer eller kategorinavn treffer).
+  const categorySuggestions = suggestionsMuted
+    ? []
+    : rpcSuggestions.length > 0
+      ? rpcSuggestions
+      : clientCategoryHint
+        ? [clientCategoryHint]
+        : [];
 
   /** `suggestedCategoryId` må være en av `categorySuggestions` sine id-er —
    * lar kalleren (category-confirm, eller «Bruk forslag»-chipen i

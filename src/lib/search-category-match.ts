@@ -1,4 +1,5 @@
-import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
+import type { CategoryFilter, CategoryNode, VehicleBrandGroup } from "@/lib/category-filters";
+import { vehicleCategoriesForBrandGroup } from "@/lib/category-filters";
 
 export type CategoryMatch = {
   matchedText: string;
@@ -155,6 +156,72 @@ export function matchVehicleAttributeOptionPhrase<
     }
   }
   return best;
+}
+
+export type TitleCategorySuggestion = {
+  category_id: string;
+  parent_id: string | null;
+  name_nb: string;
+  parent_name_nb: string | null;
+};
+
+/**
+ * Client-side fallback for the "Ny annonse" wizard's title-to-category
+ * suggestion (see use-listing-title-hints.ts): `suggest_category_for_title`
+ * (the RPC behind it) only matches free-text lexemes against historical
+ * listings and category *names*, so a vehicle title like "Volvo V70
+ * stasjonsvogn" — brand, model, no category name — never matches. Reuses the
+ * same brand/attribute matchers the search bar (annonser.tsx) already relies
+ * on for the identical problem, rather than teaching the RPC about brands.
+ *
+ * Tries the attribute match first (e.g. "Stasjonsvogn" → "Bil" directly,
+ * since that `body_type` option is category-exclusive) since it resolves to
+ * an exact leaf category. Falls back to a brand match (e.g. "Volvo" → the
+ * "car" group), which can span more than one category
+ * (`vehicleCategoriesForBrandGroup`) — when ambiguous, suggests the "Bil og
+ * MC" root itself rather than guessing a leaf; the wizard's CategoryConfirm
+ * step already collapses any all-under-"Bil og MC" suggestion set into a
+ * root-level confirmation (see isUnderBilOgMc there), so a root suggestion
+ * here degrades gracefully into that same flow.
+ */
+export function suggestVehicleCategoryForTitle<
+  T extends { id: string; slug: string; name_nb: string; parent_id: string | null },
+>(
+  title: string,
+  vehicleBrands: { name: string; category_group: VehicleBrandGroup }[],
+  allFilters: CategoryFilter[],
+  categories: T[],
+  categoriesById: Map<string, CategoryNode & { name_nb: string }>,
+  bilOgMcCategoryId: string | null,
+): TitleCategorySuggestion | null {
+  const attributeMatch = matchVehicleAttributeOptionPhrase(title, allFilters, categories);
+  const targetCategory = attributeMatch
+    ? (categories.find((c) => c.slug === attributeMatch.categorySlug) ?? null)
+    : (() => {
+        const brandMatch = matchVehicleBrandPhrase(title, vehicleBrands);
+        if (!brandMatch?.brandCategoryGroup) return null;
+        const candidates = vehicleCategoriesForBrandGroup(
+          brandMatch.brandCategoryGroup,
+          categories,
+          allFilters,
+          categoriesById,
+        );
+        if (candidates.length === 1) return candidates[0];
+        return bilOgMcCategoryId
+          ? (categories.find((c) => c.id === bilOgMcCategoryId) ?? null)
+          : null;
+      })();
+  if (!targetCategory) return null;
+
+  const parent = targetCategory.parent_id
+    ? categoriesById.get(targetCategory.parent_id)
+    : undefined;
+  return {
+    category_id: targetCategory.id,
+    parent_id: targetCategory.parent_id,
+    name_nb: targetCategory.name_nb,
+    parent_name_nb: parent?.name_nb ?? null,
+  };
 }
 
 /** Removes the matched category-name phrase from the raw query, keeping any

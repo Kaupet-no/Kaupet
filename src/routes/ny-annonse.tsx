@@ -29,6 +29,9 @@ import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
+import { suggestVehicleCategoryForTitle } from "@/lib/search-category-match";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
@@ -1012,6 +1015,39 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Fanger opp kjøretøytitler `suggest_category_for_title` (RPC-en bak
+  // useListingTitleHints) bommer på: den matcher kun mot historiske
+  // annonser og kategorinavn, så en tittel med bare merke/modell/karosseri
+  // ("Volvo V70 stasjonsvogn") gir ingen treff siden ingen kategori heter
+  // "Volvo". Gjenbruker søkets eksisterende merke-/attributtmatching
+  // (search-category-match.ts) som allerede løser akkurat dette for
+  // søkefeltet på /annonser — se suggestVehicleCategoryForTitle. Debounces
+  // på samme 400 ms som RPC-en for å unngå å flimre et annet forslag mens
+  // brukeren fortsatt skriver.
+  const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
+  const { data: vehicleBrands } = useAllVehicleBrands();
+  const clientCategoryHint = useMemo(
+    () =>
+      debouncedTitleForVehicleHint.length >= 5
+        ? suggestVehicleCategoryForTitle(
+            debouncedTitleForVehicleHint,
+            vehicleBrands ?? [],
+            allFilters ?? [],
+            categories ?? [],
+            categoriesById,
+            bilOgMcCategoryId,
+          )
+        : null,
+    [
+      debouncedTitleForVehicleHint,
+      vehicleBrands,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMcCategoryId,
+    ],
+  );
+
   const {
     categorySuggestions,
     categorySuggestionLoading,
@@ -1033,6 +1069,7 @@ function NewListingPage() {
     isFree,
     attributes,
     setValue,
+    clientCategoryHint,
   });
 
   async function goToNextPage(options?: {

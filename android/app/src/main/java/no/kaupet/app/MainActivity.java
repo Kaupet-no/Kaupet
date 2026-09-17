@@ -24,6 +24,10 @@ import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
 
+    // ponytail: fast tall, ikke en innstilling — ingen har bedt om å kunne
+    // stille på en siste skanse som aldri skal utløse i praksis.
+    private static final long SPLASH_SAFETY_VALVE_MS = 15_000;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // SoftHapticsPlugin, ServerTargetPlugin and ShellThemePlugin live in
@@ -90,14 +94,25 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public void onPageCommitVisible(WebView view, String url) {
                     super.onPageCommitVisible(view, url);
-                    if (!isLocalShellPage(url)) {
-                        return;
+                    if (isLocalShellPage(url)) {
+                        injectShellTheme(view);
                     }
-                    injectShellTheme(view);
-                    hideSplash();
+                    if (!isBridgeOrigin(url)) {
+                        hideSplash();
+                    }
                 }
             }
         );
+
+        // Siste skanse: sjekken over dekker enhver side som har MALT på en
+        // fremmed origin, men ikke en app-origin som svarer med noe SPA-en
+        // aldri booter fra (en 5xx-side fra kaupet.no selv, en JS-bunt som
+        // ikke laster). errorPath fanger bare nettverksfeil, ikke
+        // HTTP-feilsider. Med launchAutoHide: false finnes det ellers ingen
+        // vei ut av en frossen splash enn å tvangsavslutte appen. Ventilen er
+        // bevisst romslig: en normal kaldstart har malt og skjult splashen for
+        // lengst, så dette er aldri ventetiden funn 3.8 fjernet.
+        getBridge().getWebView().postDelayed(this::hideSplash, SPLASH_SAFETY_VALVE_MS);
     }
 
     private boolean isLocalShellPage(String url) {
@@ -105,15 +120,33 @@ public class MainActivity extends BridgeActivity {
         return getBridge().getScheme().equals(uri.getScheme()) && getBridge().getHost().equals(uri.getHost());
     }
 
+    // The origin the Bridge was created with — server.url's origin when one
+    // is set, otherwise the local https://localhost. Capacitor scopes its
+    // plugin-dispatch injection to exactly this origin (Bridge.loadWebView),
+    // so it is also the only origin a SplashScreen.hide() over the bridge can
+    // ever arrive from.
+    private boolean isBridgeOrigin(String url) {
+        Uri page = Uri.parse(url);
+        Uri bridge = Uri.parse(getBridge().getLocalUrl());
+        return (
+            bridge.getScheme() != null &&
+            bridge.getScheme().equals(page.getScheme()) &&
+            bridge.getAuthority() != null &&
+            bridge.getAuthority().equals(page.getAuthority())
+        );
+    }
+
     // The same origin-scoping hides the splash screen forever. With
     // launchAutoHide: false the ONLY thing that ever dismisses the native
-    // splash is a SplashScreen.hide() call over the bridge — and the calls in
-    // offline.html and index.html are dead whenever the Bridge was created
-    // with a server.url, because these pages are on the local origin. A cold
-    // launch with no network then left the branded splash frozen on screen
-    // forever, over a correctly loaded offline page, with force-quit the only
-    // way out. Hiding here instead covers every local shell page: if one has
-    // painted, the splash has to go, bridge or no bridge.
+    // splash is a SplashScreen.hide() call over the bridge, and that bridge is
+    // scoped to the single origin it was created with. Every page outside that
+    // origin is therefore mute: offline.html and index.html on the local
+    // origin once a server.url is set (F19, cold launch with no network), but
+    // equally Cloudflare Access' login wall on staging, any OAuth redirect and
+    // any error page served by a proxy in between — each one left the branded
+    // splash frozen on top with force-quit the only way out. The rule is the
+    // origin, not the page: if something painted that the bridge can never
+    // hear from, the splash has to go.
     private void hideSplash() {
         try {
             PluginHandle handle = getBridge().getPlugin("SplashScreen");
@@ -135,7 +168,7 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception e) {
             // Without this the splash stays up forever — log loudly.
-            Logger.error("Klarte ikke skjule splashen på en lokal shell-side", e);
+            Logger.error("Klarte ikke skjule splashen", e);
         }
     }
 

@@ -23,6 +23,7 @@ export type PreviewDraft = {
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;
   category: ListingDetailViewCategory;
+  categoryId: string | null;
   images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;

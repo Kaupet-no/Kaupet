@@ -1395,6 +1395,7 @@ function NewListingPage() {
       category: categoryNode
         ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
         : null,
+      categoryId: categoryId ?? null,
       images: images.map((img, i) => ({
         storage_path: String(i),
         sort_order: i,

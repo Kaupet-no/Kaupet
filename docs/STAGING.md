@@ -30,7 +30,16 @@ og hold disse verdiene i produksjon (se docs/SIKKERHETSVURDERING.md L-15):
 - **Turnstile-captcha: aktivert** for signup/passordtilbakestilling.
 - **«Leaked password protection» (HIBP): på.**
 - **`minimum_password_length`: minst 10** — matcher `passwordSchema` i
-  `src/lib/auth-schemas.ts`.
+  `src/lib/auth-schemas.ts`. Merk at `passwordSchema` kun er klientvalidering:
+  håndheves ikke lengden også i dashbordet, kan et direkte API-kall utenom
+  appen sette et kortere passord.
+
+**Kontoer under kravet:** Supabase håndhever ikke minstelengden retroaktivt.
+Kontoer opprettet før kravet ble slått på — deriblant testkontoene fra
+sluttbrukertesten 2026-09-16, som har åtte tegn — fortsetter å fungere med
+korte passord. Dette er en bevisst, akseptert begrensning: kohorten er
+testkontoer, og en tvungen nullstilling ville krevd egen flyt. Vurder på nytt
+hvis brukerbasen vokser før policyen får virke.
 
 ## Testing
 

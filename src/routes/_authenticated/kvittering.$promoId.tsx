@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/kvittering/$promoId")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Kvittering — Kaupet.no" },

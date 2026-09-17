@@ -76,12 +76,18 @@ export function SiteHeader() {
           >
             <Search className="size-5" />
           </Button>
-          {/* Sesjonen ligger i localStorage og kan ikke leses under SSR, så
-              serveren rendrer alltid den anonyme headeren. Uten denne
+          {/* Sesjonen ligger nå i informasjonskapsler, så serveren kjenner
+              auth-tilstanden og seeder AuthProvider (se __root.tsx). Da er
+              authLoading allerede false ved første maling, og riktig variant
+              — brukermeny eller «Logg inn»/«Bli medlem» — ligger i
+              SSR-svaret.
+
+              Skjelettet beholdes for tilfellene der serveren ikke har avgjort
+              tilstanden (klientnavigasjon, og ruter uten SSR). Uten den
               mellomtilstanden viste vi «Logg inn»/«Bli medlem» til en
-              innlogget bruker i ~100 ms etter første maling, helt til
-              hydreringen rakk å lese sesjonen — appen påsto altså at du var
-              logget ut. Vi venter heller med å svare til vi vet svaret. */}
+              innlogget bruker i ~100 ms etter første maling — appen påsto
+              altså at du var logget ut. Vi venter heller med å svare til vi
+              vet svaret. */}
           {authLoading ? (
             <Skeleton className="size-9 rounded-full" aria-hidden="true" />
           ) : user ? (

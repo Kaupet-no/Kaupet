@@ -2,11 +2,28 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthContext } from "@/hooks/use-auth";
+import type { SessionUser } from "@/lib/current-user.functions";
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+/** `initialUser` kommer fra serveren, som nå kan lese sesjonen fra kapselen
+ * (se __root.tsx). Med den satt vet vi auth-tilstanden allerede ved første
+ * maling, så headeren slipper skjelett-mellomtilstanden og brukermenyen
+ * ligger i SSR-svaret. `undefined` betyr "ikke avgjort av serveren" — da
+ * beholder vi den gamle oppførselen og venter på klienten.
+ *
+ * Bare `user` og `loading` konsumeres av useAuth()-brukerne; `session` fylles
+ * fortsatt først på klienten, siden ingen leser den. */
+export function AuthProvider({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  initialUser?: SessionUser | null;
+}) {
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(
+    initialUser ? ({ id: initialUser.id, email: initialUser.email ?? undefined } as User) : null,
+  );
+  const [loading, setLoading] = useState(initialUser === undefined);
 
   useEffect(() => {
     const {

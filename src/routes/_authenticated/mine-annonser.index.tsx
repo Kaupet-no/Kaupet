@@ -8,6 +8,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { republishListing } from "@/lib/listings.functions";
+import { getMyListingRows } from "@/lib/my-listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
@@ -39,10 +40,14 @@ import { isVehicleCategory } from "@/lib/category-filters";
 import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { ListingRow, type Row } from "@/features/my-listings/listing-row";
+import { ListingRow } from "@/features/my-listings/listing-row";
 import { NewListingDialog } from "@/components/new-listing-dialog";
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/")({
+  // Annonsene hentes på serveren slik at siden har innhold ved første maling.
+  // Uten denne lå de i en useQuery som først kjørte etter hydrering, og body
+  // var tom til da.
+  loader: () => getMyListingRows(),
   head: () => ({
     meta: [
       { title: "Mine annonser — Kaupet.no" },
@@ -116,55 +121,15 @@ function MyListingsPage() {
     }
   }
 
+  // Serveren har allerede hentet radene (se loader over). initialData gjør at
+  // første render — også server-renderet — har dataene, mens TanStack Query
+  // fortsatt eier invalidering etter mutasjoner.
+  const initialRows = Route.useLoaderData();
+  const fetchMyListings = useServerFn(getMyListingRows);
   const { data: rows, isLoading } = useQuery({
     queryKey: ["my-listings"],
-    queryFn: async (): Promise<Row[]> => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) return [];
-      const { data, error } = await supabase
-        .from("listings")
-        .select(
-          "id, kaupet_code, title, description, category_id, status, price_nok, is_free, attributes, city, created_at, expires_at, listing_images(storage_path, sort_order), categories(slug)",
-        )
-        .eq("seller_id", userId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      const { data: counts, error: countsError } = await supabase.rpc("my_listing_counts");
-      if (countsError) throw countsError;
-      const countMap = new Map<string, { views: number; favs: number }>();
-      for (const c of counts ?? []) {
-        countMap.set(c.listing_id, {
-          views: Number(c.view_count ?? 0),
-          favs: Number(c.favorite_count ?? 0),
-        });
-      }
-      return (data ?? []).map((l) => {
-        const cover =
-          (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
-            ?.storage_path ?? null;
-        const c = countMap.get(l.id);
-        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
-        return {
-          id: l.id,
-          kaupet_code: l.kaupet_code,
-          title: l.title,
-          status: l.status as Row["status"],
-          price_nok: l.price_nok,
-          is_free: l.is_free,
-          city: l.city,
-          category_id: l.category_id ?? null,
-          category_slug: category?.slug ?? null,
-          attributes: (l.attributes ?? null) as Record<string, unknown> | null,
-          description: l.description ?? null,
-          view_count: c?.views ?? 0,
-          favorite_count: c?.favs ?? 0,
-          created_at: l.created_at,
-          expires_at: l.expires_at,
-          cover_path: cover,
-        };
-      });
-    },
+    queryFn: () => fetchMyListings(),
+    initialData: initialRows,
   });
 
   const deleteListing = useMutation({

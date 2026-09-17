@@ -16,6 +16,7 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
+import { getSessionUser } from "@/lib/current-user.functions";
 import { clearSignedUrlCaches } from "@/lib/storage";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { initOfflineWatcher } from "@/lib/native-offline";
@@ -92,6 +93,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Leser sesjonen fra kapselen på serveren, slik at headeren kan rendres med
+  // riktig auth-tilstand ved første maling i stedet for et skjelett. På
+  // klienten lar vi AuthProvider finne sesjonen selv (den er lokal og
+  // umiddelbar) — da slipper vi et RPC-hopp per navigasjon.
+  loader: async () => ({
+    ssrUser: typeof window === "undefined" ? await getSessionUser() : undefined,
+  }),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -216,6 +224,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { ssrUser } = Route.useLoaderData();
   const router = useRouter();
 
   useEffect(() => {
@@ -273,7 +282,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
+        <AuthProvider initialUser={ssrUser}>
           <RootBody native={native} />
           <Toaster />
         </AuthProvider>

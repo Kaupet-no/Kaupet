@@ -12,6 +12,10 @@ import { formatErrorMessage } from "@/lib/errors";
 const MAX_ATTEMPTS = 15; // ~30s med 2s mellomrom
 
 export const Route = createFileRoute("/_authenticated/bekrefter/$promoId")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Bekrefter betaling — Kaupet.no" },

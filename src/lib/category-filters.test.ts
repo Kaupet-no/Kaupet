@@ -113,6 +113,17 @@ describe("getMissingRequiredFilters", () => {
     ).toEqual([]);
   });
 
+  it("does not require an is_optional cm dimension left unset", () => {
+    const filters = [
+      f({ category_id: "sub", key: "width_cm", type: "number", is_optional: true }),
+      f({ category_id: "sub", key: "material", type: "select" }),
+    ];
+
+    expect(getMissingRequiredFilters("sub", filters, byId, { material: "tre" })).toEqual([]);
+    expect(getMissingRequiredFilters("sub", filters, byId, {})).toHaveLength(1);
+    expect(getMissingRequiredFilters("sub", filters, byId, {})[0].key).toBe("material");
+  });
+
   it("requires compatible models only for a specific-fitment listing", () => {
     const filters = [
       f({

@@ -1,9 +1,22 @@
 import { useState } from "react";
 import { Laptop } from "lucide-react";
+import { registerPlugin } from "@capacitor/core";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { STAGING_HOST } from "@/hooks/use-should-show-dev-server-switch";
 import { localDevServerUrl } from "@/lib/dev-server-url";
+
+interface ServerTargetPlugin {
+  set(options: { url: string | null }): Promise<void>;
+}
+
+// Bridges to android/app/.../ServerTargetPlugin.java. Persists the choice
+// natively and restarts the activity so the next Bridge is created with
+// server.url already pointing at the target — see MainActivity.onCreate and
+// the comment on this same plugin call in capacitor-shell/index.html for why
+// that (not a WebView redirect to the shell) is what keeps native plugins
+// working after a server switch.
+const ServerTarget = registerPlugin<ServerTargetPlugin>("ServerTarget");
 
 export function DevServerSwitch() {
   const currentHost = window.location.host;
@@ -17,15 +30,11 @@ export function DevServerSwitch() {
       setError("Bruk localhost eller en privat IP-adresse med port.");
       return;
     }
-    // Via skallet (capacitor-shell/index.html, servert på androidScheme
-    // "https://localhost/") i stedet for direkte navigering, slik at
-    // valget lagres og brukes igjen på neste kaldstart — se STORAGE_KEY
-    // der.
-    window.location.assign(`https://localhost/index.html?target=${url.host}`);
+    void ServerTarget.set({ url: url.href });
   };
 
   const backToStaging = () => {
-    window.location.assign("https://localhost/index.html?target=staging");
+    void ServerTarget.set({ url: "https://staging.kaupet.no" });
   };
 
   return (

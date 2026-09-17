@@ -24,30 +24,39 @@ const config: CapacitorConfig = {
     errorPath: "offline.html",
     // Staging may connect to a local private-network dev server, but never
     // grants the production app a wildcard navigation target.
+    //
+    // Every IPv4 mask below has all four dot-separated octets ("10.*.*.*",
+    // not "10.*"). Capacitor's host matcher (HostMask.Simple.matches in
+    // @capacitor/android/.../util/HostMask.java) rejects a match outright
+    // when the mask has more than one part and its part count doesn't equal
+    // the host's part count — "10.*" (2 parts) can never match "10.0.2.2"
+    // (4 parts), no matter the octet values. Confirmed via logcat on the
+    // emulator's host alias (10.0.2.2): Android fell through to opening
+    // Chrome instead of navigating the WebView.
     cleartext: isStaging,
     allowNavigation: isStaging
       ? [
           "staging.kaupet.no",
           "*.cloudflareaccess.com",
           "localhost",
-          "10.*",
-          "172.16.*",
-          "172.17.*",
-          "172.18.*",
-          "172.19.*",
-          "172.20.*",
-          "172.21.*",
-          "172.22.*",
-          "172.23.*",
-          "172.24.*",
-          "172.25.*",
-          "172.26.*",
-          "172.27.*",
-          "172.28.*",
-          "172.29.*",
-          "172.30.*",
-          "172.31.*",
-          "192.168.*",
+          "10.*.*.*",
+          "172.16.*.*",
+          "172.17.*.*",
+          "172.18.*.*",
+          "172.19.*.*",
+          "172.20.*.*",
+          "172.21.*.*",
+          "172.22.*.*",
+          "172.23.*.*",
+          "172.24.*.*",
+          "172.25.*.*",
+          "172.26.*.*",
+          "172.27.*.*",
+          "172.28.*.*",
+          "172.29.*.*",
+          "172.30.*.*",
+          "172.31.*.*",
+          "192.168.*.*",
         ]
       : undefined,
     androidScheme: "https",
@@ -93,6 +102,14 @@ const config: CapacitorConfig = {
       style: "LIGHT",
       backgroundColor: "#fbf9f3",
       overlaysWebView: false,
+    },
+    // The edge-to-edge-aware replacement for StatusBar on Android 15+
+    // (targetSdk 35+, see android/variables.gradle) — see the comment on
+    // syncStatusBarTheme in src/lib/native-setup.ts for why both are needed.
+    // Matches StatusBar's default so cold start doesn't flash the wrong
+    // icon color before ThemeProvider's effect runs.
+    SystemBars: {
+      style: "LIGHT",
     },
   },
 };

@@ -122,9 +122,6 @@
       />
       <div class="error" id="ip-error">Bruk localhost eller en privat IP-adresse med port.</div>
       <button id="ip-btn" type="button">Koble til lokal server</button>
-      <button id="switch-btn" type="button" style="display: none; margin-top: 4px">
-        Bytt server
-      </button>
     </div>
     <script>
       // Native splash (launchAutoHide: false, se capacitor.config.ts) skjules
@@ -135,8 +132,6 @@
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) {
         window.Capacitor.Plugins.SplashScreen.hide().catch(function () {});
       }
-
-      var STORAGE_KEY = "kaupet_backend_target";
 
       function localDevServerUrl(address) {
         var match = address.trim().match(/^(localhost|\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/);
@@ -174,9 +169,18 @@
         return url;
       }
 
-      function goToStaging() {
-        localStorage.setItem(STORAGE_KEY, "staging");
-        window.location.replace("https://staging.kaupet.no");
+      // Persists the choice natively (SharedPreferences, via
+      // ServerTargetPlugin — android/app/.../ServerTargetPlugin.java) and
+      // restarts the activity, instead of redirecting this WebView there.
+      // The next Bridge is then created with server.url already set to the
+      // target, so Capacitor's plugin-dispatch JS injection (scoped to the
+      // origin the Bridge was created with) actually applies on staging —
+      // see MainActivity.onCreate for why a runtime redirect never got it.
+      function setServerTarget(url) {
+        if (!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ServerTarget)) {
+          return;
+        }
+        window.Capacitor.Plugins.ServerTarget.set({ url: url }).catch(function () {});
       }
 
       function androidNavigationUrl(url) {
@@ -194,52 +198,20 @@
         return url;
       }
 
-      function goToLocal(url) {
-        localStorage.setItem(STORAGE_KEY, url.href);
-        window.location.replace(androidNavigationUrl(url).href);
-      }
-
-      // DevServerSwitch (Meg-panelet) navigerer hit igjen med ?target=
-      // for å oppdatere det lagrede valget før den fortsetter videre dit.
-      var params = new URLSearchParams(window.location.search);
-      var target = params.get("target");
-      if (target === "staging") {
-        goToStaging();
-      } else if (target) {
-        var url = localDevServerUrl(target);
-        if (url) goToLocal(url);
-      } else {
-        var saved = localStorage.getItem(STORAGE_KEY);
-        document.getElementById("staging-btn").addEventListener("click", goToStaging);
-        document.getElementById("ip-btn").addEventListener("click", function () {
-          var input = document.getElementById("ip-input");
-          var url = localDevServerUrl(input.value);
-          var error = document.getElementById("ip-error");
-          if (!url) {
-            error.style.display = "block";
-            return;
-          }
-          error.style.display = "none";
-          goToLocal(url);
-        });
-
-        if (saved) {
-          // Husket valg: naviger dit automatisk, men gi et kort vindu til å
-          // trykke "Bytt server" — ellers sitter man fast på et gammelt
-          // localStorage-valg for alltid, siden WebView-data overlever
-          // APK-reinstallasjoner.
-          var switchBtn = document.getElementById("switch-btn");
-          switchBtn.style.display = "block";
-          var redirectTimer = setTimeout(function () {
-            if (saved === "staging") goToStaging();
-            else window.location.replace(androidNavigationUrl(new URL(saved)).href);
-          }, 600);
-          switchBtn.addEventListener("click", function () {
-            clearTimeout(redirectTimer);
-            switchBtn.style.display = "none";
-          });
+      document.getElementById("staging-btn").addEventListener("click", function () {
+        setServerTarget("https://staging.kaupet.no");
+      });
+      document.getElementById("ip-btn").addEventListener("click", function () {
+        var input = document.getElementById("ip-input");
+        var url = localDevServerUrl(input.value);
+        var error = document.getElementById("ip-error");
+        if (!url) {
+          error.style.display = "block";
+          return;
         }
-      }
+        error.style.display = "none";
+        setServerTarget(androidNavigationUrl(url).href);
+      });
     </script>
   </body>
 </html>

@@ -115,6 +115,22 @@ public class MainActivity extends BridgeActivity {
         getBridge().getWebView().postDelayed(this::hideSplash, SPLASH_SAFETY_VALVE_MS);
     }
 
+    // Sesjonen ligger i en informasjonskapsel (se
+    // src/integrations/supabase/client.ts). WebView holder kapsler i minnet og
+    // skriver dem til disk først ved CookieManager.flush() — i motsetning til
+    // localStorage, som den persisterte selv. Uten denne flushen mistet appen
+    // sesjonen ved omstart: verifisert i emulator, der innlogget bruker kom
+    // tilbake som utlogget etter at prosessen ble drept.
+    //
+    // onPause er det siste punktet vi garantert får før prosessen kan bli
+    // avlivet. Dette endrer ikke tredjepartskapsel-avveiningen i onCreate.
+    @Override
+    public void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();
+    }
+
+
     private boolean isLocalShellPage(String url) {
         Uri uri = Uri.parse(url);
         return getBridge().getScheme().equals(uri.getScheme()) && getBridge().getHost().equals(uri.getHost());

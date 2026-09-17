@@ -30,7 +30,7 @@ import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lo
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { suggestVehicleCategoryForTitle } from "@/lib/search-category-match";
-import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import { getCategoryBehavior } from "@/lib/category-behavior";
@@ -1026,12 +1026,17 @@ function NewListingPage() {
   // brukeren fortsatt skriver.
   const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
   const { data: vehicleBrands } = useAllVehicleBrands();
+  // Samme react-query-cache-oppføring som useVehicleLookupFlow (kalt lenger
+  // ned på denne siden) allerede henter via useAllVehicleModels — ingen
+  // ekstra nettverkskall her.
+  const { data: vehicleModels } = useAllVehicleModels();
   const clientCategoryHint = useMemo(
     () =>
       debouncedTitleForVehicleHint.length >= 5
         ? suggestVehicleCategoryForTitle(
             debouncedTitleForVehicleHint,
             vehicleBrands ?? [],
+            vehicleModels ?? [],
             allFilters ?? [],
             categories ?? [],
             categoriesById,
@@ -1041,6 +1046,7 @@ function NewListingPage() {
     [
       debouncedTitleForVehicleHint,
       vehicleBrands,
+      vehicleModels,
       allFilters,
       categories,
       categoriesById,

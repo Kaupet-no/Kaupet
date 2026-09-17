@@ -73,13 +73,15 @@ const allFilters: CategoryFilter[] = [
   },
 ];
 
-const vehicleBrands = [{ name: "Volvo", category_group: "bil" as const }];
+const vehicleBrands = [{ id: "volvo", name: "Volvo", category_group: "bil" as const }];
+const vehicleModels = [{ brand_id: "volvo", name: "V70" }];
 
 describe("suggestVehicleCategoryForTitle", () => {
   it("resolves a body-type attribute match straight to the exact leaf category (F6)", () => {
     const result = suggestVehicleCategoryForTitle(
       "Volvo V70 stasjonsvogn",
       vehicleBrands,
+      vehicleModels,
       allFilters,
       categories,
       categoriesById,
@@ -97,6 +99,7 @@ describe("suggestVehicleCategoryForTitle", () => {
     const result = suggestVehicleCategoryForTitle(
       "Volvo V70 automat",
       vehicleBrands,
+      vehicleModels,
       allFilters,
       categories,
       categoriesById,
@@ -106,14 +109,18 @@ describe("suggestVehicleCategoryForTitle", () => {
   });
 
   it("suggests the Bil og MC root when a brand group spans more than one category", () => {
-    const ambiguousBrands = [{ name: "Piaggio", category_group: "moped_atv" as const }];
+    const ambiguousBrands = [
+      { id: "piaggio", name: "Piaggio", category_group: "moped_atv" as const },
+    ];
+    const ambiguousModels = [{ brand_id: "piaggio", name: "Liberty" }];
     const ambiguousFilters: CategoryFilter[] = [
       { ...allFilters[1], id: "f-a", category_id: "bil", unit: "moped_atv" },
       { ...allFilters[2], id: "f-b", category_id: "mc", unit: "moped_atv" },
     ];
     const result = suggestVehicleCategoryForTitle(
-      "Piaggio scooter",
+      "Piaggio Liberty scooter",
       ambiguousBrands,
+      ambiguousModels,
       ambiguousFilters,
       categories,
       categoriesById,
@@ -126,6 +133,28 @@ describe("suggestVehicleCategoryForTitle", () => {
     const result = suggestVehicleCategoryForTitle(
       "Sluttbrukertest sofa i grå ull",
       vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMc.id,
+    );
+    expect(result).toBeNull();
+  });
+
+  // Kodegjennomgangsfunn: en tittel som treffer et kjøretøymerke, men ingen
+  // modell av det merket, må IKKE foreslå en kjøretøykategori — mange
+  // merkenavn er også vanlige ord eller kjente ikke-kjøretøy-produktmerker
+  // (f.eks. "Yamaha" på tastaturer/høyttalere), og et forslag her er ikke en
+  // ett-klikk-reverserbar filter slik det er i søkefeltet, men det
+  // CategoryConfirm-steget ber selgeren godta.
+  it("does not suggest a vehicle category for a brand match with no matching model (Yamaha keyboard)", () => {
+    const yamahaBrands = [{ id: "yamaha", name: "Yamaha", category_group: "motorsykkel" as const }];
+    const yamahaModels = [{ brand_id: "yamaha", name: "MT-07" }];
+    const result = suggestVehicleCategoryForTitle(
+      "Yamaha keyboard P-125",
+      yamahaBrands,
+      yamahaModels,
       allFilters,
       categories,
       categoriesById,

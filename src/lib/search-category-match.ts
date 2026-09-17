@@ -183,12 +183,23 @@ export type TitleCategorySuggestion = {
  * step already collapses any all-under-"Bil og MC" suggestion set into a
  * root-level confirmation (see isUnderBilOgMc there), so a root suggestion
  * here degrades gracefully into that same flow.
+ *
+ * Unlike the search bar, a wrong suggestion here isn't a one-tap-reversible
+ * filter — it's what CategoryConfirm asks the seller to accept. Many vehicle
+ * brand names double as ordinary words or non-vehicle product brands (e.g.
+ * "Yamaha keyboard P-125"), so a bare brand match is not enough evidence:
+ * the brand branch additionally requires a whole-word match of a known model
+ * belonging to that brand. No matching model → return null (no suggestion),
+ * which is strictly better than a confidently wrong one. The trade is a
+ * missed suggestion for a legitimate model not yet in the catalog — vehicle
+ * sellers normally go through the registration-number lookup anyway.
  */
 export function suggestVehicleCategoryForTitle<
   T extends { id: string; slug: string; name_nb: string; parent_id: string | null },
 >(
   title: string,
-  vehicleBrands: { name: string; category_group: VehicleBrandGroup }[],
+  vehicleBrands: { id: string; name: string; category_group: VehicleBrandGroup }[],
+  vehicleModels: { brand_id: string; name: string }[],
   allFilters: CategoryFilter[],
   categories: T[],
   categoriesById: Map<string, CategoryNode & { name_nb: string }>,
@@ -200,6 +211,16 @@ export function suggestVehicleCategoryForTitle<
     : (() => {
         const brandMatch = matchVehicleBrandPhrase(title, vehicleBrands);
         if (!brandMatch?.brandCategoryGroup) return null;
+        const matchedBrandIds = vehicleBrands
+          .filter((b) => b.name.trim().toLowerCase() === brandMatch.matchedText.toLowerCase())
+          .map((b) => b.id);
+        const hasModelMatch = vehicleModels.some((m) => {
+          if (!matchedBrandIds.includes(m.brand_id)) return false;
+          const name = m.name.trim();
+          if (name.length < 2) return false;
+          return new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(title);
+        });
+        if (!hasModelMatch) return null;
         const candidates = vehicleCategoriesForBrandGroup(
           brandMatch.brandCategoryGroup,
           categories,

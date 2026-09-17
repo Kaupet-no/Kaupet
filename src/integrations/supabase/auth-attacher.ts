@@ -18,6 +18,14 @@ import { supabase } from "./client";
 // til å lese sesjonen fra kapselen.
 export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
   async ({ next }) => {
+    // Denne client-middlewaren kjører også når en serverfunksjon kalles
+    // in-process under SSR. Da finnes ingen nettleser-sesjon å feste, og å
+    // røre `supabase` her ville konstruert NETTLESER-klienten på serveren —
+    // som kaster hvis Supabase-miljøvariablene mangler, og dermed 500-et hele
+    // siden. Siden rot-loaderen kaller en serverfunksjon på hver side, gjaldt
+    // det all SSR. Serveren leser uansett sesjonen fra kapselen selv.
+    if (typeof window === "undefined") return next();
+
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     return next({

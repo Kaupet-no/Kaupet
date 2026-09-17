@@ -11,6 +11,12 @@ export type SessionUser = { id: string; email: string | null };
  * det er ett nettverkshopp mindre enn å gå via denne. */
 export const getSessionUser = createServerFn({ method: "GET" }).handler(
   async (): Promise<SessionUser | null> => {
+    // Kjører i rot-loaderen på HVER side. Uten Supabase-konfig finnes det per
+    // definisjon ingen sesjon, så vi rendrer utlogget i stedet for å kaste og
+    // ta ned hele siden. Smoke-testen i CI kjører den bygde workeren uten
+    // secrets nettopp for å fange at `/` slutter å svare 200.
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_PUBLISHABLE_KEY) return null;
+
     const supabase = getSupabaseServerClient();
 
     // getClaims() verifiserer tokenet lokalt mot JWKS (prosjektet signerer med

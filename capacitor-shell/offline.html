@@ -84,7 +84,10 @@
         justify-content: center;
         padding: 24px;
         padding-top: max(24px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
-        padding-bottom: max(24px, calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))));
+        padding-bottom: max(
+          24px,
+          calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+        );
         touch-action: manipulation;
         -webkit-user-select: none;
         user-select: none;
@@ -244,7 +247,10 @@
         bottom: 0;
         z-index: 50;
         padding: 0 12px;
-        padding-bottom: max(0.5rem, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+        padding-bottom: max(
+          0.5rem,
+          var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
+        );
         pointer-events: none;
       }
       .bottom-nav__bar {

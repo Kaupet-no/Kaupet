@@ -177,7 +177,11 @@
       // origin the Bridge was created with) actually applies on staging —
       // see MainActivity.onCreate for why a runtime redirect never got it.
       function setServerTarget(url) {
-        if (!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ServerTarget)) {
+        if (!(
+          window.Capacitor &&
+          window.Capacitor.Plugins &&
+          window.Capacitor.Plugins.ServerTarget
+        )) {
           return;
         }
         window.Capacitor.Plugins.ServerTarget.set({ url: url }).catch(function () {});

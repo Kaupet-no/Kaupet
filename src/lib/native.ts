@@ -40,12 +40,16 @@ export function hideNativeBootSplash(): void {
   // Den *native* splashen henger igjen til den skjules eksplisitt (se
   // capacitor.config.ts, der launchShowDuration kun er en siste skanse på
   // 15 s) — det er nettopp derfor den kan skjules her, i det appen har malt,
-  // i stedet for etter 2s fast.
-  void import("@capacitor/splash-screen")
-    .then(({ SplashScreen }) => SplashScreen.hide())
-    .catch(() => {
-      /* plugin unavailable (web) */
-    });
+  // i stedet for etter 2s fast. Importen gates på isNative() for å unngå et
+  // ubrukt chunk-hent på hver vanlig web-sidelast; overlay-opprydningen under
+  // kjører likevel ubetinget, siden ?forcenative trenger den uten Capacitor.
+  if (isNative()) {
+    void import("@capacitor/splash-screen")
+      .then(({ SplashScreen }) => SplashScreen.hide())
+      .catch(() => {
+        /* plugin unavailable (web) */
+      });
+  }
 
   const el = document.getElementById("native-boot-splash");
   document.documentElement.classList.remove("native-boot");

@@ -136,6 +136,7 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
 #if DEBUG
         assert(Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "https://kaupet.no:443/path")!))
         assert(!Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "capacitor://localhost/offline")!))
+        assert(!Self.hasSameOrigin(URL(string: "https://staging.kaupet.no")!, URL(string: "https://kaupet.cloudflareaccess.com")!))
 #endif
     }
 
@@ -163,9 +164,13 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
             message.name == Self.documentReadyHandler,
             let href = message.body as? String,
             let loadedURL = URL(string: href),
-            let appURL = bridge?.config.serverURL,
-            !Self.hasSameOrigin(loadedURL, appURL)
+            let appURL = bridge?.config.serverURL
         else { return }
+
+        if Self.hasSameOrigin(loadedURL, appURL) {
+            (UIApplication.shared.delegate as? AppDelegate)?.injectCachedFCMToken(into: self)
+            return
+        }
 
         hideSplashScreen()
 
@@ -217,6 +222,19 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
         splashScreen.hide(call)
     }
 
+    fileprivate func injectFCMToken(_ token: String) {
+        guard let loadedURL = webView?.url,
+              let appURL = bridge?.config.serverURL,
+              Self.hasSameOrigin(loadedURL, appURL)
+        else { return }
+
+        let safe = token.replacingOccurrences(of: "\\", with: "\\\\")
+                        .replacingOccurrences(of: "'", with: "\\'")
+        let js = "if(document.readyState!=='loading'){window.__kaupetFCMToken='\(safe)';" +
+                 "window.dispatchEvent(new CustomEvent('kaupet:fcmToken',{detail:'\(safe)'}));}"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     private static func hasSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
         lhs.scheme?.lowercased() == rhs.scheme?.lowercased()
             && lhs.host?.lowercased() == rhs.host?.lowercased()
@@ -233,6 +251,7 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
 class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
 
     var window: UIWindow?
+    private var latestFCMToken: String?
 
     func reloadBridge() {
         guard let window,
@@ -257,20 +276,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
     // Called by Firebase when an FCM token is available or refreshed.
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
-        injectFCMToken(token)
-    }
-
-    // Inject the FCM token into the WebView so JS can pick it up.
-    private func injectFCMToken(_ token: String) {
-        let safe = token.replacingOccurrences(of: "\\", with: "\\\\")
-                        .replacingOccurrences(of: "'", with: "\\'")
-        let js = "window.__kaupetFCMToken='\(safe)';" +
-                 "window.dispatchEvent(new CustomEvent('kaupet:fcmToken',{detail:'\(safe)'}));"
         DispatchQueue.main.async {
-            if let vc = self.window?.rootViewController as? CAPBridgeViewController {
-                vc.bridge?.webView?.evaluateJavaScript(js, completionHandler: nil)
+            self.latestFCMToken = token
+            if let vc = self.window?.rootViewController as? KaupetBridgeViewController {
+                vc.injectFCMToken(token)
             }
         }
+    }
+
+    fileprivate func injectCachedFCMToken(into viewController: KaupetBridgeViewController) {
+        guard let latestFCMToken else { return }
+        viewController.injectFCMToken(latestFCMToken)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {}

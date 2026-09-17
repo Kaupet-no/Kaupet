@@ -130,7 +130,11 @@ export function useListingTitleHints(params: {
   const debouncedTitle = useDebouncedValue((title ?? "").trim(), 400);
 
   const suggestionsMuted = categoryTouchedManually || suggestionDismissed;
-  const { data, isFetching: categorySuggestionLoading } = useQuery({
+  const {
+    data,
+    isFetching: categorySuggestionLoading,
+    isSuccess: categorySuggestionReady,
+  } = useQuery({
     queryKey: ["category-suggestion", debouncedTitle],
     enabled: !suggestionsMuted && debouncedTitle.length >= 5,
     staleTime: 120_000,
@@ -151,7 +155,7 @@ export function useListingTitleHints(params: {
     ? []
     : rpcSuggestions.length > 0
       ? rpcSuggestions
-      : clientCategoryHint
+      : categorySuggestionReady && clientCategoryHint
         ? [clientCategoryHint]
         : [];
 

@@ -1,7 +1,89 @@
 import UIKit
+import WebKit
 import Capacitor
+import SplashScreenPlugin
 import FirebaseCore
 import FirebaseMessaging
+
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var delegate: WKScriptMessageHandler?
+
+    init(delegate: WKScriptMessageHandler) {
+        self.delegate = delegate
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        delegate?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+@objc(KaupetBridgeViewController)
+final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
+    private static let documentReadyHandler = "kaupetDocumentReady"
+    private var messageHandler: WeakScriptMessageHandler?
+
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+
+        let handler = WeakScriptMessageHandler(delegate: self)
+        messageHandler = handler
+        let contentController = webView?.configuration.userContentController
+        contentController?.add(handler, name: Self.documentReadyHandler)
+        contentController?.addUserScript(WKUserScript(
+            source: "window.webkit.messageHandlers.\(Self.documentReadyHandler).postMessage(window.location.href)",
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        ))
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            self?.hideSplashScreen()
+        }
+
+#if DEBUG
+        assert(Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "https://kaupet.no:443/path")!))
+        assert(!Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "capacitor://localhost/offline")!))
+#endif
+    }
+
+    deinit {
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.documentReadyHandler)
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard
+            message.name == Self.documentReadyHandler,
+            let href = message.body as? String,
+            let loadedURL = URL(string: href),
+            let appURL = bridge?.config.serverURL,
+            !Self.hasSameOrigin(loadedURL, appURL)
+        else { return }
+
+        hideSplashScreen()
+    }
+
+    private func hideSplashScreen() {
+        guard let splashScreen = bridge?.plugin(withName: "SplashScreen") as? SplashScreenPlugin else { return }
+        guard let call = CAPPluginCall(
+            callbackId: UUID().uuidString,
+            methodName: "hide",
+            options: [:],
+            success: { _, _ in },
+            error: { error in CAPLog.print("Failed to hide splash screen: \(String(describing: error))") }
+        ) else { return }
+        splashScreen.hide(call)
+    }
+
+    private static func hasSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.scheme?.lowercased() == rhs.scheme?.lowercased()
+            && lhs.host?.lowercased() == rhs.host?.lowercased()
+            && effectivePort(lhs) == effectivePort(rhs)
+    }
+
+    private static func effectivePort(_ url: URL) -> Int? {
+        if let port = url.port { return port }
+        return url.scheme?.lowercased() == "http" ? 80 : url.scheme?.lowercased() == "https" ? 443 : nil
+    }
+}
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {

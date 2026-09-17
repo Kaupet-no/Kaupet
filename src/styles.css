@@ -281,20 +281,30 @@
   gap: var(--density-data-gap);
 }
 
-/* Utility: top padding that respects the device safe area (notch / dynamic island).
-   The `var(--safe-area-inset-*, env(...))` pattern (not just `env()` alone) is
+/* The `var(--safe-area-inset-*, env(...))` pattern (not just `env()` alone) is
    Capacitor's own documented workaround (@capacitor/core's SystemBars plugin,
    see node_modules/@capacitor/core/system-bars.md): Android WebView < 140
    reports `env(safe-area-inset-*)` as 0 under edge-to-edge, even though the
    status bar really does overlap the WebView. SystemBars injects the real
    inset into `--safe-area-inset-*` custom properties instead — `env()` stays
    as the fallback for iOS/web, where it's already correct and no such
-   variable is ever injected. */
+   variable is ever injected. Skriv aldri uttrykket ut på nytt på et kallsted —
+   bruk aliasene under. De to frittstående skallsidene (capacitor-shell/*.html)
+   har hver sin kopi fordi de ikke går gjennom denne fila; utenom dem skal et
+   søk etter `env(safe-area-inset` kun treffe denne blokka. */
+:root {
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
+
+/* Utility: top padding that respects the device safe area (notch / dynamic island). */
 .pt-safe {
-  padding-top: max(0.5rem, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  padding-top: max(0.5rem, var(--safe-top));
 }
 .pb-safe {
-  padding-bottom: max(0.5rem, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  padding-bottom: max(0.5rem, var(--safe-bottom));
 }
 
 /* Edge-to-edge Android (WebView >= 140 + viewport-fit=cover): the WebView's
@@ -317,7 +327,7 @@ html.native body::before {
   top: 0;
   left: 0;
   right: 0;
-  height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  height: var(--safe-top);
   background: var(--color-background);
   z-index: 20;
   pointer-events: none;
@@ -332,30 +342,27 @@ html.native body::before {
    - `.px-safe`: 1rem i basis, altså en erstatning for `px-4` på fastlåste
      bunnlinjer der innholdet faktisk går helt ut i kantene. */
 .pl-safe {
-  padding-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  padding-left: var(--safe-left);
 }
 .pr-safe {
-  padding-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  padding-right: var(--safe-right);
 }
 .px-safe {
-  padding-left: max(1rem, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
-  padding-right: max(1rem, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+  padding-left: max(1rem, var(--safe-left));
+  padding-right: max(1rem, var(--safe-right));
 }
 
 /* Nøyaktig safe area på alle fire kanter, uten minimumsverdien `.pt-safe` har.
    Brukes av FullscreenOverlayContent: en fullskjerm-takeover skal ikke få
    8px luft rundt seg på enheter uten notch, den skal bare unngå systemets UI. */
 .p-safe {
-  padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px))
-    var(--safe-area-inset-right, env(safe-area-inset-right, 0px))
-    var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
-    var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
 /* Height reserved for the fixed bottom nav in native apps (AppBottomNav),
    plus a margin so scrolled content/floating buttons never sit under it. */
 :root {
-  --app-bottom-nav-h: calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  --app-bottom-nav-h: calc(6rem + var(--safe-bottom));
 }
 .pb-bottom-nav {
   padding-bottom: var(--app-bottom-nav-h);
@@ -415,7 +422,7 @@ html.native body::before {
    (meldinger.$id: calc(100vh - var(--app-bottom-nav-h))). */
 .nav-rail {
   --app-bottom-nav-h: 0px;
-  --app-nav-rail-w: calc(5rem + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+  --app-nav-rail-w: calc(5rem + var(--safe-left));
 }
 .nav-rail .pb-bottom-nav {
   padding-bottom: 0;

@@ -76,8 +76,7 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
         rail
           ? undefined
           : {
-              paddingBottom:
-                "calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 0.5rem)",
+              paddingBottom: "calc(var(--safe-bottom) + 0.5rem)",
             }
       }
     >

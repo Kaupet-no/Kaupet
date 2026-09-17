@@ -126,7 +126,7 @@ function FilterPage() {
           up hidden behind it. */}
       <nav
         style={{
-          top: "calc(4rem + max(0.5rem, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) + 1px)",
+          top: "calc(4rem + max(0.5rem, var(--safe-top)) + 1px)",
         }}
         className="sticky z-10 -mx-4 mb-6 flex gap-1 overflow-x-auto border-b border-border bg-background px-4 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >

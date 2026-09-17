@@ -1260,8 +1260,7 @@ function ListingDetailViewBody({
                 { bottom: "var(--app-bottom-nav-h)" }
               : {
                   bottom: 0,
-                  paddingBottom:
-                    "calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)",
+                  paddingBottom: "calc(var(--safe-bottom) + 0.75rem)",
                 }
           }
         >

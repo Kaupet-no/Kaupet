@@ -129,10 +129,6 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
             forMainFrameOnly: true
         ))
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
-            self?.hideSplashScreen()
-        }
-
 #if DEBUG
         assert(Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "https://kaupet.no:443/path")!))
         assert(!Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "capacitor://localhost/offline")!))

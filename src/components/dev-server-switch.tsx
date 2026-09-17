@@ -4,7 +4,7 @@ import { registerPlugin } from "@capacitor/core";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { STAGING_HOST } from "@/hooks/use-should-show-dev-server-switch";
-import { localDevServerUrl } from "@/lib/dev-server-url";
+import { androidNavigationUrl, localDevServerUrl } from "@/lib/dev-server-url";
 
 interface ServerTargetPlugin {
   set(options: { url: string | null }): Promise<void>;
@@ -30,11 +30,15 @@ export function DevServerSwitch() {
       setError("Bruk localhost eller en privat IP-adresse med port.");
       return;
     }
-    void ServerTarget.set({ url: url.href });
+    ServerTarget.set({ url: androidNavigationUrl(url).href }).catch(() => {
+      setError("Appen klarte ikke å bytte server. Prøv igjen.");
+    });
   };
 
   const backToStaging = () => {
-    void ServerTarget.set({ url: "https://staging.kaupet.no" });
+    ServerTarget.set({ url: "https://staging.kaupet.no" }).catch(() => {
+      setError("Appen klarte ikke å bytte server. Prøv igjen.");
+    });
   };
 
   return (
@@ -67,15 +71,6 @@ export function DevServerSwitch() {
                   aria-invalid={!!error}
                   aria-describedby={error ? "dev-server-address-error" : undefined}
                 />
-                {error && (
-                  <p
-                    id="dev-server-address-error"
-                    className="text-sm text-destructive"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
-                )}
                 <Button
                   type="button"
                   variant="secondary"
@@ -89,6 +84,15 @@ export function DevServerSwitch() {
               <Button type="button" variant="secondary" className="mt-3" onClick={backToStaging}>
                 Tilbake til staging.kaupet.no
               </Button>
+            )}
+            {error && (
+              <p
+                id="dev-server-address-error"
+                className="mt-3 text-sm text-destructive"
+                role="alert"
+              >
+                {error}
+              </p>
             )}
           </div>
         </div>

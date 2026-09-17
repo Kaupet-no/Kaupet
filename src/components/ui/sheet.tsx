@@ -80,13 +80,9 @@ const sheetVariants = cva(
           "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
         // Reell fallback hvis SheetContent noensinne rendres uten en `Sheet`-
         // forelder (ctx null) — se bruken i komponenten under.
-        //
-        // `var(--safe-area-inset-bottom, env(...))`, ikke bare `env()`: Android
-        // WebView under versjon 140 rapporterer `env(safe-area-inset-bottom)`
-        // som 0 under edge-to-edge, mens Capacitors SystemBars injiserer den
-        // ekte verdien i CSS-variabelen i stedet — se .pb-safe i styles.css.
+        // `var(--safe-bottom)` — se aliasdefinisjonen i src/styles.css.
         bottom:
-          "inset-x-0 bottom-0 border-t pb-[max(1.5rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          "inset-x-0 bottom-0 border-t pb-[max(1.5rem,var(--safe-bottom))] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
       },
     },
     defaultVariants: {
@@ -98,10 +94,9 @@ const sheetVariants = cva(
 /** Samme boks-styling som `sheetVariants`s base + bunn-plassering, men uten
  * Radix' animate-in/out-klasser — `Drawer.Content` (vaul) animerer selv via
  * transform, og ville dobbelt-animert sammen med Tailwinds enter/exit. */
-// `var(--safe-area-inset-bottom, env(...))`, ikke bare `env()`: se kommentaren
-// på `sheetVariants`s "bottom"-variant over.
+// `var(--safe-bottom)` — se aliasdefinisjonen i src/styles.css.
 const drawerContentClass =
-  "fixed inset-x-0 bottom-0 z-[10000] flex flex-col gap-4 border-t bg-background p-6 pb-[max(1.5rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] shadow-lg outline-none";
+  "fixed inset-x-0 bottom-0 z-[10000] flex flex-col gap-4 border-t bg-background p-6 pb-[max(1.5rem,var(--safe-bottom))] shadow-lg outline-none";
 
 export interface SheetContentProps
   extends

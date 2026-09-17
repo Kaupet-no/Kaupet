@@ -18,6 +18,11 @@
         --primary-fg: #fbf9f3;
         --border: #e5e1d6;
         --danger: #b3261e;
+        /* Safe area alias — se src/styles.css for begrunnelsen */
+        --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+        --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+        --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+        --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -47,8 +52,8 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
-        padding-top: max(24px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
-        padding-bottom: max(24px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+        padding-top: max(24px, var(--safe-top));
+        padding-bottom: max(24px, var(--safe-bottom));
       }
       .card {
         width: 100%;
@@ -124,8 +129,9 @@
       <button id="ip-btn" type="button">Koble til lokal server</button>
     </div>
     <script>
-      // Native splash (launchAutoHide: false, se capacitor.config.ts) skjules
-      // normalt av hideNativeBootSplash() i SPA-en (src/routes/__root.tsx).
+      // Native splash (se capacitor.config.ts) skjules normalt av
+      // hideNativeBootSplash() i SPA-en (src/routes/__root.tsx), lenge før
+      // launchShowDuration-ventilen på 15 s slår inn.
       // Denne siden lastes derimot FØR SPA-en i det hele tatt navigeres til,
       // så uten dette kallet blir splashen stående over kortet under —
       // det appearer som en blank side ved kaldstart.
@@ -176,14 +182,20 @@
       // origin the Bridge was created with) actually applies on staging —
       // see the native bridge setup for why a runtime redirect never got it.
       function setServerTarget(url) {
+        var error = document.getElementById("ip-error");
         if (!(
           window.Capacitor &&
           window.Capacitor.Plugins &&
           window.Capacitor.Plugins.ServerTarget
         )) {
+          error.textContent = "Serverplugin er ikke tilgjengelig.";
+          error.style.display = "block";
           return;
         }
-        window.Capacitor.Plugins.ServerTarget.set({ url: url }).catch(function () {});
+        window.Capacitor.Plugins.ServerTarget.set({ url: url }).catch(function () {
+          error.textContent = "Servermålet ble avvist. Sjekk adressen og prøv igjen.";
+          error.style.display = "block";
+        });
       }
 
       function androidNavigationUrl(url) {
@@ -209,6 +221,10 @@
         var url = localDevServerUrl(input.value);
         var error = document.getElementById("ip-error");
         if (!url) {
+          // Sett teksten eksplisitt — setServerTarget skriver sine egne
+          // meldinger i det samme elementet, så den som står i HTML-en kan
+          // være overskrevet av en tidligere feil.
+          error.textContent = "Bruk localhost eller en privat IP-adresse med port.";
           error.style.display = "block";
           return;
         }

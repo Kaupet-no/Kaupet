@@ -37,9 +37,10 @@ export function isNative(): boolean {
  * earlier would re-expose the web-layout flash it exists to cover.
  */
 export function hideNativeBootSplash(): void {
-  // Den *native* splashen henger igjen til den skjules eksplisitt
-  // (launchAutoHide: false, se capacitor.config.ts) — det er nettopp derfor
-  // den kan skjules her, i det appen har malt, i stedet for etter 2s fast.
+  // Den *native* splashen henger igjen til den skjules eksplisitt (se
+  // capacitor.config.ts, der launchShowDuration kun er en siste skanse på
+  // 15 s) — det er nettopp derfor den kan skjules her, i det appen har malt,
+  // i stedet for etter 2s fast.
   void import("@capacitor/splash-screen")
     .then(({ SplashScreen }) => SplashScreen.hide())
     .catch(() => {

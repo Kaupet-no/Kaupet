@@ -169,13 +169,12 @@
         return url;
       }
 
-      // Persists the choice natively (SharedPreferences, via
-      // ServerTargetPlugin — android/app/.../ServerTargetPlugin.java) and
-      // restarts the activity, instead of redirecting this WebView there.
+      // Persists the choice natively (via ServerTargetPlugin) and restarts
+      // the native bridge, instead of redirecting this WebView there.
       // The next Bridge is then created with server.url already set to the
       // target, so Capacitor's plugin-dispatch JS injection (scoped to the
       // origin the Bridge was created with) actually applies on staging —
-      // see MainActivity.onCreate for why a runtime redirect never got it.
+      // see the native bridge setup for why a runtime redirect never got it.
       function setServerTarget(url) {
         if (!(
           window.Capacitor &&

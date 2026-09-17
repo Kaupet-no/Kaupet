@@ -10,9 +10,9 @@ interface ServerTargetPlugin {
   set(options: { url: string | null }): Promise<void>;
 }
 
-// Bridges to android/app/.../ServerTargetPlugin.java. Persists the choice
-// natively and restarts the activity so the next Bridge is created with
-// server.url already pointing at the target — see MainActivity.onCreate and
+// Bridges to the native ServerTargetPlugin. Persists the choice natively and
+// restarts the native bridge so the next Bridge is created with server.url
+// already pointing at the target — see the platform bridge setup and
 // the comment on this same plugin call in capacitor-shell/index.html for why
 // that (not a WebView redirect to the shell) is what keeps native plugins
 // working after a server switch.

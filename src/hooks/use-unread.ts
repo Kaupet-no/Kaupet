@@ -3,8 +3,8 @@ import { useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useForegroundRefresh } from "@/hooks/use-foreground-refresh";
 import { isUnread } from "@/lib/unread";
-import { isNative } from "@/lib/native";
 
 export type ConvSummary = {
   id: string;
@@ -72,35 +72,7 @@ export function useUnreadConversationsCount(): number {
   }, [userId, refetch]);
 
   // Fallback: refresh når fanen får fokus igjen (i tilfelle realtime ikke leverer)
-  useEffect(() => {
-    if (!user) return;
-    const onFocus = () => {
-      qc.invalidateQueries({ queryKey: ["unread-conversations"] });
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") onFocus();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
-    let removeAppStateListener: (() => void) | undefined;
-    if (isNative()) {
-      void import("@capacitor/app").then(({ App }) => {
-        void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) onFocus();
-        }).then((handle) => {
-          removeAppStateListener = () => void handle.remove();
-        });
-      });
-    }
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      removeAppStateListener?.();
-    };
-  }, [user, qc]);
+  useForegroundRefresh(() => qc.invalidateQueries({ queryKey: ["unread-conversations"] }), !!user);
 
   return (data ?? []).filter((c) =>
     isUnread(c.last_message_at, c.last_sender_id, user?.id, c.my_last_read_at),
@@ -130,33 +102,10 @@ export function useUnreadSystemMessagesCount(): number {
     },
   });
 
-  useEffect(() => {
-    if (!user) return;
-    const onFocus = () => qc.invalidateQueries({ queryKey: ["system-messages-unread"] });
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") onFocus();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
-    let removeAppStateListener: (() => void) | undefined;
-    if (isNative()) {
-      void import("@capacitor/app").then(({ App }) => {
-        void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) onFocus();
-        }).then((handle) => {
-          removeAppStateListener = () => void handle.remove();
-        });
-      });
-    }
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      removeAppStateListener?.();
-    };
-  }, [user, qc]);
+  useForegroundRefresh(
+    () => qc.invalidateQueries({ queryKey: ["system-messages-unread"] }),
+    !!user,
+  );
 
   return data ?? 0;
 }
@@ -196,33 +145,10 @@ export function useUnreadNotificationsCount(): number {
     refetchInterval: 60_000,
   });
 
-  useEffect(() => {
-    if (!user) return;
-    const onFocus = () => qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") onFocus();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
-    let removeAppStateListener: (() => void) | undefined;
-    if (isNative()) {
-      void import("@capacitor/app").then(({ App }) => {
-        void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) onFocus();
-        }).then((handle) => {
-          removeAppStateListener = () => void handle.remove();
-        });
-      });
-    }
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      removeAppStateListener?.();
-    };
-  }, [user, qc]);
+  useForegroundRefresh(
+    () => qc.invalidateQueries({ queryKey: ["notifications-unread-count"] }),
+    !!user,
+  );
 
   return data ?? 0;
 }

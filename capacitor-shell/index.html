@@ -47,8 +47,8 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
-        padding-top: max(24px, env(safe-area-inset-top));
-        padding-bottom: max(24px, env(safe-area-inset-bottom));
+        padding-top: max(24px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+        padding-bottom: max(24px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
       }
       .card {
         width: 100%;

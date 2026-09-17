@@ -2,15 +2,19 @@ package no.kaupet.app;
 
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.CookieManager;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.CapConfig;
+import com.getcapacitor.WebViewListener;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -18,12 +22,13 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // SoftHapticsPlugin and ServerTargetPlugin live in this app module,
-        // not an npm package, so Capacitor's plugin autodiscovery (which
-        // scans node_modules) never finds them — they must be registered
-        // manually, before super.onCreate().
+        // SoftHapticsPlugin, ServerTargetPlugin and ShellThemePlugin live in
+        // this app module, not an npm package, so Capacitor's plugin
+        // autodiscovery (which scans node_modules) never finds them — they
+        // must be registered manually, before super.onCreate().
         registerPlugin(SoftHapticsPlugin.class);
         registerPlugin(ServerTargetPlugin.class);
+        registerPlugin(ShellThemePlugin.class);
 
         // Staging's "Velg server" screen (capacitor-shell/index.html) and
         // the in-app DevServerSwitch persist their choice via
@@ -66,6 +71,47 @@ public class MainActivity extends BridgeActivity {
         // til Configuration.fontScale finnes ikke ennå — det er en egen,
         // fremtidig utvidelse, ikke del av denne endringen.
         getBridge().getWebView().getSettings().setTextZoom(100);
+
+        // capacitor-shell/offline.html and index.html are served from this
+        // app's own local origin (the errorPath fallback and, on staging
+        // without a stored server choice, the "Velg server" screen), never
+        // from server.url — so window.Capacitor is never injected there (see
+        // ShellThemePlugin). Mirror the app's own theme choice in ourselves,
+        // the same way SystemBars mirrors safe-area insets into
+        // --safe-area-inset-* regardless of origin: evaluateJavascript runs
+        // on whatever page is currently loaded, unlike the origin-scoped
+        // plugin-dispatch bridge.
+        getBridge().addWebViewListener(
+            new WebViewListener() {
+                @Override
+                public void onPageCommitVisible(WebView view, String url) {
+                    super.onPageCommitVisible(view, url);
+                    injectShellThemeIfLocal(view, url);
+                }
+            }
+        );
+    }
+
+    private void injectShellThemeIfLocal(WebView view, String url) {
+        Uri uri = Uri.parse(url);
+        if (!getBridge().getScheme().equals(uri.getScheme()) || !getBridge().getHost().equals(uri.getHost())) {
+            return;
+        }
+
+        SharedPreferences prefs = getSharedPreferences(ShellThemePlugin.PREFS, MODE_PRIVATE);
+        if (!prefs.contains(ShellThemePlugin.KEY_DARK)) {
+            // No known app choice yet (fresh install, theme never applied) —
+            // leave the page's own `@media (prefers-color-scheme)` fallback
+            // in charge instead of forcing a value.
+            return;
+        }
+        String theme = prefs.getBoolean(ShellThemePlugin.KEY_DARK, false) ? "dark" : "light";
+        String script = String.format(
+            Locale.US,
+            "document.documentElement.setAttribute('data-theme', '%s');",
+            theme
+        );
+        view.evaluateJavascript(script, null);
     }
 
     private boolean isStaging() {

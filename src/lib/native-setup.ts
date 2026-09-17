@@ -1,9 +1,23 @@
 // One-shot native initialization: status bar styling + keyboard behavior.
 // Safe to call from any component effect; no-ops on web.
 
+import { registerPlugin } from "@capacitor/core";
 import { isNative, nativePlatform } from "./native";
 import { lockPortraitOnPhone } from "./orientation";
 import { initTextScale } from "./text-scale";
+
+interface ShellThemePlugin {
+  set(options: { dark: boolean }): Promise<void>;
+}
+
+// Bridges to android/app/.../ShellThemePlugin.java. Mirrors the resolved
+// theme into SharedPreferences so MainActivity can inject it into
+// capacitor-shell/offline.html and index.html — those pages are served from
+// this app's own local origin, never server.url, so window.Capacitor (and
+// this very plugin) is never available there. See ShellThemePlugin's own
+// comment for why a plugin call from here (the real app origin, where the
+// bridge does work) is the only way the choice reaches native at all.
+const ShellTheme = registerPlugin<ShellThemePlugin>("ShellTheme");
 
 let initialized = false;
 
@@ -41,6 +55,16 @@ export async function syncStatusBarTheme(dark: boolean): Promise<void> {
     await SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light });
   } catch (err) {
     warnNativeCallFailed("SystemBars.setStyle", err);
+  }
+
+  try {
+    // Android only (see ShellTheme.set's own comment) — no-ops via the
+    // catch on iOS, where offline.html doesn't need it (WKWebView's
+    // env(safe-area-inset-*) and the shell's own prefers-color-scheme
+    // fallback are already correct there).
+    await ShellTheme.set({ dark });
+  } catch (err) {
+    warnNativeCallFailed("ShellTheme.set", err);
   }
 
   try {

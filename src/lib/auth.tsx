@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthContext } from "@/hooks/use-auth";
 import type { SessionUser } from "@/lib/current-user.functions";
@@ -10,8 +10,7 @@ import type { SessionUser } from "@/lib/current-user.functions";
  * ligger i SSR-svaret. `undefined` betyr "ikke avgjort av serveren" — da
  * beholder vi den gamle oppførselen og venter på klienten.
  *
- * Bare `user` og `loading` konsumeres av useAuth()-brukerne; `session` fylles
- * fortsatt først på klienten, siden ingen leser den. */
+ * Konteksten eksponerer bevisst ingen `session` — se AuthState. */
 export function AuthProvider({
   children,
   initialUser,
@@ -19,7 +18,6 @@ export function AuthProvider({
   children: ReactNode;
   initialUser?: SessionUser | null;
 }) {
-  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(
     initialUser ? ({ id: initialUser.id, email: initialUser.email ?? undefined } as User) : null,
   );
@@ -42,12 +40,10 @@ export function AuthProvider({
       // it — this warning still surfaced once, later, per
       // E2E-ROBUSTNESS-PLAN-STATUS-3.md).
       if (event === "INITIAL_SESSION") return;
-      setSession(s);
       setUser(s?.user ?? null);
     });
 
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
@@ -55,5 +51,5 @@ export function AuthProvider({
     return () => subscription.unsubscribe();
   }, []);
 
-  return <AuthContext.Provider value={{ session, user, loading }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>;
 }

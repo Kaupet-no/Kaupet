@@ -56,6 +56,7 @@ import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
+import { Route as ApiPublicR2CleanupRouteImport } from './routes/api/public/r2/cleanup'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -309,6 +310,11 @@ const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
   path: '/api/public/push/dispatch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicR2CleanupRoute = ApiPublicR2CleanupRouteImport.update({
+  id: '/api/public/r2/cleanup',
+  path: '/api/public/r2/cleanup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicVippsWebhookRoute = ApiPublicVippsWebhookRouteImport.update({
   id: '/api/public/vipps/webhook',
   path: '/api/public/vipps/webhook',
@@ -362,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -409,6 +416,7 @@ export interface FileRoutesByTo {
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRoutesById {
@@ -460,6 +468,7 @@ export interface FileRoutesById {
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRouteTypes {
@@ -511,6 +520,7 @@ export interface FileRouteTypes {
     | '/meldinger/'
     | '/mine-annonser/'
     | '/api/public/push/dispatch'
+    | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -558,6 +568,7 @@ export interface FileRouteTypes {
     | '/meldinger'
     | '/mine-annonser'
     | '/api/public/push/dispatch'
+    | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
   id:
     | '__root__'
@@ -608,6 +619,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/api/public/push/dispatch'
+    | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -635,6 +647,7 @@ export interface RootRouteChildren {
   OkIdRoute: typeof OkIdRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
+  ApiPublicR2CleanupRoute: typeof ApiPublicR2CleanupRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
 
@@ -969,6 +982,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPushDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/r2/cleanup': {
+      id: '/api/public/r2/cleanup'
+      path: '/api/public/r2/cleanup'
+      fullPath: '/api/public/r2/cleanup'
+      preLoaderRoute: typeof ApiPublicR2CleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/vipps/webhook': {
       id: '/api/public/vipps/webhook'
       path: '/api/public/vipps/webhook'
@@ -1086,6 +1106,7 @@ const rootRouteChildren: RootRouteChildren = {
   OkIdRoute: OkIdRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
+  ApiPublicR2CleanupRoute: ApiPublicR2CleanupRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }
 export const routeTree = rootRouteImport

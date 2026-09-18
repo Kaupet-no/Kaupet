@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Pencil,
@@ -109,20 +109,10 @@ export function ListingRow({
   /** Render only the listing link in console surfaces. */
   readOnly?: boolean;
 }) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const native = useIsNative();
 
-  useEffect(() => {
-    if (!row.cover_path) return;
-    let cancelled = false;
-    signListingImageUrls([row.cover_path]).then((m) => {
-      if (!cancelled) setImgUrl(m[row.cover_path!] ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [row.cover_path]);
+  const imgUrl = row.cover_path ? signListingImageUrls([row.cover_path])[row.cover_path] : null;
 
   // Same total the ad, search cards and message list show — not the
   // seller's bare price_nok (F4).

@@ -5,11 +5,13 @@ import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { BoatInfoGrid, isBoatAttributes } from "@/components/listing-detail/boat/boat-info-grid";
 import { UsageLabel, type ListingCardData } from "@/components/listing-card";
+import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { useListingGalleryImages } from "@/hooks/use-listing-gallery-images";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
+import { signListingImageUrls } from "@/lib/storage";
 
 type Props = {
   listing: ListingCardData;
@@ -54,6 +56,14 @@ export function ListingCardExpanded({
   }, []);
 
   const { images, imgUrls, isLoading } = useListingGalleryImages(listing.id, inView);
+
+  const originalUrl = listing.cover_path
+    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
+    : null;
+  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
+    coverImageUrl ?? null,
+    originalUrl,
+  );
 
   const attributes = listing.attributes ?? {};
   // Samme utledning som listing-detail-view.tsx — kort-visningen skal vise de
@@ -116,8 +126,13 @@ export function ListingCardExpanded({
             />
           ) : (
             <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-              {coverImageUrl ? (
-                <img src={coverImageUrl} alt={listing.title} className="size-full object-cover" />
+              {effectiveImageUrl ? (
+                <img
+                  src={effectiveImageUrl}
+                  alt={listing.title}
+                  className="size-full object-cover"
+                  onError={handleImageError}
+                />
               ) : (
                 <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
                   {isLoading ? "Laster bilder…" : "Ingen bilder"}

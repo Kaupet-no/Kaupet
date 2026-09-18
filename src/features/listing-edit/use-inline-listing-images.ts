@@ -4,8 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import {
+  deleteListingImage,
   describeImageError,
-  LISTING_BUCKET,
   MAX_LISTING_IMAGES,
   uploadListingImage,
   uploadListingImageThumb,
@@ -108,12 +108,6 @@ export function useInlineListingImages(params: {
       showErrorToast(describeImageError(err));
       return;
     }
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) {
-      showErrorToast("Du må være logget inn.");
-      return;
-    }
     for (const file of files) {
       const tempPath = `pending-${crypto.randomUUID()}`;
       setItems((curr) => [
@@ -131,12 +125,7 @@ export function useInlineListingImages(params: {
           compressImage(file, "listing"),
           compressImage(file, "listing-thumb"),
         ]);
-        const path = await uploadListingImage({
-          userId,
-          listingId,
-          index: Date.now(),
-          file: compressed,
-        });
+        const path = await uploadListingImage({ listingId, file: compressed });
         await uploadListingImageThumb({ path, file: thumb }).catch((err) =>
           console.warn("Kunne ikke laste opp miniatyrbilde", err),
         );
@@ -172,7 +161,7 @@ export function useInlineListingImages(params: {
         .eq("storage_path", storagePath);
       if (error) throw error;
       // Best-effort storage cleanup.
-      await supabase.storage.from(LISTING_BUCKET).remove([storagePath]);
+      await deleteListingImage(storagePath).catch(() => {});
       invalidate();
     } catch (e) {
       setItems(prev);

@@ -27,7 +27,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
 vi.mock("@/lib/image-compression", () => ({ compressImage: vi.fn() }));
 vi.mock("@/lib/storage", () => ({
-  LISTING_BUCKET: "listing-images",
+  deleteListingImage: vi.fn(),
   describeImageError: vi.fn(),
   uploadListingImage: vi.fn(),
   uploadListingImageThumb: vi.fn(),

@@ -2,7 +2,12 @@
 // sesjon fra informasjonskapslene. Bruker RLS som brukeren — dette er IKKE
 // service-role (se `client.server.ts` for den).
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { getCookies, setCookie } from "@tanstack/react-start/server";
+import {
+  getCookies,
+  getRequestProtocol,
+  setCookie,
+  setResponseHeader,
+} from "@tanstack/react-start/server";
 import type { Database } from "./types";
 
 export type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
@@ -30,7 +35,8 @@ function createSupabaseServerClient() {
       getAll() {
         return Object.entries(getCookies()).map(([name, value]) => ({ name, value }));
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
+        for (const [name, value] of Object.entries(headers)) setResponseHeader(name, value);
         for (const { name, value, options } of cookiesToSet) {
           setCookie(name, value, {
             ...(options as CookieOptions),
@@ -43,7 +49,7 @@ function createSupabaseServerClient() {
             // HttpOnly-kravet er dokumentert i
             // `docs/decisions/2026-09-17-sesjon-i-informasjonskapsler.md`.
             httpOnly: false,
-            secure: SUPABASE_URL.startsWith("https://"),
+            secure: getRequestProtocol() === "https",
           });
         }
       },

@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Simulerer det TanStack Start gjør i produksjon: forespørselen ligger i
 // AsyncLocalStorage, og getCookies()/setCookie() treffer den forespørselen som
 // er aktiv i det kallstakken kjører.
-type Jar = { in: Record<string, string>; out: Array<{ name: string; options: unknown }> };
+type Jar = {
+  in: Record<string, string>;
+  out: Array<{ name: string; options: unknown }>;
+  protocol: "http" | "https";
+  responseHeaders: Record<string, string>;
+};
 const requestStore = new AsyncLocalStorage<Jar>();
 
 function currentJar(): Jar {
@@ -15,14 +20,21 @@ function currentJar(): Jar {
 
 vi.mock("@tanstack/react-start/server", () => ({
   getCookies: () => currentJar().in,
+  getRequestProtocol: () => currentJar().protocol,
   setCookie: (name: string, _value: string, options: unknown) => {
     currentJar().out.push({ name, options });
+  },
+  setResponseHeader: (name: string, value: string) => {
+    currentJar().responseHeaders[name] = value;
   },
 }));
 
 type CapturedCookies = {
   getAll: () => Array<{ name: string; value: string }>;
-  setAll: (c: Array<{ name: string; value: string; options?: unknown }>) => void;
+  setAll: (
+    c: Array<{ name: string; value: string; options?: unknown }>,
+    headers: Record<string, string>,
+  ) => void;
 };
 let instanceCount = 0;
 
@@ -52,8 +64,12 @@ type TestClient = {
   getSession: () => Array<{ name: string; value: string }>;
 };
 
-function inRequest<T>(cookies: Record<string, string>, fn: (jar: Jar) => Promise<T> | T) {
-  const jar: Jar = { in: cookies, out: [] };
+function inRequest<T>(
+  cookies: Record<string, string>,
+  fn: (jar: Jar) => Promise<T> | T,
+  protocol: "http" | "https" = "https",
+) {
+  const jar: Jar = { in: cookies, out: [], protocol, responseHeaders: {} };
   return requestStore.run(jar, () => fn(jar));
 }
 
@@ -97,7 +113,11 @@ describe("getSupabaseServerClient", () => {
   it("skriver fornyet sesjon tilbake til forespørselens egne kapsler", async () => {
     const jar = await inRequest({}, async (j) => {
       const client = getSupabaseServerClient() as unknown as TestClient;
-      client.cookies.setAll([{ name: "sb-access-token", value: "fornyet" }]);
+      client.cookies.setAll([{ name: "sb-access-token", value: "fornyet" }], {
+        "Cache-Control": "private, no-store",
+        Expires: "0",
+        Pragma: "no-cache",
+      });
       return j;
     });
 
@@ -110,5 +130,24 @@ describe("getSupabaseServerClient", () => {
       // Nettleserklienten må kunne lese sesjonen — se ADR-en.
       httpOnly: false,
     });
+    expect(jar.responseHeaders).toEqual({
+      "Cache-Control": "private, no-store",
+      Expires: "0",
+      Pragma: "no-cache",
+    });
+  });
+
+  it("bruker forespørselsprotokollen for secure-attributtet", async () => {
+    const jar = await inRequest(
+      {},
+      async (j) => {
+        const client = getSupabaseServerClient() as unknown as TestClient;
+        client.cookies.setAll([{ name: "sb-access-token", value: "fornyet" }], {});
+        return j;
+      },
+      "http",
+    );
+
+    expect(jar.out[0]!.options).toMatchObject({ secure: false });
   });
 });

@@ -36,6 +36,10 @@ import {
 } from "@/lib/wtb-listings.functions";
 
 export const Route = createFileRoute("/_authenticated/varsler")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({ meta: [{ title: "Mine varsler — Kaupet.no" }] }),
   component: VarslerPage,
 });

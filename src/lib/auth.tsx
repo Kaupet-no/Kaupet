@@ -1,12 +1,24 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthContext } from "@/hooks/use-auth";
+import { AuthContext, type AuthUser } from "@/hooks/use-auth";
+import type { SessionUser } from "@/lib/current-user.functions";
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+/** `initialUser` kommer fra serveren, som nå kan lese sesjonen fra kapselen
+ * (se __root.tsx). Med den satt vet vi auth-tilstanden allerede ved første
+ * maling, så headeren slipper skjelett-mellomtilstanden og brukermenyen
+ * ligger i SSR-svaret. `undefined` betyr "ikke avgjort av serveren" — da
+ * beholder vi den gamle oppførselen og venter på klienten.
+ *
+ * Konteksten eksponerer bevisst ingen `session` — se AuthState. */
+export function AuthProvider({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  initialUser?: SessionUser | null;
+}) {
+  const [user, setUser] = useState<AuthUser | null>(initialUser ?? null);
+  const [loading, setLoading] = useState(initialUser === undefined);
 
   useEffect(() => {
     const {
@@ -25,12 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // it — this warning still surfaced once, later, per
       // E2E-ROBUSTNESS-PLAN-STATUS-3.md).
       if (event === "INITIAL_SESSION") return;
-      setSession(s);
       setUser(s?.user ?? null);
     });
 
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
@@ -38,5 +48,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  return <AuthContext.Provider value={{ session, user, loading }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>;
 }

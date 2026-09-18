@@ -160,5 +160,36 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // GET-serverfunksjoner må være lesende.
+    //
+    // Sesjonen ligger nå i informasjonskapsler (se
+    // src/integrations/supabase/client.ts), og kapsler sendes automatisk med
+    // på top-level GET-navigasjoner. En muterende GET er derfor et CSRF-hull:
+    // CSRF-middlewaren i src/start.ts unntar bevisst GET fordi GET skal være
+    // lesende. Før kapslene var en slik GET ufarlig, fordi bearer-tokenet
+    // aldri ble sendt automatisk — nå er den det ikke.
+    //
+    // Regelen treffer .insert/.update/.upsert/.delete inne i handleren til en
+    // createServerFn({ method: "GET" }). Begrensning: den kan ikke se hva en
+    // .rpc() gjør. De 11 RPC-ene som i dag kalles fra GET er gjennomgått og
+    // lesende, og ti av dem er deklarert STABLE, som Postgres håndhever.
+    // Nye RPC-er som kalles fra GET må verifiseres manuelt — helst ved å
+    // deklarere dem STABLE.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='handler']" +
+            ":has(CallExpression[callee.name='createServerFn'] Property[key.name='method'] > Literal[value='GET'])" +
+            ":has(CallExpression[callee.property.name=/^(insert|update|upsert|delete)$/])",
+          message:
+            'GET-serverfunksjoner skal være lesende. Kapselsesjonen sendes automatisk på GET, så en muterende GET er et CSRF-hull (CSRF-middlewaren i src/start.ts unntar GET). Bruk method: "POST" for skriveoperasjoner.',
+        },
+      ],
+    },
+  },
   eslintPluginPrettier,
 );

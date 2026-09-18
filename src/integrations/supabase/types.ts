@@ -1964,6 +1964,33 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_delete_queue: {
+        Row: {
+          attempts: number
+          bucket: string
+          id: number
+          last_error: string | null
+          prefix: string
+          requested_at: string
+        }
+        Insert: {
+          attempts?: number
+          bucket: string
+          id?: number
+          last_error?: string | null
+          prefix: string
+          requested_at?: string
+        }
+        Update: {
+          attempts?: number
+          bucket?: string
+          id?: number
+          last_error?: string | null
+          prefix?: string
+          requested_at?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           comment: string | null

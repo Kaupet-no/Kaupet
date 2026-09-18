@@ -272,6 +272,11 @@ function ConversationPage() {
 
   // Realtime
   useEffect(() => {
+    // Slås av i cleanup: supabase.removeChannel(...) er asynkron, så den
+    // gamle kanalens sene CLOSED-status kan komme inn etter at en ny kanal
+    // (for neste samtale) allerede har meldt SUBSCRIBED. Uten denne sjekken
+    // overskriver den sene CLOSED-en realtimeDown til true permanent.
+    let active = true;
     const channel = supabase
       .channel(`messages:${id}`)
       .on(
@@ -321,11 +326,13 @@ function ConversationPage() {
         },
       )
       .subscribe((status) => {
+        if (!active) return;
         // SUBSCRIBED = kanalen virker → ingen polling. Alt annet
         // (CHANNEL_ERROR/TIMED_OUT/CLOSED) → slå på poll-fallback.
         setRealtimeDown(status !== "SUBSCRIBED");
       });
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

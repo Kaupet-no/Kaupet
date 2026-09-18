@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
+import { act, createElement } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 
 // public/boot.js kjører synkront i <head> og er den eneste som rekker å dekke
 // SSR-malingen med boot-splashen. Den er ren JS uten import/eksport, så den
 // testes ved å kjøre den mot et jsdom-vindu.
 const source = readFileSync(resolve(process.cwd(), "public/boot.js"), "utf8");
+const rootSource = readFileSync(resolve(process.cwd(), "src/routes/__root.tsx"), "utf8");
 
 function bootAt(url: string): string {
   window.history.replaceState(null, "", url);
@@ -34,5 +38,36 @@ describe("boot.js", () => {
     window.sessionStorage.setItem("kaupet.forceNative", "true");
     expect(bootAt("/?forcenative=0")).not.toContain("native-boot");
     window.sessionStorage.clear();
+  });
+
+  it("tillater boot-mutasjon på roten, men rapporterer andre hydreringsfeil", async () => {
+    expect(rootSource).toContain('<html lang="nb" suppressHydrationWarning>');
+
+    const serverMarkup = renderToString(
+      createElement("div", { suppressHydrationWarning: true }, createElement("span", null, "SSR")),
+    );
+    const container = document.createElement("div");
+    container.innerHTML = serverMarkup;
+    document.body.append(container);
+    container.firstElementChild?.classList.add("native-boot");
+    const hydrationErrors: unknown[] = [];
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await act(async () => {
+      hydrateRoot(
+        container,
+        createElement(
+          "div",
+          { suppressHydrationWarning: true },
+          createElement("span", null, "client"),
+        ),
+        { onRecoverableError: (error) => hydrationErrors.push(error) },
+      );
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(hydrationErrors).toHaveLength(1);
+    expect(String(hydrationErrors[0])).toContain("Hydration failed");
+    consoleError.mockRestore();
   });
 });

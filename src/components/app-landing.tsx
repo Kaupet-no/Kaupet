@@ -9,6 +9,7 @@ import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { NewListingDialog } from "@/components/new-listing-dialog";
+import { Button } from "@/components/ui/button";
 
 export function AppLanding({
   adPickerOpen,
@@ -18,7 +19,7 @@ export function AppLanding({
   onAdPickerOpenChange: (open: boolean) => void;
 }) {
   const { openPanel, savedLocation } = useSearchPanel();
-  const { popular, hasPopularitySignal } = usePopularListings(10);
+  const { popular, popularIsError, refetchPopular, hasPopularitySignal } = usePopularListings(10);
   const isTablet = useFormFactor() === "tablet";
   const searchExamples = useDefaultSearchExamples();
   const hasLocation = savedLocation.lat != null && savedLocation.lng != null;
@@ -32,9 +33,12 @@ export function AppLanding({
   // som er nøyaktig det en bruker møter rett etter lansering. Web gjør dette
   // riktig fra før, se PopularCarousel. Er det ingenting under folden,
   // skjules både seksjonen og chevronen som inviterer til å scrolle dit.
-  const isLoadingPopular = popular === undefined;
+  // `popular` er også `undefined` når spørringen FEILER — en feil er ikke en
+  // lastetilstand heller, og skal tilby et forsøk på nytt i stedet for å
+  // pulsere i det uendelige.
+  const isLoadingPopular = popular === undefined && !popularIsError;
   const hasListings = !!popular && popular.length > 0;
-  const hasSectionBelow = isLoadingPopular || hasListings;
+  const hasSectionBelow = isLoadingPopular || hasListings || popularIsError;
 
   const pillClass =
     "native-touch-target inline-flex max-w-full items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition active:opacity-80";
@@ -131,7 +135,16 @@ export function AppLanding({
               Se alle →
             </button>
           </div>
-          {hasListings ? (
+          {popularIsError ? (
+            <div className="mr-5 flex flex-col items-center gap-2 rounded-xl border border-border bg-muted/40 py-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Klarte ikke å hente populære annonser akkurat nå.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void refetchPopular()}>
+                Prøv igjen
+              </Button>
+            </div>
+          ) : hasListings ? (
             isTablet ? (
               <div className="grid grid-cols-3 gap-4 pb-2 pr-5 lg:grid-cols-4 xl:grid-cols-5">
                 {popular.map((listing) => (

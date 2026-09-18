@@ -24,10 +24,6 @@ import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
 
-    // ponytail: fast tall, ikke en innstilling — ingen har bedt om å kunne
-    // stille på en siste skanse som aldri skal utløse i praksis.
-    private static final long SPLASH_SAFETY_VALVE_MS = 15_000;
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // SoftHapticsPlugin, ServerTargetPlugin and ShellThemePlugin live in
@@ -35,7 +31,16 @@ public class MainActivity extends BridgeActivity {
         // autodiscovery (which scans node_modules) never finds them — they
         // must be registered manually, before super.onCreate().
         registerPlugin(SoftHapticsPlugin.class);
-        registerPlugin(ServerTargetPlugin.class);
+        // ServerTargetPlugin is staging-only, the same boundary iOS draws with
+        // #if DEBUG (see KaupetBridgeViewController.capacitorDidLoad in
+        // AppDelegate.swift, and the reasoning in its comment there): set()
+        // decides what origin every future cold launch is built against, and
+        // must not be callable from JS running on the bridge origin in a signed
+        // production build. Gating only the READ of the stored value still left
+        // set() reachable — and it calls recreate().
+        if (isStaging()) {
+            registerPlugin(ServerTargetPlugin.class);
+        }
         registerPlugin(ShellThemePlugin.class);
         registerPlugin(AuthCookiesPlugin.class);
 
@@ -101,19 +106,10 @@ public class MainActivity extends BridgeActivity {
                     if (!isBridgeOrigin(url)) {
                         hideSplash();
                     }
+                    recoverFromDeadServerTarget(url);
                 }
             }
         );
-
-        // Siste skanse: sjekken over dekker enhver side som har MALT på en
-        // fremmed origin, men ikke en app-origin som svarer med noe SPA-en
-        // aldri booter fra (en 5xx-side fra kaupet.no selv, en JS-bunt som
-        // ikke laster). errorPath fanger bare nettverksfeil, ikke
-        // HTTP-feilsider. Med launchAutoHide: false finnes det ellers ingen
-        // vei ut av en frossen splash enn å tvangsavslutte appen. Ventilen er
-        // bevisst romslig: en normal kaldstart har malt og skjult splashen for
-        // lengst, så dette er aldri ventetiden funn 3.8 fjernet.
-        getBridge().getWebView().postDelayed(this::hideSplash, SPLASH_SAFETY_VALVE_MS);
     }
 
     // Sesjonen ligger i en informasjonskapsel (se
@@ -153,10 +149,11 @@ public class MainActivity extends BridgeActivity {
         );
     }
 
-    // The same origin-scoping hides the splash screen forever. With
-    // launchAutoHide: false the ONLY thing that ever dismisses the native
-    // splash is a SplashScreen.hide() call over the bridge, and that bridge is
-    // scoped to the single origin it was created with. Every page outside that
+    // The same origin-scoping hides the splash screen forever. A
+    // SplashScreen.hide() call over the bridge is the only thing that dismisses
+    // the native splash before launchShowDuration's 15s safety valve expires
+    // (see capacitor.config.ts), and that bridge is scoped to the single origin
+    // it was created with. Every page outside that
     // origin is therefore mute: offline.html and index.html on the local
     // origin once a server.url is set (F19, cold launch with no network), but
     // equally Cloudflare Access' login wall on staging, any OAuth redirect and
@@ -204,6 +201,42 @@ public class MainActivity extends BridgeActivity {
             theme
         );
         view.evaluateJavascript(script, null);
+    }
+
+    // Redder appen ut av en død dev-server uten å røre UI. Når et servermål
+    // ligger lagret, er Bridge-en bygget mot DET målet (se onCreate), så
+    // "Velg server"-skjermen (capacitor-shell/index.html) lastes aldri igjen
+    // — den vises kun når INGEN mål er lagret. Slutter Vite-serveren å svare
+    // (utviklerens maskin sover, byttet nettverk), faller Capacitor tilbake
+    // på errorPath: capacitor-shell/offline.html, servert fra appens egen
+    // lokale origin. Der er window.Capacitor aldri injisert — plugin-dispatch
+    // er origin-scoped til origin-en Bridge-en ble opprettet med (server.url),
+    // ikke den lokale origin-en siden er servert fra — så offline.html kan
+    // ikke kalle ServerTarget.set({url: null}) for å rydde opp selv.
+    // DevServerSwitch, som ellers kunne løst det samme, ligger i SPA-en som
+    // aldri booter. Uten dette er eneste vei ut å slette appdata eller
+    // installere på nytt.
+    //
+    // Regelen er trygg: lagret mål ⇒ Bridge mot det målet ⇒ lokal shell-side
+    // kan kun nås via errorPath ⇒ målet er dødt. Etter recreate() er intet
+    // mål lagret lenger, så neste Bridge bygges mot den lokale origin-en, og
+    // DA er "siden er lokal shell" den NORMALE tilstanden — men betingelsen
+    // under er da false (ingenting er lagret), så det looper aldri.
+    //
+    // Bevisst avveining: en forbigående nettverksfeil mot et ellers GYLDIG
+    // staging-mål trigger det samme og sender utvikleren tilbake til
+    // velgeren. Det er akseptabelt for et rent utviklerverktøy — ikke "fiks"
+    // dette til å skille de to tilfellene.
+    private void recoverFromDeadServerTarget(String url) {
+        if (!isStaging() || !isLocalShellPage(url)) {
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences(ServerTargetPlugin.PREFS, MODE_PRIVATE);
+        if (!prefs.contains(ServerTargetPlugin.KEY_URL)) {
+            return;
+        }
+        prefs.edit().remove(ServerTargetPlugin.KEY_URL).apply();
+        runOnUiThread(this::recreate);
     }
 
     private boolean isStaging() {

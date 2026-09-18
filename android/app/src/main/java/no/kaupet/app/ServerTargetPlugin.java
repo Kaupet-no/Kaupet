@@ -17,9 +17,16 @@ import java.net.URL;
 // plugin-dispatch JS injection, because that injection
 // (WebViewCompat.addDocumentStartJavaScript in Bridge.loadWebView, see
 // node_modules/@capacitor/android) is scoped to the single origin the
-// Bridge was created with. Registered unconditionally like SoftHapticsPlugin,
-// but MainActivity only ever reads the stored value on the staging flavor —
-// this is a staging-only mechanism.
+// Bridge was created with.
+//
+// Registered by MainActivity.onCreate ONLY on the staging flavor (package name
+// ending in ".staging") — the same boundary iOS draws with #if DEBUG, see
+// KaupetBridgeViewController.capacitorDidLoad in AppDelegate.swift. set()
+// decides what origin every future cold launch is built against, so it must not
+// be reachable from JS running on the bridge origin in a signed production
+// build; gating only the READ of the stored value would leave set() — which
+// calls recreate() — callable. In production the plugin is simply not
+// registered, and a call from JS rejects with "not implemented".
 @CapacitorPlugin(name = "ServerTarget")
 public class ServerTargetPlugin extends Plugin {
 

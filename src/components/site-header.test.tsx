@@ -12,6 +12,8 @@ type HeaderMembership = {
   organization: { selected_plan: "proff_basis" | "proff" | null };
 };
 
+const defaultHeaderUser = { id: "user-id", email: "user@example.test" };
+
 const headerMocks = vi.hoisted(() => ({
   user: { id: "user-id", email: "user@example.test" } as { id: string; email: string } | null,
   membership: null as HeaderMembership | null,
@@ -56,6 +58,7 @@ afterEach(() => {
   document.body.replaceChildren();
   headerMocks.membership = null;
   headerMocks.loading = false;
+  headerMocks.user = defaultHeaderUser;
 });
 
 describe("HeaderSearchPortal", () => {
@@ -181,7 +184,5 @@ describe("SiteHeader under auth-oppstart", () => {
 
     expect(screen.getByText("Logg inn")).toBeTruthy();
     expect(screen.getByText("Bli medlem")).toBeTruthy();
-
-    headerMocks.user = { id: "user-id", email: "user@example.test" };
   });
 });

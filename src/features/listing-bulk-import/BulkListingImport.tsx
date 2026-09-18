@@ -521,6 +521,7 @@ export function BulkListingImport({
               failedCount={failedCount}
               onDownloadErrors={downloadErrors}
               onNewImport={reset}
+              onOpenChange={onOpenChange}
             />
           )}
         </div>
@@ -566,6 +567,7 @@ function ImportResult({
   failedCount,
   onDownloadErrors,
   onNewImport,
+  onOpenChange,
 }: {
   results: BulkImportResult[];
   createdCount: number;
@@ -573,6 +575,7 @@ function ImportResult({
   failedCount: number;
   onDownloadErrors: () => void;
   onNewImport: () => void;
+  onOpenChange: (open: boolean) => void;
 }) {
   return (
     <section aria-labelledby="bulk-result-title" className="space-y-5">
@@ -617,6 +620,7 @@ function ImportResult({
                     <Link
                       to="/$kaupetCode"
                       params={{ kaupetCode: result.kaupetCode }}
+                      onClick={() => onOpenChange(false)}
                       className="underline"
                     >
                       Åpne annonsen

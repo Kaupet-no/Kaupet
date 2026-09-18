@@ -165,6 +165,14 @@ export type TitleCategorySuggestion = {
   parent_name_nb: string | null;
 };
 
+/** Karosserietiketter som også er vanlige norske ord i helt andre
+ * varekategorier ("pickup" = gitar-/platespillerelement). I søkefeltet er
+ * et falskt treff et ett-klikk-reverserbart filter; her er det det
+ * CategoryConfirm ber selgeren godta, så disse alene er ikke nok bevis.
+ * ponytail: håndholdt liste mot dagens `body_type`-etiketter — vurder å
+ * flagge tvetydige alternativer i `category_filters` hvis den vokser. */
+const AMBIGUOUS_ATTRIBUTE_LABELS = new Set(["pickup", "kombi"]);
+
 /**
  * Client-side fallback for the "Ny annonse" wizard's title-to-category
  * suggestion (see use-listing-title-hints.ts): `suggest_category_for_title`
@@ -183,23 +191,61 @@ export type TitleCategorySuggestion = {
  * step already collapses any all-under-"Bil og MC" suggestion set into a
  * root-level confirmation (see isUnderBilOgMc there), so a root suggestion
  * here degrades gracefully into that same flow.
+ *
+ * Unlike the search bar, a wrong suggestion here isn't a one-tap-reversible
+ * filter — it's what CategoryConfirm asks the seller to accept. Many vehicle
+ * brand names double as ordinary words or non-vehicle product brands (e.g.
+ * "Yamaha keyboard P-125"), so a bare brand match is not enough evidence:
+ * the brand branch additionally requires a whole-word match of a known model
+ * belonging to that brand. No matching model → return null (no suggestion),
+ * which is strictly better than a confidently wrong one. The trade is a
+ * missed suggestion for a legitimate model not yet in the catalog — vehicle
+ * sellers normally go through the registration-number lookup anyway. The
+ * same reasoning applies to the attribute branch: an ambiguous body-type
+ * label alone doesn't count as a match here, and falls back to the
+ * brand+model branch instead.
  */
 export function suggestVehicleCategoryForTitle<
   T extends { id: string; slug: string; name_nb: string; parent_id: string | null },
->(
-  title: string,
-  vehicleBrands: { name: string; category_group: VehicleBrandGroup }[],
-  allFilters: CategoryFilter[],
-  categories: T[],
-  categoriesById: Map<string, CategoryNode & { name_nb: string }>,
-  bilOgMcCategoryId: string | null,
-): TitleCategorySuggestion | null {
+>(params: {
+  title: string;
+  vehicleBrands: { id: string; name: string; category_group: VehicleBrandGroup }[];
+  vehicleModels: { brand_id: string; name: string }[];
+  allFilters: CategoryFilter[];
+  categories: T[];
+  categoriesById: Map<string, CategoryNode & { name_nb: string }>;
+  bilOgMcCategoryId: string | null;
+}): TitleCategorySuggestion | null {
+  const {
+    title,
+    vehicleBrands,
+    vehicleModels,
+    allFilters,
+    categories,
+    categoriesById,
+    bilOgMcCategoryId,
+  } = params;
   const attributeMatch = matchVehicleAttributeOptionPhrase(title, allFilters, categories);
-  const targetCategory = attributeMatch
-    ? (categories.find((c) => c.slug === attributeMatch.categorySlug) ?? null)
+  const usableAttributeMatch =
+    attributeMatch &&
+    AMBIGUOUS_ATTRIBUTE_LABELS.has(attributeMatch.matchedText.trim().toLowerCase())
+      ? null
+      : attributeMatch;
+  const targetCategory = usableAttributeMatch
+    ? (categories.find((c) => c.slug === usableAttributeMatch.categorySlug) ?? null)
     : (() => {
         const brandMatch = matchVehicleBrandPhrase(title, vehicleBrands);
         if (!brandMatch?.brandCategoryGroup) return null;
+        const matchedBrandIds = vehicleBrands
+          .filter((b) => b.name.trim().toLowerCase() === brandMatch.matchedText.toLowerCase())
+          .map((b) => b.id);
+        const hasModelMatch = vehicleModels.some((m) => {
+          if (!matchedBrandIds.includes(m.brand_id)) return false;
+          const name = m.name.trim();
+          if (name.length < 2) return false;
+          return new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(title);
+        });
+        if (!hasModelMatch) return null;
         const candidates = vehicleCategoriesForBrandGroup(
           brandMatch.brandCategoryGroup,
           categories,

@@ -78,10 +78,14 @@ const config: CapacitorConfig = {
       // Splashen skjules når appen faktisk har malt (hideNativeBootSplash i
       // src/lib/native.ts), ikke etter en fast ventetid — før dette ventet
       // appen alltid minst 2s, også med varm WebView (funn 3.8).
-      // launchShowDuration er uten effekt når launchAutoHide er false;
-      // fallbacken hvis kaupet.no ikke svarer er offline.html, som kaller
-      // hide() selv.
-      launchAutoHide: false,
+      // launchShowDuration er en siste skanse på 15 s for sider som aldri
+      // kan kalle hide() over broen (Capacitors plugin-dispatch er scoped til
+      // den ene originen broen ble opprettet med), slik at en frossen splash
+      // aldri blir stående med tvangsavslutning som eneste vei ut. 15 s er
+      // bevisst romslig: en normal kaldstart har malt og skjult splashen for
+      // lengst, så ventilen utløser aldri i praksis.
+      launchAutoHide: true,
+      launchShowDuration: 15000,
       launchFadeOutDuration: 200,
       backgroundColor: "#fbf9f3",
       androidScaleType: "CENTER_INSIDE",

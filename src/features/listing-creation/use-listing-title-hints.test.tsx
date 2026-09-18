@@ -249,6 +249,45 @@ describe("useListingTitleHints", () => {
     vi.useRealTimers();
   });
 
+  it("skjuler klientfallback mens RPC-en laster og viser den etter tomt svar", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    matchWtbListingsForListingMock.mockResolvedValue(null);
+    let resolveSuggestion!: (value: { suggestions: [] }) => void;
+    suggestCategoryForTitleMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSuggestion = resolve;
+      }),
+    );
+    const clientCategoryHint = {
+      category_id: "bil",
+      parent_id: "bilogmc",
+      name_nb: "Bil",
+      parent_name_nb: "Bil og MC",
+    };
+    const { result } = renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Volvo V70 stasjonsvogn",
+          description: "",
+          categoryId: "",
+          categoryTouchedManually: false,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+          clientCategoryHint,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(suggestCategoryForTitleMock).toHaveBeenCalled());
+    expect(result.current.categorySuggestions).toEqual([]);
+
+    await act(async () => resolveSuggestion({ suggestions: [] }));
+
+    await waitFor(() => expect(result.current.categorySuggestions).toEqual([clientCategoryHint]));
+    vi.useRealTimers();
+  });
+
   it("prefers the RPC suggestion over clientCategoryHint when the RPC finds one (regression: sofa)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     suggestCategoryForTitleMock.mockResolvedValue({

@@ -28,18 +28,25 @@ export function useForegroundRefresh(onForeground: () => void, enabled: boolean)
     document.addEventListener("visibilitychange", onVisibility);
 
     // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
+    let disposed = false;
     let removeAppStateListener: (() => void) | undefined;
     if (isNative()) {
-      void import("@capacitor/app").then(({ App }) => {
-        void App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) fire();
-        }).then((handle) => {
-          removeAppStateListener = () => void handle.remove();
-        });
-      });
+      void import("@capacitor/app")
+        .then(({ App }) =>
+          App.addListener("appStateChange", ({ isActive }) => {
+            if (isActive) fire();
+          }),
+        )
+        .then((handle) => {
+          const remove = () => void handle.remove().catch(() => {});
+          if (disposed) remove();
+          else removeAppStateListener = remove;
+        })
+        .catch(() => {});
     }
 
     return () => {
+      disposed = true;
       window.removeEventListener("focus", fire);
       document.removeEventListener("visibilitychange", onVisibility);
       removeAppStateListener?.();

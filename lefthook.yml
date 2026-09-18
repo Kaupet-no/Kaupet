@@ -4,11 +4,11 @@ pre-commit:
       # Hold denne i sync med hva `prettier --check .` dekker i CI — ellers
       # slipper en filtype gjennom hooken og felles først på PR-en. `html` kom
       # med etter at capacitor-shell/*.html gjorde nettopp det.
-      glob: "*.{ts,tsx,js,jsx,css,json,md,html,yml,yaml}"
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs,css,json,md,html,yml,yaml}"
       run: bunx prettier --write {staged_files}
       stage_fixed: true
     lint:
-      glob: "*.{ts,tsx,js,jsx}"
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs}"
       run: bunx eslint {staged_files}
 
 pre-push:

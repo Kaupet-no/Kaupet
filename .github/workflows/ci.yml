@@ -27,6 +27,9 @@ jobs:
       - name: Server/client boundary
         run: bun run check:server-boundary
 
+      - name: Safe-area boundary
+        run: bun run check:safe-area
+
       - name: Lint
         run: bun run lint:ci
 

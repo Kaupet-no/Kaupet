@@ -33,7 +33,10 @@ const allFilters: CategoryFilter[] = [
     label_nb: "Karosseri",
     type: "select",
     unit: null,
-    options: [{ value: "stasjonsvogn", label_nb: "Stasjonsvogn" }],
+    options: [
+      { value: "stasjonsvogn", label_nb: "Stasjonsvogn" },
+      { value: "pickup", label_nb: "Pickup" },
+    ],
     sort_order: 0,
     is_primary: false,
     depends_on_key: null,
@@ -73,18 +76,20 @@ const allFilters: CategoryFilter[] = [
   },
 ];
 
-const vehicleBrands = [{ name: "Volvo", category_group: "bil" as const }];
+const vehicleBrands = [{ id: "volvo", name: "Volvo", category_group: "bil" as const }];
+const vehicleModels = [{ brand_id: "volvo", name: "V70" }];
 
 describe("suggestVehicleCategoryForTitle", () => {
   it("resolves a body-type attribute match straight to the exact leaf category (F6)", () => {
-    const result = suggestVehicleCategoryForTitle(
-      "Volvo V70 stasjonsvogn",
+    const result = suggestVehicleCategoryForTitle({
+      title: "Volvo V70 stasjonsvogn",
       vehicleBrands,
+      vehicleModels,
       allFilters,
       categories,
       categoriesById,
-      bilOgMc.id,
-    );
+      bilOgMcCategoryId: bilOgMc.id,
+    });
     expect(result).toEqual({
       category_id: "bil",
       parent_id: "bilogmc",
@@ -94,43 +99,99 @@ describe("suggestVehicleCategoryForTitle", () => {
   });
 
   it("falls back to a brand match when no category-exclusive attribute is mentioned", () => {
-    const result = suggestVehicleCategoryForTitle(
-      "Volvo V70 automat",
+    const result = suggestVehicleCategoryForTitle({
+      title: "Volvo V70 automat",
       vehicleBrands,
+      vehicleModels,
       allFilters,
       categories,
       categoriesById,
-      bilOgMc.id,
-    );
+      bilOgMcCategoryId: bilOgMc.id,
+    });
     expect(result?.category_id).toBe("bil");
   });
 
   it("suggests the Bil og MC root when a brand group spans more than one category", () => {
-    const ambiguousBrands = [{ name: "Piaggio", category_group: "moped_atv" as const }];
+    const ambiguousBrands = [
+      { id: "piaggio", name: "Piaggio", category_group: "moped_atv" as const },
+    ];
+    const ambiguousModels = [{ brand_id: "piaggio", name: "Liberty" }];
     const ambiguousFilters: CategoryFilter[] = [
       { ...allFilters[1], id: "f-a", category_id: "bil", unit: "moped_atv" },
       { ...allFilters[2], id: "f-b", category_id: "mc", unit: "moped_atv" },
     ];
-    const result = suggestVehicleCategoryForTitle(
-      "Piaggio scooter",
-      ambiguousBrands,
-      ambiguousFilters,
+    const result = suggestVehicleCategoryForTitle({
+      title: "Piaggio Liberty scooter",
+      vehicleBrands: ambiguousBrands,
+      vehicleModels: ambiguousModels,
+      allFilters: ambiguousFilters,
       categories,
       categoriesById,
-      bilOgMc.id,
-    );
+      bilOgMcCategoryId: bilOgMc.id,
+    });
     expect(result?.category_id).toBe(bilOgMc.id);
   });
 
   it("does not touch a plain, non-vehicle title (regression: sofa must keep matching via the RPC path)", () => {
-    const result = suggestVehicleCategoryForTitle(
-      "Sluttbrukertest sofa i grå ull",
+    const result = suggestVehicleCategoryForTitle({
+      title: "Sluttbrukertest sofa i grå ull",
       vehicleBrands,
+      vehicleModels,
       allFilters,
       categories,
       categoriesById,
-      bilOgMc.id,
-    );
+      bilOgMcCategoryId: bilOgMc.id,
+    });
     expect(result).toBeNull();
+  });
+
+  // Kodegjennomgangsfunn: en tittel som treffer et kjøretøymerke, men ingen
+  // modell av det merket, må IKKE foreslå en kjøretøykategori — mange
+  // merkenavn er også vanlige ord eller kjente ikke-kjøretøy-produktmerker
+  // (f.eks. "Yamaha" på tastaturer/høyttalere), og et forslag her er ikke en
+  // ett-klikk-reverserbar filter slik det er i søkefeltet, men det
+  // CategoryConfirm-steget ber selgeren godta.
+  it("does not suggest a vehicle category for a brand match with no matching model (Yamaha keyboard)", () => {
+    const yamahaBrands = [{ id: "yamaha", name: "Yamaha", category_group: "motorsykkel" as const }];
+    const yamahaModels = [{ brand_id: "yamaha", name: "MT-07" }];
+    const result = suggestVehicleCategoryForTitle({
+      title: "Yamaha keyboard P-125",
+      vehicleBrands: yamahaBrands,
+      vehicleModels: yamahaModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMcCategoryId: bilOgMc.id,
+    });
+    expect(result).toBeNull();
+  });
+
+  // Kodegjennomgangsfunn: "Pickup" er en karosserietikett, men også et vanlig
+  // norsk ord for gitar-/platespillerelement — ikke nok bevis alene for
+  // wizardens kostbare, ikke-ett-klikk-reverserbare forslag.
+  it("foreslår ingen kjøretøykategori for en tvetydig karosserietikett alene (Pickup til platespiller)", () => {
+    const result = suggestVehicleCategoryForTitle({
+      title: "Pickup til platespiller",
+      vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMcCategoryId: bilOgMc.id,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("faller tilbake på merke+modell når karosserietiketten er tvetydig", () => {
+    const result = suggestVehicleCategoryForTitle({
+      title: "Volvo V70 pickup",
+      vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMcCategoryId: bilOgMc.id,
+    });
+    expect(result?.category_id).toBe("bil");
   });
 });

@@ -1,17 +1,25 @@
 // Runs synchronously during parsing, before anything paints. Only ever true
 // inside the Capacitor WebView — real kaupet.no visitors never see this
 // class or the #native-boot-splash overlay (see styles.css) — eller når
-// utvikleren har bedt om native-grenene med ?forcenative (samme semantikk
-// som isNative() i src/lib/native.ts, som kjører for sent til å dekke
-// SSR-malingen). Overlayet fjernes uansett når appen mounter, så et
-// ?forcenative mot prod (der flagget er strippet) står ikke fast.
+// utvikleren har bedt om native-grenene med ?forcenative. Dev-flagget er
+// gatet til dev-verter for å ha samme semantikk som isNative() i
+// src/lib/native.ts, der grenen kun finnes bak import.meta.env.DEV og altså
+// er strippet bort i staging/prod-bygg. Ekte Capacitor-deteksjon over er
+// UGATET og virker i alle miljøer. Overlayet fjernes uansett når appen
+// mounter, så et ?forcenative mot prod (der dev-flagget ikke slår inn) står
+// ikke fast.
 (function () {
   var native = !!(
     window.Capacitor &&
     window.Capacitor.isNativePlatform &&
     window.Capacitor.isNativePlatform()
   );
-  if (!native) {
+  if (
+    !native &&
+    /^(localhost|127\.0\.0\.1|10(\.\d{1,3}){3}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.168(\.\d{1,3}){2})$/.test(
+      window.location.hostname,
+    )
+  ) {
     try {
       var p = new URLSearchParams(window.location.search).get("forcenative");
       if (p === null) native = sessionStorage.getItem("kaupet.forceNative") === "true";

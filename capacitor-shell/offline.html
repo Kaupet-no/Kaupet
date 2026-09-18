@@ -18,6 +18,11 @@
         --accent: #d97a3c;
         --primary-fg: #fbf9f3;
         --border: #e5e1d6;
+        /* Safe area alias — se src/styles.css for begrunnelsen */
+        --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+        --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+        --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+        --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -83,11 +88,8 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
-        padding-top: max(24px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
-        padding-bottom: max(
-          24px,
-          calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
-        );
+        padding-top: max(24px, var(--safe-top));
+        padding-bottom: max(24px, calc(6rem + var(--safe-bottom)));
         touch-action: manipulation;
         -webkit-user-select: none;
         user-select: none;
@@ -198,8 +200,8 @@
          — før spillet starter, mens det kjører, og når resultatet vises. */
       .reconnect-control {
         position: fixed;
-        top: max(1rem, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
-        right: max(1rem, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+        top: max(1rem, var(--safe-top));
+        right: max(1rem, var(--safe-right));
         z-index: 20;
       }
       #retry-connection {
@@ -247,10 +249,7 @@
         bottom: 0;
         z-index: 50;
         padding: 0 12px;
-        padding-bottom: max(
-          0.5rem,
-          var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
-        );
+        padding-bottom: max(0.5rem, var(--safe-bottom));
         pointer-events: none;
       }
       .bottom-nav__bar {
@@ -797,9 +796,10 @@
         });
       })();
     </script>
-    <!-- Splashen skjules ikke lenger automatisk (launchAutoHide: false i
-         capacitor.config.ts) — uten dette ville den blitt stående over
-         offline-siden når kaupet.no ikke svarer. Kallet under når kun fram
+    <!-- Splashen skjules ikke når appen har malt, men når noen kaller hide()
+         (se capacitor.config.ts) — uten dette ville den blitt stående over
+         offline-siden i opptil 15 s når kaupet.no ikke svarer, helt til
+         launchShowDuration-ventilen slår inn. Kallet under når kun fram
          på iOS: window.Capacitor er undefined her på Android av samme grunn
          som data-theme må injiseres nativt (se over). Android skjuler i
          stedet splashen fra MainActivity.hideSplash(). -->

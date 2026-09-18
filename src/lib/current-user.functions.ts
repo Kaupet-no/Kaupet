@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
 
 import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
 
@@ -25,6 +26,12 @@ export const getSessionUser = createServerFn({ method: "GET" }).handler(
     // seg på all SSR. Samme mønster som auth-middleware.ts.
     const { data, error } = await supabase.auth.getClaims();
     if (error || !data?.claims?.sub) return null;
+
+    // HTML-en bærer nå brukeridentitet fra kapselsesjonen. `private` hindrer
+    // en delt cache (CDN/edge) i å servere denne siden til en annen bruker.
+    // Ikke `no-store`: den ville også slått av bfcache og gjort
+    // tilbakenavigasjon dyrere enn nødvendig.
+    setResponseHeader("Cache-Control", "private, no-cache");
 
     const email = data.claims.email;
     return { id: data.claims.sub, email: typeof email === "string" ? email : null };

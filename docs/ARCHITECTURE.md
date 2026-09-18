@@ -11,7 +11,8 @@ Kaupet består av:
 
 - TanStack Start med React og Vite for web- og serverlaget.
 - Cloudflare Workers som produksjonsruntime for serverfunksjoner.
-- Supabase for Postgres, Auth, Storage, Realtime og RLS.
+- Supabase for Postgres, Auth, Realtime og RLS.
+- Cloudflare R2 for bildelagring (annonser, avatarer, 360-frames, meldingsvedlegg).
 - Capacitor som native skall rundt samme webapplikasjon for iOS og Android.
 - TanStack Query for servertilstand og React Hook Form/Zod for skjemaer.
 
@@ -22,6 +23,8 @@ Eksterne tredjepartstjenester (kalt kun server-side, se § 3):
 
 - Vipps/MobilePay for betaling (promoteringer).
 - Cloudflare Turnstile for bot-beskyttelse ved annonsepublisering.
+- Cloudflare R2 (S3-kompatibelt API) for bildelagring; autorisasjon håndheves
+  av serverfunksjoner, ikke bucket-policyer.
 - Statens Vegvesen (Datautlevering) for kjøretøyoppslag.
 - Mistral API (Mistral Small 4) for AI-basert kategoriforslag, som fallback
   når vote-basert forslag mangler treffsikker historikk.

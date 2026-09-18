@@ -1,5 +1,11 @@
 import { createContext, useContext } from "react";
-import type { User } from "@supabase/supabase-js";
+
+/** Konteksten seedes både fra en ekte Supabase-`User` (klienten) og fra
+ * serverens kapselsesjon (`SessionUser`, se AuthProvider). De to har ikke
+ * samme form — bare `id` og `email` er garantert til stede i begge ved
+ * første maling. `AuthUser` smalner derfor typen til fellesmengden, i
+ * stedet for å late som om vi alltid har en full `User`. */
+export type AuthUser = { id: string; email?: string | null };
 
 /** Bevisst uten `session`. Serveren kjenner brukeren fra kapselen (se
  * AuthProvider), men har ingen ekte `Session` å seede — den bærer
@@ -9,7 +15,7 @@ import type { User } from "@supabase/supabase-js";
  * som er uenige om du er innlogget. Trenger du et token: bruk
  * `supabase.auth.getSession()` direkte. */
 export interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
 }
 

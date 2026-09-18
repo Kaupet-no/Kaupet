@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthContext } from "@/hooks/use-auth";
+import { AuthContext, type AuthUser } from "@/hooks/use-auth";
 import type { SessionUser } from "@/lib/current-user.functions";
 
 /** `initialUser` kommer fra serveren, som nå kan lese sesjonen fra kapselen
@@ -18,9 +17,7 @@ export function AuthProvider({
   children: ReactNode;
   initialUser?: SessionUser | null;
 }) {
-  const [user, setUser] = useState<User | null>(
-    initialUser ? ({ id: initialUser.id, email: initialUser.email ?? undefined } as User) : null,
-  );
+  const [user, setUser] = useState<AuthUser | null>(initialUser ?? null);
   const [loading, setLoading] = useState(initialUser === undefined);
 
   useEffect(() => {

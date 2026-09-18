@@ -16,12 +16,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   statusCallback: null as ((status: string) => void) | null,
+  statusCallbacks: [] as ((status: string) => void)[],
   queryCalls: [] as { key: unknown[]; opts: Record<string, unknown> }[],
+  routeId: "conv-1",
 }));
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => ({
-    useParams: () => ({ id: "conv-1" }),
+    useParams: () => ({ id: mocks.routeId }),
     useSearch: () => ({}),
     options,
   }),
@@ -49,6 +51,7 @@ vi.mock("@/integrations/supabase/client", () => {
     on: () => channel,
     subscribe: (cb: (status: string) => void) => {
       mocks.statusCallback = cb;
+      mocks.statusCallbacks.push(cb);
       return channel;
     },
   };
@@ -106,7 +109,9 @@ function lastQueryOptsFor(keyPrefix: string) {
 
 beforeEach(() => {
   mocks.statusCallback = null;
+  mocks.statusCallbacks = [];
   mocks.queryCalls = [];
+  mocks.routeId = "conv-1";
 });
 
 afterEach(() => {
@@ -148,5 +153,31 @@ describe("meldinger.$id — realtime-fallback (F16)", () => {
       mocks.statusCallback?.("SUBSCRIBED");
     });
     expect(lastQueryOptsFor("messages")?.refetchInterval).toBe(false);
+  });
+
+  it("ignorerer CLOSED fra en utgått kanal etter samtalebytte", () => {
+    const { rerender } = render(<ConversationPage />);
+    const channel1Status = mocks.statusCallbacks[0];
+
+    act(() => {
+      channel1Status("SUBSCRIBED");
+    });
+
+    mocks.routeId = "conv-2";
+    rerender(<ConversationPage />);
+    const channel2Status = mocks.statusCallbacks[1];
+
+    act(() => {
+      channel2Status("SUBSCRIBED");
+    });
+
+    // Kanal 1 sin CLOSED kommer inn asynkront, etter at kanal 2 allerede
+    // er SUBSCRIBED — den skal ikke slå på polling igjen.
+    act(() => {
+      channel1Status("CLOSED");
+    });
+
+    expect(lastQueryOptsFor("messages")?.refetchInterval).toBe(false);
+    expect(lastQueryOptsFor("conversation")?.refetchInterval).toBe(false);
   });
 });

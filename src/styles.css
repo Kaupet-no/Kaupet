@@ -290,8 +290,9 @@
    as the fallback for iOS/web, where it's already correct and no such
    variable is ever injected. Skriv aldri uttrykket ut på nytt på et kallsted —
    bruk aliasene under. De to frittstående skallsidene (capacitor-shell/*.html)
-   har hver sin kopi fordi de ikke går gjennom denne fila; utenom dem skal et
-   søk etter `env(safe-area-inset` kun treffe denne blokka. */
+   har hver sin kopi fordi de ikke går gjennom denne fila; utenom dem håndheves
+   regelen av `bun run check:safe-area` (scripts/check-safe-area.mjs), som
+   feiler CI-en hvis `env(safe-area-inset` dukker opp andre steder. */
 :root {
   --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));

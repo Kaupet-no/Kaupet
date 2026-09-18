@@ -207,15 +207,24 @@ const AMBIGUOUS_ATTRIBUTE_LABELS = new Set(["pickup", "kombi"]);
  */
 export function suggestVehicleCategoryForTitle<
   T extends { id: string; slug: string; name_nb: string; parent_id: string | null },
->(
-  title: string,
-  vehicleBrands: { id: string; name: string; category_group: VehicleBrandGroup }[],
-  vehicleModels: { brand_id: string; name: string }[],
-  allFilters: CategoryFilter[],
-  categories: T[],
-  categoriesById: Map<string, CategoryNode & { name_nb: string }>,
-  bilOgMcCategoryId: string | null,
-): TitleCategorySuggestion | null {
+>(params: {
+  title: string;
+  vehicleBrands: { id: string; name: string; category_group: VehicleBrandGroup }[];
+  vehicleModels: { brand_id: string; name: string }[];
+  allFilters: CategoryFilter[];
+  categories: T[];
+  categoriesById: Map<string, CategoryNode & { name_nb: string }>;
+  bilOgMcCategoryId: string | null;
+}): TitleCategorySuggestion | null {
+  const {
+    title,
+    vehicleBrands,
+    vehicleModels,
+    allFilters,
+    categories,
+    categoriesById,
+    bilOgMcCategoryId,
+  } = params;
   const attributeMatch = matchVehicleAttributeOptionPhrase(title, allFilters, categories);
   const usableAttributeMatch =
     attributeMatch &&

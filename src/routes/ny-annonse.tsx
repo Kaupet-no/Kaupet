@@ -1033,15 +1033,15 @@ function NewListingPage() {
   const clientCategoryHint = useMemo(
     () =>
       debouncedTitleForVehicleHint.length >= 5
-        ? suggestVehicleCategoryForTitle(
-            debouncedTitleForVehicleHint,
-            vehicleBrands ?? [],
-            vehicleModels ?? [],
-            allFilters ?? [],
-            categories ?? [],
+        ? suggestVehicleCategoryForTitle({
+            title: debouncedTitleForVehicleHint,
+            vehicleBrands: vehicleBrands ?? [],
+            vehicleModels: vehicleModels ?? [],
+            allFilters: allFilters ?? [],
+            categories: categories ?? [],
             categoriesById,
             bilOgMcCategoryId,
-          )
+          })
         : null,
     [
       debouncedTitleForVehicleHint,

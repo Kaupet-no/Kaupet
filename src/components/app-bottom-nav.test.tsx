@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { UserAvatarButton } from "./app-bottom-nav";
+import { AuthPendingButton, UserAvatarButton } from "./app-bottom-nav";
 import { hapticImpact } from "@/lib/haptics";
 
 let unreadCount = 0;
@@ -58,5 +58,23 @@ describe("UserAvatarButton", () => {
 
     expect(hapticImpact).toHaveBeenCalledOnce();
     expect(hapticImpact).toHaveBeenCalledWith("light");
+  });
+});
+
+describe("AuthPendingButton", () => {
+  // Vises i bunnnavigasjonen i de ~100 ms der sesjonen ennå ikke er lest fra
+  // localStorage. Knappen skal verken navigere feil eller se død ut.
+  it("er ikke trykkbar, så et tidlig trykk ikke sender brukeren til innlogging", () => {
+    render(<AuthPendingButton label="Ny annonse" />);
+
+    const button = screen.getByRole("button", { name: "Ny annonse (laster)" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("viser en spinner som markerer at noe lastes", () => {
+    const { container } = render(<AuthPendingButton label="Meldinger" />);
+
+    expect(container.querySelector(".animate-spin")).toBeTruthy();
   });
 });

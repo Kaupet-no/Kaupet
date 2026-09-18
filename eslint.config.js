@@ -17,6 +17,7 @@ export default tseslint.config(
       "android/.gradle/**",
       "android/app/build/**",
       "android/build/**",
+      ".claude/worktrees/**",
     ],
   },
   {

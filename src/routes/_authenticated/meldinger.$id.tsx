@@ -9,6 +9,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useForegroundRefresh } from "@/hooks/use-foreground-refresh";
 import {
   IMAGE_ACCEPT,
   signListingImageUrls,
@@ -58,6 +59,13 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   ),
 });
 
+// Poll-fallback når realtime-kanalen for denne samtalen ikke er SUBSCRIBED
+// (CHANNEL_ERROR/TIMED_OUT/CLOSED — f.eks. når Supabase realtime svarer 500,
+// som i staging per F16). 5s føles "levende" nok for en aktiv samtale, og
+// kostnaden er begrenset: det er kun den ene åpne samtalen som poller, og
+// kun mens kanalen faktisk er nede.
+export const MESSAGES_POLL_INTERVAL_MS = 5_000;
+
 function ConversationPage() {
   const { data: businessMembership } = useBusinessMembership();
   const isBusinessSuperuser =
@@ -87,6 +95,9 @@ function ConversationPage() {
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendAttemptRef = useRef<{ clientId: string; attachmentPath: string | null } | null>(null);
+  // true når realtime-kanalen for samtalen ikke er SUBSCRIBED — se
+  // MESSAGES_POLL_INTERVAL_MS.
+  const [realtimeDown, setRealtimeDown] = useState(false);
 
   const { data: myBlocks } = useQuery({
     queryKey: ["my-blocks"],
@@ -106,6 +117,10 @@ function ConversationPage() {
   } = useQuery({
     queryKey: ["conversation", id, isBusinessSuperuser],
     enabled: !!user,
+    // Leserkvitteringer (buyer/seller_last_read_at) kommer via samme
+    // realtime-kanal som meldingene (UPDATE på conversations) — samme
+    // polling-fallback dekker derfor begge.
+    refetchInterval: realtimeDown ? MESSAGES_POLL_INTERVAL_MS : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("conversations")
@@ -171,6 +186,7 @@ function ConversationPage() {
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", id],
     enabled: !!user,
+    refetchInterval: realtimeDown ? MESSAGES_POLL_INTERVAL_MS : false,
     queryFn: async (): Promise<Message[]> => {
       const { data, error } = await supabase
         .from("messages")
@@ -252,6 +268,11 @@ function ConversationPage() {
 
   // Realtime
   useEffect(() => {
+    // Slås av i cleanup: supabase.removeChannel(...) er asynkron, så den
+    // gamle kanalens sene CLOSED-status kan komme inn etter at en ny kanal
+    // (for neste samtale) allerede har meldt SUBSCRIBED. Uten denne sjekken
+    // overskriver den sene CLOSED-en realtimeDown til true permanent.
+    let active = true;
     const channel = supabase
       .channel(`messages:${id}`)
       .on(
@@ -300,12 +321,25 @@ function ConversationPage() {
           );
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (!active) return;
+        // SUBSCRIBED = kanalen virker → ingen polling. Alt annet
+        // (CHANNEL_ERROR/TIMED_OUT/CLOSED) → slå på poll-fallback.
+        setRealtimeDown(status !== "SUBSCRIBED");
+      });
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, queryClient, userId]);
+
+  // Fallback: refresh samtale + meldinger når fanen/appen får fokus igjen
+  // (i tilfelle realtime ikke leverer) — samme mønster som use-unread.ts.
+  useForegroundRefresh(() => {
+    queryClient.invalidateQueries({ queryKey: ["messages", id] });
+    queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+  }, !!user);
 
   // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {

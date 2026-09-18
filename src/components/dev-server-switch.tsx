@@ -1,9 +1,22 @@
 import { useState } from "react";
 import { Laptop } from "lucide-react";
+import { registerPlugin } from "@capacitor/core";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { STAGING_HOST } from "@/hooks/use-should-show-dev-server-switch";
-import { localDevServerUrl } from "@/lib/dev-server-url";
+import { androidNavigationUrl, localDevServerUrl } from "@/lib/dev-server-url";
+
+interface ServerTargetPlugin {
+  set(options: { url: string | null }): Promise<void>;
+}
+
+// Bridges to the native ServerTargetPlugin. Persists the choice natively and
+// restarts the native bridge so the next Bridge is created with server.url
+// already pointing at the target — see the platform bridge setup and
+// the comment on this same plugin call in capacitor-shell/index.html for why
+// that (not a WebView redirect to the shell) is what keeps native plugins
+// working after a server switch.
+const ServerTarget = registerPlugin<ServerTargetPlugin>("ServerTarget");
 
 export function DevServerSwitch() {
   const currentHost = window.location.host;
@@ -17,15 +30,15 @@ export function DevServerSwitch() {
       setError("Bruk localhost eller en privat IP-adresse med port.");
       return;
     }
-    // Via skallet (capacitor-shell/index.html, servert på androidScheme
-    // "https://localhost/") i stedet for direkte navigering, slik at
-    // valget lagres og brukes igjen på neste kaldstart — se STORAGE_KEY
-    // der.
-    window.location.assign(`https://localhost/index.html?target=${url.host}`);
+    ServerTarget.set({ url: androidNavigationUrl(url).href }).catch(() => {
+      setError("Appen klarte ikke å bytte server. Prøv igjen.");
+    });
   };
 
   const backToStaging = () => {
-    window.location.assign("https://localhost/index.html?target=staging");
+    ServerTarget.set({ url: "https://staging.kaupet.no" }).catch(() => {
+      setError("Appen klarte ikke å bytte server. Prøv igjen.");
+    });
   };
 
   return (
@@ -58,15 +71,6 @@ export function DevServerSwitch() {
                   aria-invalid={!!error}
                   aria-describedby={error ? "dev-server-address-error" : undefined}
                 />
-                {error && (
-                  <p
-                    id="dev-server-address-error"
-                    className="text-sm text-destructive"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
-                )}
                 <Button
                   type="button"
                   variant="secondary"
@@ -80,6 +84,15 @@ export function DevServerSwitch() {
               <Button type="button" variant="secondary" className="mt-3" onClick={backToStaging}>
                 Tilbake til staging.kaupet.no
               </Button>
+            )}
+            {error && (
+              <p
+                id="dev-server-address-error"
+                className="mt-3 text-sm text-destructive"
+                role="alert"
+              >
+                {error}
+              </p>
             )}
           </div>
         </div>

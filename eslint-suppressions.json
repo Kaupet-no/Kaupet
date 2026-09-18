@@ -97,11 +97,6 @@
       "count": 1
     }
   },
-  "src/hooks/use-is-native.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/hooks/use-push-status.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1

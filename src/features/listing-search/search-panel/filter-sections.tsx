@@ -200,7 +200,7 @@ export function SearchFilterSections({
   };
 
   const overview = (
-    <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+    <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+var(--safe-bottom))]">
       {activeItems && activeItems.length > 0 && (
         <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
       )}
@@ -529,7 +529,7 @@ export function SearchFilterSections({
       ) : overviewOpen ? (
         overview
       ) : (
-        <div className="@container flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <div className="@container flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+var(--safe-bottom))]">
           <button
             type="button"
             onClick={() => setOverviewOpen(true)}

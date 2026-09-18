@@ -42,6 +42,7 @@ export function PreviewDraftView({ draft, onClose }: { draft: PreviewDraft; onCl
           noKnownIssues={draft.noKnownIssues}
           maintenanceHistory={draft.maintenanceHistory}
           category={draft.category}
+          categoryId={draft.categoryId}
           images={draft.images}
           imgUrls={draft.imgUrls}
           attributes={draft.attributes}

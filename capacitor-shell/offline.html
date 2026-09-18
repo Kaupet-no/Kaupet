@@ -18,6 +18,11 @@
         --accent: #d97a3c;
         --primary-fg: #fbf9f3;
         --border: #e5e1d6;
+        /* Safe area alias — se src/styles.css for begrunnelsen */
+        --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+        --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+        --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+        --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -28,6 +33,31 @@
           --muted: #a3a3a3;
           --border: #2a2a2a;
         }
+      }
+      /* This page is served from the app's own local origin, never from
+         kaupet.no — so it never sees the app's kaupet_theme localStorage
+         choice, and window.Capacitor is never injected here either (see
+         ShellThemePlugin.java). MainActivity injects data-theme on load
+         instead (evaluateJavascript works on any origin, unlike the
+         plugin-dispatch bridge). Higher specificity than the bare :root
+         above wins over the OS media query when the app's own choice is
+         known; prefers-color-scheme stays as the fallback for when it
+         isn't (fresh install, iOS — see native-setup.ts). */
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0f0f0f;
+        --surface: #1a1a1a;
+        --fg: #f5f5f5;
+        --muted: #a3a3a3;
+        --border: #2a2a2a;
+      }
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg: #fbf9f3;
+        --surface: #ffffff;
+        --fg: #1a1a1a;
+        --muted: #6b6b6b;
+        --border: #e5e1d6;
       }
       * {
         box-sizing: border-box;
@@ -58,8 +88,8 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
-        padding-top: max(24px, env(safe-area-inset-top));
-        padding-bottom: max(24px, calc(6rem + env(safe-area-inset-bottom)));
+        padding-top: max(24px, var(--safe-top));
+        padding-bottom: max(24px, calc(6rem + var(--safe-bottom)));
         touch-action: manipulation;
         -webkit-user-select: none;
         user-select: none;
@@ -170,8 +200,8 @@
          — før spillet starter, mens det kjører, og når resultatet vises. */
       .reconnect-control {
         position: fixed;
-        top: max(1rem, env(safe-area-inset-top));
-        right: max(1rem, env(safe-area-inset-right));
+        top: max(1rem, var(--safe-top));
+        right: max(1rem, var(--safe-right));
         z-index: 20;
       }
       #retry-connection {
@@ -219,7 +249,7 @@
         bottom: 0;
         z-index: 50;
         padding: 0 12px;
-        padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+        padding-bottom: max(0.5rem, var(--safe-bottom));
         pointer-events: none;
       }
       .bottom-nav__bar {
@@ -766,9 +796,13 @@
         });
       })();
     </script>
-    <!-- Splashen skjules ikke lenger automatisk (launchAutoHide: false i
-         capacitor.config.ts) — uten dette ville den blitt stående over
-         offline-siden når kaupet.no ikke svarer. -->
+    <!-- Splashen skjules ikke når appen har malt, men når noen kaller hide()
+         (se capacitor.config.ts) — uten dette ville den blitt stående over
+         offline-siden i opptil 15 s når kaupet.no ikke svarer, helt til
+         launchShowDuration-ventilen slår inn. Kallet under når kun fram
+         på iOS: window.Capacitor er undefined her på Android av samme grunn
+         som data-theme må injiseres nativt (se over). Android skjuler i
+         stedet splashen fra MainActivity.hideSplash(). -->
     <script>
       try {
         window.Capacitor &&

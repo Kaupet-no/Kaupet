@@ -1,4 +1,5 @@
-import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
+import type { CategoryFilter, CategoryNode, VehicleBrandGroup } from "@/lib/category-filters";
+import { vehicleCategoriesForBrandGroup } from "@/lib/category-filters";
 
 export type CategoryMatch = {
   matchedText: string;
@@ -155,6 +156,118 @@ export function matchVehicleAttributeOptionPhrase<
     }
   }
   return best;
+}
+
+export type TitleCategorySuggestion = {
+  category_id: string;
+  parent_id: string | null;
+  name_nb: string;
+  parent_name_nb: string | null;
+};
+
+/** Karosserietiketter som også er vanlige norske ord i helt andre
+ * varekategorier ("pickup" = gitar-/platespillerelement). I søkefeltet er
+ * et falskt treff et ett-klikk-reverserbart filter; her er det det
+ * CategoryConfirm ber selgeren godta, så disse alene er ikke nok bevis.
+ * ponytail: håndholdt liste mot dagens `body_type`-etiketter — vurder å
+ * flagge tvetydige alternativer i `category_filters` hvis den vokser. */
+const AMBIGUOUS_ATTRIBUTE_LABELS = new Set(["pickup", "kombi"]);
+
+/**
+ * Client-side fallback for the "Ny annonse" wizard's title-to-category
+ * suggestion (see use-listing-title-hints.ts): `suggest_category_for_title`
+ * (the RPC behind it) only matches free-text lexemes against historical
+ * listings and category *names*, so a vehicle title like "Volvo V70
+ * stasjonsvogn" — brand, model, no category name — never matches. Reuses the
+ * same brand/attribute matchers the search bar (annonser.tsx) already relies
+ * on for the identical problem, rather than teaching the RPC about brands.
+ *
+ * Tries the attribute match first (e.g. "Stasjonsvogn" → "Bil" directly,
+ * since that `body_type` option is category-exclusive) since it resolves to
+ * an exact leaf category. Falls back to a brand match (e.g. "Volvo" → the
+ * "car" group), which can span more than one category
+ * (`vehicleCategoriesForBrandGroup`) — when ambiguous, suggests the "Bil og
+ * MC" root itself rather than guessing a leaf; the wizard's CategoryConfirm
+ * step already collapses any all-under-"Bil og MC" suggestion set into a
+ * root-level confirmation (see isUnderBilOgMc there), so a root suggestion
+ * here degrades gracefully into that same flow.
+ *
+ * Unlike the search bar, a wrong suggestion here isn't a one-tap-reversible
+ * filter — it's what CategoryConfirm asks the seller to accept. Many vehicle
+ * brand names double as ordinary words or non-vehicle product brands (e.g.
+ * "Yamaha keyboard P-125"), so a bare brand match is not enough evidence:
+ * the brand branch additionally requires a whole-word match of a known model
+ * belonging to that brand. No matching model → return null (no suggestion),
+ * which is strictly better than a confidently wrong one. The trade is a
+ * missed suggestion for a legitimate model not yet in the catalog — vehicle
+ * sellers normally go through the registration-number lookup anyway. The
+ * same reasoning applies to the attribute branch: an ambiguous body-type
+ * label alone doesn't count as a match here, and falls back to the
+ * brand+model branch instead.
+ */
+export function suggestVehicleCategoryForTitle<
+  T extends { id: string; slug: string; name_nb: string; parent_id: string | null },
+>(params: {
+  title: string;
+  vehicleBrands: { id: string; name: string; category_group: VehicleBrandGroup }[];
+  vehicleModels: { brand_id: string; name: string }[];
+  allFilters: CategoryFilter[];
+  categories: T[];
+  categoriesById: Map<string, CategoryNode & { name_nb: string }>;
+  bilOgMcCategoryId: string | null;
+}): TitleCategorySuggestion | null {
+  const {
+    title,
+    vehicleBrands,
+    vehicleModels,
+    allFilters,
+    categories,
+    categoriesById,
+    bilOgMcCategoryId,
+  } = params;
+  const attributeMatch = matchVehicleAttributeOptionPhrase(title, allFilters, categories);
+  const usableAttributeMatch =
+    attributeMatch &&
+    AMBIGUOUS_ATTRIBUTE_LABELS.has(attributeMatch.matchedText.trim().toLowerCase())
+      ? null
+      : attributeMatch;
+  const targetCategory = usableAttributeMatch
+    ? (categories.find((c) => c.slug === usableAttributeMatch.categorySlug) ?? null)
+    : (() => {
+        const brandMatch = matchVehicleBrandPhrase(title, vehicleBrands);
+        if (!brandMatch?.brandCategoryGroup) return null;
+        const matchedBrandIds = vehicleBrands
+          .filter((b) => b.name.trim().toLowerCase() === brandMatch.matchedText.toLowerCase())
+          .map((b) => b.id);
+        const hasModelMatch = vehicleModels.some((m) => {
+          if (!matchedBrandIds.includes(m.brand_id)) return false;
+          const name = m.name.trim();
+          if (name.length < 2) return false;
+          return new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(title);
+        });
+        if (!hasModelMatch) return null;
+        const candidates = vehicleCategoriesForBrandGroup(
+          brandMatch.brandCategoryGroup,
+          categories,
+          allFilters,
+          categoriesById,
+        );
+        if (candidates.length === 1) return candidates[0];
+        return bilOgMcCategoryId
+          ? (categories.find((c) => c.id === bilOgMcCategoryId) ?? null)
+          : null;
+      })();
+  if (!targetCategory) return null;
+
+  const parent = targetCategory.parent_id
+    ? categoriesById.get(targetCategory.parent_id)
+    : undefined;
+  return {
+    category_id: targetCategory.id,
+    parent_id: targetCategory.parent_id,
+    name_nb: targetCategory.name_nb,
+    parent_name_nb: parent?.name_nb ?? null,
+  };
 }
 
 /** Removes the matched category-name phrase from the raw query, keeping any

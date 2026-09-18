@@ -126,7 +126,7 @@ function MyListingsPage() {
   // fortsatt eier invalidering etter mutasjoner.
   const initialRows = Route.useLoaderData();
   const fetchMyListings = useServerFn(getMyListingRows);
-  const { data: rows, isLoading } = useQuery({
+  const { data: rows } = useQuery({
     queryKey: ["my-listings"],
     queryFn: () => fetchMyListings(),
     initialData: initialRows,
@@ -264,11 +264,7 @@ function MyListingsPage() {
           )}
           {tab !== "wtb" && (
             <TabsContent value={tab} className="mt-6">
-              {isLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" /> Laster annonser…
-                </div>
-              ) : filtered.length === 0 ? (
+              {filtered.length === 0 ? (
                 <EmptyState
                   title={
                     rows && rows.length > 0

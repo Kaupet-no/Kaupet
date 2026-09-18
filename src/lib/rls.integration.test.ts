@@ -178,6 +178,41 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
     expect(second.data?.id).toBe(first.data?.id);
   });
 
+  // R2-migreringen fjernet storage.objects-eksistenssjekken for
+  // meldingsvedlegg (se 20260918220000_r2_storage_objects_validation_fixes.sql)
+  // — attachment_path kan ikke lenger verifiseres mot en lagret fil, kun mot
+  // formatet {conversationId}/{uuid}.{ext} for DENNE samtalen.
+  it("accepts a well-formed attachment_path for the conversation but rejects a mismatched or malformed one", async () => {
+    const buyerId = userIds[0]!;
+
+    const { error: okError } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Se vedlagt bilde",
+      _attachment_path: `${conversationId}/${crypto.randomUUID()}.jpg`,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(okError).toBeNull();
+
+    const { error: wrongConversationError } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Feil samtale-id i stien",
+      _attachment_path: `${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(wrongConversationError).not.toBeNull();
+
+    const { error: malformedError } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Ugyldig filnavn i stien",
+      _attachment_path: `${conversationId}/not-a-uuid.jpg`,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(malformedError).not.toBeNull();
+  });
+
   it("rejects direct profile writes, including valid-length names (M-7)", async () => {
     const buyer = await signIn(emails.buyer);
     const {
@@ -2455,6 +2490,14 @@ describe.skipIf(!canRun)(
       return signInWithRetry(email);
     }
 
+    // R2-migreringen: nøkkelen har ikke lenger uploader-id i seg
+    // ({listingId}/{uuid}.{ext}, se validate_listing_image_reference i
+    // 20260918220000_r2_storage_objects_validation_fixes.sql), og det finnes
+    // ingen storage.objects-rad å opprette. Innsettingen gjøres derfor som
+    // den innloggede selgeren (ikke admin/service-role) — akkurat slik
+    // use-inline-listing-images.ts og ny-annonse.tsx faktisk setter inn rader
+    // fra klienten — siden triggerens autorisasjonssjekk nå bruker
+    // auth.uid(), som er NULL for en service-role-innsetting.
     beforeAll(async () => {
       const mkUser = async (email: string) => {
         const { data, error } = await admin.auth.admin.createUser({
@@ -2482,12 +2525,9 @@ describe.skipIf(!canRun)(
       if (listingErr) throw listingErr;
       draftListingId = listing.id;
 
-      imagePath = `${sellerId}/${draftListingId}/rls-test-${suffix}.jpg`;
-      const { error: uploadError } = await admin.storage
-        .from("listing-images")
-        .upload(imagePath, new Blob(["test"], { type: "image/jpeg" }), { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data: image, error: imageErr } = await admin
+      const seller = await signIn(emails.seller);
+      imagePath = `${draftListingId}/${crypto.randomUUID()}.jpg`;
+      const { data: image, error: imageErr } = await seller
         .from("listing_images")
         .insert({ listing_id: draftListingId, storage_path: imagePath })
         .select("id")
@@ -2499,7 +2539,6 @@ describe.skipIf(!canRun)(
     afterAll(async () => {
       if (!canRun) return;
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
-      await admin.storage.from("listing-images").remove([imagePath]);
     });
 
     it("lets the owner see images on their own draft listing", async () => {
@@ -2532,10 +2571,83 @@ describe.skipIf(!canRun)(
 
     it("blocks a non-owner from adding images to someone else's listing", async () => {
       const other = await signIn(emails.other);
-      const { error } = await other
-        .from("listing_images")
-        .insert({ listing_id: draftListingId, storage_path: `rls-hijack/${suffix}.jpg` });
+      const { error } = await other.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${draftListingId}/${crypto.randomUUID()}.jpg`,
+      });
       expect(error).not.toBeNull();
+    });
+
+    // Regresjonsdekning for R2-migreringens nøkkelskjemabytte: dette er
+    // nettopp bruddet som ikke ble fanget opp fordi enhetstestene mocker
+    // databasen (se validate_listing_image_reference i
+    // 20260918220000_r2_storage_objects_validation_fixes.sql). Kjører ekte
+    // INSERT-er mot Postgres som den eide selgeren, ikke bare RLS-policyen på
+    // tabellen (som slipper alle formater gjennom) — dette tester
+    // trigger-funksjonens egen path-validering.
+    it("accepts the new {listingId}/{uuid}.ext path but rejects malformed or mismatched ones", async () => {
+      const seller = await signIn(emails.seller);
+
+      const { error: okError } = await seller.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${draftListingId}/${crypto.randomUUID()}.jpg`,
+      });
+      expect(okError).toBeNull();
+
+      const { error: oldFormatError } = await seller.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${sellerId}/${draftListingId}/${crypto.randomUUID()}.jpg`,
+      });
+      expect(oldFormatError).not.toBeNull();
+
+      const { error: wrongListingError } = await seller.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`,
+      });
+      expect(wrongListingError).not.toBeNull();
+
+      const { error: notUuidError } = await seller.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${draftListingId}/not-a-uuid.jpg`,
+      });
+      expect(notUuidError).not.toBeNull();
+
+      const { error: badExtError } = await seller.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${draftListingId}/${crypto.randomUUID()}.svg`,
+      });
+      expect(badExtError).not.toBeNull();
+    });
+
+    it("still enforces the 20-images-per-listing cap", async () => {
+      const owner = await signIn(emails.seller);
+      const { data: capListing, error: capListingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS image cap test listing",
+          price_nok: 100,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (capListingErr) throw capListingErr;
+
+      for (let i = 0; i < 20; i++) {
+        const { error } = await owner.from("listing_images").insert({
+          listing_id: capListing.id,
+          storage_path: `${capListing.id}/${crypto.randomUUID()}.jpg`,
+        });
+        expect(error).toBeNull();
+      }
+
+      const { error: overCapError } = await owner.from("listing_images").insert({
+        listing_id: capListing.id,
+        storage_path: `${capListing.id}/${crypto.randomUUID()}.jpg`,
+      });
+      expect(overCapError).not.toBeNull();
+
+      await admin.from("listings").delete().eq("id", capListing.id);
     });
   },
 );
@@ -3699,8 +3811,6 @@ describe.skipIf(!canRun)(
     const userIds: string[] = [];
     const organizationIds: string[] = [];
     const locationIds = new Map<string, string>();
-    const objectPaths: string[] = [];
-    const listingImagePaths: string[] = [];
     let ownerId: string;
     let memberId: string;
     let buyerId: string;
@@ -3887,12 +3997,6 @@ describe.skipIf(!canRun)(
 
     afterAll(async () => {
       if (!canRun) return;
-      if (objectPaths.length > 0) {
-        await admin.storage.from("organization-logos").remove(objectPaths);
-      }
-      if (listingImagePaths.length > 0) {
-        await admin.storage.from("listing-images").remove(listingImagePaths);
-      }
       await Promise.all(
         organizationIds.map((id) => admin.from("organizations").delete().eq("id", id)),
       );
@@ -4084,29 +4188,33 @@ describe.skipIf(!canRun)(
       expect(ownerDeleteCount).toBe(1);
     });
 
-    it("lets an authorized organization member attach an image uploaded under their own id", async () => {
+    // R2-migreringen fjernet listing_images_write/_delete (storage.objects-
+    // policyer, se 20260918210000_drop_dead_storage_object_policies.sql) —
+    // opplasting går nå til R2, ikke Supabase Storage. Autorisasjonen som lå
+    // i den policyen er gjenskapt i RPC-en can_upload_listing_image
+    // (20260918100000_can_upload_listing_image.sql), som denne testen nå
+    // kaller direkte som de ulike brukerne, siden funksjonen er `security
+    // definer` og bruker auth.uid() akkurat som policyen gjorde. Vi tester
+    // ikke lenger den faktiske metadata-innsettingen i listing_images her
+    // (dekket av "Owners can manage listing images"-policyen og RLS-testene
+    // for listings ovenfor) — kun autorisasjonsbeslutningen serverfunksjonen
+    // (uploadListingImage/uploadListingImageThumb/deleteListingImage) spør om.
+    it("lets an authorized organization member/superuser upload, but not an outsider", async () => {
       const owner = await signIn(emails.owner);
-      const path = `${ownerId}/${memberListingId}/rls-${suffix}.png`;
-      listingImagePaths.push(path);
+      const member = await signIn(emails.member);
+      const other = await signIn(emails.other);
 
-      const { error: uploadError } = await owner.storage
-        .from("listing-images")
-        .upload(path, new Blob(["img"], { type: "image/png" }), {
-          contentType: "image/png",
+      const canUpload = async (client: SupabaseClient) => {
+        const { data, error } = await client.rpc("can_upload_listing_image", {
+          _listing_id: memberListingId,
         });
-      expect(uploadError).toBeNull();
+        expect(error).toBeNull();
+        return data;
+      };
 
-      const { data: image, error: metadataError } = await owner
-        .from("listing_images")
-        .insert({
-          listing_id: memberListingId,
-          storage_path: path,
-          sort_order: 0,
-        })
-        .select("id")
-        .single();
-      expect(metadataError).toBeNull();
-      expect(image?.id).toBeTruthy();
+      expect(await canUpload(owner)).toBe(true);
+      expect(await canUpload(member)).toBe(true);
+      expect(await canUpload(other)).toBe(false);
     });
 
     it("lets an organization superuser read and send messages, but not another business", async () => {
@@ -4171,45 +4279,39 @@ describe.skipIf(!canRun)(
       expect(outsiderSendError).not.toBeNull();
     });
 
+    // R2-migreringen fjernet organization_logos_superuser_insert/_update/_delete
+    // (storage.objects-policyer, se
+    // 20260918210000_drop_dead_storage_object_policies.sql) — opplasting går
+    // nå til R2 via uploadOrganizationLogo i src/lib/storage.functions.ts,
+    // som sjekker nøyaktig de to betingelsene policyen krevde:
+    // is_organization_superuser og organization_has_proff_access. Begge er
+    // allerede GRANT EXECUTE'd til `authenticated` og kalles her direkte som
+    // de ulike brukerne. Offentlig lesing (organization_logos_public_read)
+    // trengte ingen erstatning — organization-logos var allerede en offentlig
+    // bucket, så det fantes ingen beskyttet lesing å miste.
     it("allows only an effective-Proff superuser to write organization logos", async () => {
       const owner = await signIn(emails.owner);
       const member = await signIn(emails.member);
       const other = await signIn(emails.other);
-      const anon = createClient(URL!, ANON_KEY!);
-      const path = `${organizationId}/rls-logo-${suffix}.png`;
-      objectPaths.push(path);
-      const content = new Blob(["rls-logo"], { type: "image/png" });
 
-      const { error: ownerUploadError } = await owner.storage
-        .from("organization-logos")
-        .upload(path, content, { contentType: "image/png", upsert: true });
-      expect(ownerUploadError).toBeNull();
-
-      const { data: anonymousDownload, error: anonymousDownloadError } = await anon.storage
-        .from("organization-logos")
-        .download(path);
-      expect(anonymousDownloadError).toBeNull();
-      expect(anonymousDownload).toBeTruthy();
-
-      const memberPath = `${organizationId}/member-${suffix}.png`;
-      objectPaths.push(memberPath);
-      const { error: memberUploadError } = await member.storage
-        .from("organization-logos")
-        .upload(memberPath, content, {
-          contentType: "image/png",
-          upsert: true,
+      const isSuperuser = async (client: SupabaseClient) => {
+        const { data, error } = await client.rpc("is_organization_superuser", {
+          _organization_id: organizationId,
         });
-      expect(memberUploadError).not.toBeNull();
+        expect(error).toBeNull();
+        return data;
+      };
 
-      const otherPath = `${organizationId}/other-${suffix}.png`;
-      objectPaths.push(otherPath);
-      const { error: otherUploadError } = await other.storage
-        .from("organization-logos")
-        .upload(otherPath, content, {
-          contentType: "image/png",
-          upsert: true,
-        });
-      expect(otherUploadError).not.toBeNull();
+      expect(await isSuperuser(owner)).toBe(true);
+      expect(await isSuperuser(member)).toBe(false);
+      expect(await isSuperuser(other)).toBe(false);
+
+      const { data: proffAccess, error: proffAccessError } = await owner.rpc(
+        "organization_has_proff_access",
+        { _organization_id: organizationId },
+      );
+      expect(proffAccessError).toBeNull();
+      expect(proffAccess).toBe(true);
     });
 
     it("enforces the Proff entitlement boundary for owner, member, other user and anon", async () => {
@@ -4270,15 +4372,23 @@ describe.skipIf(!canRun)(
       expect(ownerListingError).toBeNull();
       expect(ownerStillSeesListing).toHaveLength(1);
 
-      const expiredLogoPath = `${organizationId}/expired-${suffix}.png`;
-      objectPaths.push(expiredLogoPath);
-      const { error: expiredOwnerUploadError } = await owner.storage
-        .from("organization-logos")
-        .upload(expiredLogoPath, new Blob(["expired"], { type: "image/png" }), {
-          contentType: "image/png",
-          upsert: true,
-        });
-      expect(expiredOwnerUploadError).not.toBeNull();
+      // organization_logos_superuser_insert/_update/_delete required both
+      // is_organization_superuser AND organization_has_proff_access — the
+      // owner is still a superuser after expiry, but the org no longer has
+      // Proff access, so uploadOrganizationLogo must now reject the owner too.
+      const { data: ownerStillSuperuser, error: ownerSuperuserError } = await owner.rpc(
+        "is_organization_superuser",
+        { _organization_id: organizationId },
+      );
+      expect(ownerSuperuserError).toBeNull();
+      expect(ownerStillSuperuser).toBe(true);
+
+      const { data: expiredProffAccess, error: expiredProffAccessError } = await owner.rpc(
+        "organization_has_proff_access",
+        { _organization_id: organizationId },
+      );
+      expect(expiredProffAccessError).toBeNull();
+      expect(expiredProffAccess).toBe(false);
     });
 
     it("keeps proff_orders server-only and stacks paid terms on remaining access", async () => {
@@ -4341,27 +4451,25 @@ describe.skipIf(!canRun)(
   },
 );
 
-describe.skipIf(!canRun)("RLS: storage buckets enforce owner/participant access (K-2)", () => {
+// R2-migreringen fjernet listing_images_read/_write/_delete,
+// listing_360_frames_read, avatars_*, og message_attachments_participant_*
+// (storage.objects-policyer, se
+// 20260918210000_drop_dead_storage_object_policies.sql) — Supabase Storage
+// er ikke lenger i bruk for noen av disse bucketene. Denne describe-blokken
+// testet dem alle; se kommentaren over hver `it` for hvor beskyttelsen (om
+// noen) flyttet.
+describe.skipIf(!canRun)("RLS: listing-image upload authorization (K-2)", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();
   const emails = {
     seller: `rls-storage-seller-${suffix}@example.com`,
-    buyer: `rls-storage-buyer-${suffix}@example.com`,
     outsider: `rls-storage-outsider-${suffix}@example.com`,
   };
 
   const userIds: string[] = [];
-  const objectPaths: Record<string, string[]> = {
-    "listing-images": [],
-    "listing-360-frames": [],
-    avatars: [],
-    "message-attachments": [],
-  };
   let sellerId: string;
-  let buyerId: string;
   let activeListingId: string;
   let draftListingId: string;
-  let conversationId: string;
 
   async function signIn(email: string) {
     return signInWithRetry(email);
@@ -4379,7 +4487,6 @@ describe.skipIf(!canRun)("RLS: storage buckets enforce owner/participant access 
       return data.user!.id;
     };
     sellerId = await mkUser(emails.seller);
-    buyerId = await mkUser(emails.buyer);
     await mkUser(emails.outsider);
 
     const { data: active, error: activeErr } = await admin
@@ -4407,170 +4514,65 @@ describe.skipIf(!canRun)("RLS: storage buckets enforce owner/participant access 
       .single();
     if (draftErr) throw draftErr;
     draftListingId = draft.id;
-
-    const { data: conv, error: convErr } = await admin
-      .from("conversations")
-      .insert({ listing_id: activeListingId, buyer_id: buyerId, seller_id: sellerId })
-      .select("id")
-      .single();
-    if (convErr) throw convErr;
-    conversationId = conv.id;
   });
 
   afterAll(async () => {
     if (!canRun) return;
-    for (const [bucket, paths] of Object.entries(objectPaths)) {
-      if (paths.length > 0) await admin.storage.from(bucket).remove(paths);
-    }
     await admin.from("listings").delete().in("id", [activeListingId, draftListingId]);
     await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
   });
 
-  it("lets only the seller upload/delete listing images, but anyone read an active listing's", async () => {
+  // Erstatter listing_images_write/_delete. can_upload_listing_image
+  // (20260918100000_can_upload_listing_image.sql) er `security definer` og
+  // kalles her direkte som selger/utenforstående, akkurat som
+  // uploadListingImage/uploadListingImageThumb/deleteListingImage i
+  // src/lib/storage.functions.ts gjør via RPC før de skriver til R2.
+  //
+  // TAPT DEKNING: listing_images_read (aktiv annonse offentlig lesbar, utkast
+  // skjult for andre enn selger) har ingen erstatning. Annonsebilder ligger nå
+  // i en offentlig R2-bucket (se publicImageUrl i src/lib/image-url.ts) og
+  // serveres uten noen tilgangssjekk — hvem som helst med URL-en/nøkkelen kan
+  // laste den ned, uavhengig av annonsens status. Dette er en bevisst
+  // konsekvens av R2-migreringen (kode allerede ferdig i arbeidskopien), ikke
+  // noe denne oppgaven kan gjenskape, men det bør vurderes separat om et
+  // utkasts bilder skal være offentlig hentbare via en gjettbar/lekket URL.
+  it("lets only the seller (not an outsider) upload/delete images for their listing", async () => {
     const seller = await signIn(emails.seller);
     const outsider = await signIn(emails.outsider);
-    const anon = createClient(URL!, ANON_KEY!);
-    const content = new Blob(["img"], { type: "image/png" });
 
-    const path = `${sellerId}/${activeListingId}/rls-${suffix}.png`;
-    objectPaths["listing-images"].push(path);
+    const canUpload = async (client: SupabaseClient, listingId: string) => {
+      const { data, error } = await client.rpc("can_upload_listing_image", {
+        _listing_id: listingId,
+      });
+      expect(error).toBeNull();
+      return data;
+    };
 
-    const { error: outsiderUploadError } = await outsider.storage
-      .from("listing-images")
-      .upload(path, content, { contentType: "image/png" });
-    expect(outsiderUploadError).not.toBeNull();
-
-    const { error: sellerUploadError } = await seller.storage
-      .from("listing-images")
-      .upload(path, content, { contentType: "image/png" });
-    expect(sellerUploadError).toBeNull();
-
-    const { data: anonDownload, error: anonDownloadError } = await anon.storage
-      .from("listing-images")
-      .download(path);
-    expect(anonDownloadError).toBeNull();
-    expect(anonDownload).toBeTruthy();
-
-    const { error: outsiderDeleteError } = await outsider.storage
-      .from("listing-images")
-      .remove([path]);
-    // Supabase Storage returns ok even when RLS silently filters the row
-    // out of the delete set, so assert the object is still there instead.
-    expect(outsiderDeleteError).toBeNull();
-    const { data: stillThere } = await seller.storage.from("listing-images").download(path);
-    expect(stillThere).toBeTruthy();
+    expect(await canUpload(seller, activeListingId)).toBe(true);
+    expect(await canUpload(outsider, activeListingId)).toBe(false);
+    expect(await canUpload(seller, draftListingId)).toBe(true);
+    expect(await canUpload(outsider, draftListingId)).toBe(false);
   });
 
-  it("hides a draft listing's images from everyone but the seller", async () => {
-    const seller = await signIn(emails.seller);
-    const outsider = await signIn(emails.outsider);
-    const anon = createClient(URL!, ANON_KEY!);
-    const content = new Blob(["img"], { type: "image/png" });
-
-    const path = `${sellerId}/${draftListingId}/rls-${suffix}.png`;
-    objectPaths["listing-images"].push(path);
-    const { error: uploadError } = await seller.storage
-      .from("listing-images")
-      .upload(path, content, { contentType: "image/png" });
-    expect(uploadError).toBeNull();
-
-    const { error: anonError } = await anon.storage.from("listing-images").download(path);
-    expect(anonError).not.toBeNull();
-
-    const { error: outsiderError } = await outsider.storage.from("listing-images").download(path);
-    expect(outsiderError).not.toBeNull();
-
-    const { data: sellerDownload, error: sellerError } = await seller.storage
-      .from("listing-images")
-      .download(path);
-    expect(sellerError).toBeNull();
-    expect(sellerDownload).toBeTruthy();
-  });
-
-  it("exposes 360 frames of an active listing publicly but hides a draft's", async () => {
-    const anon = createClient(URL!, ANON_KEY!);
-    const content = new Blob(["frame"], { type: "image/webp" });
-
-    const activePath = `${activeListingId}/0.webp`;
-    objectPaths["listing-360-frames"].push(activePath);
-    const { error: activeUploadError } = await admin.storage
-      .from("listing-360-frames")
-      .upload(activePath, content, { contentType: "image/webp" });
-    expect(activeUploadError).toBeNull();
-
-    const draftPath = `${draftListingId}/0.webp`;
-    objectPaths["listing-360-frames"].push(draftPath);
-    const { error: draftUploadError } = await admin.storage
-      .from("listing-360-frames")
-      .upload(draftPath, content, { contentType: "image/webp" });
-    expect(draftUploadError).toBeNull();
-
-    const { data: activeDownload, error: activeError } = await anon.storage
-      .from("listing-360-frames")
-      .download(activePath);
-    expect(activeError).toBeNull();
-    expect(activeDownload).toBeTruthy();
-
-    const { error: draftError } = await anon.storage.from("listing-360-frames").download(draftPath);
-    expect(draftError).not.toBeNull();
-  });
-
-  it("lets only conversation participants read/write message attachments", async () => {
-    const seller = await signIn(emails.seller);
-    const buyer = await signIn(emails.buyer);
-    const outsider = await signIn(emails.outsider);
-    const content = new Blob(["attachment"], { type: "image/png" });
-
-    const path = `${conversationId}/rls-${suffix}.png`;
-    objectPaths["message-attachments"].push(path);
-
-    const { error: outsiderUploadError } = await outsider.storage
-      .from("message-attachments")
-      .upload(path, content, { contentType: "image/png" });
-    expect(outsiderUploadError).not.toBeNull();
-
-    const { error: buyerUploadError } = await buyer.storage
-      .from("message-attachments")
-      .upload(path, content, { contentType: "image/png" });
-    expect(buyerUploadError).toBeNull();
-
-    const { data: sellerDownload, error: sellerDownloadError } = await seller.storage
-      .from("message-attachments")
-      .download(path);
-    expect(sellerDownloadError).toBeNull();
-    expect(sellerDownload).toBeTruthy();
-
-    const { error: outsiderDownloadError } = await outsider.storage
-      .from("message-attachments")
-      .download(path);
-    expect(outsiderDownloadError).not.toBeNull();
-  });
-
-  it("lets anyone read avatars but only the owner write their own", async () => {
-    const seller = await signIn(emails.seller);
-    const outsider = await signIn(emails.outsider);
-    const anon = createClient(URL!, ANON_KEY!);
-    const content = new Blob(["avatar"], { type: "image/png" });
-
-    const path = `${sellerId}/avatar-${suffix}.png`;
-    objectPaths.avatars.push(path);
-
-    const { error: outsiderUploadError } = await outsider.storage
-      .from("avatars")
-      .upload(path, content, { contentType: "image/png" });
-    expect(outsiderUploadError).not.toBeNull();
-
-    const { error: sellerUploadError } = await seller.storage
-      .from("avatars")
-      .upload(path, content, { contentType: "image/png" });
-    expect(sellerUploadError).toBeNull();
-
-    const { data: anonDownload, error: anonDownloadError } = await anon.storage
-      .from("avatars")
-      .download(path);
-    expect(anonDownloadError).toBeNull();
-    expect(anonDownload).toBeTruthy();
-  });
+  // listing_360_frames_read hadde ingen skrivepolicy å erstatte (kun
+  // service-role skriver, se capture-token-flyten i
+  // vehicle-360.functions.ts). TAPT DEKNING: samme som over — lesing av
+  // 360-frames er nå ubeskyttet offentlig R2, "hides a draft's" finnes ikke
+  // lenger som en testbar egenskap.
+  //
+  // message_attachments_participant_read/_insert: skrivesiden er dekket av
+  // src/lib/storage.functions.test.ts ("avviser en bruker som ikke er
+  // deltaker i samtalen" under uploadMessageAttachment), lesesiden av samme
+  // fils "utelater vedlegg fra en samtale brukeren ikke er deltaker i" under
+  // signMessageAttachmentUrls — begge mot ekte deltakeroppslag mot
+  // `conversations`, samme betingelse policyen krevde. Ingen dekning tapt.
+  //
+  // avatars_owner_insert/_update/_delete: eierskapssjekken er dekket av
+  // storage.functions.test.ts ("bygger nøkkelen fra den innloggede brukerens
+  // id, ikke klientinput" under uploadAvatarImage, og
+  // deletePreviousAvatarImage sine tester). avatars_public_read trengte ingen
+  // erstatning — avatars var alltid en offentlig bucket, ingen beskyttet
+  // lesing gikk tapt.
 });
 
 describe.skipIf(!canRun)("RLS: feedback rate limiting is enforced in the database (M-8)", () => {

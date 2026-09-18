@@ -3016,6 +3016,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_upload_listing_image: {
+        Args: { _listing_id: string }
+        Returns: boolean
+      }
       can_view_organization_listing: {
         Args: {
           _location_id: string

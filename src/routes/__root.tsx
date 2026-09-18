@@ -16,7 +16,7 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
-import { clearSignedUrlCaches } from "@/lib/storage";
+import { clearMessageAttachmentUrlCache } from "@/lib/storage";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { initOfflineWatcher } from "@/lib/native-offline";
 import {
@@ -232,7 +232,7 @@ function RootComponent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") clearSignedUrlCaches();
+      if (event === "SIGNED_OUT") clearMessageAttachmentUrlCache();
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();
         queryClient.invalidateQueries();

@@ -26,6 +26,22 @@ const BATCH_SIZE = 100;
 // forsøkes på nytt hver time uten grunn til å tro utfallet endrer seg.
 const MAX_ATTEMPTS = 10;
 
+// deletePrefix gjør ett listObjectKeys-kall pluss ett deleteObject-kall per
+// nøkkel. Et annonseprefiks kan romme ~76 objekter (20 bilder + thumbnails +
+// 36 360-frames), så en full BATCH_SIZE-batch kan i verste fall koste
+// tusenvis av fetch-kall i én request — Cloudflare Workers tillater maks
+// 1000 subrequests per request, og kjøringen ryker når taket nås. Vi sjekker
+// budsjettet FØR hvert prefiks, så det siste prefikset som får starte kan i
+// verste fall dra budsjettet opp til ~500 + 76 ≈ 576 objekter/subrequests —
+// fremdeles godt under taket.
+const MAX_OBJECTS_PER_RUN = 500;
+
+// Fem feil på rad er nesten aldri N enkeltrader med ugyldig prefiks — det er
+// et kjøringsnivå-problem (R2 nede, subrequest-taket nådd, manglende
+// credentials), og da skal vi ikke straffe resten av batchen med
+// attempts+1. Nullstilles ved hver vellykkede sletting.
+const MAX_CONSECUTIVE_FAILURES = 5;
+
 export const Route = createFileRoute("/api/public/r2/cleanup")({
   server: {
     handlers: {
@@ -50,14 +66,24 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
 
         let deletedObjects = 0;
         let failed = 0;
+        let consecutiveFailures = 0;
+        let stopped: "budget" | "failures" | null = null;
 
         for (const row of rows ?? []) {
+          // Budsjettet er brukt opp — resten av batchen står urørt til neste
+          // kjøring, med attempts uendret. De ble aldri forsøkt.
+          if (deletedObjects >= MAX_OBJECTS_PER_RUN) {
+            stopped = "budget";
+            break;
+          }
+
           try {
             deletedObjects += await deletePrefix(
               row.bucket as Parameters<typeof deletePrefix>[0],
               row.prefix,
             );
             await supabaseAdmin.from("r2_delete_queue").delete().eq("id", row.id);
+            consecutiveFailures = 0;
           } catch (cause) {
             // Raden blir stående og forsøkes på nytt ved neste kjøring — et
             // objekt som ikke blir slettet er et personvernavvik, ikke noe
@@ -66,6 +92,7 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
             // last_error intakt som et synlig personvernavvik til manuell
             // oppfølging, siden køen er revisjonssporet for GDPR-dokumentasjonen.
             failed += 1;
+            consecutiveFailures += 1;
             // Kun cron-jobben skriver her, én kjøring om gangen, så
             // attempts+1 trenger ingen atomisk inkrementering.
             await supabaseAdmin
@@ -75,10 +102,18 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
                 last_error: cause instanceof Error ? cause.message : String(cause),
               })
               .eq("id", row.id);
+
+            // Kretsbryter: så mange feil på rad skyldes nesten sikkert
+            // kjøringen selv, ikke radene. Stopp før vi brenner opp
+            // attempts-budsjettet til resten av friske rader.
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+              stopped = "failures";
+              break;
+            }
           }
         }
 
-        return Response.json({ prefixes: rows?.length ?? 0, deletedObjects, failed });
+        return Response.json({ prefixes: rows?.length ?? 0, deletedObjects, failed, stopped });
       },
     },
   },

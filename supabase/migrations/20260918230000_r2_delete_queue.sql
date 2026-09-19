@@ -22,8 +22,10 @@
 --   * R2_CLEANUP_SECRET i secrets/cloudflare.env (miljøvariabel for appen)
 --   * app_settings-radene 'r2_cleanup_secret' (samme verdi) og, utenfor prod,
 --     'r2_cleanup_url' som peker på riktig miljø.
--- Uten hemmeligheten svarer endepunktet 401 og køen vokser i stedet for å
--- tømmes — den er synlig i r2_delete_queue.attempts/last_error.
+-- Uten hemmeligheten poster dispatch_r2_cleanup ikke i det hele tatt —
+-- pg_net svelger et 401-svar uten header, så et postet kall ville forsvunnet
+-- stille. I stedet gir funksjonen RAISE WARNING i Postgres-loggen, og
+-- r2_delete_queue vokser synlig med attempts = 0.
 --
 -- Vi køer *prefikser*, ikke enkeltnøkler: alle nøkler er partisjonert på
 -- eier-id (`{listingId}/…`, `{conversationId}/…`, `{userId}/…`), så én rad
@@ -115,10 +117,19 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.r2_delete_queue) THEN
     RETURN;
   END IF;
+  IF _secret IS NULL THEN
+    -- Uten hemmeligheten ville kallet blitt avvist med 401, og pg_net
+    -- svelger det svaret — køen ville vokst i det stille uten noe signal.
+    -- Post ikke i det hele tatt, og varsle i loggen i stedet.
+    RAISE WARNING 'r2-opprydning hoppet over: app_settings-raden "r2_cleanup_secret" er ikke satt';
+    RETURN;
+  END IF;
   PERFORM net.http_post(
     url := _url,
-    headers := jsonb_build_object('Content-Type', 'application/json') ||
-      CASE WHEN _secret IS NOT NULL THEN jsonb_build_object('X-R2-Cleanup-Secret', _secret) ELSE '{}'::jsonb END,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'X-R2-Cleanup-Secret', _secret
+    ),
     body := '{}'::jsonb
   );
 END;

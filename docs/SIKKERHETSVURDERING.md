@@ -399,7 +399,7 @@ Skill offentlig presentasjon fra kommersiell tilstand. Opprett et `security_invo
 > `strict-transport-security` er lagt til. Punkt 2 gjenstår: `'unsafe-inline'`
 > i `script-src` krever per-request nonce gjennom SSR-rendringen.
 
-**Hvor:** `vite.config.ts:12–33`
+**Hvor:** `src/lib/security-headers.ts` (het `vite.config.ts:12–33` da funnet ble skrevet)
 
 **Hva:** Tre ting:
 

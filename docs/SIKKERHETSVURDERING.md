@@ -235,7 +235,7 @@ Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stac
 
 **Delvise fikser / bevisst ikke gjort:**
 
-- **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen); promotering til enforcement venter på stille produksjonsrapporter.
+- **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen).
 - **M-9:** ~~Turnstile er ikke lagt til på `suggestCategoryForTitle`~~ — lukket 2026-09-09: AI-stien er skilt ut av det automatiske kallet. `suggestCategoryForTitle` gjør nå kun det interne stemmeoppslaget (ingen Mistral, ingen kostnad per tastetrykk), mens hvert eksterne KI-kall ligger bak `suggestCategoryForTitleWithAi` / `suggestListingFromPhotos` med Turnstile-verifisering før rate limiter og leverandør. Se notatet under M-9 nedenfor.
 - **L-14:** `toClientError()` er kun brukt på de tre eksemplene funnet nevner (`saveDraftListing`, `createBlock`, `createPromotionCheckout`). Resten av `throw error`-forekomstene i handlers gjenstår — funnet selv foreslår inkrementell utrulling.
 - **I-17:** urørt. Å flytte til en dedikert read-only Postgres-rolle eller en manuell `workflow_dispatch`-jobb er en infrastrukturendring mot en levende staging-database, forskjellig fra kodeendringene i resten av lista — bør gjøres bevisst, ikke som del av denne gjennomgangen.
@@ -391,6 +391,13 @@ Skill offentlig presentasjon fra kommersiell tilstand. Opprett et `security_invo
 ## M-6 — CSP er report-only uten rapportmottaker, og planlagt enforcement har `'unsafe-inline'`
 
 **Alvorlighet: Middels**
+
+> **Status 2026-09-19 (delvis lukket):** Headerne ligger ikke lenger i
+> `vite.config.ts`, men bygges av `buildSecurityHeaders` i
+> `src/lib/security-headers.ts` (enhetstestet). Punkt 1 og 3 er lukket:
+> policyen håndheves, `report-to` og `reporting-endpoints` er på plass, og
+> `strict-transport-security` er lagt til. Punkt 2 gjenstår: `'unsafe-inline'`
+> i `script-src` krever per-request nonce gjennom SSR-rendringen.
 
 **Hvor:** `vite.config.ts:12–33`
 

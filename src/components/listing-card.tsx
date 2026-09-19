@@ -3,6 +3,7 @@ import { Gauge, ImageOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice, displayPriceNok } from "@/lib/format";
+import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
 import { FavoriteButton } from "@/components/favorite-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PART_FITMENT_SCOPE_KEY, PART_FITMENT_VEHICLE_IDS_KEY } from "@/lib/category-filters";
@@ -84,11 +85,13 @@ function ListingImage({
   hasCoverPath,
   alt,
   compact,
+  onError,
 }: {
   imgUrl: string | null;
   hasCoverPath: boolean;
   alt: string;
   compact: boolean;
+  onError?: () => void;
 }) {
   if (imgUrl) {
     return (
@@ -97,6 +100,7 @@ function ListingImage({
         alt={alt}
         className={`size-full object-cover ${compact ? "" : "transition group-hover:scale-[1.02]"}`}
         loading="lazy"
+        onError={onError}
       />
     );
   }
@@ -117,10 +121,12 @@ export function ListingCardContent({
   listing,
   imgUrl,
   missingPriceLabel,
+  onImageError,
 }: {
   listing: ListingCardData;
   imgUrl: string | null;
   missingPriceLabel?: string;
+  onImageError?: () => void;
 }) {
   const displayPrice = displayPriceNok(listing);
   const priceLabel =
@@ -137,6 +143,7 @@ export function ListingCardContent({
           hasCoverPath={!!listing.cover_path}
           alt={`${listing.title} — ${priceLabel}`}
           compact={false}
+          onError={onImageError}
         />
       </div>
       <div className="density-data px-3">
@@ -176,7 +183,6 @@ export function ListingCard({
   knownFavorite,
   favoriteStateReady,
 }: Props) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
   const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
   const supportsHover = useRef(true);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
@@ -185,29 +191,19 @@ export function ListingCard({
     supportsHover.current = window.matchMedia?.("(hover: hover)").matches ?? true;
   }, []);
 
-  useEffect(() => {
-    if (signedImageUrl !== undefined) return;
-    const coverPath = listing.cover_path;
-    if (!coverPath) return;
-    let cancelled = false;
-    // Prøv den lille kort-thumbnailen først; eldre annonser uten en faller
-    // tilbake til fullstørrelsesbildet.
-    const thumbPath = thumbPathFor(coverPath);
-    signListingImageUrls([thumbPath]).then(async (map) => {
-      if (cancelled) return;
-      if (map[thumbPath]) {
-        setImgUrl(map[thumbPath]);
-        return;
-      }
-      const fallback = await signListingImageUrls([coverPath]);
-      if (!cancelled) setImgUrl(fallback[coverPath] ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [listing.cover_path, signedImageUrl]);
-
-  const effectiveImageUrl = signedImageUrl !== undefined ? signedImageUrl : imgUrl;
+  // Prøv den lille kort-thumbnailen først; eldre annonser uten en faller
+  // tilbake til fullstørrelsesbildet via onError under, siden en ren URL
+  // ikke kan fortelle oss på forhånd om thumbnail-filen faktisk finnes.
+  const coverPath = listing.cover_path;
+  const thumbUrl = coverPath
+    ? signListingImageUrls([thumbPathFor(coverPath)])[thumbPathFor(coverPath)]
+    : null;
+  const originalUrl = coverPath ? signListingImageUrls([coverPath])[coverPath] : null;
+  const primaryImageUrl = signedImageUrl !== undefined ? signedImageUrl : thumbUrl;
+  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
+    primaryImageUrl,
+    originalUrl,
+  );
 
   const cardClass = `group relative overflow-hidden rounded-lg border bg-card transition-[border-color,box-shadow] duration-150 ${
     highlighted
@@ -223,6 +219,7 @@ export function ListingCard({
           listing={listing}
           imgUrl={effectiveImageUrl}
           missingPriceLabel={missingPriceLabel}
+          onImageError={handleImageError}
         />
       </article>
     );
@@ -254,6 +251,7 @@ export function ListingCard({
               hasCoverPath={!!listing.cover_path}
               alt={`${listing.title} — ${priceLabel}`}
               compact
+              onError={handleImageError}
             />
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
@@ -309,7 +307,11 @@ export function ListingCard({
         className={linkClass}
         aria-label={`${listing.title}, ${priceLabel}`}
       >
-        <ListingCardContent listing={listing} imgUrl={effectiveImageUrl} />
+        <ListingCardContent
+          listing={listing}
+          imgUrl={effectiveImageUrl}
+          onImageError={handleImageError}
+        />
       </Link>
       <FavoriteButton
         listingId={listing.id}

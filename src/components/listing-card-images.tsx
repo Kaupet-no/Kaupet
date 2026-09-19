@@ -3,9 +3,11 @@ import { MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import type { ListingCardData } from "@/components/listing-card";
+import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { useListingGalleryImages } from "@/hooks/use-listing-gallery-images";
+import { signListingImageUrls } from "@/lib/storage";
 
 type Props = {
   listing: ListingCardData;
@@ -50,6 +52,14 @@ export function ListingCardImages({
   }, []);
 
   const { images, imgUrls, isLoading } = useListingGalleryImages(listing.id, inView);
+
+  const originalUrl = listing.cover_path
+    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
+    : null;
+  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
+    coverImageUrl ?? null,
+    originalUrl,
+  );
 
   const overlay = (
     <div
@@ -109,8 +119,13 @@ export function ListingCardImages({
           />
         ) : (
           <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-            {coverImageUrl ? (
-              <img src={coverImageUrl} alt={listing.title} className="size-full object-cover" />
+            {effectiveImageUrl ? (
+              <img
+                src={effectiveImageUrl}
+                alt={listing.title}
+                className="size-full object-cover"
+                onError={handleImageError}
+              />
             ) : (
               <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
                 {isLoading ? "Laster bilder…" : "Ingen bilder"}

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ConvSummary } from "@/hooks/use-unread";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowLeft, Paperclip, Send, User as UserIcon, X } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
@@ -93,7 +93,6 @@ function ConversationPage() {
   const createReviewFn = useServerFn(createReview);
   const [body, setBody] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
@@ -215,15 +214,13 @@ function ConversationPage() {
   }, [messages]);
 
   // Bilde av annonsen
-  useEffect(() => {
+  const coverUrl = useMemo(() => {
     const imgs = (conv?.listing?.listing_images ?? [])
       .slice()
       .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order);
     const path = imgs[0]?.storage_path;
-    if (path) {
-      signListingImageUrls([path]).then((urls) => setCoverUrl(urls[path] ?? null));
-    }
-  }, [conv?.listing?.id, conv?.listing?.listing_images]);
+    return path ? (signListingImageUrls([path])[path] ?? null) : null;
+  }, [conv?.listing?.listing_images]);
 
   // Markér samtalen som lest i databasen for innlogget bruker.
   // lastMarkedRef hindrer at samme (eller eldre) tidsstempel skrives på nytt

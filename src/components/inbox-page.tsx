@@ -4,7 +4,7 @@ import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   MessageCircle,
   ChevronDown,
@@ -113,7 +113,6 @@ export function InboxPage() {
   const qc = useQueryClient();
   const [view, setView] = useState<"inbox" | "trash">("inbox");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [systemOpen, setSystemOpen] = useState(true);
 
   const { refreshing, pullDistance } = usePullToRefresh({
@@ -229,10 +228,9 @@ export function InboxPage() {
 
   const unreadSystemCount = useUnreadSystemMessagesCount();
 
-  // Last opp signerte bilde-URLer for omslagsbilder
-  useEffect(() => {
-    if (!conversations) return;
-    const paths = conversations
+  // Bilde-URLer for omslagsbilder
+  const imgUrls = useMemo(() => {
+    const paths = (conversations ?? [])
       .map((c) => {
         const imgs = (c.listing?.listing_images ?? [])
           .slice()
@@ -240,9 +238,7 @@ export function InboxPage() {
         return imgs[0]?.storage_path;
       })
       .filter((p): p is string => !!p);
-    if (paths.length > 0) {
-      signListingImageUrls(paths).then((urls) => setImgUrls((prev) => ({ ...prev, ...urls })));
-    }
+    return signListingImageUrls(paths);
   }, [conversations]);
 
   // Beregn uleste per samtale

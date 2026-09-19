@@ -4,6 +4,12 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   test: {
     environment: "node",
+    // R2_PUBLIC_BASE_URL settes eksplisitt her slik at testsuiten ikke
+    // stilltiende avhenger av utviklerens lokale .env — uten denne feiler
+    // testene som bruker `publicImageUrl` i CI, der .env ikke finnes.
+    env: {
+      R2_PUBLIC_BASE_URL: "https://bilder.test.invalid",
+    },
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     // Integration tests need a running local Supabase stack (`supabase start`)
     // and are run separately via `bun run test:rls`, not in the default suite/CI.

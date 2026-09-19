@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
+import { organizationLogoUrl } from "@/lib/organization-logo-url";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
 import { displayPriceNok } from "@/lib/format";
@@ -326,8 +327,6 @@ function ListingDetailPage() {
   const isNative = useIsNative();
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
-  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
-  const [vehicle360ImgUrls, setVehicle360ImgUrls] = useState<Record<string, string>>({});
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -650,20 +649,17 @@ function ListingDetailPage() {
     [data?.listing_images],
   );
 
-  useEffect(() => {
-    if (images.length === 0) return;
-    signListingImageUrls(images.map((i) => i.storage_path)).then(setImgUrls);
-  }, [images]);
+  const imgUrls = useMemo(() => signListingImageUrls(images.map((i) => i.storage_path)), [images]);
 
   const vehicle360Frames = useMemo(
     () => (data?.listing_360_frames ?? []).slice().sort((a, b) => a.frame_order - b.frame_order),
     [data?.listing_360_frames],
   );
 
-  useEffect(() => {
-    if (vehicle360Frames.length === 0) return;
-    signVehicle360FrameUrls(vehicle360Frames.map((f) => f.storage_path)).then(setVehicle360ImgUrls);
-  }, [vehicle360Frames]);
+  const vehicle360ImgUrls = useMemo(
+    () => signVehicle360FrameUrls(vehicle360Frames.map((f) => f.storage_path)),
+    [vehicle360Frames],
+  );
 
   useEffect(() => {
     if (!data?.id || user?.id === data.seller_id) return;
@@ -730,10 +726,7 @@ function ListingDetailPage() {
           id: organization.id,
           displayName: organization.display_name,
           organizationNumber: organization.organization_number,
-          logoUrl: organization.logo_path
-            ? supabase.storage.from("organization-logos").getPublicUrl(organization.logo_path).data
-                .publicUrl
-            : null,
+          logoUrl: organizationLogoUrl(organization.logo_path),
           websiteUrl: organization.website_url,
           palette: organization.brand_palette,
           concept: organization.listing_concept as ProffOrganizationPresentation["concept"],

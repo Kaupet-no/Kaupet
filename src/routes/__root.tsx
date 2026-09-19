@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
 import { getSessionUser } from "@/lib/current-user.functions";
 import { flushAuthCookies } from "@/lib/native-cookies";
-import { clearSignedUrlCaches } from "@/lib/storage";
+import { clearMessageAttachmentUrlCache } from "@/lib/storage";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { initOfflineWatcher } from "@/lib/native-offline";
 import {
@@ -249,7 +249,7 @@ function RootComponent() {
       // INITIAL_SESSION endrer ingenting og trenger ingen flush.
       if (event !== "INITIAL_SESSION") void flushAuthCookies();
 
-      if (event === "SIGNED_OUT") clearSignedUrlCaches();
+      if (event === "SIGNED_OUT") clearMessageAttachmentUrlCache();
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();
         queryClient.invalidateQueries();

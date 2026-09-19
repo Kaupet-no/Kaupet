@@ -9,6 +9,7 @@ import { ProffListingHeader } from "@/components/listing-detail/proff-listing-pr
 import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { supabase } from "@/integrations/supabase/client";
 import { toListingCardData } from "@/lib/listing-card-data";
+import { organizationLogoUrl } from "@/lib/organization-logo-url";
 
 export const Route = createFileRoute("/bedrift/$organizationId")({
   loader: async ({ params }) => {
@@ -75,10 +76,7 @@ function OrganizationListingsPage() {
     id: organization.id,
     displayName: organization.display_name,
     organizationNumber: organization.organization_number,
-    logoUrl: organization.logo_path
-      ? supabase.storage.from("organization-logos").getPublicUrl(organization.logo_path).data
-          .publicUrl
-      : null,
+    logoUrl: organizationLogoUrl(organization.logo_path),
     websiteUrl: organization.website_url,
     palette: organization.brand_palette,
     concept: organization.listing_concept as ProffOrganizationPresentation["concept"],

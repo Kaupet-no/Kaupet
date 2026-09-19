@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, MessageCircle } from "lucide-react";
@@ -99,8 +99,7 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
       }));
     },
   });
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  useEffect(() => {
+  const imageUrls = useMemo(() => {
     const paths = (conversationsQuery.data ?? [])
       .map((conversation) => {
         const listing = conversation.listing;
@@ -108,17 +107,7 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
           ?.storage_path;
       })
       .filter((path): path is string => !!path);
-    let cancelled = false;
-    signListingImageUrls(paths)
-      .then((urls) => {
-        if (!cancelled) setImageUrls(urls);
-      })
-      .catch(() => {
-        if (!cancelled) setImageUrls({});
-      });
-    return () => {
-      cancelled = true;
-    };
+    return signListingImageUrls(paths);
   }, [conversationsQuery.data]);
 
   const conversations = conversationsQuery.data ?? [];

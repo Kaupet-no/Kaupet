@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
@@ -55,19 +54,9 @@ export function useListingPreview(listingId: string, enabled: boolean) {
     },
   });
 
-  const [signedUrls, setSignedUrls] = useState<Record<string, string | null>>({});
-  useEffect(() => {
-    const path = listing?.cover_path;
-    if (!path) return;
-    let cancelled = false;
-    signListingImageUrls([path]).then((m) => {
-      if (!cancelled) setSignedUrls((prev) => ({ ...prev, [path]: m[path] ?? null }));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [listing?.cover_path]);
-  const imgUrl = listing?.cover_path ? (signedUrls[listing.cover_path] ?? null) : null;
+  const imgUrl = listing?.cover_path
+    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
+    : null;
 
   return { listing, imgUrl };
 }

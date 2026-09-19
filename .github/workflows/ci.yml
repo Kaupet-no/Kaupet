@@ -277,12 +277,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Sjekk at VITE_R2_PUBLIC_BASE_URL er satt
+      - name: Sjekk at påkrevde R2-variabler er satt
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i production-miljøet — hele siden krasjer uten den." >&2
+            exit 1
+          fi
+          if [ -z "$R2_CLEANUP_SECRET" ]; then
+            echo "R2_CLEANUP_SECRET mangler i production-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
             exit 1
           fi
 
@@ -320,6 +325,7 @@ jobs:
           echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
           echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
           echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
+          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -458,12 +464,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Sjekk at VITE_R2_PUBLIC_BASE_URL er satt
+      - name: Sjekk at påkrevde R2-variabler er satt
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i staging-miljøet — hele siden krasjer uten den." >&2
+            exit 1
+          fi
+          if [ -z "$R2_CLEANUP_SECRET" ]; then
+            echo "R2_CLEANUP_SECRET mangler i staging-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
             exit 1
           fi
 
@@ -492,6 +503,7 @@ jobs:
           echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
           echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
           echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
+          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

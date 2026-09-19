@@ -36,9 +36,13 @@ function getClient(): AwsClient {
   return _client;
 }
 
-function objectUrl(bucket: R2BucketName, key: string): string {
+function bucketUrl(bucket: R2BucketName): string {
   const accountId = readEnv("R2_ACCOUNT_ID");
-  return `https://${accountId}.r2.cloudflarestorage.com/${getBucketName(bucket)}/${key}`;
+  return `https://${accountId}.r2.cloudflarestorage.com/${getBucketName(bucket)}`;
+}
+
+function objectUrl(bucket: R2BucketName, key: string): string {
+  return `${bucketUrl(bucket)}/${key}`;
 }
 
 export async function putObject(
@@ -80,4 +84,65 @@ export async function deleteObject(bucket: R2BucketName, key: string): Promise<v
       `Klarte ikke å slette fra R2 (${bucket}/${key}): ${response.status} ${response.statusText}`,
     );
   }
+}
+
+/** Alle nøkler under et prefiks, paginert (S3 gir maks 1000 per svar).
+ *
+ * R2 svarer med S3-XML. Nøklene vi lager er alltid `{uuid}/{uuid}.{ext}`
+ * eller `{uuid}/{tall}.{ext}` (se storage.functions.ts og
+ * vehicle-360.functions.ts), altså aldri tegn som XML-escapes — derfor
+ * plukker vi dem ut med et regex fremfor å dra inn en XML-parser.
+ *
+ * Regexet finner ingenting både når prefikset faktisk er tomt OG når svaret
+ * ikke er det vi tror (uventet format, navnerom på taggene, en feilside med
+ * HTTP 200 et sted foran oss). De to tilfellene må skilles: en parsefeil skal
+ * IKKE tolkes som et tomt prefiks, for da sletter deletePrefix køraden uten
+ * at objektene noensinne ble slettet fra R2 — stille datatap, usporbart i
+ * r2_delete_queue som skal være revisjonssporet for GDPR-dokumentasjonen.
+ * Derfor sjekker vi at kroppen faktisk er et S3-listesvar før vi stoler på
+ * uttrekket. Et gyldig, tomt `ListBucketResult` (uten `<Contents>`) gir
+ * fortsatt en tom liste, som den skal. */
+export async function listObjectKeys(bucket: R2BucketName, prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const url = new URL(bucketUrl(bucket));
+    url.searchParams.set("list-type", "2");
+    url.searchParams.set("prefix", prefix);
+    if (continuationToken) url.searchParams.set("continuation-token", continuationToken);
+
+    const response = await getClient().fetch(url.toString(), { method: "GET" });
+    if (!response.ok) {
+      throw new Error(
+        `Klarte ikke å liste R2-objekter (${bucket}/${prefix}): ${response.status} ${response.statusText}`,
+      );
+    }
+    const xml = await response.text();
+    if (!xml.includes("<ListBucketResult")) {
+      throw new Error(
+        `Uventet svar ved listing av R2-objekter (${bucket}/${prefix}): svaret var ikke et gyldig ListBucketResult`,
+      );
+    }
+    for (const match of xml.matchAll(/<Key>([^<]*)<\/Key>/g)) keys.push(match[1]);
+    continuationToken = /<IsTruncated>true<\/IsTruncated>/.test(xml)
+      ? /<NextContinuationToken>([^<]*)<\/NextContinuationToken>/.exec(xml)?.[1]
+      : undefined;
+  } while (continuationToken);
+  return keys;
+}
+
+/** Sletter alt under et prefiks og returnerer antall slettede objekter.
+ *
+ * Prefikset må være ikke-tomt: et tomt prefiks ville tømt hele bucketen, og
+ * denne funksjonen kalles med verdier som stammer fra databaserader. */
+export async function deletePrefix(bucket: R2BucketName, prefix: string): Promise<number> {
+  if (!prefix) throw new Error("deletePrefix krever et ikke-tomt prefiks");
+
+  const keys = await listObjectKeys(bucket, prefix);
+  // ponytail: én DELETE per nøkkel i stedet for S3 DeleteObjects (batch på
+  // 1000). Et annonseprefiks rommer maks 20 bilder + thumbnails + 36
+  // 360-frames ≈ 76 objekter, så batching sparer lite. Bytt til
+  // DeleteObjects hvis prefiksene vokser vesentlig.
+  for (const key of keys) await deleteObject(bucket, key);
+  return keys.length;
 }

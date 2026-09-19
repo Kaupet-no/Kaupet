@@ -207,9 +207,12 @@ function ConversationPage() {
       .map((m) => m.attachment_path)
       .filter((p): p is string => !!p && !attachmentUrls[p]);
     if (paths.length === 0) return;
-    signMessageAttachmentUrls(paths).then((urls) =>
-      setAttachmentUrls((prev) => ({ ...prev, ...urls })),
-    );
+    signMessageAttachmentUrls(paths)
+      .then((urls) => setAttachmentUrls((prev) => ({ ...prev, ...urls })))
+      .catch(() => {
+        // Best-effort — feiler signeringen, vises vedlegget bare uten
+        // forhåndsvisning fremfor å knekke resten av samtalen.
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 

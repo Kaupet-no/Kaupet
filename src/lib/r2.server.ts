@@ -59,22 +59,6 @@ export async function putObject(
   }
 }
 
-/** Returnerer en stream + innholdstype som kan legges rett i et `Response`,
- * eller `null` hvis objektet ikke finnes. */
-export async function getObject(
-  bucket: R2BucketName,
-  key: string,
-): Promise<{ body: ReadableStream; contentType?: string } | null> {
-  const response = await getClient().fetch(objectUrl(bucket, key), { method: "GET" });
-  if (response.status === 404) return null;
-  if (!response.ok || !response.body) {
-    throw new Error(
-      `Klarte ikke å hente fra R2 (${bucket}/${key}): ${response.status} ${response.statusText}`,
-    );
-  }
-  return { body: response.body, contentType: response.headers.get("content-type") ?? undefined };
-}
-
 /** Presignert GET-URL (samme modell som Supabase sin `createSignedUrls`) —
  * bæreren av URL-en har tilgang fram til utløp, så kall denne kun etter at
  * autorisasjon er sjekket server-side. */

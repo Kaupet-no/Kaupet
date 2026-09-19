@@ -20,12 +20,17 @@
 --
 -- Oppsett som må på plass før jobben virker (samme mønster som push):
 --   * R2_CLEANUP_SECRET i secrets/cloudflare.env (miljøvariabel for appen)
+--     og på Cloudflare-workeren (satt av deploy-jobben i
+--     .github/workflows/ci.yml fra GitHub Environment-secreten)
 --   * app_settings-radene 'r2_cleanup_secret' (samme verdi) og, utenfor prod,
 --     'r2_cleanup_url' som peker på riktig miljø.
 -- Uten hemmeligheten poster dispatch_r2_cleanup ikke i det hele tatt —
 -- pg_net svelger et 401-svar uten header, så et postet kall ville forsvunnet
 -- stille. I stedet gir funksjonen RAISE WARNING i Postgres-loggen, og
--- r2_delete_queue vokser synlig med attempts = 0.
+-- r2_delete_queue vokser synlig med attempts = 0. Funksjonen varsler også
+-- når køen har rader som aldri er forsøkt (attempts = 0) og er eldre enn
+-- seks timer, slik at et 401/302/404-svar som pg_net svelger ikke blir
+-- usynlig.
 --
 -- Vi køer *prefikser*, ikke enkeltnøkler: alle nøkler er partisjonert på
 -- eier-id (`{listingId}/…`, `{conversationId}/…`, `{userId}/…`), så én rad
@@ -112,6 +117,8 @@ DECLARE
     'https://kaupet.no/api/public/r2/cleanup'
   );
   _secret text := (SELECT value FROM public.app_settings WHERE key = 'r2_cleanup_secret');
+  _stale_count integer;
+  _oldest timestamptz;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.r2_delete_queue) THEN
     RETURN;
@@ -122,6 +129,19 @@ BEGIN
     -- Post ikke i det hele tatt, og varsle i loggen i stedet.
     RAISE WARNING 'r2-opprydning hoppet over: app_settings-raden "r2_cleanup_secret" er ikke satt';
     RETURN;
+  END IF;
+  -- Rader med attempts = 0 er aldri forsøkt. Da har endepunktet ikke svart
+  -- 200 i det hele tatt — manglende worker-secret gir 401, Cloudflare Access
+  -- gir 302, feil r2_cleanup_url gir 404 — og pg_net svelger alle tre uten
+  -- spor. Jobben går hver time, så en urørt rad eldre enn seks timer betyr at
+  -- kallet ikke kommer fram, ikke at én rad er vanskelig. Rader som HAR vært
+  -- forsøkt har attempts > 0 og last_error, og er synlige i tabellen uten
+  -- dette varselet.
+  SELECT count(*), min(requested_at) INTO _stale_count, _oldest
+  FROM public.r2_delete_queue
+  WHERE attempts = 0 AND requested_at < now() - interval '6 hours';
+  IF _stale_count > 0 THEN
+    RAISE WARNING 'r2-opprydning: % rad(er) i r2_delete_queue er aldri forsøkt, eldste fra %. Endepunktet svarer sannsynligvis ikke 200 — sjekk worker-secreten R2_CLEANUP_SECRET, app_settings-raden r2_cleanup_url, og om miljøet ligger bak en Cloudflare Access-policy på /api/public/*.', _stale_count, _oldest;
   END IF;
   PERFORM net.http_post(
     url := _url,

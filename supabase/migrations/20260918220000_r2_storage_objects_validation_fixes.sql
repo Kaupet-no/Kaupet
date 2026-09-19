@@ -22,11 +22,13 @@
 -- Hva som erstatter storage.objects-sjekken:
 --
 -- `validate_listing_image_reference`:
---   - Stiformatet valideres nå mot `{listingId}/{uuid}.{ext}`: første segment
---     må være NEW.listing_id::text, andre segment må være en uuid med en av
---     de tillatte bildeendelsene (jpg/png/webp/jxl — se ALLOWED_MIME/
---     extFromMime i src/lib/storage.ts og LISTING_IMAGE_PATH_RE i
---     src/lib/storage.functions.ts, som bygger nøkkelen server-side).
+--   - Stiformatet valideres nå mot `{listingId}/{uuid}.{ext}` med én
+--     forankret regex mot HELE `NEW.storage_path` (samme form som
+--     `send_message_rate_limited` bruker for vedleggsstier under, med
+--     `NEW.listing_id::text` i stedet for samtale-id-en) — ikke separate
+--     `split_part`-sjekk av første og andre segment som før, siden den
+--     varianten ikke forankrer strengens slutt og dermed slipper gjennom en
+--     sti med et uventet tredje segment (`{listingId}/{uuid}.jpg/noe`).
 --   - Eksistenssjekken mot `storage.objects` fjernes uten erstatning: Postgres
 --     har ingen måte å verifisere at et R2-objekt finnes, og skal ikke få en.
 --     Selve opplastingen skjer uansett kun gjennom
@@ -91,8 +93,10 @@ as $$
 declare
   image_count integer;
 begin
-  IF split_part(NEW.storage_path, '/', 1) <> NEW.listing_id::text
-     OR split_part(NEW.storage_path, '/', 2) !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|jxl)$'
+  IF NEW.storage_path !~* (
+       '^' || NEW.listing_id::text ||
+       '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|jxl)$'
+     )
      OR NOT EXISTS (
        SELECT 1
        FROM public.listings l

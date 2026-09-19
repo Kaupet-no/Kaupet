@@ -2617,6 +2617,14 @@ describe.skipIf(!canRun)(
         storage_path: `${draftListingId}/${crypto.randomUUID()}.svg`,
       });
       expect(badExtError).not.toBeNull();
+
+      // Forankret regex (20260918220000_r2_storage_objects_validation_fixes.sql):
+      // et uventet tredje segment skal ikke slippe gjennom.
+      const { error: extraSegmentError } = await seller.from("listing_images").insert({
+        listing_id: draftListingId,
+        storage_path: `${draftListingId}/${crypto.randomUUID()}.jpg/noe`,
+      });
+      expect(extraSegmentError).not.toBeNull();
     });
 
     it("still enforces the 20-images-per-listing cap", async () => {

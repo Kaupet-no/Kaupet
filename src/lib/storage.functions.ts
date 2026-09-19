@@ -268,7 +268,15 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
 export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
-    z.object({ paths: z.array(z.string().regex(UUID_DIR_UUID_FILE_PATH_RE)) }).parse(input),
+    z
+      .object({
+        // Grense for å hindre at en klient sender vilkårlig mange stier inn i
+        // én `.in()`-spørring og presign-løkke.
+        paths: z
+          .array(z.string().regex(UUID_DIR_UUID_FILE_PATH_RE))
+          .max(100, "For mange vedlegg i én forespørsel"),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }): Promise<Record<string, string>> => {
     const conversationIds = Array.from(new Set(data.paths.map((p) => p.split("/", 1)[0])));

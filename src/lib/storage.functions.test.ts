@@ -413,4 +413,15 @@ describe("signMessageAttachmentUrls", () => {
     ).rejects.toThrow();
     expect(presignGetUrlMock).not.toHaveBeenCalled();
   });
+
+  it("avviser mer enn 100 stier i én forespørsel", async () => {
+    const paths = Array.from(
+      { length: 101 },
+      () => `${CONVERSATION_ID}/${crypto.randomUUID()}.jpg`,
+    );
+    await expect(signMessageAttachmentUrls({ data: { paths } })).rejects.toThrow(
+      "For mange vedlegg",
+    );
+    expect(presignGetUrlMock).not.toHaveBeenCalled();
+  });
 });

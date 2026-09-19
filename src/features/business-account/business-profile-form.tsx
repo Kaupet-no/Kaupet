@@ -19,7 +19,7 @@ import {
   validateAvatarImage,
   describeImageError,
 } from "@/lib/storage";
-import { publicImageUrl } from "@/lib/image-url";
+import { organizationLogoUrl } from "@/lib/organization-logo-url";
 import { formatErrorMessage } from "@/lib/errors";
 import {
   BRAND_PALETTES,
@@ -123,8 +123,8 @@ export function BusinessProfileForm({ organization }: Props) {
   );
   const callUpdate = useServerFn(updateBusinessProfile);
   const logoUrl = useMemo(() => {
-    if (!canBrand || !organization.logo_path) return null;
-    return publicImageUrl(organization.logo_path);
+    if (!canBrand) return null;
+    return organizationLogoUrl(organization.logo_path);
   }, [canBrand, organization.logo_path]);
   const pendingLogoUrl = useMemo(
     () => (logoFile ? URL.createObjectURL(logoFile) : null),

@@ -24,6 +24,9 @@ const BATCH_SIZE = 100;
 // En rad som feiler permanent (f.eks. ugyldig prefiks) skal ikke få stå
 // først i køen for alltid — den utestenger friske rader fra hver batch og
 // forsøkes på nytt hver time uten grunn til å tro utfallet endrer seg.
+// Terskelen er duplisert i dispatch_r2_cleanup (supabase/migrations/
+// 20260918230000_r2_delete_queue.sql) sitt varsel for oppbrukte rader —
+// oppdater begge steder samtidig.
 const MAX_ATTEMPTS = 10;
 
 // deletePrefix gjør ett listObjectKeys-kall pluss ett deleteObject-kall per

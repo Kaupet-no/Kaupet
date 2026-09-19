@@ -119,6 +119,8 @@ DECLARE
   _secret text := (SELECT value FROM public.app_settings WHERE key = 'r2_cleanup_secret');
   _stale_count integer;
   _oldest timestamptz;
+  _exhausted_count integer;
+  _exhausted_oldest timestamptz;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.r2_delete_queue) THEN
     RETURN;
@@ -142,6 +144,19 @@ BEGIN
   WHERE attempts = 0 AND requested_at < now() - interval '6 hours';
   IF _stale_count > 0 THEN
     RAISE WARNING 'r2-opprydning: % rad(er) i r2_delete_queue er aldri forsøkt, eldste fra %. Endepunktet svarer sannsynligvis ikke 200 — sjekk worker-secreten R2_CLEANUP_SECRET, app_settings-raden r2_cleanup_url, og om miljøet ligger bak en Cloudflare Access-policy på /api/public/*.', _stale_count, _oldest;
+  END IF;
+  -- Rader med attempts >= 10 er derimot faktisk forsøkt og feiler
+  -- permanent. De faller ut av spørringen i /api/public/r2/cleanup.ts
+  -- (attempts < MAX_ATTEMPTS) og slettes bevisst ikke — se kommentaren der.
+  -- Terskelen 10 er duplisert i MAX_ATTEMPTS i
+  -- src/routes/api/public/r2/cleanup.ts; oppdater begge steder samtidig.
+  -- Uten dette varselet ville en slik rad vært usynlig for alle andre enn
+  -- noen som manuelt ser i tabellen.
+  SELECT count(*), min(requested_at) INTO _exhausted_count, _exhausted_oldest
+  FROM public.r2_delete_queue
+  WHERE attempts >= 10;
+  IF _exhausted_count > 0 THEN
+    RAISE WARNING 'r2-opprydning: % rad(er) i r2_delete_queue har brukt opp alle forsøkene, eldste fra %. Slettingen feiler permanent — se last_error i public.r2_delete_queue for manuell oppfølging.', _exhausted_count, _exhausted_oldest;
   END IF;
   PERFORM net.http_post(
     url := _url,

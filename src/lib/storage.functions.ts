@@ -32,15 +32,20 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { deleteObject, presignGetUrl, putObject } from "@/lib/r2.server";
 import { pathFromPublicImageUrl, publicImageUrl } from "@/lib/image-url";
-import { describeImageError, extFromMime, thumbPathFor, validateImages } from "@/lib/storage";
+import {
+  ATTACHMENT_URL_TTL_SECONDS,
+  describeImageError,
+  extFromMime,
+  MAX_ATTACHMENT_PATHS_PER_REQUEST,
+  thumbPathFor,
+  validateImages,
+} from "@/lib/storage";
 
 // {id}/{uuid}.{ext} — samme mønster for annonsebilder (id = listingId, se
 // `thumbPathFor` for thumbnail-varianten) og meldingsvedlegg (id =
 // conversationId, se uploadMessageAttachment).
 const UUID_DIR_UUID_FILE_PATH_RE =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|jxl)$/i;
-
-const ONE_HOUR_SECONDS = 60 * 60;
 
 function assertServerSideImage(file: File): void {
   const err = validateImages([file]);
@@ -268,7 +273,15 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
 export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
-    z.object({ paths: z.array(z.string().regex(UUID_DIR_UUID_FILE_PATH_RE)) }).parse(input),
+    z
+      .object({
+        // Grense for å hindre at en klient sender vilkårlig mange stier inn i
+        // én `.in()`-spørring og presign-løkke.
+        paths: z
+          .array(z.string().regex(UUID_DIR_UUID_FILE_PATH_RE))
+          .max(MAX_ATTACHMENT_PATHS_PER_REQUEST, "For mange vedlegg i én forespørsel"),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }): Promise<Record<string, string>> => {
     const conversationIds = Array.from(new Set(data.paths.map((p) => p.split("/", 1)[0])));
@@ -288,7 +301,7 @@ export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
 
     const allowedPaths = data.paths.filter((p) => allowedConversationIds.has(p.split("/", 1)[0]));
     const urls = await Promise.all(
-      allowedPaths.map((path) => presignGetUrl("VEDLEGG", path, ONE_HOUR_SECONDS)),
+      allowedPaths.map((path) => presignGetUrl("VEDLEGG", path, ATTACHMENT_URL_TTL_SECONDS)),
     );
     return Object.fromEntries(allowedPaths.map((path, i) => [path, urls[i]]));
   });

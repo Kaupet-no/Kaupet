@@ -13,6 +13,13 @@ import {
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const MAX_LISTING_IMAGES = 20;
+// Må matche `.max(...)` på `paths` i signMessageAttachmentUrls-validatoren i
+// storage.functions.ts.
+export const MAX_ATTACHMENT_PATHS_PER_REQUEST = 100;
+// Delt med `presignGetUrl`-kallet i storage.functions.ts, slik at
+// klientcachens TTL aldri kommer i utakt med den faktiske utløpstiden på den
+// signerte URL-en.
+export const ATTACHMENT_URL_TTL_SECONDS = 60 * 60;
 export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/jxl"] as const;
 export const IMAGE_ACCEPT = `${ALLOWED_MIME.join(",")},.jxl`;
 
@@ -160,10 +167,7 @@ let messageAttachmentCacheGeneration = 0;
 // i motsetning til annonsebilder og 360-bilder, som ligger i den offentlige
 // bucketen og kan bygges syntaktisk. Cachen unngår å be om ny signatur for
 // vedlegg vi nylig har fått URL for.
-export async function signMessageAttachmentUrls(
-  paths: string[],
-  expiresInSeconds = 60 * 60,
-): Promise<Record<string, string>> {
+export async function signMessageAttachmentUrls(paths: string[]): Promise<Record<string, string>> {
   const generation = messageAttachmentCacheGeneration;
   const now = Date.now();
   const result: Record<string, string> = {};
@@ -176,11 +180,18 @@ export async function signMessageAttachmentUrls(
       need.push(p);
     }
   }
-  if (need.length > 0) {
-    const urls = await signMessageAttachmentUrlsFn({ data: { paths: need } });
+  // Serverens validator avviser mer enn MAX_ATTACHMENT_PATHS_PER_REQUEST stier
+  // i én forespørsel — del opp her, ellers feiler ALLE vedleggene i en tråd
+  // med mange bilder, ikke bare de utover grensen.
+  for (let i = 0; i < need.length; i += MAX_ATTACHMENT_PATHS_PER_REQUEST) {
+    const chunk = need.slice(i, i + MAX_ATTACHMENT_PATHS_PER_REQUEST);
+    const urls = await signMessageAttachmentUrlsFn({ data: { paths: chunk } });
     for (const [path, url] of Object.entries(urls)) {
       if (generation !== messageAttachmentCacheGeneration) continue;
-      signedMessageAttachmentUrlCache.set(path, { url, expiresAt: now + expiresInSeconds * 1000 });
+      signedMessageAttachmentUrlCache.set(path, {
+        url,
+        expiresAt: now + ATTACHMENT_URL_TTL_SECONDS * 1000,
+      });
       result[path] = url;
     }
   }

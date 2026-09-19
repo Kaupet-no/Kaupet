@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
+import { organizationLogoUrl } from "@/lib/organization-logo-url";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
 import { displayPriceNok } from "@/lib/format";
@@ -725,10 +726,7 @@ function ListingDetailPage() {
           id: organization.id,
           displayName: organization.display_name,
           organizationNumber: organization.organization_number,
-          logoUrl: organization.logo_path
-            ? supabase.storage.from("organization-logos").getPublicUrl(organization.logo_path).data
-                .publicUrl
-            : null,
+          logoUrl: organizationLogoUrl(organization.logo_path),
           websiteUrl: organization.website_url,
           palette: organization.brand_palette,
           concept: organization.listing_concept as ProffOrganizationPresentation["concept"],

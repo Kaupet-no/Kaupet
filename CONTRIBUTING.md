@@ -1,40 +1,40 @@
-# Bidra til Kaupet.no
+# Contributing to Kaupet.no
 
-Tusen takk for at du vurderer å bidra! Kaupet.no er et fellesskapsdrevet prosjekt, og hvert bidrag, fra rettelse av skrivefeil til nye funksjoner, gjør tjenesten bedre for alle.
+Thank you for considering contributing! Kaupet.no is a community-driven project, and every contribution — from fixing a typo to adding new features — makes the service better for everyone.
 
-## Slik foreslår du en endring
+## How to propose a change
 
-1. **Fork** repoet til din egen GitHub-konto.
-2. **Lag en branch** med et beskrivende navn: `git checkout -b fiks/manglende-knapp` eller `feat/favoritter-sortering`.
-3. **Gjør endringene** — hold dem fokuserte og atomiske.
-4. **Kjør sjekkene lokalt** før du pusher:
+1. **Fork** the repo to your own GitHub account.
+2. **Create a branch** with a descriptive name: `git checkout -b fiks/manglende-knapp` or `feat/favoritter-sortering`.
+3. **Make your changes** — keep them focused and atomic.
+4. **Run the checks locally** before pushing:
    ```bash
    bun run lint
    bunx tsc --noEmit
    bun run build
    ```
-5. **Åpne en pull request** mot `main`. Beskriv hva du har endret og hvorfor. Skjermbilder er gull for UI-endringer.
+5. **Open a pull request** against `main`. Describe what you changed and why. Screenshots are gold for UI changes.
 
-En moderator vil se på PR-en så snart som mulig. CI må være grønn og minst én moderator må godkjenne før merge.
+A moderator will look at the PR as soon as possible. CI must be green and at least one moderator must approve before merging.
 
-## Rapportere bugs og foreslå funksjoner
+## Reporting bugs and suggesting features
 
-- **Bug?** Åpne en [bug-issue](https://github.com/Kaupet-no/kaupet/issues/new?template=bug_report.md) med stegene for å reprodusere.
-- **Idé?** Åpne en [feature-issue](https://github.com/Kaupet-no/kaupet/issues/new?template=feature_request.md) eller start en [Discussion](https://github.com/Kaupet-no/kaupet/discussions).
-- **Sårbarhet?** Se [SECURITY.md](SECURITY.md) — ikke i offentlige issues.
+- **Bug?** Open a [bug issue](https://github.com/Kaupet-no/kaupet/issues/new?template=bug_report.md) with steps to reproduce.
+- **Idea?** Open a [feature issue](https://github.com/Kaupet-no/kaupet/issues/new?template=feature_request.md) or start a [Discussion](https://github.com/Kaupet-no/kaupet/discussions).
+- **Vulnerability?** See [SECURITY.md](SECURITY.md) — not in public issues.
 
-## Kodestil
+## Code style
 
-- **Formatering:** Prettier (`bun run format` hvis tilgjengelig, ellers kjøres det automatisk i editor).
+- **Formatting:** Prettier (`bun run format` if available, otherwise it runs automatically in your editor).
 - **Linting:** ESLint — `bun run lint`.
-- **TypeScript:** strict mode er på. Ingen `any` uten god grunn.
-- **Komponenter:** funksjonelle, små, og bruk semantiske design-tokens fra `src/styles.css` (ikke hardkodede farger).
-- **Språk i UI:** norsk bokmål.
-- **Språk i kode/kommentarer:** engelsk er greit, norsk er også greit — vær konsistent innenfor en fil.
+- **TypeScript:** strict mode is on. No `any` without a good reason.
+- **Components:** functional, small, and use the semantic design tokens from `src/styles.css` (no hardcoded colors).
+- **Language in the UI:** Norwegian Bokmål.
+- **Language in code/comments:** English is fine, Norwegian is fine too — be consistent within a file.
 
-## Commit-meldinger
+## Commit messages
 
-Vi følger en lett variant av [Conventional Commits](https://www.conventionalcommits.org/):
+We follow a light variant of [Conventional Commits](https://www.conventionalcommits.org/). Commit subjects in this repo are written in Norwegian:
 
 ```
 feat: legg til sortering på favoritter
@@ -43,23 +43,23 @@ docs: oppdater README med Bun-versjon
 chore: oppgrader Tailwind til 4.1
 ```
 
-## Overordnet arkitektur
+## High-level architecture
 
-- `src/routes/` — sider (file-based routing via TanStack Start)
-- `src/features/<navn>/` — selvstendige featuremoduler (f.eks. annonseopprettelse, annonsesøk)
-- `src/components/` — gjenbrukbare UI-komponenter
-- `src/lib/` — hjelpere, server-funksjoner (`*.functions.ts`)
-- `src/integrations/supabase/` — auto-generert, ikke rør
-- `supabase/migrations/` — database-skjema som SQL-migrasjoner
+- `src/routes/` — pages (file-based routing via TanStack Start)
+- `src/features/<name>/` — self-contained feature modules (e.g. listing creation, listing search)
+- `src/components/` — reusable UI components
+- `src/lib/` — helpers, server functions (`*.functions.ts`)
+- `src/integrations/supabase/` — auto-generated, do not touch
+- `supabase/migrations/` — database schema as SQL migrations
 
-Server-side logikk skrives som TanStack `createServerFn`, ikke som Supabase Edge Functions.
+Server-side logic is written as TanStack `createServerFn`, not as Supabase Edge Functions.
 
-## Lisensiering og rettigheter for bidrag
+## Licensing and contribution rights
 
-Alle bidragsytere må signere vår **Contributor License Agreement (CLA)** før en pull request kan merges. CLA-en gir Happy Pixel AS rettigheter til å bruke og distribuere bidraget ditt.
+All contributors must sign our **Contributor License Agreement (CLA)** before a pull request can be merged. The CLA grants Happy Pixel AS the rights to use and distribute your contribution.
 
-Når du åpner en PR for første gang, vil en GitHub-bot be deg om å signere ved å skrive en kommentar i PR-en. Det tar bare noen sekunder.
+The first time you open a PR, a GitHub bot will ask you to sign by posting a comment on the PR. It only takes a few seconds.
 
-Les CLA-en her: [CLA.md](CLA.md)
+Read the CLA here: [CLA.md](CLA.md)
 
-Takk! Sammen bygger vi Norges beste markedsplass for brukte ting! ❤️
+Thank you! Together we're building Norway's best marketplace for second-hand goods! ❤️

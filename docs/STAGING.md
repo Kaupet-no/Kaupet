@@ -10,6 +10,8 @@ Server-side secrets (`SUPABASE_SERVICE_ROLE_KEY`, Resend API key og avsender, Vi
 
 Produksjon (`main`) bruker fortsatt GitHub Environment `production`, men kategorisynken på produksjons-Workeren har ingen staging service-role-nøkkel. Den bruker en staging publishable key med kun offentlige lesetilganger.
 
+R2-konfigurasjonen for bildelagring bruker egne staging-buckets (`kaupet-bilder-staging`, `kaupet-vedlegg-staging`) og eget bildedomene (`https://bilder.staging.kaupet.no`). Ikke-hemmelige variabler (`R2_ACCOUNT_ID`, `R2_BILDER_BUCKET`, `R2_VEDLEGG_BUCKET`, `R2_PUBLIC_BASE_URL`) legges i GitHub Environment "staging" (`vars`), mens hemmeligheter (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) settes med `wrangler secret put <NAVN> --name kaupet-no-staging`. `VITE_R2_PUBLIC_BASE_URL` (bygges inn i klientbundlen) settes også i GitHub Environment `vars` på samme måte som andre `VITE_*`-variabler.
+
 ## Supabase Auth e-post
 
 Flyttet til [EPOST.md](EPOST.md), sammen med resten av e-postlogikken —

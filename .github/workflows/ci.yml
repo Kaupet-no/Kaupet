@@ -285,6 +285,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
 
       - name: Deploy
         run: bun run deploy
@@ -298,6 +299,18 @@ jobs:
         run: |
           echo "${{ vars.STAGING_SUPABASE_URL }}" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
           echo "${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set R2 secrets on the production Worker
+        run: |
+          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
+          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
+          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
+          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
+          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
+          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -444,10 +457,23 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
           CLOUDFLARE_WORKER_NAME: kaupet-no-staging
 
       - name: Deploy
         run: bun run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set R2 secrets on the staging Worker
+        run: |
+          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
+          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no-staging
+          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no-staging
+          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
+          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
+          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

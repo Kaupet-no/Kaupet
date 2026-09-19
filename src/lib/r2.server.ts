@@ -91,7 +91,17 @@ export async function deleteObject(bucket: R2BucketName, key: string): Promise<v
  * R2 svarer med S3-XML. Nøklene vi lager er alltid `{uuid}/{uuid}.{ext}`
  * eller `{uuid}/{tall}.{ext}` (se storage.functions.ts og
  * vehicle-360.functions.ts), altså aldri tegn som XML-escapes — derfor
- * plukker vi dem ut med et regex fremfor å dra inn en XML-parser. */
+ * plukker vi dem ut med et regex fremfor å dra inn en XML-parser.
+ *
+ * Regexet finner ingenting både når prefikset faktisk er tomt OG når svaret
+ * ikke er det vi tror (uventet format, navnerom på taggene, en feilside med
+ * HTTP 200 et sted foran oss). De to tilfellene må skilles: en parsefeil skal
+ * IKKE tolkes som et tomt prefiks, for da sletter deletePrefix køraden uten
+ * at objektene noensinne ble slettet fra R2 — stille datatap, usporbart i
+ * r2_delete_queue som skal være revisjonssporet for GDPR-dokumentasjonen.
+ * Derfor sjekker vi at kroppen faktisk er et S3-listesvar før vi stoler på
+ * uttrekket. Et gyldig, tomt `ListBucketResult` (uten `<Contents>`) gir
+ * fortsatt en tom liste, som den skal. */
 export async function listObjectKeys(bucket: R2BucketName, prefix: string): Promise<string[]> {
   const keys: string[] = [];
   let continuationToken: string | undefined;
@@ -108,6 +118,11 @@ export async function listObjectKeys(bucket: R2BucketName, prefix: string): Prom
       );
     }
     const xml = await response.text();
+    if (!xml.includes("<ListBucketResult")) {
+      throw new Error(
+        `Uventet svar ved listing av R2-objekter (${bucket}/${prefix}): svaret var ikke et gyldig ListBucketResult`,
+      );
+    }
     for (const match of xml.matchAll(/<Key>([^<]*)<\/Key>/g)) keys.push(match[1]);
     continuationToken = /<IsTruncated>true<\/IsTruncated>/.test(xml)
       ? /<NextContinuationToken>([^<]*)<\/NextContinuationToken>/.exec(xml)?.[1]

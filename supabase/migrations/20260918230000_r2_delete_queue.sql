@@ -48,7 +48,6 @@ CREATE INDEX r2_delete_queue_pending_idx ON public.r2_delete_queue (requested_at
 ALTER TABLE public.r2_delete_queue ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.r2_delete_queue FROM PUBLIC, anon, authenticated;
 GRANT SELECT, UPDATE, DELETE ON TABLE public.r2_delete_queue TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.r2_delete_queue_id_seq TO service_role;
 
 -- Bucketnavnet kommer fra triggerdefinisjonen, ikke fra data.
 CREATE FUNCTION public.enqueue_r2_delete() RETURNS trigger

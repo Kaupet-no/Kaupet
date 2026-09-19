@@ -61,4 +61,23 @@ describe("deletePrefix", () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 403, statusText: "Forbidden" });
     await expect(deletePrefix("BILDER", "annonse/")).rejects.toThrow(/Klarte ikke å liste/);
   });
+
+  // Et svar med HTTP 200 som likevel ikke er et ListBucketResult (uventet
+  // format, feilside) skal ikke tolkes som et tomt prefiks — da ville
+  // deletePrefix returnert 0 og køraden blitt slettet uten at objektene
+  // noensinne ble fjernet fra R2.
+  it("kaster hvis svaret er HTTP 200 men ikke et gyldig ListBucketResult", async () => {
+    const { deletePrefix } = await import("./r2.server");
+    fetchMock.mockResolvedValueOnce({ ok: true, text: async () => "<html>ikke S3-XML</html>" });
+    await expect(deletePrefix("BILDER", "annonse/")).rejects.toThrow(/ikke et gyldig/);
+  });
+
+  // Grensen fiksen over ikke skal flytte: et legitimt tomt prefiks er
+  // fortsatt et gyldig ListBucketResult uten <Contents>, og skal fortsatt gi
+  // 0 uten å kaste.
+  it("gir 0 uten å kaste for et gyldig, tomt ListBucketResult", async () => {
+    const { deletePrefix } = await import("./r2.server");
+    fetchMock.mockResolvedValueOnce(listResponse([]));
+    await expect(deletePrefix("BILDER", "annonse/")).resolves.toBe(0);
+  });
 });

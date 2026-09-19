@@ -8,7 +8,11 @@ import { nitro } from "nitro/vite";
 // Change `preset` here if Kaupet moves to a different host later.
 const NITRO_PRESET = "cloudflare-module";
 
-const SECURITY_HEADERS = {
+// Bildene ligger nå i R2 bak `VITE_R2_PUBLIC_BASE_URL` (prod og staging har
+// hvert sitt domene), og meldingsvedlegg hentes med presignerte S3-URL-er på
+// `<account>.r2.cloudflarestorage.com`. Begge må stå i `img-src`, ellers
+// blokkerer nettleseren hvert `<img>` selv om filen ligger der den skal.
+const securityHeaders = (r2PublicBaseUrl: string) => ({
   "x-content-type-options": "nosniff",
   "x-frame-options": "SAMEORIGIN",
   "referrer-policy": "strict-origin-when-cross-origin",
@@ -26,7 +30,9 @@ const SECURITY_HEADERS = {
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
-    "img-src 'self' data: blob: https://*.supabase.co https://cache.kartverket.no",
+    // `*.supabase.co` blir stående: avatar-URL-er fra før R2-migreringen er
+    // lagret som fulle Supabase Storage-URL-er i `profiles`.
+    `img-src 'self' data: blob: ${r2PublicBaseUrl} https://*.r2.cloudflarestorage.com https://*.supabase.co https://cache.kartverket.no`,
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
     "frame-src https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
@@ -34,7 +40,7 @@ const SECURITY_HEADERS = {
     "report-to csp",
   ].join("; "),
   "reporting-endpoints": 'csp="/api/public/csp-report"',
-};
+});
 
 // Server-only secrets that features silently need at runtime. Warn early in
 // dev so a missing key surfaces at `bun run dev` instead of mid-wizard when a
@@ -46,6 +52,9 @@ export default defineConfig(({ command, mode }) => {
   // Statically inline VITE_* env vars so they're also available in the
   // Nitro-bundled server output, not just the client bundle.
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  // Tom streng hvis den mangler — da faller CSP-en tilbake til å blokkere
+  // R2-bildedomenet, som er riktigere enn å slippe inn strengen "undefined".
+  const r2PublicBaseUrl = env.VITE_R2_PUBLIC_BASE_URL ?? "";
   const envDefine = Object.fromEntries(
     Object.entries(env).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
   );
@@ -146,7 +155,7 @@ export default defineConfig(({ command, mode }) => {
               // static asset serving would otherwise guess a generic content
               // type from the missing file extension.
               routeRules: {
-                "/**": { headers: SECURITY_HEADERS },
+                "/**": { headers: securityHeaders(r2PublicBaseUrl) },
                 "/.well-known/apple-app-site-association": {
                   headers: { "content-type": "application/json" },
                 },

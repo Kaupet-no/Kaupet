@@ -23,6 +23,11 @@ function isAuthorized(request: Request): boolean {
 // forespørsel kan holde på.
 const BATCH_SIZE = 100;
 
+// En rad som feiler permanent (f.eks. ugyldig prefiks) skal ikke få stå
+// først i køen for alltid — den utestenger friske rader fra hver batch og
+// forsøkes på nytt hver time uten grunn til å tro utfallet endrer seg.
+const MAX_ATTEMPTS = 10;
+
 export const Route = createFileRoute("/api/public/r2/cleanup")({
   server: {
     handlers: {
@@ -36,6 +41,7 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
         const { data: rows, error } = await supabaseAdmin
           .from("r2_delete_queue")
           .select("id, bucket, prefix, attempts")
+          .lt("attempts", MAX_ATTEMPTS)
           .order("requested_at", { ascending: true })
           .limit(BATCH_SIZE);
         if (error) return new Response("Kunne ikke lese slettekøen", { status: 500 });
@@ -50,7 +56,10 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
           } catch (cause) {
             // Raden blir stående og forsøkes på nytt ved neste kjøring — et
             // objekt som ikke blir slettet er et personvernavvik, ikke noe
-            // vi kan svelge.
+            // vi kan svelge. Når MAX_ATTEMPTS er nådd faller den ut av
+            // spørringen over, men den slettes IKKE: den blir liggende med
+            // last_error intakt som et synlig personvernavvik til manuell
+            // oppfølging, siden køen er revisjonssporet for GDPR-dokumentasjonen.
             failed += 1;
             // Kun cron-jobben skriver her, én kjøring om gangen, så
             // attempts+1 trenger ingen atomisk inkrementering.

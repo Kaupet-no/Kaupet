@@ -1,4 +1,5 @@
--- Opprydning av R2-objekter når en annonse, samtale eller konto slettes.
+-- Opprydning av R2-objekter når en annonse, samtale, organisasjon eller
+-- konto slettes.
 --
 -- Postgres kan ikke selv nå R2, så kaskadene våre etterlater binærfilene selv
 -- om metadataradene forsvinner (kjent gap i
@@ -69,6 +70,14 @@ CREATE TRIGGER enqueue_r2_delete_after_listing_delete
 CREATE TRIGGER enqueue_r2_delete_after_conversation_delete
   AFTER DELETE ON public.conversations
   FOR EACH ROW EXECUTE FUNCTION public.enqueue_r2_delete('VEDLEGG');
+
+-- Organisasjonslogoer ligger under {organizationId}/logo-{uuid}.{ext} i
+-- BILDER (uploadOrganizationLogo). purge_expired_accounts sletter
+-- organisasjonsraden når brukeren som slettes er eneste superbruker, så
+-- kontosletting kan foreldreløsgjøre en logo uten denne triggeren.
+CREATE TRIGGER enqueue_r2_delete_after_organization_delete
+  AFTER DELETE ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.enqueue_r2_delete('BILDER');
 
 -- Kontosletting: purge_expired_accounts sletter annonsene (triggeren over
 -- fanger dem) men *anonymiserer* profilraden fremfor å slette den, så

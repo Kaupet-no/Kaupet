@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 
-import { deletePrefix, type R2BucketName } from "@/lib/r2.server";
-
 // Tømmer r2_delete_queue (se 20260918230000_r2_delete_queue.sql). Kalles av
 // en pg_cron-jobb via pg_net, med samme delte hemmelighet-mønster som
 // /api/public/push/dispatch. Endepunktet tar ingen input: hva som skal
@@ -36,6 +34,10 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
           return new Response("Unauthorized", { status: 401 });
         }
 
+        // Dynamisk import av samme grunn som supabaseAdmin under: en statisk
+        // import av en .server-modul i src/routes drar den inn i
+        // klientgrafen (se scripts/check-server-boundary.mjs).
+        const { deletePrefix } = await import("@/lib/r2.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: rows, error } = await supabaseAdmin
@@ -51,7 +53,10 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
 
         for (const row of rows ?? []) {
           try {
-            deletedObjects += await deletePrefix(row.bucket as R2BucketName, row.prefix);
+            deletedObjects += await deletePrefix(
+              row.bucket as Parameters<typeof deletePrefix>[0],
+              row.prefix,
+            );
             await supabaseAdmin.from("r2_delete_queue").delete().eq("id", row.id);
           } catch (cause) {
             // Raden blir stående og forsøkes på nytt ved neste kjøring — et

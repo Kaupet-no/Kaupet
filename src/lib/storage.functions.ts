@@ -31,15 +31,13 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { deleteObject, presignGetUrl, putObject } from "@/lib/r2.server";
-import { publicImageUrl } from "@/lib/image-url";
+import { pathFromPublicImageUrl, publicImageUrl } from "@/lib/image-url";
 import { describeImageError, extFromMime, thumbPathFor, validateImages } from "@/lib/storage";
 
-// {listingId}/{uuid}.{ext} — se `thumbPathFor` for thumbnail-varianten.
-const LISTING_IMAGE_PATH_RE =
-  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|jxl)$/i;
-
-// {conversationId}/{uuid}.{ext} — se uploadMessageAttachment.
-const MESSAGE_ATTACHMENT_PATH_RE =
+// {id}/{uuid}.{ext} — samme mønster for annonsebilder (id = listingId, se
+// `thumbPathFor` for thumbnail-varianten) og meldingsvedlegg (id =
+// conversationId, se uploadMessageAttachment).
+const UUID_DIR_UUID_FILE_PATH_RE =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|jxl)$/i;
 
 const ONE_HOUR_SECONDS = 60 * 60;
@@ -51,15 +49,6 @@ function assertServerSideImage(file: File): void {
 
 function listingIdFromValidatedPath(path: string): string {
   return path.split("/", 1)[0];
-}
-
-/** Sti fra en offentlig R2-URL, eller `null` hvis den ikke peker inn i den
- * konfigurerte bildebasen (f.eks. en URL fra en tidligere migrering, eller
- * forsøk på å referere en annen bucket). Kjører kun server-side. */
-function pathFromPublicImageUrl(url: string): string | null {
-  const base = (process.env.R2_PUBLIC_BASE_URL ?? "").replace(/\/+$/, "");
-  if (!base || !url.startsWith(`${base}/`)) return null;
-  return url.slice(base.length + 1);
 }
 
 export const uploadListingImage = createServerFn({ method: "POST" })
@@ -92,7 +81,7 @@ export const uploadListingImageThumb = createServerFn({ method: "POST" })
   .validator((formData: FormData) => {
     const path = formData.get("path");
     const file = formData.get("file");
-    if (typeof path !== "string" || !LISTING_IMAGE_PATH_RE.test(path)) {
+    if (typeof path !== "string" || !UUID_DIR_UUID_FILE_PATH_RE.test(path)) {
       throw new Error("Ugyldig bildesti");
     }
     if (!(file instanceof File)) throw new Error("Mangler miniatyrbilde");
@@ -120,7 +109,9 @@ export const uploadListingImageThumb = createServerFn({ method: "POST" })
 export const deleteListingImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
-    z.object({ path: z.string().regex(LISTING_IMAGE_PATH_RE, "Ugyldig bildesti") }).parse(input),
+    z
+      .object({ path: z.string().regex(UUID_DIR_UUID_FILE_PATH_RE, "Ugyldig bildesti") })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const listingId = listingIdFromValidatedPath(data.path);
@@ -277,7 +268,7 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
 export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
-    z.object({ paths: z.array(z.string().regex(MESSAGE_ATTACHMENT_PATH_RE)) }).parse(input),
+    z.object({ paths: z.array(z.string().regex(UUID_DIR_UUID_FILE_PATH_RE)) }).parse(input),
   )
   .handler(async ({ data, context }): Promise<Record<string, string>> => {
     const conversationIds = Array.from(new Set(data.paths.map((p) => p.split("/", 1)[0])));

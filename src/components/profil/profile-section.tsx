@@ -112,7 +112,7 @@ export function ProfileSection() {
     mutationFn: async (file: File) => {
       if (!userId) throw new Error("Ikke innlogget");
       const previousUrl = profile?.avatar_url ?? null;
-      const avatarUrl = await uploadAvatarImage({ userId, file });
+      const avatarUrl = await uploadAvatarImage({ file });
       await updateAvatar({ data: { avatarUrl } });
       await deletePreviousAvatarImage(previousUrl);
     },

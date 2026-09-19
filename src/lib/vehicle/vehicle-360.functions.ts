@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { deleteObject, putObject } from "@/lib/r2.server";
 
 export const MIN_360_FRAMES = 16;
 export const MAX_360_FRAMES = 36;
@@ -212,16 +213,11 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       throw await toClientError("database", previousError);
     }
 
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from("listing-360-frames")
-      .upload(path, bytes, {
-        contentType: data.contentType,
-        cacheControl: "31536000",
-        upsert: true,
-      });
-    if (uploadError) {
+    try {
+      await putObject("BILDER", path, bytes, data.contentType);
+    } catch (error) {
       const { toClientError } = await import("@/lib/to-client-error");
-      throw await toClientError("database", uploadError);
+      throw await toClientError("database", error);
     }
 
     const { error } = await supabaseAdmin.from("listing_360_frames").upsert(
@@ -234,13 +230,13 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
     );
     if (error) {
       if (previousFrame?.storage_path !== path) {
-        await supabaseAdmin.storage.from("listing-360-frames").remove([path]);
+        await deleteObject("BILDER", path).catch(() => {});
       }
       throw error;
     }
 
     if (previousFrame?.storage_path && previousFrame.storage_path !== path) {
-      await supabaseAdmin.storage.from("listing-360-frames").remove([previousFrame.storage_path]);
+      await deleteObject("BILDER", previousFrame.storage_path).catch(() => {});
     }
 
     return { ok: true as const };
@@ -349,9 +345,7 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       throw await toClientError("database", framesError);
     }
     if (frames && frames.length > 0) {
-      await supabaseAdmin.storage
-        .from("listing-360-frames")
-        .remove(frames.map((f) => f.storage_path));
+      await Promise.all(frames.map((f) => deleteObject("BILDER", f.storage_path).catch(() => {})));
     }
     const { error } = await supabaseAdmin
       .from("listing_360_frames")

@@ -14,13 +14,12 @@ import { updateBusinessProfile } from "@/lib/business.functions";
 import { compressImage } from "@/lib/image-compression";
 import {
   IMAGE_ACCEPT,
-  ORGANIZATION_LOGOS_BUCKET,
   deletePreviousOrganizationLogo,
   uploadOrganizationLogo,
   validateAvatarImage,
   describeImageError,
 } from "@/lib/storage";
-import { supabase } from "@/integrations/supabase/client";
+import { publicImageUrl } from "@/lib/image-url";
 import { formatErrorMessage } from "@/lib/errors";
 import {
   BRAND_PALETTES,
@@ -125,8 +124,7 @@ export function BusinessProfileForm({ organization }: Props) {
   const callUpdate = useServerFn(updateBusinessProfile);
   const logoUrl = useMemo(() => {
     if (!canBrand || !organization.logo_path) return null;
-    return supabase.storage.from(ORGANIZATION_LOGOS_BUCKET).getPublicUrl(organization.logo_path)
-      .data.publicUrl;
+    return publicImageUrl(organization.logo_path);
   }, [canBrand, organization.logo_path]);
   const pendingLogoUrl = useMemo(
     () => (logoFile ? URL.createObjectURL(logoFile) : null),

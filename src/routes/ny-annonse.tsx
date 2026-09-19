@@ -1230,7 +1230,6 @@ function NewListingPage() {
     mutationFn: async (values: ListingForm) => {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
-      const userId = userData.user.id;
 
       const finalCoords =
         coords ??
@@ -1289,12 +1288,7 @@ function NewListingPage() {
         const thumbPromises: Promise<void>[] = [];
         const results = await Promise.all(
           images.map(async (img, i) => {
-            const path = await uploadListingImage({
-              userId,
-              listingId: listing.id,
-              index: i,
-              file: img.file,
-            });
+            const path = await uploadListingImage({ listingId: listing.id, file: img.file });
             // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
             // hvis thumbnailen mangler, så en feil her skal ikke stoppe
             // publiseringen — men samles opp og vises til brukeren etterpå.

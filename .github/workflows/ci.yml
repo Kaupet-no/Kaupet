@@ -280,10 +280,15 @@ jobs:
       - name: Sjekk at påkrevde R2-variabler er satt
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
           R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i production-miljøet — hele siden krasjer uten den." >&2
+            exit 1
+          fi
+          if [ -z "$R2_ACCOUNT_ID" ]; then
+            echo "R2_ACCOUNT_ID mangler i production-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
             exit 1
           fi
           if [ -z "$R2_CLEANUP_SECRET" ]; then
@@ -300,6 +305,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
 
       - name: Deploy
         run: bun run deploy
@@ -467,10 +473,15 @@ jobs:
       - name: Sjekk at påkrevde R2-variabler er satt
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
           R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i staging-miljøet — hele siden krasjer uten den." >&2
+            exit 1
+          fi
+          if [ -z "$R2_ACCOUNT_ID" ]; then
+            echo "R2_ACCOUNT_ID mangler i staging-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
             exit 1
           fi
           if [ -z "$R2_CLEANUP_SECRET" ]; then
@@ -487,6 +498,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
           CLOUDFLARE_WORKER_NAME: kaupet-no-staging
 
       - name: Deploy

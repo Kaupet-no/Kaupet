@@ -180,8 +180,9 @@ VITE_SUPABASE_PROJECT_ID=...
 - [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 8
 - [Tailwind CSS v4](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com) komponenter
-- [Supabase](https://supabase.com) — database, auth, storage, realtime og RLS
+- [Supabase](https://supabase.com) — database, auth, realtime og RLS
 - [Cloudflare Workers](https://www.cloudflare.com/products/workers/) for hosting
+- [Cloudflare R2](https://www.cloudflare.com/products/r2/) for bildelagring
 - [Capacitor](https://capacitorjs.com) for native iOS og Android-app — se [README-CAPACITOR.md](README-CAPACITOR.md) for oppsett av native build
 - [Statens vegvesen (Datautlevering)](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) for kjøretøyoppslag
 - [Mistral Small 4](https://mistral.ai) for AI-basert kategoriforslag, som fallback når vote-basert forslag mangler treffsikker historikk

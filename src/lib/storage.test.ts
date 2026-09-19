@@ -1,57 +1,67 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const createSignedUrlsMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    storage: {
-      from: () => ({
-        createSignedUrls: (...args: unknown[]) => createSignedUrlsMock(...args),
-      }),
-    },
-  },
+  supabase: { storage: { from: () => ({}) } },
 }));
 
-import { signListingImageUrls } from "./storage";
+const signMessageAttachmentUrlsFnMock = vi.fn();
+vi.mock("@/lib/storage.functions", () => ({
+  signMessageAttachmentUrls: (...args: unknown[]) => signMessageAttachmentUrlsFnMock(...args),
+}));
 
-beforeEach(() => {
-  createSignedUrlsMock.mockReset();
-});
+import {
+  MAX_ATTACHMENT_PATHS_PER_REQUEST,
+  signListingImageUrls,
+  signMessageAttachmentUrls,
+  signVehicle360FrameUrls,
+} from "./storage";
 
-describe("signListingImageUrls", () => {
-  it("batches concurrent calls made within the same tick into one createSignedUrls request", async () => {
-    createSignedUrlsMock.mockResolvedValue({
-      data: [
-        { path: "a.jpg", signedUrl: "https://example.com/a.jpg" },
-        { path: "b.jpg", signedUrl: "https://example.com/b.jpg" },
-      ],
-      error: null,
-    });
+describe("signListingImageUrls / signVehicle360FrameUrls", () => {
+  const originalBaseUrl = process.env.R2_PUBLIC_BASE_URL;
 
-    const [resultA, resultB] = await Promise.all([
-      signListingImageUrls(["a.jpg"]),
-      signListingImageUrls(["b.jpg"]),
-    ]);
-
-    expect(createSignedUrlsMock).toHaveBeenCalledTimes(1);
-    expect(createSignedUrlsMock).toHaveBeenCalledWith(
-      expect.arrayContaining(["a.jpg", "b.jpg"]),
-      expect.any(Number),
-    );
-    expect(resultA).toEqual({ "a.jpg": "https://example.com/a.jpg" });
-    expect(resultB).toEqual({ "b.jpg": "https://example.com/b.jpg" });
+  beforeEach(() => {
+    process.env.R2_PUBLIC_BASE_URL = "https://bilder.kaupet.no";
   });
 
-  it("reuses the in-memory cache instead of re-fetching an already-signed path", async () => {
-    createSignedUrlsMock.mockResolvedValue({
-      data: [{ path: "c.jpg", signedUrl: "https://example.com/c.jpg" }],
-      error: null,
+  afterEach(() => {
+    process.env.R2_PUBLIC_BASE_URL = originalBaseUrl;
+  });
+
+  it("bygger offentlige URL-er synkront for hver sti, uten noe nettverkskall", () => {
+    const result = signListingImageUrls(["a.jpg", "b.jpg"]);
+    expect(result).toEqual({
+      "a.jpg": "https://bilder.kaupet.no/a.jpg",
+      "b.jpg": "https://bilder.kaupet.no/b.jpg",
     });
+  });
 
-    await signListingImageUrls(["c.jpg"]);
-    createSignedUrlsMock.mockClear();
-    const result = await signListingImageUrls(["c.jpg"]);
+  it("gjør det samme for 360-bilder", () => {
+    const result = signVehicle360FrameUrls(["frames/1.jpg"]);
+    expect(result).toEqual({ "frames/1.jpg": "https://bilder.kaupet.no/frames/1.jpg" });
+  });
+});
 
-    expect(createSignedUrlsMock).not.toHaveBeenCalled();
-    expect(result).toEqual({ "c.jpg": "https://example.com/c.jpg" });
+describe("signMessageAttachmentUrls", () => {
+  beforeEach(() => {
+    signMessageAttachmentUrlsFnMock.mockReset();
+  });
+
+  it("deler opp over MAX_ATTACHMENT_PATHS_PER_REQUEST stier i flere kall til serverfunksjonen", async () => {
+    const pathCount = MAX_ATTACHMENT_PATHS_PER_REQUEST + 5;
+    const paths = Array.from(
+      { length: pathCount },
+      (_, i) => `conv/${String(i).padStart(4, "0")}.jpg`,
+    );
+
+    signMessageAttachmentUrlsFnMock.mockImplementation(({ data }: { data: { paths: string[] } }) =>
+      Promise.resolve(Object.fromEntries(data.paths.map((p) => [p, `https://signert/${p}`]))),
+    );
+
+    const result = await signMessageAttachmentUrls(paths);
+
+    expect(signMessageAttachmentUrlsFnMock).toHaveBeenCalledTimes(2);
+    for (const path of paths) {
+      expect(result[path]).toBe(`https://signert/${path}`);
+    }
   });
 });

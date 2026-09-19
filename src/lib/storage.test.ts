@@ -17,14 +17,15 @@ import {
 } from "./storage";
 
 describe("signListingImageUrls / signVehicle360FrameUrls", () => {
-  const originalBaseUrl = process.env.R2_PUBLIC_BASE_URL;
-
   beforeEach(() => {
-    process.env.R2_PUBLIC_BASE_URL = "https://bilder.kaupet.no";
+    // VITE-varianten må settes fordi koden foretrekker den — ellers slår
+    // utviklerens `.env` (hvis den finnes) gjennom og gjør testen ustabil.
+    vi.stubEnv("VITE_R2_PUBLIC_BASE_URL", "https://bilder.kaupet.no");
+    vi.stubEnv("R2_PUBLIC_BASE_URL", "https://bilder.kaupet.no");
   });
 
   afterEach(() => {
-    process.env.R2_PUBLIC_BASE_URL = originalBaseUrl;
+    vi.unstubAllEnvs();
   });
 
   it("bygger offentlige URL-er synkront for hver sti, uten noe nettverkskall", () => {

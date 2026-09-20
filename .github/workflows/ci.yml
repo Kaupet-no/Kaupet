@@ -418,9 +418,16 @@ jobs:
           interval=20
 
           while [ "$elapsed" -lt "$timeout" ]; do
+            # Bare ekte staging-deployer teller. Statusen denne jobben selv
+            # poster nedenfor ligger i samme miljø, og uten filteret ville den
+            # blitt lest som "siste staging-deploy" av neste PR — som da
+            # sammenlignet seg mot en forrige PR sin HEAD i stedet for mot
+            # staging (task-feltet skiller dem, se steget under).
+            deploys=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=30" \
+              | jq '[.[] | select(.task == "deploy")]')
+
             # Eksakt treff: PR_HEAD er selv deployet.
-            exact=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=20" \
-              | jq -r --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
+            exact=$(echo "$deploys" | jq -r --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
 
             if [ -n "$exact" ]; then
               state=$(gh api "repos/${{ github.repository }}/deployments/$exact/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')
@@ -428,13 +435,17 @@ jobs:
                 ok=true
                 break
               fi
-            else
-              # Ingen eksakt deploy ennå — sjekk om PR_HEAD er en ancestor
-              # av siste vellykkede staging-deploy (staging kan ha gått
-              # forbi PR-en siden den ble åpnet).
-              latest=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=1" --jq '.[0]')
-              latest_id=$(echo "$latest" | jq -r '.id')
-              latest_sha=$(echo "$latest" | jq -r '.sha')
+            fi
+
+            # Ingen vellykket eksakt deploy — sjekk om PR_HEAD er en ancestor
+            # av siste vellykkede staging-deploy (staging kan ha gått forbi
+            # PR-en siden den ble åpnet). Sjekken kjøres også når det finnes
+            # en eksakt deploy som ikke er vellykket, ellers ville én mislykket
+            # deploy på PR-ens SHA blokkere porten helt til timeout.
+            latest=$(echo "$deploys" | jq '.[0] // empty')
+            latest_id=$(echo "$latest" | jq -r '.id // empty')
+            latest_sha=$(echo "$latest" | jq -r '.sha // empty')
+            if [ -n "$latest_id" ]; then
               latest_state=$(gh api "repos/${{ github.repository }}/deployments/$latest_id/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')
               if [ "$latest_state" = "success" ] && git merge-base --is-ancestor "$PR_HEAD" "$latest_sha" 2>/dev/null; then
                 ok=true
@@ -461,8 +472,12 @@ jobs:
           # required_contexts må sendes eksplisitt som tom liste, ellers
           # avviser deployment-endepunktet med 409 hvis andre required
           # status-sjekker på PR-en ikke er "success" ennå.
+          # task: "staging-gate" gjør at steget over kan skille denne
+          # syntetiske deploymenten fra de ekte (task: "deploy"). Miljønavnet
+          # må bli stående som "staging" for at "Require deployments to
+          # succeed" på main skal se statusen.
           deploy_id=$(jq -n --arg ref "$PR_HEAD" \
-            '{ref: $ref, environment: "staging", auto_merge: false, required_contexts: []}' \
+            '{ref: $ref, environment: "staging", task: "staging-gate", auto_merge: false, required_contexts: []}' \
             | gh api "repos/${{ github.repository }}/deployments" --input - --jq '.id')
 
           gh api "repos/${{ github.repository }}/deployments/$deploy_id/statuses" \

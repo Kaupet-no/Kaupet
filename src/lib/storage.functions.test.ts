@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { putObjectMock, deleteObjectMock, presignGetUrlMock, rpcMock, fromMock } = vi.hoisted(
   () => ({
@@ -281,8 +281,18 @@ describe("uploadOrganizationLogo", () => {
 });
 
 describe("deletePreviousAvatarImage", () => {
+  beforeEach(() => {
+    // VITE-varianten må settes fordi koden foretrekker den — ellers slår
+    // utviklerens `.env` (hvis den finnes) gjennom og gjør testen ustabil.
+    vi.stubEnv("VITE_R2_PUBLIC_BASE_URL", "https://bilder.kaupet.no");
+    vi.stubEnv("R2_PUBLIC_BASE_URL", "https://bilder.kaupet.no");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("nekter å slette en annen brukers avatar", async () => {
-    process.env.R2_PUBLIC_BASE_URL = "https://bilder.kaupet.no";
     await deletePreviousAvatarImage({
       data: { previousPublicUrl: "https://bilder.kaupet.no/en-annen-bruker/avatar-x.jpg" },
     });
@@ -290,7 +300,6 @@ describe("deletePreviousAvatarImage", () => {
   });
 
   it("sletter den forrige avataren til samme bruker", async () => {
-    process.env.R2_PUBLIC_BASE_URL = "https://bilder.kaupet.no";
     await deletePreviousAvatarImage({
       data: { previousPublicUrl: "https://bilder.kaupet.no/user-id/avatar-x.jpg" },
     });

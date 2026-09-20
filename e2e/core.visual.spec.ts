@@ -31,6 +31,12 @@ async function installDeterministicListingRoutes(page: Page) {
     });
   });
 
+  // Kartflisene hentes fra Kartverket over nett, og hvor mange som rekker å
+  // males før skjermbildet tas varierer fra kjøring til kjøring. Alle
+  // referansebildene er tatt uten fliser, så vi blokkerer dem i stedet for å
+  // la nettverket avgjøre om testen består.
+  await page.route("**/cache.kartverket.no/**", (route) => route.abort());
+
   await page.route("**/rest/v1/rpc/popular_listings_last_week", async (route) => {
     const payload = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
     const response = await route.fetch({
@@ -109,12 +115,23 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .locator('[aria-labelledby="listing-evidence-heading"] time')
     .filter({ hasText: /^Registrert / });
   const memberSinceDate = page.locator("p").filter({ hasText: /^Medlem siden / });
+  // Leveringsraden kommer fra CategoryBehavior, som avhenger av kategori- og
+  // filterspørringene ($kaupetCode.tsx). Kontaktknappen og datoene over er
+  // klare før den, så uten en egen venting her rekker skjermbildet å bli tatt
+  // mens faktalista mangler én rad — og alt under forskyves 20 px.
+  const deliveryFact = page
+    .locator("dt")
+    .filter({ hasText: /^Levering$/ })
+    .locator("xpath=..")
+    .locator("dd");
   await expect(publishedDate).toHaveCount(1);
   await expect(publishedDate).toBeVisible();
   await expect(profileDate).toHaveCount(1);
   await expect(profileDate).toBeVisible();
   await expect(memberSinceDate).toHaveCount(1);
   await expect(memberSinceDate).toBeVisible();
+  await expect(deliveryFact).toHaveCount(1);
+  await expect(deliveryFact).toBeVisible();
   await expect(page).toHaveScreenshot("listing-detail.png", {
     animations: "disabled",
     fullPage: true,

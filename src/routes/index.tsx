@@ -37,6 +37,8 @@ import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { supabase } from "@/integrations/supabase/client";
+import type { CategoryRecord } from "@/hooks/use-categories";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -49,6 +51,22 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
+  // Kategorirutenettet er det første brukeren ser på forsiden, og uten denne
+  // loaderen kan henting ikke engang starte før JS-en er lastet og hydrert
+  // (skjelett → useQuery → nettverkskall). Kun på serveren (samme mønster som
+  // __root.tsx sin loader): ved klient-navigasjon til "/" ville loaderen
+  // ellers gjort et unødvendig ekstra kall parallelt med at useCategories
+  // uansett har dataen i cache fra sist.
+  loader: async () => {
+    if (typeof window !== "undefined") return { categories: undefined };
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order")
+      .order("name_nb");
+    if (error) throw error;
+    return { categories: (data ?? []) as CategoryRecord[] };
+  },
   head: () => ({
     meta: [
       { title: "Kaupet.no — Gi tingene dine et nytt liv" },
@@ -116,8 +134,9 @@ function WebLanding({
   const navigate = useNavigate();
   const [qDraft, setQDraft] = useState("");
 
-  const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
-  const { data: vehicleBrands } = useAllVehicleBrands();
+  const { categories: ssrCategories } = Route.useLoaderData();
+  const { categories, categoriesIsError, refetchCategories, allFilters } =
+    useLandingCategories(ssrCategories);
 
   // Only colored root categories are presented as main categories on the landing
   // page; the catch-all "Annet" (no color) stays reachable via search but is not
@@ -201,6 +220,11 @@ function WebLanding({
   const feedListings = useMemo(() => feedPages?.pages.flatMap((p) => p.rows) ?? [], [feedPages]);
 
   const [qFocused, setQFocused] = useState(false);
+  // Kjøretøymerker (1000 rader, se vehicle-brands.ts) trengs først når
+  // brukeren faktisk sender et søk (handleSearchSubmit under), men vi starter
+  // hentingen så snart søkefeltet får fokus eller får tekst, slik at fokuset
+  // gir hentingen forsprang på tiden brukeren bruker på å skrive/lese.
+  const { data: vehicleBrands } = useAllVehicleBrands(qFocused || qDraft.length > 0);
   const heroSearchSentinelRef = useRef<HTMLFormElement>(null);
   const [heroSearchVisible, setHeroSearchVisible] = useState(true);
   useEffect(() => {

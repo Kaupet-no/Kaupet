@@ -31,7 +31,7 @@ export type CategoryRecord = {
  * another, and the fragmentation meant every screen refetched independently
  * instead of sharing one cache entry.
  */
-export function useCategories() {
+export function useCategories(initialData?: CategoryRecord[]) {
   return useQuery({
     queryKey: ["categories"],
     queryFn: async (): Promise<CategoryRecord[]> => {
@@ -43,6 +43,14 @@ export function useCategories() {
       if (error) throw error;
       return data ?? [];
     },
+    // categories endres kun via admin-UI-et i src/routes/_authenticated/admin/
+    // kategorier.tsx, som invaliderer sin egen ["admin", "categories"]-nøkkel —
+    // IKKE denne delte ["categories"]-nøkkelen. En admin-endring blir altså
+    // ikke synlig her før denne cachen selv går stale, så staleTime holdes
+    // konservativ (5 min, samme som gcTime-defaulten i router.tsx) i stedet
+    // for den lange verdien man ellers kunne satt for tilnærmet statiske data.
+    staleTime: 5 * 60_000,
+    initialData,
   });
 }
 

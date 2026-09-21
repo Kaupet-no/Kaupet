@@ -99,17 +99,25 @@
 -- inkluderingstermer skanner derfor fortsatt fullt, som før.
 --
 -- ---------------------------------------------------------------------------
--- MERK — overlapp med perf/ytelsestiltak (20260921100000)
+-- MERK — forholdet til perf/ytelsestiltak (20260921100000)
 -- ---------------------------------------------------------------------------
--- Den migrasjonen re-definerer SAMME funksjon med et geo-forfilter
--- (bounding box på lat + listings_active_lat_idx), og er ikke merget til main
--- når denne skrives. Begge bruker CREATE OR REPLACE med hele kroppen, så den
--- som kjører SIST vinner HELE definisjonen. Denne migrasjonen har derfor et
--- senere tidsstempel OG inneholder geo-forfilteret ord for ord, og oppretter
--- lat-indeksen med IF NOT EXISTS. Da blir resultatet korrekt uansett om
--- perf/ytelsestiltak merges før, etter eller aldri — ingen av delene faller
--- ut. Indeksen listings_active_created_at_idx fra den migrasjonen er ren
--- sorteringsytelse og hører ikke hjemme her; den følger sin egen branch.
+-- Den migrasjonen oppretter listings_active_lat_idx, som denne også gjør.
+-- Fordi begge bruker CREATE INDEX IF NOT EXISTS, er begge rekkefølger trygge
+-- — det spiller ingen rolle om den kjører før eller etter denne.
+--
+-- Denne migrasjonen er derimot eneste sted i de to grenene hvor
+-- search_listings_page defineres (20260921100000 inneholder ikke lenger noen
+-- CREATE OR REPLACE FUNCTION for den). Det er bevisst: to CREATE OR REPLACE
+-- av samme funksjon i parallelle grener er en deploy-felle. Den som anvendes
+-- SIST vinner HELE definisjonen, og i produksjon følger rekkefølgen hva som
+-- MANGLER i schema_migrations — ikke tidsstempelet i filnavnet. Et nyere
+-- tidsstempel er derfor ingen garanti: hadde 20260921100000 fortsatt
+-- re-definert funksjonen, og blitt merget etter at denne var anvendt, ville
+-- den kjørt etterpå og overskrevet tekst-forfilteret. Med bare én definisjon
+-- i spill kan det ikke skje, uansett anvendelsesrekkefølge.
+--
+-- Indeksen listings_active_created_at_idx er ren sorteringsytelse og hører
+-- ikke hjemme her; den følger sin egen branch.
 
 -- pg_trgm-biblioteket må være lastet i sesjonen før CREATE FUNCTION kan
 -- validere SET-klausulene for pg_trgm-tersklene — ellers er de bare

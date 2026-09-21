@@ -10,7 +10,8 @@ const PASSWORD = "test-password-12345";
 
 /**
  * Semantikkvakt for det indekserbare forhåndsfilteret i
- * public.search_listings_page (20260921120000).
+ * public.search_listings_page (20260921120000) og public.search_listing_ids
+ * (20260921130000).
  *
  * Forhåndsfilteret er ment å være et rent supersett: det skal bare kutte
  * skanningen, aldri endre treffmengden. Hver test her er valgt fordi den
@@ -24,7 +25,7 @@ const PASSWORD = "test-password-12345";
  *  - ekskludering går utenom forhåndsfilteret og må fortsatt virke
  */
 describe.skipIf(!canRun)(
-  "search_listings_page: semantikk holder med indeksert forhåndsfilter",
+  "search_listings_page og search_listing_ids: semantikk holder med indeksert forhåndsfilter",
   () => {
     const admin = canRun ? createClient<Database>(URL!, SERVICE_ROLE_KEY!) : null!;
     const anon = canRun ? createClient<Database>(URL!, ANON_KEY!) : null!;
@@ -32,6 +33,7 @@ describe.skipIf(!canRun)(
     let userId: string;
     let categoryId: string;
     const listingIds: string[] = [];
+    const idToTitle = new Map<string, string>();
 
     // Titlene har MED VILJE ingen unik suffiks: trigram-likhet regnes over hele
     // tittelen, så en påhengt tidsstempelstreng ville fortynnet similarity under
@@ -58,6 +60,14 @@ describe.skipIf(!canRun)(
 
     const titlesOf = (data: { title: string }[] | null) =>
       (data ?? []).map((row) => row.title).sort();
+
+    // search_listing_ids har ingen kategorifilter og returnerer id-er over hele
+    // basen, så treffene må snevres inn til fikstur-annonsene her.
+    const ownTitlesOf = (data: { id: string }[] | null) =>
+      (data ?? [])
+        .map((row) => idToTitle.get(row.id))
+        .filter((title): title is string => title !== undefined)
+        .sort();
 
     beforeAll(async () => {
       const { data: user, error: userError } = await admin.auth.admin.createUser({
@@ -100,9 +110,10 @@ describe.skipIf(!canRun)(
             attributes: {},
           })),
         )
-        .select("id");
+        .select("id, title");
       if (error) throw error;
       listingIds.push(...data.map((listing) => listing.id));
+      for (const listing of data) idToTitle.set(listing.id, listing.title);
     });
 
     afterAll(async () => {
@@ -225,6 +236,35 @@ describe.skipIf(!canRun)(
       expect(data).toHaveLength(1);
       expect(data?.[0]?.total_count).toBe(2);
       expect(data?.[0]?.title).toBe(titles.testsykkel);
+    });
+    // ---- search_listing_ids (20260921130000) --------------------------------
+    // Samme forhåndsfilter, egen funksjon. Dette er stien bak søkeforslagene,
+    // som kjører per tastetrykk — den mest kalte av de to.
+
+    it("search_listing_ids, sammensatte ord: 'sykkel' treffer 'Terrengsykkel' og 'Testsykkel', men ikke 'sykepleier'", async () => {
+      const { data, error } = await anon.rpc("search_listing_ids", {
+        include_groups: [{ mode: "any", terms: ["sykkel"] }],
+      });
+      expect(error).toBeNull();
+      expect(ownTitlesOf(data)).toEqual([titles.terrengsykkel, titles.testsykkel].sort());
+    });
+
+    it("search_listing_ids, fuzzy via similarity > 0.25: 'hodetelefon' finner 'Telefon til salgs'", async () => {
+      // similarity = 0.2609, i båndet 0.25–0.30: treffet ryker hvis
+      // forhåndsfilteret bruker pg_trgm sin standardterskel 0.3.
+      const { data, error } = await anon.rpc("search_listing_ids", {
+        include_groups: [{ mode: "any", terms: ["hodetelefon"] }],
+      });
+      expect(error).toBeNull();
+      expect(ownTitlesOf(data)).toContain(titles.telefon);
+    });
+
+    it("search_listing_ids uten søkeord gir fortsatt alle aktive annonser", async () => {
+      // Vakten i forhåndsfilteret: uten termer må hele leddet kobles ut. Var den
+      // borte ville `% ANY(NULL)` gitt NULL og tømt lista.
+      const { data, error } = await anon.rpc("search_listing_ids", {});
+      expect(error).toBeNull();
+      expect(ownTitlesOf(data)).toEqual(Object.values(titles).sort());
     });
   },
 );

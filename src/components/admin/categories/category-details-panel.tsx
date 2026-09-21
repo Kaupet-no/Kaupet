@@ -28,8 +28,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
-import { ALL_ICON_OPTIONS } from "@/lib/category-icons.all";
-import { CategoryIcon } from "@/lib/category-icons";
+import { CATEGORY_ICON_OPTIONS, CategoryIcon } from "@/lib/category-icons";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 import { collectDescendantIds, depthOf, MAX_CATEGORY_DEPTH } from "@/lib/category-admin-tree";
 import { MAIN_CATEGORY_COLOR_PRESETS, slugify, type Category } from "./shared";
@@ -58,8 +57,8 @@ export function CategoryDetailsPanel({
   const [iconSearch, setIconSearch] = useState("");
   const filteredIconOptions = useMemo(() => {
     const q = iconSearch.trim().toLowerCase();
-    if (!q) return ALL_ICON_OPTIONS.slice(0, 100);
-    return ALL_ICON_OPTIONS.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 100);
+    if (!q) return CATEGORY_ICON_OPTIONS;
+    return CATEGORY_ICON_OPTIONS.filter((o) => o.name.toLowerCase().includes(q));
   }, [iconSearch]);
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");

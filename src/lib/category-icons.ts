@@ -22,6 +22,7 @@ import {
   Dog,
   Dumbbell,
   Film,
+  FlaskConical,
   Flower2,
   Footprints,
   Forklift,
@@ -82,7 +83,7 @@ import {
   Cog,
   createLucideIcon,
 } from "lucide-react";
-import { type ComponentProps, Suspense, createElement, lazy } from "react";
+import { createElement } from "react";
 
 // Lucide har verken en dressjakke eller en kjole, så disse to er bygget for
 // hånd — som strøk-ikoner i nøyaktig samme stil som resten av settet (samme
@@ -183,6 +184,8 @@ export const CATEGORY_ICON_OPTIONS: { name: string; icon: LucideIcon }[] = [
   { name: "Lightbulb", icon: Lightbulb },
   { name: "Layers", icon: Layers },
   { name: "Flower2", icon: Flower2 },
+  // Brukes av e2e-test-kategoriene i supabase/seed.sql.
+  { name: "FlaskConical", icon: FlaskConical },
   { name: "Hammer", icon: Hammer },
   { name: "HardHat", icon: HardHat },
   { name: "Handshake", icon: Handshake },
@@ -238,33 +241,10 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
   CATEGORY_ICON_OPTIONS.map(({ name, icon }) => [name, icon]),
 );
 
-// Ikonnavn som admin har valgt utenfor det kuraterte settet over finnes ikke i
-// bundlen. De hentes med lucides DynamicIcon, som laster ett og ett ikon ved
-// behov. Alternativet — å importere hele lucide-registeret — la ~500 KiB i
-// forsidens preload-sett, siden denne modulen ligger i modulgrafen til /.
-// Ikonvelgeren i admin bruker category-icons.all.ts for å søke blant alle.
-const DynamicIcon = lazy(async () => ({
-  default: (await import("lucide-react/dynamic")).DynamicIcon,
-}));
-
-// DynamicIcon slår opp på kebab-case, mens navnene vi lagrer er PascalCase:
-// "PawPrint" -> "paw-print", "Gamepad2" -> "gamepad-2". Navnet kommer fra
-// databasen og kan i prinsippet være hva som helst, så castet er bevisst:
-// DynamicIcon rendrer fallback-ikonet hvis oppslaget bommer.
-type IconSlug = ComponentProps<typeof DynamicIcon>["name"];
-
-function toIconSlug(name: string): IconSlug {
-  return name
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/([a-zA-Z])(\d)/g, "$1-$2")
-    .toLowerCase() as IconSlug;
-}
-
-/**
- * Det kuraterte ikonet for navnet, eller Package som reserve. Merk at denne
- * kun kjenner CATEGORY_ICON_OPTIONS — for vilkårlige lucide-navn må du bruke
- * <CategoryIcon>, som faller tilbake på lat lasting.
- */
+// Ikonnavn utenfor det kuraterte settet over finnes ikke i bundlen og faller
+// tilbake på Package. Å slå dem opp i lucides fulle register kostet 514 KiB i
+// forsidens preload-sett; ikonvelgeren i admin tilbyr derfor kun settet over,
+// slik at det ikke går an å velge et ikon som ikke kan rendres.
 export function getCategoryIcon(iconName: string | null | undefined): LucideIcon {
   if (!iconName) return Package;
   return CATEGORY_ICON_MAP[iconName] ?? Package;
@@ -274,14 +254,5 @@ export function CategoryIcon({
   iconName,
   ...props
 }: LucideProps & { iconName: string | null | undefined }) {
-  const curated = iconName ? CATEGORY_ICON_MAP[iconName] : undefined;
-  if (curated) return createElement(curated, props);
-  if (!iconName) return createElement(Package, props);
-
-  const placeholder = () => createElement(Package, props);
-  return createElement(
-    Suspense,
-    { fallback: createElement(Package, props) },
-    createElement(DynamicIcon, { ...props, name: toIconSlug(iconName), fallback: placeholder }),
-  );
+  return createElement(getCategoryIcon(iconName), props);
 }

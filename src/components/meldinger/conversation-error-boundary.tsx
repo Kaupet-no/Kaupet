@@ -1,8 +1,8 @@
-import { useRouter } from "@tanstack/react-router";
+import { type ErrorComponentProps, useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
-export function ConversationErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+export function ConversationErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   console.error(error);
   return (

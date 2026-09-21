@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
-import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  type ErrorComponentProps,
+  Link,
+  useBlocker,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
@@ -84,7 +91,7 @@ export const Route = createFileRoute("/ny-ok-annonse")({
   errorComponent: NewWtbError,
 });
 
-function NewWtbError({ error, reset }: { error: Error; reset: () => void }) {
+function NewWtbError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">

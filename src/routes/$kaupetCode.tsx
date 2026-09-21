@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  type ErrorComponentProps,
   isNotFound,
   Link,
   notFound,
@@ -295,7 +296,7 @@ function RootSlugPage() {
   return <ListingDetailPage />;
 }
 
-function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+function ListingErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   console.error(error);
   return (

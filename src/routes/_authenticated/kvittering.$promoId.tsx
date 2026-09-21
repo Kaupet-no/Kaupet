@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, type ErrorComponentProps, Link, useRouter } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_authenticated/kvittering/$promoId")({
   ),
 });
 
-function ReceiptError({ error, reset }: { error: Error; reset: () => void }) {
+function ReceiptError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">

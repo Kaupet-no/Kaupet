@@ -1,10 +1,10 @@
-import { useRouter, Link } from "@tanstack/react-router";
+import { type ErrorComponentProps, Link, useRouter } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
-export function NewListingError({ error, reset }: { error: Error; reset: () => void }) {
+export function NewListingError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">

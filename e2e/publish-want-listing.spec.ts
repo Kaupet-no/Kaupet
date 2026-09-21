@@ -34,9 +34,14 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   // stegtelleren er nå veien tilbake til et tidligere steg (W7/W8).
   await goBackToStep(page, "Siste detaljer");
   await composerPage(page, "details").waitFor();
-  await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("1200");
+  // Oppsummeringen som viste «Maks 1 200 kr» ble fjernet sammen med resten av
+  // ComposerReview (W9), og beløpet vises ikke lenger noe sted i flyten. At
+  // feltet holder den nye verdien er det som gjenstår å bekrefte her — altså
+  // at stegmenyen faktisk tok oss til riktig steg og at redigeringen satt.
+  const maxPrice = page.getByLabel("Maks pris du vil betale (valgfritt)");
+  await maxPrice.fill("1200");
+  await expect(maxPrice).toHaveValue("1200");
   await advanceWantStep(page, "review");
-  await expect(page.getByText("Maks 1 200 kr")).toBeVisible();
 
   await page.getByRole("checkbox", { name: "Varsle meg om matchende annonser" }).click();
   await publishWantAndExpectSuccess(page);

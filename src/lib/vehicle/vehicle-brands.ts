@@ -34,16 +34,20 @@ async function fetchAllPages<T>(
   return rows;
 }
 
+/** Delt konfigurasjon, slik at en kallsted som må ha merkene NÅ (f.eks.
+ * søke-submit på forsiden) kan hente dem via queryClient.ensureQueryData og
+ * treffe nøyaktig samme cache som hooken. */
+export const allVehicleBrandsQueryOptions = {
+  queryKey: ["vehicle-brands", "all"] as const,
+  queryFn: () => fetchAllPages<VehicleBrand>("vehicle_brands", "id, name, category_group"),
+  staleTime: 5 * 60 * 1000,
+};
+
 /** Fetches all vehicle brands once; cached across the app, filtered client-side by group.
  * `enabled` (default `true`) lets callers defer the fetch — e.g. the landing
  * page only needs brands once the user shows search intent. */
 export function useAllVehicleBrands(enabled = true) {
-  return useQuery({
-    queryKey: ["vehicle-brands", "all"],
-    queryFn: () => fetchAllPages<VehicleBrand>("vehicle_brands", "id, name, category_group"),
-    staleTime: 5 * 60 * 1000,
-    enabled,
-  });
+  return useQuery({ ...allVehicleBrandsQueryOptions, enabled });
 }
 
 /** Fetches all vehicle models once; cached across the app, filtered client-side by brand_id. */

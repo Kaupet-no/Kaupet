@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, FolderOpen, Search } from "lucide-react";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { HeaderSearchPortal } from "@/components/site-header";
@@ -36,9 +37,8 @@ import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown"
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
-import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
-import { supabase } from "@/integrations/supabase/client";
-import type { CategoryRecord } from "@/hooks/use-categories";
+import { useAllVehicleBrands, allVehicleBrandsQueryOptions } from "@/lib/vehicle/vehicle-brands";
+import { categoriesQueryOptions } from "@/hooks/use-categories";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -59,13 +59,16 @@ export const Route = createFileRoute("/")({
   // uansett har dataen i cache fra sist.
   loader: async () => {
     if (typeof window !== "undefined") return { categories: undefined };
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .order("sort_order")
-      .order("name_nb");
-    if (error) throw error;
-    return { categories: (data ?? []) as CategoryRecord[] };
+    // Forsiden må rendre selv om Supabase er utilgjengelig eller ukonfigurert:
+    // klienten som importeres her kaster ved første tilgang uten env-variabler,
+    // og workerd-smoke-testen i CI kjører den bygde workeren uten secrets.
+    // Faller vi tilbake til undefined, henter useLandingCategories dataen etter
+    // hydrering og har allerede en feil-/retry-sti (categoriesIsError).
+    try {
+      return { categories: await categoriesQueryOptions.queryFn() };
+    } catch {
+      return { categories: undefined };
+    }
   },
   head: () => ({
     meta: [
@@ -132,6 +135,7 @@ function WebLanding({
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [qDraft, setQDraft] = useState("");
 
   const { categories: ssrCategories } = Route.useLoaderData();
@@ -272,24 +276,34 @@ function WebLanding({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // When a main category is active, scope the search to just that category
-    // — /annonser already expands a parent category to include all of its
-    // children server-side, so listing it alone (not every subcategory
-    // slug too) is both sufficient and what the filter UI should display.
-    void submitSearch({
-      applied: {
-        value: {
-          ...defaultAdvancedSearchValue(),
-          categories: activeCategory ? [activeCategory.slug] : [],
+    void (async () => {
+      // Merkene hentes først ved søkeintensjon (se useAllVehicleBrands over),
+      // så et raskt søk kan rekke å bli sendt før hentingen er ferdig. Uten
+      // lista mister resolveTextToFilters merkegjenkjenningen stille, så her
+      // venter vi på den. Er den allerede i cache, koster ensureQueryData
+      // ingenting.
+      const brands =
+        vehicleBrands ??
+        (await queryClient.ensureQueryData(allVehicleBrandsQueryOptions).catch(() => []));
+      // When a main category is active, scope the search to just that category
+      // — /annonser already expands a parent category to include all of its
+      // children server-side, so listing it alone (not every subcategory
+      // slug too) is both sufficient and what the filter UI should display.
+      await submitSearch({
+        applied: {
+          value: {
+            ...defaultAdvancedSearchValue(),
+            categories: activeCategory ? [activeCategory.slug] : [],
+          },
+          attributes: {},
         },
-        attributes: {},
-      },
-      query: qDraft,
-      categories: categories ?? [],
-      vehicleBrands: vehicleBrands ?? [],
-      allFilters: allFilters ?? [],
-      commit: (search) => navigate({ to: "/annonser", search }),
-    });
+        query: qDraft,
+        categories: categories ?? [],
+        vehicleBrands: brands,
+        allFilters: allFilters ?? [],
+        commit: (search) => navigate({ to: "/annonser", search }),
+      });
+    })();
   };
 
   return (

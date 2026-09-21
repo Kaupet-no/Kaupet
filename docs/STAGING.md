@@ -29,7 +29,7 @@ skriver, og særlig før noe som sletter:
 | Miljø      | Prosjektref            |
 | ---------- | ---------------------- |
 | Staging    | `zpazmwzhvylptptygzlw` |
-| Produksjon | _fyll inn_             |
+| Produksjon | `efuexbrxdvjznrvoqbsd` |
 
 Refsene er ikke hemmeligheter — de står i URL-en appen bruker. Poenget er at
 det skal være mulig å lese ut av repoet hvilken database man er koblet til,

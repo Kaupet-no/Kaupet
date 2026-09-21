@@ -6,6 +6,7 @@ import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
+import { invalidateSharedVehicleQueries } from "@/lib/reference-query-invalidation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -130,7 +131,10 @@ function VehicleBrandsCrud() {
     queryFn: () => listFn() as Promise<Row[]>,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-vehicle-brands-with-models"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin-vehicle-brands-with-models"] });
+    invalidateSharedVehicleQueries(qc);
+  };
 
   const brandsInGroup = useMemo(() => {
     const byId = new Map<string, Brand>();

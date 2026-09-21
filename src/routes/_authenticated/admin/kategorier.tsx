@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
+import { invalidateSharedCategoryQueries } from "@/lib/reference-query-invalidation";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { flattenTree } from "@/lib/category-admin-tree";
@@ -198,6 +199,7 @@ function AdminCategories() {
       showSuccessToast("Kategori slettet");
       qc.invalidateQueries({ queryKey: ["admin", "categories"] });
       qc.invalidateQueries({ queryKey: ["admin", "category-counts"] });
+      invalidateSharedCategoryQueries(qc);
       setDeleting(null);
       setReplacementId("__none__");
     },
@@ -217,7 +219,10 @@ function AdminCategories() {
       const failed = results.find((r) => r.error);
       if (failed?.error) throw failed.error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "categories"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "categories"] });
+      invalidateSharedCategoryQueries(qc);
+    },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre rekkefølgen")),
   });
 
@@ -254,6 +259,7 @@ function AdminCategories() {
     onSuccess: () => {
       showSuccessToast("Underkategorier flyttet");
       qc.invalidateQueries({ queryKey: ["admin", "categories"] });
+      invalidateSharedCategoryQueries(qc);
     },
     onError: (e: Error) =>
       showErrorToast(formatErrorMessage(e, "Kunne ikke flytte underkategoriene")),
@@ -405,7 +411,10 @@ function AdminCategories() {
           initialTab={dialogState.initialTab}
           categories={categories ?? []}
           onClose={() => setDialogState(null)}
-          onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "categories"] })}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["admin", "categories"] });
+            invalidateSharedCategoryQueries(qc);
+          }}
         />
       )}
 

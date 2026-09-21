@@ -36,6 +36,7 @@ import {
   adminUpdateVehicleModelClass,
 } from "@/lib/vehicle/admin-vehicle-brands.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { invalidateSharedVehicleQueries } from "@/lib/reference-query-invalidation";
 import { EmptyState } from "@/components/ui/empty-state";
 
 type PendingRow = {
@@ -163,7 +164,10 @@ export function VehicleBrandsTab() {
     queryFn: () => listFn(),
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-pending-vehicle-entries"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin-pending-vehicle-entries"] });
+    invalidateSharedVehicleQueries(qc);
+  };
 
   const approveMut = useMutation({
     mutationFn: (row: PendingRow) =>

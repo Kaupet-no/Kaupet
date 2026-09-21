@@ -12,6 +12,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import interVariableFontUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import { SiteHeader } from "@/components/site-header";
 import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
@@ -38,6 +39,18 @@ import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
 import { isComposerRoute, isFocusedRoute } from "@/features/listing-creation/chrome-routes";
+
+// Prøver å hente ut origin fra en env-variabel til et preconnect-hint. Skal
+// aldri kaste under SSR — hopper heller over hintet hvis variabelen mangler
+// eller ikke er en gyldig URL.
+function safeOrigin(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
 
 function NotFoundComponent() {
   return (
@@ -156,6 +169,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
     links: [
+      // Preconnect sparer en DNS+TLS-rundtur før det første bilde-/datakallet,
+      // og preload av brødtekstfonten (Inter) fjerner FOUT-forsinkelsen ved
+      // første maling.
+      ...(safeOrigin(import.meta.env.VITE_SUPABASE_URL)
+        ? [
+            {
+              rel: "preconnect",
+              href: safeOrigin(import.meta.env.VITE_SUPABASE_URL),
+              crossOrigin: "anonymous" as const,
+            },
+          ]
+        : []),
+      ...(safeOrigin(import.meta.env.VITE_R2_PUBLIC_BASE_URL)
+        ? [{ rel: "preconnect", href: safeOrigin(import.meta.env.VITE_R2_PUBLIC_BASE_URL) }]
+        : []),
+      {
+        rel: "preload",
+        href: interVariableFontUrl,
+        as: "font",
+        type: "font/woff2",
+        crossOrigin: "anonymous",
+      },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/manifest.webmanifest" },
     ],

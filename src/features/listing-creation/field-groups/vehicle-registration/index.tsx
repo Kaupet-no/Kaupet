@@ -21,7 +21,7 @@ import {
 import { getMissingRequiredFilters, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { matchBrandAndModelInTitle } from "@/lib/vehicle/vehicle-brand-match";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryIcon } from "@/lib/category-icons";
 import {
   LEAF_LABELS_NB,
   VEHICLE_LEAF_SLUGS,
@@ -462,7 +462,6 @@ export function VehicleRegistration(props: WizardSharedProps) {
         >
           {VEHICLE_LEAF_SLUGS.filter((slug) => leafBySlug.has(slug)).map((slug) => {
             const leaf = leafBySlug.get(slug)!;
-            const Icon = getCategoryIcon(leaf.icon);
             const selected = selectedLeafSlug === slug;
             return (
               <button
@@ -477,7 +476,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
                     : "border-border hover:border-primary/40"
                 }`}
               >
-                <Icon className="size-5" />
+                <CategoryIcon iconName={leaf.icon} className="size-5" />
                 {LEAF_LABELS_NB[slug]}
               </button>
             );

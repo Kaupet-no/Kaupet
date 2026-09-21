@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryIcon } from "@/lib/category-icons";
 
 type Category = {
   id: string;
@@ -335,7 +335,6 @@ export function CategoryPicker({
               const isPending = pendingSelection === cat.id;
               const isSelected = !manualExpand && selectedId === cat.id;
               const highlighted = isPending || isSelected;
-              const Icon = getCategoryIcon(cat.icon);
               return (
                 <button
                   key={cat.id}
@@ -373,7 +372,10 @@ export function CategoryPicker({
                     {highlighted ? (
                       <Check className={`size-5 ${cat.color ? "" : "text-primary"}`} />
                     ) : (
-                      <Icon className={`size-5 ${cat.color ? "" : "text-primary"}`} />
+                      <CategoryIcon
+                        iconName={cat.icon}
+                        className={`size-5 ${cat.color ? "" : "text-primary"}`}
+                      />
                     )}
                   </span>
                   <span className="text-sm font-medium leading-tight">{cat.name_nb}</span>

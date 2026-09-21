@@ -50,13 +50,6 @@ export default defineConfig(({ command, mode }) => {
             maxSize: 450 * 1024,
             groups: [
               {
-                name: "lucide-icons",
-                test: /node_modules[\\/]lucide-react/,
-                includeDependenciesRecursively: false,
-                maxSize: 450 * 1024,
-                priority: 20,
-              },
-              {
                 name: "tanstack-router",
                 test: /node_modules[\\/]@tanstack[\\/](?:react-router|router-core|history)/,
                 includeDependenciesRecursively: false,

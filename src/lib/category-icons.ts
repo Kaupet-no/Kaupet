@@ -80,10 +80,9 @@ import {
   Wrench,
   Zap,
   Cog,
-  icons as LUCIDE_ICONS,
   createLucideIcon,
 } from "lucide-react";
-import { createElement } from "react";
+import { type ComponentProps, Suspense, createElement, lazy } from "react";
 
 // Lucide har verken en dressjakke eller en kjole, så disse to er bygget for
 // hånd — som strøk-ikoner i nøyaktig samme stil som resten av settet (samme
@@ -239,29 +238,50 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
   CATEGORY_ICON_OPTIONS.map(({ name, icon }) => [name, icon]),
 );
 
-// Alle ikonene lucide-react leverer, i tillegg til de håndbygde egendefinerte
-// ikonene over. Brukes av ikonvelgeren i admin slik at man kan søke blant og
-// velge ethvert lucide-ikon, ikke bare det kuraterte utvalget i
-// CATEGORY_ICON_OPTIONS (som fortsatt styrer hvilke ikoner som faktisk brukes
-// på kategoriene i dag).
-export const ALL_ICON_OPTIONS: { name: string; icon: LucideIcon }[] = (() => {
-  const seen = new Set(CATEGORY_ICON_OPTIONS.map((o) => o.name));
-  const extra = Object.entries(LUCIDE_ICONS)
-    .filter(([name]) => !seen.has(name))
-    .map(([name, icon]) => ({ name, icon: icon as LucideIcon }));
-  return [...CATEGORY_ICON_OPTIONS, ...extra].sort((a, b) => a.name.localeCompare(b.name));
-})();
+// Ikonnavn som admin har valgt utenfor det kuraterte settet over finnes ikke i
+// bundlen. De hentes med lucides DynamicIcon, som laster ett og ett ikon ved
+// behov. Alternativet — å importere hele lucide-registeret — la ~500 KiB i
+// forsidens preload-sett, siden denne modulen ligger i modulgrafen til /.
+// Ikonvelgeren i admin bruker category-icons.all.ts for å søke blant alle.
+const DynamicIcon = lazy(async () => ({
+  default: (await import("lucide-react/dynamic")).DynamicIcon,
+}));
 
+// DynamicIcon slår opp på kebab-case, mens navnene vi lagrer er PascalCase:
+// "PawPrint" -> "paw-print", "Gamepad2" -> "gamepad-2". Navnet kommer fra
+// databasen og kan i prinsippet være hva som helst, så castet er bevisst:
+// DynamicIcon rendrer fallback-ikonet hvis oppslaget bommer.
+type IconSlug = ComponentProps<typeof DynamicIcon>["name"];
+
+function toIconSlug(name: string): IconSlug {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([a-zA-Z])(\d)/g, "$1-$2")
+    .toLowerCase() as IconSlug;
+}
+
+/**
+ * Det kuraterte ikonet for navnet, eller Package som reserve. Merk at denne
+ * kun kjenner CATEGORY_ICON_OPTIONS — for vilkårlige lucide-navn må du bruke
+ * <CategoryIcon>, som faller tilbake på lat lasting.
+ */
 export function getCategoryIcon(iconName: string | null | undefined): LucideIcon {
   if (!iconName) return Package;
-  return (
-    CATEGORY_ICON_MAP[iconName] ?? (LUCIDE_ICONS as Record<string, LucideIcon>)[iconName] ?? Package
-  );
+  return CATEGORY_ICON_MAP[iconName] ?? Package;
 }
 
 export function CategoryIcon({
   iconName,
   ...props
 }: LucideProps & { iconName: string | null | undefined }) {
-  return createElement(getCategoryIcon(iconName), props);
+  const curated = iconName ? CATEGORY_ICON_MAP[iconName] : undefined;
+  if (curated) return createElement(curated, props);
+  if (!iconName) return createElement(Package, props);
+
+  const placeholder = () => createElement(Package, props);
+  return createElement(
+    Suspense,
+    { fallback: createElement(Package, props) },
+    createElement(DynamicIcon, { ...props, name: toIconSlug(iconName), fallback: placeholder }),
+  );
 }

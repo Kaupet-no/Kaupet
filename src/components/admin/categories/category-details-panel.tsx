@@ -28,7 +28,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
-import { ALL_ICON_OPTIONS, CategoryIcon } from "@/lib/category-icons";
+import { ALL_ICON_OPTIONS } from "@/lib/category-icons.all";
+import { CategoryIcon } from "@/lib/category-icons";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 import { collectDescendantIds, depthOf, MAX_CATEGORY_DEPTH } from "@/lib/category-admin-tree";
 import { MAIN_CATEGORY_COLOR_PRESETS, slugify, type Category } from "./shared";

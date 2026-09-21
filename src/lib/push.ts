@@ -5,7 +5,7 @@
 import { savePushSubscription, deletePushSubscription } from "./push.functions";
 
 // Public VAPID key — safe to expose to the browser.
-// Rotated as part of the Lovable migration (old private key wasn't retrievable).
+// Rotated because the old private key wasn't retrievable.
 // All push subscriptions created against the previous key stop working once
 // this ships to production — existing subscribers must re-enable push.
 export const VAPID_PUBLIC_KEY =

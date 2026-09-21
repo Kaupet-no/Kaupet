@@ -624,17 +624,9 @@ function PriceMarker({
 }
 
 function PopupCard({ listing }: { listing: MapListing }) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!listing.cover_path) return;
-    let cancelled = false;
-    signListingImageUrls([listing.cover_path]).then((map) => {
-      if (!cancelled) setImgUrl(map[listing.cover_path!] ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [listing.cover_path]);
+  const imgUrl = listing.cover_path
+    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
+    : null;
 
   return (
     <div className="w-[220px] overflow-hidden">

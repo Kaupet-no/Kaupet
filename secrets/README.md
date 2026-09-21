@@ -43,6 +43,14 @@ Mistral Small 4 krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudflare
 Worker-secret. Legg den inn med SOPS (`bun run secrets:edit` og
 `bun run secrets:edit:staging`); aldri legg nøkkelen i `VITE_*` eller klartekst.
 
+### R2-opprydning
+
+`R2_CLEANUP_SECRET` i `cloudflare.env` er den delte hemmeligheten mellom
+pg_cron-jobben `r2-cleanup-hourly` og `/api/public/r2/cleanup`. Deploy-jobben
+setter den på workeren fra GitHub Environment-secreten med samme navn — den må
+altså ligge begge steder, og i tillegg som `app_settings`-raden
+`r2_cleanup_secret` i Supabase (samme verdi i alle tre).
+
 ## Viktig
 
 - Den private nøkkelen (`keys.txt`) skal **aldri** committes eller deles

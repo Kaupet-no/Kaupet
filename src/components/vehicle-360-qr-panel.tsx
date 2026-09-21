@@ -52,12 +52,10 @@ export function Vehicle360QrPanel({
   });
 
   const frames = useMemo(() => framesQuery.data ?? [], [framesQuery.data]);
-  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (frames.length === 0) return;
-    signVehicle360FrameUrls(frames.map((f) => f.storage_path)).then(setImgUrls);
-  }, [frames]);
+  const imgUrls = useMemo(
+    () => signVehicle360FrameUrls(frames.map((f) => f.storage_path)),
+    [frames],
+  );
 
   async function generateQr() {
     setQrError(null);

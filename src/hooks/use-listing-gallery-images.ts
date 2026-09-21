@@ -22,7 +22,7 @@ export function useListingGalleryImages(listingId: string, enabled: boolean) {
         .order("sort_order");
       if (error) throw error;
       const images = (data ?? []) as ListingGalleryImage[];
-      const imgUrls = await signListingImageUrls(images.map((i) => i.storage_path));
+      const imgUrls = signListingImageUrls(images.map((i) => i.storage_path));
       return { images, imgUrls };
     },
     enabled: enabled && !!listingId,

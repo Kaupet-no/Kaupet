@@ -216,7 +216,7 @@ Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stac
 | #    | Funn                                                  | Status                                    |
 | ---- | ----------------------------------------------------- | ----------------------------------------- |
 | K-1  | Betalingsmiljø nedgraderes via forfalsket cookie      | ✅ Fikset (`3e36c7a`)                     |
-| K-2  | Storage-policyer ikke i versjonskontroll              | ✅ Fikset (`a59eb2e`)                     |
+| K-2  | Storage-policyene ved Supabase er erstattet av R2     | ✅ Migrert (`20260918*`)                  |
 | H-3  | `pull_request_target` + `bun install` med scripts     | ✅ Fjernet (workflowen er slettet)        |
 | M-4  | Ingen affiliasjonskontroll ved bedriftsregistrering   | ✅ Fikset (`ff38743`, minimumsvariant)    |
 | M-5  | `organizations` lesbar for `anon` med `USING (true)`  | ✅ Fikset (`859d2e6`)                     |
@@ -235,7 +235,7 @@ Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stac
 
 **Delvise fikser / bevisst ikke gjort:**
 
-- **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen); promotering til enforcement venter på stille produksjonsrapporter.
+- **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen).
 - **M-9:** ~~Turnstile er ikke lagt til på `suggestCategoryForTitle`~~ — lukket 2026-09-09: AI-stien er skilt ut av det automatiske kallet. `suggestCategoryForTitle` gjør nå kun det interne stemmeoppslaget (ingen Mistral, ingen kostnad per tastetrykk), mens hvert eksterne KI-kall ligger bak `suggestCategoryForTitleWithAi` / `suggestListingFromPhotos` med Turnstile-verifisering før rate limiter og leverandør. Se notatet under M-9 nedenfor.
 - **L-14:** `toClientError()` er kun brukt på de tre eksemplene funnet nevner (`saveDraftListing`, `createBlock`, `createPromotionCheckout`). Resten av `throw error`-forekomstene i handlers gjenstår — funnet selv foreslår inkrementell utrulling.
 - **I-17:** urørt. Å flytte til en dedikert read-only Postgres-rolle eller en manuell `workflow_dispatch`-jobb er en infrastrukturendring mot en levende staging-database, forskjellig fra kodeendringene i resten av lista — bør gjøres bevisst, ikke som del av denne gjennomgangen.
@@ -306,25 +306,26 @@ Resultat: betalte fremhevinger gratis, i produksjon, uten admin-rolle.
 
 ---
 
-## K-2 — Storage-policyene for fire buckets finnes ikke i versjonskontroll
+## K-2 — Bildelagring er migrert fra Supabase Storage til Cloudflare R2
 
-**Alvorlighet: Høy**
+**Alvorlighet: Adressert (arkitekturendring)**
 
-**Hvor:** `src/lib/storage.ts:79,121,199` (klientopplasting), `supabase/migrations/20260604073223_baseline_squash.sql:6730` og `20260809160000_messages_attachment.sql:7` (bucket-oppretting)
+**Hvor:** `src/lib/r2.server.ts`, `src/lib/storage.functions.ts`, `supabase/migrations/20260918*` (drop policies), R2 buckets `kaupet-bilder` (og staging) + `kaupet-vedlegg` (og staging)
 
-**Hva:** Bucketene `listing-images`, `avatars`, `listing-360-frames` og `message-attachments` opprettes i migrasjoner, men **ingen `storage.objects`-policyer for dem finnes i repoet**. Kun `organization-logos` har policyer (`20260901140000_business_accounts.sql:796–850`). Samtidig laster klienten opp direkte med brukerens egen nøkkel (`supabase.storage.from(...).upload(...)`) og signerer nedlastings-URL-er direkte (`createSignedUrls`) — begge deler krever at policyer _finnes_ i den kjørende databasen.
+**Hva:** Bildelagring for annonser, avatarer, organisasjonslogoer og 360-frames er flyttet fra Supabase Storage til Cloudflare R2 bak et S3-kompatibelt API (`aws4fetch`). Autorisasjonen som tidligere lå i `storage.objects`-policyer ligger nå i serverfunksjoner:
 
-Konsekvenser:
+- **Offentlig bucket** (`kaupet-bilder`) — bilder på publiserte annonser: lesing via rene HTTPS-URL-er uten signering, opplasting via serverfunksjon `uploadListingImage` som verifiserer `can_upload_listing_image` RPC.
+- **Privat bucket** (`kaupet-vedlegg`) — meldingsvedlegg: lesing via presignerte S3-URL-er med 1 times utløpstid, utstedt av `signMessageAttachmentUrls` som verifiserer brukeren er deltaker i samtalen.
 
-- Den faktiske tilgangskontrollen for private annonsebilder, 360-bilder og **chat-vedlegg** er usynlig for kodegjennomgang, ikke dekket av `bun run test:rls`, og kan ikke gjenskapes i et nytt miljø. Kommentaren i `20260809160000_messages_attachment.sql:2` bekrefter at dette er bevisst, men konsekvensen er at et sikkerhetskritisk lag står utenfor den kontrollen resten av skjemaet har.
-- Hvis policyene i produksjon følger det vanlige `bucket_id = 'message-attachments'`-mønsteret uten eier-predikat, kan enhver innlogget bruker signere URL-er til andres chat-vedlegg. Det er ikke mulig å avkrefte fra repoet.
-- Bucketene mangler `file_size_limit` og `allowed_mime_types` (kun `organization-logos` har det). `validateImages` i `storage.ts:15` kjører kun i nettleseren og omgås trivielt ved å kalle Storage-API-et direkte.
+**Sikkerhetsbetraktninger som implementeres:**
 
-**Anbefalt løsning**
+1. Autorisasjon skjer på serveren før S3-operasjon, ikke gjennom bucket-policyer. RPC-er (`can_upload_listing_image`, `is_organization_superuser`, deltakeroppslag) er autoritativ kilder for tilgangskontroll.
+2. **Offentlige bilder på utkast/deaktiverte annonser** (`draft`, `disabled`) ligger i den offentlige bucketen med nøkelskjemaet `{listingId}/{uuid}.{ext}`. Annonsens ID er offentlig kjent og synlig i annonsens URL og API-svar; kun filnavnet (`{uuid}.{ext}`) er tilfeldig. Konsekvensen er at et bilde på en utkast- eller deaktivert annonse er lesbart for den som har eller gjetter den fulle URL-en. En moderator som stenger en annonse gjør ikke bildene utilgjengelige, og støtter må være klar over at bildene fortsatt finnes når de håndterer moderasjonsarbeid. Dette valget ble tatt fordi en offentlig bucket gir CDN-caching og null egress-kostnader; alternativet (flytte objekter mellom buckets ved statusendring, eller proxye alt gjennom autentisert rute) ble vurdert som for kompleks før lansering.
+3. **Meldingsvedlegg** er privat korrespondanse og krever at brukeren er verifisert deltaker i samtalen ved hver lesing (via presignert URL).
+4. S3-API-kallene gjøres fra `src/lib/r2.server.ts` server-only modulen med HMAC-signering; klienten har ingen direktetilgang til R2.
+5. Gamle Supabase Storage-policyer for `listing-images`, `avatars`, `listing-360-frames` og `message-attachments` er droppet i migrasjoner siden de ikke lenger brukes (`20260918210000_drop_dead_storage_object_policies.sql`). De gamle Storage-bucketene og objektene i dem eksisterer fortsatt inntil de slettes manuelt i Supabase-dashbordet — policyene er droppet slik at de er utilgjengelige, men dataene er der.
 
-1. Dump gjeldende policyer fra produksjon (`select * from pg_policies where schemaname='storage'`) og legg dem inn som en ny migrasjon, slik at de er reviewbare og reproduserbare. Rett samtidig opp eventuelle predikater som ikke binder mot eier/samtaledeltakelse — vedlegg bør kreve at `auth.uid()` er deltaker i samtalen `split_part(name,'/',1)` peker på, og annonsebilder at brukeren har lov å se annonsen (`can_view_organization_listing` finnes allerede).
-2. Sett `file_size_limit` (5 MB) og `allowed_mime_types` (`image/jpeg,image/png,image/webp`) på alle fire bucketene, slik `organization-logos` allerede har.
-3. Utvid `src/lib/rls.integration.test.ts` med samme opp-/nedlastingstester som allerede finnes for `organization-logos` (rundt linje 3908): eier kan laste opp og lese, utenforstående kan ikke, anonym kan ikke.
+**Status:** Fullt implementert og migrert. Supabase Storage brukes ikke lenger for bildelagring.
 
 ---
 
@@ -391,7 +392,14 @@ Skill offentlig presentasjon fra kommersiell tilstand. Opprett et `security_invo
 
 **Alvorlighet: Middels**
 
-**Hvor:** `vite.config.ts:12–33`
+> **Status 2026-09-19 (delvis lukket):** Headerne ligger ikke lenger i
+> `vite.config.ts`, men bygges av `buildSecurityHeaders` i
+> `src/lib/security-headers.ts` (enhetstestet). Punkt 1 og 3 er lukket:
+> policyen håndheves, `report-to` og `reporting-endpoints` er på plass, og
+> `strict-transport-security` er lagt til. Punkt 2 gjenstår: `'unsafe-inline'`
+> i `script-src` krever per-request nonce gjennom SSR-rendringen.
+
+**Hvor:** `src/lib/security-headers.ts` (het `vite.config.ts:12–33` da funnet ble skrevet)
 
 **Hva:** Tre ting:
 

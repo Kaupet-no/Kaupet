@@ -2,6 +2,11 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const FILTER_QUERY = "e2efilterfixture";
+/** 1×1 gjennomsiktig PNG, brukt som stand-in for kartfliser. */
+const TRANSPARENT_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
 
 async function waitForHydration(page: Page) {
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
@@ -30,6 +35,16 @@ async function installDeterministicListingRoutes(page: Page) {
       }),
     });
   });
+
+  // Kartflisene hentes fra Kartverket over nett, og hvor mange som rekker å
+  // males før skjermbildet tas varierer fra kjøring til kjøring. Alle
+  // referansebildene er tatt uten fliser, så vi svarer med en gjennomsiktig
+  // flis i stedet for å la nettverket avgjøre om testen består. En abort
+  // hadde gitt samme bilde, men Chromium logger da en console.error per flis,
+  // og fixtures.ts feiler testen på nettleserfeil.
+  await page.route("**/cache.kartverket.no/**", (route) =>
+    route.fulfill({ contentType: "image/png", body: TRANSPARENT_PNG }),
+  );
 
   await page.route("**/rest/v1/rpc/popular_listings_last_week", async (route) => {
     const payload = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
@@ -109,12 +124,23 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .locator('[aria-labelledby="listing-evidence-heading"] time')
     .filter({ hasText: /^Registrert / });
   const memberSinceDate = page.locator("p").filter({ hasText: /^Medlem siden / });
+  // Leveringsraden kommer fra CategoryBehavior, som avhenger av kategori- og
+  // filterspørringene ($kaupetCode.tsx). Kontaktknappen og datoene over er
+  // klare før den, så uten en egen venting her rekker skjermbildet å bli tatt
+  // mens faktalista mangler én rad — og alt under forskyves 20 px.
+  const deliveryFact = page
+    .locator("dt")
+    .filter({ hasText: /^Levering$/ })
+    .locator("xpath=..")
+    .locator("dd");
   await expect(publishedDate).toHaveCount(1);
   await expect(publishedDate).toBeVisible();
   await expect(profileDate).toHaveCount(1);
   await expect(profileDate).toBeVisible();
   await expect(memberSinceDate).toHaveCount(1);
   await expect(memberSinceDate).toBeVisible();
+  await expect(deliveryFact).toHaveCount(1);
+  await expect(deliveryFact).toBeVisible();
   await expect(page).toHaveScreenshot("listing-detail.png", {
     animations: "disabled",
     fullPage: true,

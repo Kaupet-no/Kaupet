@@ -3,38 +3,11 @@ import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
+import { buildSecurityHeaders } from "./src/lib/security-headers";
 
 // Deploy target: Cloudflare Workers (module format), matching production today.
 // Change `preset` here if Kaupet moves to a different host later.
 const NITRO_PRESET = "cloudflare-module";
-
-const SECURITY_HEADERS = {
-  "x-content-type-options": "nosniff",
-  "x-frame-options": "SAMEORIGIN",
-  "referrer-policy": "strict-origin-when-cross-origin",
-  "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
-  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-  // Enforce the policy. Keep the explicit inline allowance until SSR
-  // hydration/bootstrap has been migrated to nonces; report-only provided no
-  // protection at all.
-  "content-security-policy": [
-    "default-src 'self'",
-    "base-uri 'self'",
-    "object-src 'none'",
-    "frame-ancestors 'self'",
-    "form-action 'self'",
-    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
-    "style-src 'self' 'unsafe-inline'",
-    "font-src 'self' data:",
-    "img-src 'self' data: blob: https://*.supabase.co https://cache.kartverket.no",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
-    "frame-src https://challenges.cloudflare.com",
-    "worker-src 'self' blob:",
-    "upgrade-insecure-requests",
-    "report-to csp",
-  ].join("; "),
-  "reporting-endpoints": 'csp="/api/public/csp-report"',
-};
 
 // Server-only secrets that features silently need at runtime. Warn early in
 // dev so a missing key surfaces at `bun run dev` instead of mid-wizard when a
@@ -46,12 +19,17 @@ export default defineConfig(({ command, mode }) => {
   // Statically inline VITE_* env vars so they're also available in the
   // Nitro-bundled server output, not just the client bundle.
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  const allEnv = loadEnv(mode, process.cwd(), "");
   const envDefine = Object.fromEntries(
     Object.entries(env).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
   );
 
+  const securityHeaders = buildSecurityHeaders({
+    r2PublicBaseUrl: env.VITE_R2_PUBLIC_BASE_URL,
+    r2AccountId: allEnv.R2_ACCOUNT_ID,
+  });
+
   if (command === "serve") {
-    const allEnv = loadEnv(mode, process.cwd(), "");
     const missing = REQUIRED_DEV_SECRETS.filter((key) => !allEnv[key]);
     if (missing.length > 0) {
       console.warn(
@@ -146,7 +124,7 @@ export default defineConfig(({ command, mode }) => {
               // static asset serving would otherwise guess a generic content
               // type from the missing file extension.
               routeRules: {
-                "/**": { headers: SECURITY_HEADERS },
+                "/**": { headers: securityHeaders },
                 "/.well-known/apple-app-site-association": {
                   headers: { "content-type": "application/json" },
                 },

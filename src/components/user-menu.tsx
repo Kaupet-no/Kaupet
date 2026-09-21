@@ -24,7 +24,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
-import { clearSignedUrlCaches } from "@/lib/storage";
+import { clearMessageAttachmentUrlCache } from "@/lib/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -203,7 +203,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
         <DropdownMenuItem
           className="cursor-pointer text-destructive focus:text-destructive"
           onSelect={async () => {
-            clearSignedUrlCaches();
+            clearMessageAttachmentUrlCache();
             await supabase.auth.signOut();
             navigate({ to: "/" });
           }}

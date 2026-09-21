@@ -277,6 +277,25 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Sjekk at påkrevde R2-variabler er satt
+        env:
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
+        run: |
+          if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
+            echo "VITE_R2_PUBLIC_BASE_URL mangler i production-miljøet — hele siden krasjer uten den." >&2
+            exit 1
+          fi
+          if [ -z "$R2_ACCOUNT_ID" ]; then
+            echo "R2_ACCOUNT_ID mangler i production-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
+            exit 1
+          fi
+          if [ -z "$R2_CLEANUP_SECRET" ]; then
+            echo "R2_CLEANUP_SECRET mangler i production-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
+            exit 1
+          fi
+
       - name: Build
         run: bun run build
         env:
@@ -285,6 +304,25 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+
+      - name: Sjekk at R2-domenene havnet i den bygde CSP-en
+        env:
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+        run: |
+          img_src=$(grep -o "img-src [^\"]*" dist/server/index.mjs | head -1)
+          if [ -z "$img_src" ]; then
+            echo "Fant ingen img-src i production-bygget — CSP-en mangler helt." >&2
+            exit 1
+          fi
+          for domain in "$VITE_R2_PUBLIC_BASE_URL" "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"; do
+            case "$img_src" in
+              *"$domain"*) ;;
+              *) echo "$domain mangler i img-src i production-bygget — bilder ville blitt blokkert av CSP-en." >&2; exit 1 ;;
+            esac
+          done
 
       - name: Deploy
         run: bun run deploy
@@ -297,7 +335,20 @@ jobs:
       - name: Set staging-sync read secrets on the production Worker
         run: |
           echo "${{ vars.STAGING_SUPABASE_URL }}" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
-          echo "${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
+          echo "${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set R2 secrets on the production Worker
+        run: |
+          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
+          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
+          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
+          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
+          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
+          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
+          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -367,9 +418,16 @@ jobs:
           interval=20
 
           while [ "$elapsed" -lt "$timeout" ]; do
+            # Bare ekte staging-deployer teller. Statusen denne jobben selv
+            # poster nedenfor ligger i samme miljø, og uten filteret ville den
+            # blitt lest som "siste staging-deploy" av neste PR — som da
+            # sammenlignet seg mot en forrige PR sin HEAD i stedet for mot
+            # staging (task-feltet skiller dem, se steget under).
+            deploys=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=30" \
+              | jq '[.[] | select(.task == "deploy")]')
+
             # Eksakt treff: PR_HEAD er selv deployet.
-            exact=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=20" \
-              | jq -r --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
+            exact=$(echo "$deploys" | jq -r --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
 
             if [ -n "$exact" ]; then
               state=$(gh api "repos/${{ github.repository }}/deployments/$exact/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')
@@ -377,13 +435,17 @@ jobs:
                 ok=true
                 break
               fi
-            else
-              # Ingen eksakt deploy ennå — sjekk om PR_HEAD er en ancestor
-              # av siste vellykkede staging-deploy (staging kan ha gått
-              # forbi PR-en siden den ble åpnet).
-              latest=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=1" --jq '.[0]')
-              latest_id=$(echo "$latest" | jq -r '.id')
-              latest_sha=$(echo "$latest" | jq -r '.sha')
+            fi
+
+            # Ingen vellykket eksakt deploy — sjekk om PR_HEAD er en ancestor
+            # av siste vellykkede staging-deploy (staging kan ha gått forbi
+            # PR-en siden den ble åpnet). Sjekken kjøres også når det finnes
+            # en eksakt deploy som ikke er vellykket, ellers ville én mislykket
+            # deploy på PR-ens SHA blokkere porten helt til timeout.
+            latest=$(echo "$deploys" | jq '.[0] // empty')
+            latest_id=$(echo "$latest" | jq -r '.id // empty')
+            latest_sha=$(echo "$latest" | jq -r '.sha // empty')
+            if [ -n "$latest_id" ]; then
               latest_state=$(gh api "repos/${{ github.repository }}/deployments/$latest_id/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')
               if [ "$latest_state" = "success" ] && git merge-base --is-ancestor "$PR_HEAD" "$latest_sha" 2>/dev/null; then
                 ok=true
@@ -410,8 +472,12 @@ jobs:
           # required_contexts må sendes eksplisitt som tom liste, ellers
           # avviser deployment-endepunktet med 409 hvis andre required
           # status-sjekker på PR-en ikke er "success" ennå.
+          # task: "staging-gate" gjør at steget over kan skille denne
+          # syntetiske deploymenten fra de ekte (task: "deploy"). Miljønavnet
+          # må bli stående som "staging" for at "Require deployments to
+          # succeed" på main skal se statusen.
           deploy_id=$(jq -n --arg ref "$PR_HEAD" \
-            '{ref: $ref, environment: "staging", auto_merge: false, required_contexts: []}' \
+            '{ref: $ref, environment: "staging", task: "staging-gate", auto_merge: false, required_contexts: []}' \
             | gh api "repos/${{ github.repository }}/deployments" --input - --jq '.id')
 
           gh api "repos/${{ github.repository }}/deployments/$deploy_id/statuses" \
@@ -436,6 +502,25 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Sjekk at påkrevde R2-variabler er satt
+        env:
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
+        run: |
+          if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
+            echo "VITE_R2_PUBLIC_BASE_URL mangler i staging-miljøet — hele siden krasjer uten den." >&2
+            exit 1
+          fi
+          if [ -z "$R2_ACCOUNT_ID" ]; then
+            echo "R2_ACCOUNT_ID mangler i staging-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
+            exit 1
+          fi
+          if [ -z "$R2_CLEANUP_SECRET" ]; then
+            echo "R2_CLEANUP_SECRET mangler i staging-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
+            exit 1
+          fi
+
       - name: Build
         run: bun run build
         env:
@@ -444,10 +529,42 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
           CLOUDFLARE_WORKER_NAME: kaupet-no-staging
+
+      - name: Sjekk at R2-domenene havnet i den bygde CSP-en
+        env:
+          VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+        run: |
+          img_src=$(grep -o "img-src [^\"]*" dist/server/index.mjs | head -1)
+          if [ -z "$img_src" ]; then
+            echo "Fant ingen img-src i staging-bygget — CSP-en mangler helt." >&2
+            exit 1
+          fi
+          for domain in "$VITE_R2_PUBLIC_BASE_URL" "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"; do
+            case "$img_src" in
+              *"$domain"*) ;;
+              *) echo "$domain mangler i img-src i staging-bygget — bilder ville blitt blokkert av CSP-en." >&2; exit 1 ;;
+            esac
+          done
 
       - name: Deploy
         run: bun run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set R2 secrets on the staging Worker
+        run: |
+          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
+          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no-staging
+          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no-staging
+          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
+          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
+          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
+          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -1,0 +1,174 @@
+-- Opprydning av R2-objekter når en annonse, samtale, organisasjon eller
+-- konto slettes.
+--
+-- Postgres kan ikke selv nå R2, så kaskadene våre etterlater binærfilene selv
+-- om metadataradene forsvinner (kjent gap i
+-- docs/PERSONVERN-BEHANDLINGSPROTOKOLL.md, relevant for retten til sletting).
+--
+-- Valgt løsning: en slettekø som fylles av triggere og tømmes av en jobb.
+-- Alternativene vi forkastet:
+--   * Rydde i en serverfunksjon før sletting. Fanger ikke de viktigste
+--     stiene: annonser slettes klientsidig rett mot tabellen
+--     (mine-annonser.index.tsx), samtaler slettes bare via kaskade fra
+--     listings, og kontosletting skjer helt inne i Postgres
+--     (purge_expired_accounts).
+--   * En jobb som lister R2 og sammenligner mot databasen. Dyr på en bucket
+--     som vokser, og rydder først i etterkant. En trigger vet nøyaktig hva
+--     som forsvant, i samme transaksjon som slettingen.
+-- Køen gir dessuten et revisjonsspor på at slettingen faktisk ble utført,
+-- som er nyttig nettopp for GDPR-dokumentasjonen.
+--
+-- Oppsett som må på plass før jobben virker (samme mønster som push):
+--   * R2_CLEANUP_SECRET i secrets/cloudflare.env (miljøvariabel for appen)
+--     og på Cloudflare-workeren (satt av deploy-jobben i
+--     .github/workflows/ci.yml fra GitHub Environment-secreten)
+--   * app_settings-radene 'r2_cleanup_secret' (samme verdi) og, utenfor prod,
+--     'r2_cleanup_url' som peker på riktig miljø.
+-- Uten hemmeligheten poster dispatch_r2_cleanup ikke i det hele tatt —
+-- pg_net svelger et 401-svar uten header, så et postet kall ville forsvunnet
+-- stille. I stedet gir funksjonen RAISE WARNING i Postgres-loggen, og
+-- r2_delete_queue vokser synlig med attempts = 0. Funksjonen varsler også
+-- når køen har rader som aldri er forsøkt (attempts = 0) og er eldre enn
+-- seks timer, slik at et 401/302/404-svar som pg_net svelger ikke blir
+-- usynlig.
+--
+-- Vi køer *prefikser*, ikke enkeltnøkler: alle nøkler er partisjonert på
+-- eier-id (`{listingId}/…`, `{conversationId}/…`, `{userId}/…`), så én rad
+-- dekker hele annonsen — inkludert thumbnails og 360-frames, som deler
+-- prefiks med annonsebildene.
+
+CREATE TABLE public.r2_delete_queue (
+  id bigserial PRIMARY KEY,
+  bucket text NOT NULL CHECK (bucket IN ('BILDER', 'VEDLEGG')),
+  prefix text NOT NULL CHECK (prefix <> ''),
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  attempts integer NOT NULL DEFAULT 0,
+  last_error text
+);
+
+CREATE INDEX r2_delete_queue_pending_idx ON public.r2_delete_queue (requested_at);
+
+-- Ingen policyer: tabellen skal kun nås av service_role (opprydningsjobben)
+-- og av SECURITY DEFINER-triggerne under.
+ALTER TABLE public.r2_delete_queue ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.r2_delete_queue FROM PUBLIC, anon, authenticated;
+GRANT SELECT, UPDATE, DELETE ON TABLE public.r2_delete_queue TO service_role;
+
+-- Bucketnavnet kommer fra triggerdefinisjonen, ikke fra data.
+CREATE FUNCTION public.enqueue_r2_delete() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+BEGIN
+  INSERT INTO public.r2_delete_queue (bucket, prefix) VALUES (TG_ARGV[0], OLD.id || '/');
+  RETURN OLD;
+END;
+$$;
+
+-- Annonsebilder, thumbnails og 360-frames ligger alle under {listingId}/.
+CREATE TRIGGER enqueue_r2_delete_after_listing_delete
+  AFTER DELETE ON public.listings
+  FOR EACH ROW EXECUTE FUNCTION public.enqueue_r2_delete('BILDER');
+
+-- Meldingsvedlegg ligger under {conversationId}/ i den private bucketen.
+-- Radtriggere fyrer også når raden forsvinner via kaskade fra listings, så
+-- dette dekker både direkte sletting av en samtale og sletting av annonsen.
+CREATE TRIGGER enqueue_r2_delete_after_conversation_delete
+  AFTER DELETE ON public.conversations
+  FOR EACH ROW EXECUTE FUNCTION public.enqueue_r2_delete('VEDLEGG');
+
+-- Organisasjonslogoer ligger under {organizationId}/logo-{uuid}.{ext} i
+-- BILDER (uploadOrganizationLogo). purge_expired_accounts sletter
+-- organisasjonsraden når brukeren som slettes er eneste superbruker, så
+-- kontosletting kan foreldreløsgjøre en logo uten denne triggeren.
+CREATE TRIGGER enqueue_r2_delete_after_organization_delete
+  AFTER DELETE ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.enqueue_r2_delete('BILDER');
+
+-- Kontosletting: purge_expired_accounts sletter annonsene (triggeren over
+-- fanger dem) men *anonymiserer* profilraden fremfor å slette den, så
+-- avatarfilen må fanges på overgangen til deleted_at.
+CREATE FUNCTION public.enqueue_r2_delete_for_purged_profile() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+BEGIN
+  IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
+    INSERT INTO public.r2_delete_queue (bucket, prefix) VALUES ('BILDER', NEW.id || '/');
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER enqueue_r2_delete_after_profile_purge
+  AFTER UPDATE OF deleted_at ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.enqueue_r2_delete_for_purged_profile();
+
+-- Tømming: samme pg_net-mønster som dispatch_push_for_*, siden Postgres selv
+-- ikke kan snakke S3. Endepunktet gjør selve slettingen mot R2 og fjerner
+-- raden først når den lyktes, så et tapt kall bare utsetter opprydningen.
+CREATE FUNCTION public.dispatch_r2_cleanup() RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  _url text := COALESCE(
+    (SELECT value FROM public.app_settings WHERE key = 'r2_cleanup_url'),
+    'https://kaupet.no/api/public/r2/cleanup'
+  );
+  _secret text := (SELECT value FROM public.app_settings WHERE key = 'r2_cleanup_secret');
+  _stale_count integer;
+  _oldest timestamptz;
+  _exhausted_count integer;
+  _exhausted_oldest timestamptz;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.r2_delete_queue) THEN
+    RETURN;
+  END IF;
+  IF _secret IS NULL THEN
+    -- Uten hemmeligheten ville kallet blitt avvist med 401, og pg_net
+    -- svelger det svaret — køen ville vokst i det stille uten noe signal.
+    -- Post ikke i det hele tatt, og varsle i loggen i stedet.
+    RAISE WARNING 'r2-opprydning hoppet over: app_settings-raden "r2_cleanup_secret" er ikke satt';
+    RETURN;
+  END IF;
+  -- Rader med attempts = 0 er aldri forsøkt. Da har endepunktet ikke svart
+  -- 200 i det hele tatt — manglende worker-secret gir 401, Cloudflare Access
+  -- gir 302, feil r2_cleanup_url gir 404 — og pg_net svelger alle tre uten
+  -- spor. Jobben går hver time, så en urørt rad eldre enn seks timer betyr at
+  -- kallet ikke kommer fram, ikke at én rad er vanskelig. Rader som HAR vært
+  -- forsøkt har attempts > 0 og last_error, og er synlige i tabellen uten
+  -- dette varselet.
+  SELECT count(*), min(requested_at) INTO _stale_count, _oldest
+  FROM public.r2_delete_queue
+  WHERE attempts = 0 AND requested_at < now() - interval '6 hours';
+  IF _stale_count > 0 THEN
+    RAISE WARNING 'r2-opprydning: % rad(er) i r2_delete_queue er aldri forsøkt, eldste fra %. Endepunktet svarer sannsynligvis ikke 200 — sjekk worker-secreten R2_CLEANUP_SECRET, app_settings-raden r2_cleanup_url, og om miljøet ligger bak en Cloudflare Access-policy på /api/public/*.', _stale_count, _oldest;
+  END IF;
+  -- Rader med attempts >= 10 er derimot faktisk forsøkt og feiler
+  -- permanent. De faller ut av spørringen i /api/public/r2/cleanup.ts
+  -- (attempts < MAX_ATTEMPTS) og slettes bevisst ikke — se kommentaren der.
+  -- Terskelen 10 er duplisert i MAX_ATTEMPTS i
+  -- src/routes/api/public/r2/cleanup.ts; oppdater begge steder samtidig.
+  -- Uten dette varselet ville en slik rad vært usynlig for alle andre enn
+  -- noen som manuelt ser i tabellen.
+  SELECT count(*), min(requested_at) INTO _exhausted_count, _exhausted_oldest
+  FROM public.r2_delete_queue
+  WHERE attempts >= 10;
+  IF _exhausted_count > 0 THEN
+    RAISE WARNING 'r2-opprydning: % rad(er) i r2_delete_queue har brukt opp alle forsøkene, eldste fra %. Slettingen feiler permanent — se last_error i public.r2_delete_queue for manuell oppfølging.', _exhausted_count, _exhausted_oldest;
+  END IF;
+  PERFORM net.http_post(
+    url := _url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'X-R2-Cleanup-Secret', _secret
+    ),
+    body := '{}'::jsonb
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.dispatch_r2_cleanup() FROM PUBLIC, anon, authenticated;
+
+SELECT cron.schedule('r2-cleanup-hourly', '15 * * * *', 'SELECT public.dispatch_r2_cleanup();');

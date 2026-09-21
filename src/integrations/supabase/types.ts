@@ -1964,6 +1964,33 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_delete_queue: {
+        Row: {
+          attempts: number
+          bucket: string
+          id: number
+          last_error: string | null
+          prefix: string
+          requested_at: string
+        }
+        Insert: {
+          attempts?: number
+          bucket: string
+          id?: number
+          last_error?: string | null
+          prefix: string
+          requested_at?: string
+        }
+        Update: {
+          attempts?: number
+          bucket?: string
+          id?: number
+          last_error?: string | null
+          prefix?: string
+          requested_at?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           comment: string | null
@@ -3014,6 +3041,10 @@ export type Database = {
           _status: Database["public"]["Enums"]["listing_status"]
           _user_id?: string
         }
+        Returns: boolean
+      }
+      can_upload_listing_image: {
+        Args: { _listing_id: string }
         Returns: boolean
       }
       can_view_organization_listing: {

@@ -4,7 +4,7 @@
 -- never see these inserts/updates. The only length limits were client-side
 -- (a <textarea maxLength> and a zod schema in profile-section.tsx), which is
 -- not enforcement — a direct API call can send an arbitrarily large value.
--- See docs/SIKKERHETSVURDERING.md M-7.
+-- See the internal security review, M-7.
 --
 -- 4000 matches the messages textarea limit (meldinger.$id.tsx). 80 matches
 -- the profile-edit form's zod schema (profile-section.tsx) — the higher of

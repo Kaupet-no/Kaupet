@@ -37,7 +37,7 @@ type RawReviewRow = {
 
 /** Deleted profiles must never show their real name/avatar in a review list
  * — this is the one masking rule, applied at every path that joins reviewer
- * profiles (see docs/SIKKERHETSVURDERING.md L-12). */
+ * profiles (see the internal security review, L-12). */
 function maskDeletedReviewer(
   p: {
     id: string;

@@ -2,9 +2,9 @@ import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PRIVACY_POINTS = [
-  "Ingen sporing av brukeraktivitet eller eksterne analyseverktøy",
+  "Ingen sporing av brukeraktivitet eller bruk av eksterne analyseverktøy",
   "Ingen markedsførings- eller adferdsdata å selge videre",
-  "Kildekoden er offentlig — sjekk selv",
+  "All kildekode er åpen og fri. Sjekk selv!",
 ];
 
 export function HowItWorksSection() {

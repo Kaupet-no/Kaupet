@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   User,
   ListChecks,
@@ -28,7 +28,6 @@ import { clearMessageAttachmentUrlCache } from "@/lib/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { NewListingDialog } from "@/components/new-listing-dialog";
 import {
   isActiveBusinessMember,
   useBusinessMembership,
@@ -41,6 +40,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+// Lat-lastet: user-menu sitter i SiteHeader (rotsettet), men dialogen
+// trengs først når brukeren faktisk åpner den.
+const NewListingDialog = lazy(() =>
+  import("@/components/new-listing-dialog").then((m) => ({ default: m.NewListingDialog })),
+);
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -57,6 +62,9 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
   const [newListingOpen, setNewListingOpen] = useState(false);
+  // Holdes montert etter første åpning slik at Radix' lukkeanimasjon i
+  // ResponsiveOverlay ikke kuttes når `newListingOpen` går tilbake til false.
+  const [newListingLoaded, setNewListingLoaded] = useState(false);
   const callSetTestMode = useServerFn(setTestMode);
   const { resolvedTheme, setTheme } = useTheme();
   const { data: businessMembership } = useBusinessMembership();
@@ -122,6 +130,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
           className="cursor-pointer"
           onSelect={(e) => {
             e.preventDefault();
+            setNewListingLoaded(true);
             setNewListingOpen(true);
           }}
         >
@@ -211,7 +220,11 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
           <LogOut className="size-4" /> Logg ut
         </DropdownMenuItem>
       </DropdownMenuContent>
-      <NewListingDialog open={newListingOpen} onOpenChange={setNewListingOpen} />
+      {newListingLoaded && (
+        <Suspense fallback={null}>
+          <NewListingDialog open={newListingOpen} onOpenChange={setNewListingOpen} />
+        </Suspense>
+      )}
     </DropdownMenu>
   );
 }

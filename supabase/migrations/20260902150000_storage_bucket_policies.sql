@@ -2,7 +2,7 @@
 -- and message-attachments did not exist in this repo — the actual access
 -- control for private annonse-bilder, 360-bilder and chat-vedlegg lived only
 -- in production and was not reviewable or reproducible. See
--- docs/SIKKERHETSVURDERING.md K-2.
+-- the internal security review, K-2.
 --
 -- Path conventions (enforced below, matching src/lib/storage.ts and
 -- src/lib/vehicle/vehicle-360.functions.ts):

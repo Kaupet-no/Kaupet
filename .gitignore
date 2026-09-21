@@ -65,3 +65,6 @@ android/keystore.properties
 keys.txt
 
 coverage/
+
+# Intern sikkerhetsvurdering holdes utenfor det offentlige repoet.
+docs/SIKKERHETSVURDERING.md

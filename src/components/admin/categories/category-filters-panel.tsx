@@ -31,6 +31,7 @@ import {
   type CategoryFilter,
   type FilterType,
 } from "@/lib/category-filters";
+import { invalidateSharedCategoryQueries } from "@/lib/reference-query-invalidation";
 import { SortableFilterRow } from "./sortable-filter-row";
 import { FilterSynonymsDialog } from "./filter-synonyms-dialog";
 import { SuggestValuesButton } from "./suggest-values-button";
@@ -109,7 +110,10 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
     [allCategories],
   );
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "category-filters"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin", "category-filters"] });
+    invalidateSharedCategoryQueries(qc);
+  };
 
   const save = useMutation({
     mutationFn: async (f: EditableFilter) => {

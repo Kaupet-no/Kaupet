@@ -31,19 +31,27 @@ export type CategoryRecord = {
  * another, and the fragmentation meant every screen refetched independently
  * instead of sharing one cache entry.
  */
-export function useCategories() {
-  return useQuery({
-    queryKey: ["categories"],
-    queryFn: async (): Promise<CategoryRecord[]> => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+export const categoriesQueryOptions = {
+  queryKey: ["categories"] as const,
+  queryFn: async (): Promise<CategoryRecord[]> => {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order")
+      .order("name_nb");
+    if (error) throw error;
+    return data ?? [];
+  },
+  // Categories are near-static: they only change when an admin edits them,
+  // and every admin mutation that touches the table now invalidates this
+  // key (invalidateSharedCategoryQueries). A long staleTime therefore only
+  // delays propagation to *other* clients' already-open sessions, which is
+  // acceptable for this data — it saves a refetch on every screen change.
+  staleTime: 30 * 60_000,
+};
+
+export function useCategories(initialData?: CategoryRecord[]) {
+  return useQuery({ ...categoriesQueryOptions, initialData });
 }
 
 /**

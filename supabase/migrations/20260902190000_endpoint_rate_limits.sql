@@ -5,7 +5,7 @@
 -- and suggestKeywordsForListing (service-role DB aggregations). A single
 -- reusable bucket/key table, same upsert-and-count shape as
 -- feedback_rate_limits / product_event_rate_limits. See
--- docs/SIKKERHETSVURDERING.md M-9.
+-- the internal security review, M-9.
 
 CREATE TABLE public.endpoint_rate_limits (
   bucket text NOT NULL CHECK (length(bucket) BETWEEN 1 AND 64),

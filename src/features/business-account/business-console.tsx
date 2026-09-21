@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,15 +19,6 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,6 +71,14 @@ import {
   MAX_SOLD_DAYS,
   summarizeListingInsights,
 } from "@/features/business-account/listing-insights";
+
+// recharts er ~95 KiB brotli og trengs ikke i første maling — kun
+// historikkgrafen under Oversikt bruker den.
+const BusinessConsoleChart = lazy(() =>
+  import("@/features/business-account/business-console-chart").then((m) => ({
+    default: m.BusinessConsoleChart,
+  })),
+);
 
 export type BusinessTab =
   "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "administrer" | "brukere";
@@ -916,31 +915,9 @@ function ListingInsights({
           </div>
         </div>
         <div className="mt-4 h-72 w-full" aria-label={`Graf for ${selectedMetricDetails.label}`}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: -20 }}>
-              <CartesianGrid vertical={false} className="stroke-border" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "0.5rem",
-                  color: "var(--foreground)",
-                }}
-                formatter={(value) => [value, selectedMetricDetails.label]}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                name={selectedMetricDetails.label}
-                stroke="var(--primary)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<Skeleton className="h-full w-full rounded-xl" />}>
+            <BusinessConsoleChart data={chartData} seriesLabel={selectedMetricDetails.label} />
+          </Suspense>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Historikken bygger på registrerte statusendringer, bekreftede salg og tilgjengelige

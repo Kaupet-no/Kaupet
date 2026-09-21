@@ -9,7 +9,16 @@ import {
   SearchX,
   X,
 } from "lucide-react";
-import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ClientOnly } from "@tanstack/react-router";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -38,6 +47,10 @@ import { trackProductEvent } from "@/lib/product-analytics";
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
 );
+
+// Konstant referanse — unngår at kortene under (memoiserte) får et nytt
+// linkState-objekt hver rendring, som ville nullstilt memoiseringen.
+const SEARCH_LINK_STATE = { fromSearch: true };
 
 type Props = {
   isNative: boolean;
@@ -155,6 +168,14 @@ export function ResultList({
     cards.map((card) => card.id),
   );
   const zeroResultKey = `${q}|${effectiveCategories.join(",")}`;
+  // Stabil callback — konstrueres inline i cards.map ville gitt hvert
+  // (memoiserte) kort en ny onOpen-referanse ved hver rendring, f.eks. når
+  // bare hover-state endrer seg for et annet kort.
+  const handleResultOpen = useCallback((position: number, resultCount: number) => {
+    trackProductEvent("search_result_opened", { position, resultCount });
+  }, []);
+  // new Set(...) hver rendring ville brutt memoisering av det som leser den.
+  const allowedIds = useMemo(() => new Set(cards.map((l) => l.id)), [cards]);
 
   useEffect(() => {
     if (isLoading || cards.length > 0) return;
@@ -397,7 +418,7 @@ export function ResultList({
           {!isLoading && (
             <FeaturedListingsSection
               categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
-              allowedIds={new Set(cards.map((l) => l.id))}
+              allowedIds={allowedIds}
               limit={3}
             />
           )}
@@ -483,13 +504,10 @@ export function ResultList({
                   <ListingCardExpanded
                     key={l.id}
                     listing={l}
-                    linkState={{ fromSearch: true }}
-                    onOpen={() =>
-                      trackProductEvent("search_result_opened", {
-                        position: index + 1,
-                        resultCount: totalCount ?? cards.length,
-                      })
-                    }
+                    linkState={SEARCH_LINK_STATE}
+                    onOpen={handleResultOpen}
+                    position={index + 1}
+                    resultCount={totalCount ?? cards.length}
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -498,13 +516,10 @@ export function ResultList({
                   <ListingCardImages
                     key={l.id}
                     listing={l}
-                    linkState={{ fromSearch: true }}
-                    onOpen={() =>
-                      trackProductEvent("search_result_opened", {
-                        position: index + 1,
-                        resultCount: totalCount ?? cards.length,
-                      })
-                    }
+                    linkState={SEARCH_LINK_STATE}
+                    onOpen={handleResultOpen}
+                    position={index + 1}
+                    resultCount={totalCount ?? cards.length}
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -516,13 +531,10 @@ export function ResultList({
                     highlighted={hoveredId === l.id || activeId === l.id}
                     onHoverChange={setHoveredId}
                     compact={viewMode === "list"}
-                    linkState={{ fromSearch: true }}
-                    onOpen={() =>
-                      trackProductEvent("search_result_opened", {
-                        position: index + 1,
-                        resultCount: totalCount ?? cards.length,
-                      })
-                    }
+                    linkState={SEARCH_LINK_STATE}
+                    onOpen={handleResultOpen}
+                    position={index + 1}
+                    resultCount={totalCount ?? cards.length}
                     signedImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}

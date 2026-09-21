@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import type { ListingCardData } from "@/components/listing-card";
 import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
@@ -12,7 +12,11 @@ import { signListingImageUrls } from "@/lib/storage";
 type Props = {
   listing: ListingCardData;
   linkState?: Record<string, unknown>;
-  onOpen?: () => void;
+  onOpen?: (position: number, resultCount: number) => void;
+  /** Kortets posisjon (1-basert) og totalt antall treff — sendes videre til
+   * onOpen ved klikk, se search_result_opened-sporingen i result-list. */
+  position?: number;
+  resultCount?: number;
   coverImageUrl?: string | null;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
@@ -22,10 +26,14 @@ type Props = {
  * is the entire card, with title/price/location laid over the top as a
  * gradient-backed overlay so the text stays readable regardless of how
  * light or dark the photo is. */
-export function ListingCardImages({
+// Memoisert fordi hover-state i result-list ellers rendrer hele resultatlista
+// på nytt for hver musebevegelse mellom kort.
+export const ListingCardImages = memo(function ListingCardImages({
   listing,
   linkState,
   onOpen,
+  position = 0,
+  resultCount = 0,
   coverImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -102,7 +110,7 @@ export function ListingCardImages({
             e.preventDefault();
             return;
           }
-          onOpen?.();
+          onOpen?.(position, resultCount);
         }}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
@@ -144,4 +152,4 @@ export function ListingCardImages({
       />
     </article>
   );
-}
+});

@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
-import { buildSecurityHeaders } from "./src/lib/security-headers";
+import { buildSecurityHeaders } from "./src/lib/security-headers.ts";
 
 // Deploy target: Cloudflare Workers (module format), matching production today.
 // Change `preset` here if Kaupet moves to a different host later.

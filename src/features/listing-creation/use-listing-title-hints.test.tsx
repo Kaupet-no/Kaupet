@@ -219,6 +219,116 @@ describe("useListingTitleHints", () => {
     expect(setValue).toHaveBeenCalledWith("description", "Fin sofa #sofa", { shouldTouch: false });
   });
 
+  it("uses clientCategoryHint as a fallback when the RPC returns no suggestion (F6: vehicle titles)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    suggestCategoryForTitleMock.mockResolvedValue({ suggestions: [] });
+    const clientCategoryHint = {
+      category_id: "bil",
+      parent_id: "bilogmc",
+      name_nb: "Bil",
+      parent_name_nb: "Bil og MC",
+    };
+    const { result } = renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Volvo V70 stasjonsvogn",
+          description: "",
+          categoryId: "",
+          categoryTouchedManually: false,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+          clientCategoryHint,
+        }),
+      { wrapper },
+    );
+
+    await act(() => vi.advanceTimersByTimeAsync(400));
+
+    expect(result.current.categorySuggestions).toEqual([clientCategoryHint]);
+    vi.useRealTimers();
+  });
+
+  it("skjuler klientfallback mens RPC-en laster og viser den etter tomt svar", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    matchWtbListingsForListingMock.mockResolvedValue(null);
+    let resolveSuggestion!: (value: { suggestions: [] }) => void;
+    suggestCategoryForTitleMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSuggestion = resolve;
+      }),
+    );
+    const clientCategoryHint = {
+      category_id: "bil",
+      parent_id: "bilogmc",
+      name_nb: "Bil",
+      parent_name_nb: "Bil og MC",
+    };
+    const { result } = renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Volvo V70 stasjonsvogn",
+          description: "",
+          categoryId: "",
+          categoryTouchedManually: false,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+          clientCategoryHint,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(suggestCategoryForTitleMock).toHaveBeenCalled());
+    expect(result.current.categorySuggestions).toEqual([]);
+
+    await act(async () => resolveSuggestion({ suggestions: [] }));
+
+    await waitFor(() => expect(result.current.categorySuggestions).toEqual([clientCategoryHint]));
+    vi.useRealTimers();
+  });
+
+  it("prefers the RPC suggestion over clientCategoryHint when the RPC finds one (regression: sofa)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    suggestCategoryForTitleMock.mockResolvedValue({
+      suggestions: [
+        {
+          category_id: "sofa",
+          parent_id: "mobler",
+          name_nb: "Sofa",
+          parent_name_nb: "Møbler",
+        },
+      ],
+    });
+    const clientCategoryHint = {
+      category_id: "bil",
+      parent_id: "bilogmc",
+      name_nb: "Bil",
+      parent_name_nb: "Bil og MC",
+    };
+    const { result } = renderHook(
+      () =>
+        useListingTitleHints({
+          title: "Sluttbrukertest sofa i grå ull",
+          description: "",
+          categoryId: "",
+          categoryTouchedManually: false,
+          setSelectedParentId: vi.fn(),
+          setCategoryTouchedManually: vi.fn(),
+          setValue: vi.fn(),
+          clientCategoryHint,
+        }),
+      { wrapper },
+    );
+
+    await act(() => vi.advanceTimersByTimeAsync(400));
+
+    expect(result.current.categorySuggestions).toEqual([
+      expect.objectContaining({ category_id: "sofa" }),
+    ]);
+    vi.useRealTimers();
+  });
+
   it("fetches a WTB match once the debounced title reaches 3 characters", async () => {
     matchWtbListingsForListingMock.mockResolvedValue({ id: "wtb-1" });
     const { result } = renderHook(

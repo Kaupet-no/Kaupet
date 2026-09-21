@@ -12,9 +12,12 @@ type HeaderMembership = {
   organization: { selected_plan: "proff_basis" | "proff" | null };
 };
 
+const defaultHeaderUser = { id: "user-id", email: "user@example.test" };
+
 const headerMocks = vi.hoisted(() => ({
   user: { id: "user-id", email: "user@example.test" } as { id: string; email: string } | null,
   membership: null as HeaderMembership | null,
+  loading: false,
   openPanel: vi.fn(),
 }));
 
@@ -34,7 +37,7 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: headerMocks.user, session: null, loading: false }),
+  useAuth: () => ({ user: headerMocks.user, session: null, loading: headerMocks.loading }),
 }));
 vi.mock("@/features/business-account/use-business-membership", () => ({
   useBusinessMembership: () => ({ data: headerMocks.membership }),
@@ -54,6 +57,8 @@ afterEach(() => {
   cleanup();
   document.body.replaceChildren();
   headerMocks.membership = null;
+  headerMocks.loading = false;
+  headerMocks.user = defaultHeaderUser;
 });
 
 describe("HeaderSearchPortal", () => {
@@ -155,5 +160,29 @@ describe("SiteHeader", () => {
     expect(screen.getByText("kaupet")).toBeTruthy();
     expect(screen.getByText("no")).toBeTruthy();
     expect(screen.queryByText("Proff")).toBeNull();
+  });
+});
+
+describe("SiteHeader under auth-oppstart", () => {
+  // Sesjonen ligger i localStorage og er ukjent til hydreringen har lest den.
+  // Headeren skal ikke gjette i mellomtiden — å vise «Logg inn» til en
+  // innlogget bruker er verre enn å vise ingenting.
+  it("viser verken innlogget eller utlogget tilstand mens sesjonen leses", () => {
+    headerMocks.loading = true;
+
+    render(<SiteHeader />);
+
+    expect(screen.queryByText("Logg inn")).toBeNull();
+    expect(screen.queryByText("Bli medlem")).toBeNull();
+  });
+
+  it("viser innloggingsknappene så snart vi vet at ingen er innlogget", () => {
+    headerMocks.loading = false;
+    headerMocks.user = null;
+
+    render(<SiteHeader />);
+
+    expect(screen.getByText("Logg inn")).toBeTruthy();
+    expect(screen.getByText("Bli medlem")).toBeTruthy();
   });
 });

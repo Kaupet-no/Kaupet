@@ -217,7 +217,7 @@ Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stac
 | ---- | ----------------------------------------------------- | ----------------------------------------- |
 | K-1  | Betalingsmiljø nedgraderes via forfalsket cookie      | ✅ Fikset (`3e36c7a`)                     |
 | K-2  | Storage-policyer ikke i versjonskontroll              | ✅ Fikset (`a59eb2e`)                     |
-| H-3  | `pull_request_target` + `bun install` med scripts     | ✅ Fikset (`a584b80`)                     |
+| H-3  | `pull_request_target` + `bun install` med scripts     | ✅ Fjernet (workflowen er slettet)        |
 | M-4  | Ingen affiliasjonskontroll ved bedriftsregistrering   | ✅ Fikset (`ff38743`, minimumsvariant)    |
 | M-5  | `organizations` lesbar for `anon` med `USING (true)`  | ✅ Fikset (`859d2e6`)                     |
 | M-6  | CSP report-only uten rapportmottaker; mangler HSTS    | ✅ Fikset (`9f5de3a`, delvis — se notat)  |
@@ -344,6 +344,12 @@ Selv med `if: github.actor == 'dependabot[bot]'` er dette risikabelt: hele poeng
 2. Flytt `permissions: contents: write` fra workflow-nivå til jobben, og behold ellers `permissions: {}` som standard.
 3. Pin actions til commit-SHA i stedet for flytende tags (`actions/checkout@v7`, `oven-sh/setup-bun@v2`, `softprops/action-gh-release@v3`, `dorny/paths-filter@v4`).
 4. Vurder å bytte `pull_request_target` mot en `workflow_run`- eller `schedule`-basert jobb som regenererer lockfilen uten å eksekvere PR-innhold i en privilegert kontekst.
+
+**Status:** Løst ved å fjerne angrepsflaten helt. Dependabot har støtte for
+`package-ecosystem: bun` (bun >= 1.1.39), og oppdaterer da `bun.lock` sammen
+med `package.json`. `.github/dependabot.yml` er byttet fra `npm` til `bun`, og
+`.github/workflows/dependabot-lockfile.yml` er slettet — det finnes ikke lenger
+noen `pull_request_target`-jobb med `contents: write` i repoet.
 
 ---
 

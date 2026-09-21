@@ -1,5 +1,5 @@
 import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
-import { ClientOnly, Link } from "@tanstack/react-router";
+import { ClientOnly, Link, useLocation } from "@tanstack/react-router";
 import { ChevronLeft, Loader2, MapPin, Maximize2 } from "lucide-react";
 
 import { useIsNative } from "@/hooks/use-is-native";
@@ -109,11 +109,16 @@ function LightboxLoadingFallback() {
 /** Link back to the last /annonser search this session, read from
  * sessionStorage (see last-search-context.ts) — rendered inside
  * `ClientOnly` since sessionStorage isn't available during SSR. Renders
- * nothing when the visitor didn't arrive from a search this session
- * (fresh tab, shared link, notification, ...). */
+ * nothing unless the current navigation actually came from a search result
+ * (the `fromSearch` router state set by result-list.tsx/listings-map.tsx on
+ * the listing link) — otherwise a stale search from earlier in the session
+ * would show up on an unrelated listing (see F12). */
 function BackToSearchLink() {
+  const fromSearch = useLocation({
+    select: (l) => Boolean((l.state as unknown as Record<string, unknown>).fromSearch),
+  });
   const ctx = readLastSearchContext();
-  if (!ctx) return null;
+  if (!fromSearch || !ctx) return null;
   return (
     <Link
       to="/annonser"
@@ -381,8 +386,14 @@ export function ListingDetailView({
             if (!e.currentTarget.contains(e.relatedTarget as Node)) onCommit();
           }}
         >
-          <Checkbox checked={v.isFree} onCheckedChange={(c) => onChange({ ...v, isFree: !!c })} />
-          <Label className="text-xs">Gis bort</Label>
+          <Checkbox
+            id="edit-price-is-free"
+            checked={v.isFree}
+            onCheckedChange={(c) => onChange({ ...v, isFree: !!c })}
+          />
+          <Label htmlFor="edit-price-is-free" className="text-xs">
+            Gis bort
+          </Label>
           {!v.isFree && buyerPaysAvgift && (
             <span className="text-xs text-muted-foreground">Din pris, uten avgift:</span>
           )}
@@ -391,6 +402,7 @@ export function ListingDetailView({
               type="number"
               min={0}
               className="h-8 w-28"
+              aria-label="Pris i kroner"
               value={v.priceNok ?? ""}
               onChange={(e) =>
                 onChange({ ...v, priceNok: e.target.value === "" ? null : Number(e.target.value) })
@@ -1246,7 +1258,10 @@ function ListingDetailViewBody({
                 // trenger ikke egen safe-area-padding siden tab-baren
                 // allerede reserverer den.
                 { bottom: "var(--app-bottom-nav-h)" }
-              : { bottom: 0, paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }
+              : {
+                  bottom: 0,
+                  paddingBottom: "calc(var(--safe-bottom) + 0.75rem)",
+                }
           }
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">

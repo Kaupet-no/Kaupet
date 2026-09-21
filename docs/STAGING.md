@@ -17,6 +17,22 @@ avsenderdomene, Resend-oppsett, redirect-lista under **Authentication → URL
 Configuration**, og applikasjonens egne varsel-e-poster. Staging og produksjon
 er separate Supabase-prosjekter og må konfigureres hver for seg.
 
+## Hvilket prosjekt peker nøkkelen på?
+
+Staging og produksjon er separate Supabase-prosjekter, og `.env` sier ikke
+selv hvilket den er satt opp mot — `VITE_ENVIRONMENT` og `PUBLIC_SITE_URL` kan
+stå tomme. Sjekk prosjektref-en i `SUPABASE_URL` før du kjører noe som
+skriver, og særlig før noe som sletter:
+
+| Miljø      | Prosjektref            |
+| ---------- | ---------------------- |
+| Staging    | `zpazmwzhvylptptygzlw` |
+| Produksjon | _fyll inn_             |
+
+Refsene er ikke hemmeligheter — de står i URL-en appen bruker. Poenget er at
+det skal være mulig å lese ut av repoet hvilken database man er koblet til,
+uten å måtte spørre noen.
+
 ## Auth security (produksjon)
 
 `supabase/config.toml` er kun lokal dev-config — de faktiske innstillingene
@@ -30,7 +46,16 @@ og hold disse verdiene i produksjon (se docs/SIKKERHETSVURDERING.md L-15):
 - **Turnstile-captcha: aktivert** for signup/passordtilbakestilling.
 - **«Leaked password protection» (HIBP): på.**
 - **`minimum_password_length`: minst 10** — matcher `passwordSchema` i
-  `src/lib/auth-schemas.ts`.
+  `src/lib/auth-schemas.ts`. Merk at `passwordSchema` kun er klientvalidering:
+  håndheves ikke lengden også i dashbordet, kan et direkte API-kall utenom
+  appen sette et kortere passord.
+
+**Kontoer under kravet:** Supabase håndhever ikke minstelengden retroaktivt.
+Kontoer opprettet før kravet ble slått på — deriblant testkontoene fra
+sluttbrukertesten 2026-09-16, som har åtte tegn — fortsetter å fungere med
+korte passord. Dette er en bevisst, akseptert begrensning: kohorten er
+testkontoer, og en tvungen nullstilling ville krevd egen flyt. Vurder på nytt
+hvis brukerbasen vokser før policyen får virke.
 
 ## Testing
 

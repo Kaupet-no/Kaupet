@@ -7,8 +7,18 @@ import { AppLanding } from "./app-landing";
 
 const openPanel = vi.fn();
 
+const queryMocks = vi.hoisted(() => ({
+  data: [] as unknown[] | undefined,
+  isError: false,
+  refetch: vi.fn(),
+}));
+
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: [] }),
+  useQuery: () => ({
+    data: queryMocks.data,
+    isError: queryMocks.isError,
+    refetch: queryMocks.refetch,
+  }),
 }));
 vi.mock("@/hooks/use-form-factor", () => ({ useFormFactor: () => "phone" }));
 vi.mock("@/features/listing-search/search-panel/search-panel-context", () => ({
@@ -24,7 +34,12 @@ vi.mock("@/components/app-hero-logo", () => ({ AppHeroLogo: () => null }));
 vi.mock("@/components/kaupet-code-dialog", () => ({ KaupetCodeDialog: () => null }));
 
 beforeEach(() => openPanel.mockReset());
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  queryMocks.data = [];
+  queryMocks.isError = false;
+  queryMocks.refetch.mockReset();
+});
 
 describe("AppLanding", () => {
   it("åpner søk, lokasjon og kategorier gjennom samme panel", () => {
@@ -35,5 +50,14 @@ describe("AppLanding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Alle kategorier" }));
 
     expect(openPanel.mock.calls).toEqual([["query"], ["location"], ["categories"]]);
+  });
+
+  it("viser 'Prøv igjen' i stedet for et evigvarende skjelett når populære annonser feiler", () => {
+    queryMocks.data = undefined;
+    queryMocks.isError = true;
+
+    render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Prøv igjen" })).toBeTruthy();
   });
 });

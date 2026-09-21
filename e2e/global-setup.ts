@@ -142,6 +142,16 @@ export default async function globalSetup() {
     const now = new Date();
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + 30);
+    // Fast publiseringsdato, ikke `now`. Annonsedetaljen viser datoen med
+    // `toLocaleDateString("nb-NO", { day: "numeric", month: "long" })` i en
+    // smal kolonne, og «20. september 2026» ligger få piksler fra
+    // ombrekkingsgrensen: sifferbreddene gjør at samme tekst brekker til to
+    // linjer én dag og én linje neste, og hele siden under forskyves 20 px.
+    // Maskeringen i den visuelle testen skjuler pikslene, men ikke høyden.
+    // «5. januar 2026» er kort nok til aldri å brekke. `updated_at` må settes
+    // til samme dag, ellers bytter etiketten til «Sist redigert» og viser
+    // dagens dato i stedet.
+    const publishedAt = "2026-01-05T09:00:00.000Z";
     const { error: fixtureError } = await admin.from("listings").insert([
       {
         seller_id: fixtureOwner.userId,
@@ -154,7 +164,8 @@ export default async function globalSetup() {
         status: "active",
         lat: 59.9139,
         lng: 10.7522,
-        published_at: now.toISOString(),
+        published_at: publishedAt,
+        updated_at: publishedAt,
         expires_at: expiresAt.toISOString(),
       },
       {
@@ -168,7 +179,8 @@ export default async function globalSetup() {
         condition: "good",
         lat: 59.922,
         lng: 10.73,
-        published_at: now.toISOString(),
+        published_at: publishedAt,
+        updated_at: publishedAt,
         expires_at: expiresAt.toISOString(),
       },
       {
@@ -181,7 +193,8 @@ export default async function globalSetup() {
         price_nok: 200,
         lat: 59.9,
         lng: 10.78,
-        published_at: now.toISOString(),
+        published_at: publishedAt,
+        updated_at: publishedAt,
         expires_at: expiresAt.toISOString(),
       },
     ]);

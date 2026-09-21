@@ -272,8 +272,13 @@ export function BoatFactsGroup(props: WizardSharedProps) {
 
   const toggle = (section: BoatSectionKey) =>
     setOpenSections((current) => ({ ...current, [section]: !current[section] }));
+  /* Et påkrevd felt som er tomt skal aldri ligge bak en lukket seksjon, så
+     `hasMissing` åpner seksjonen med én gang. `hasError` (rød markering)
+     venter fortsatt til brukeren har forsøkt å gå videre. */
+  const hasMissing = (section: BoatSectionKey) =>
+    missingKeys.some((key) => sectionForField(key) === section);
   const hasError = (section: BoatSectionKey) =>
-    (props.attributesTouched && missingKeys.some((key) => sectionForField(key) === section)) ||
+    (props.attributesTouched && hasMissing(section)) ||
     (!!props.extraFieldError && sectionForField(props.extraFieldError.field) === section) ||
     (section === "description" && (!!props.errors.subtitle || !!props.errors.description));
   const attributeProps = {
@@ -291,7 +296,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
       <BoatDetailsSection
         section="basic"
         title="Grunnleggende"
-        open={openSections.basic || hasError("basic")}
+        open={openSections.basic || hasMissing("basic") || hasError("basic")}
         hasError={hasError("basic")}
         onToggle={() => toggle("basic")}
       >
@@ -319,7 +324,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
       <BoatDetailsSection
         section="motor"
         title="Motor og kapasitet"
-        open={openSections.motor || hasError("motor")}
+        open={openSections.motor || hasMissing("motor") || hasError("motor")}
         hasError={hasError("motor")}
         onToggle={() => toggle("motor")}
       >
@@ -329,7 +334,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
       <BoatDetailsSection
         section="more"
         title="Flere opplysninger"
-        open={openSections.more || hasError("more")}
+        open={openSections.more || hasMissing("more") || hasError("more")}
         hasError={hasError("more")}
         onToggle={() => toggle("more")}
       >
@@ -339,7 +344,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
       <BoatDetailsSection
         section="description"
         title="Beskrivelse"
-        open={openSections.description || hasError("description")}
+        open={openSections.description || hasMissing("description") || hasError("description")}
         hasError={hasError("description")}
         onToggle={() => toggle("description")}
       >

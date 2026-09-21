@@ -15,6 +15,7 @@ import {
   Caravan,
   Cat,
   ChefHat,
+  ChessKnight,
   Compass,
   Construction,
   Container,
@@ -22,6 +23,7 @@ import {
   Dog,
   Dumbbell,
   Film,
+  FlaskConical,
   Flower2,
   Footprints,
   Forklift,
@@ -80,7 +82,6 @@ import {
   Wrench,
   Zap,
   Cog,
-  icons as LUCIDE_ICONS,
   createLucideIcon,
 } from "lucide-react";
 import { createElement } from "react";
@@ -184,6 +185,8 @@ export const CATEGORY_ICON_OPTIONS: { name: string; icon: LucideIcon }[] = [
   { name: "Lightbulb", icon: Lightbulb },
   { name: "Layers", icon: Layers },
   { name: "Flower2", icon: Flower2 },
+  // Brukes av e2e-test-kategoriene i supabase/seed.sql.
+  { name: "FlaskConical", icon: FlaskConical },
   { name: "Hammer", icon: Hammer },
   { name: "HardHat", icon: HardHat },
   { name: "Handshake", icon: Handshake },
@@ -193,6 +196,7 @@ export const CATEGORY_ICON_OPTIONS: { name: string; icon: LucideIcon }[] = [
   { name: "SuitJacket", icon: SuitJacket },
   { name: "Dress", icon: Dress },
   { name: "Saddle", icon: Saddle },
+  { name: "ChessKnight", icon: ChessKnight },
   { name: "Backpack", icon: Backpack },
   { name: "ShoppingBag", icon: ShoppingBag },
   { name: "Activity", icon: Activity },
@@ -239,24 +243,13 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
   CATEGORY_ICON_OPTIONS.map(({ name, icon }) => [name, icon]),
 );
 
-// Alle ikonene lucide-react leverer, i tillegg til de håndbygde egendefinerte
-// ikonene over. Brukes av ikonvelgeren i admin slik at man kan søke blant og
-// velge ethvert lucide-ikon, ikke bare det kuraterte utvalget i
-// CATEGORY_ICON_OPTIONS (som fortsatt styrer hvilke ikoner som faktisk brukes
-// på kategoriene i dag).
-export const ALL_ICON_OPTIONS: { name: string; icon: LucideIcon }[] = (() => {
-  const seen = new Set(CATEGORY_ICON_OPTIONS.map((o) => o.name));
-  const extra = Object.entries(LUCIDE_ICONS)
-    .filter(([name]) => !seen.has(name))
-    .map(([name, icon]) => ({ name, icon: icon as LucideIcon }));
-  return [...CATEGORY_ICON_OPTIONS, ...extra].sort((a, b) => a.name.localeCompare(b.name));
-})();
-
+// Ikonnavn utenfor det kuraterte settet over finnes ikke i bundlen og faller
+// tilbake på Package. Å slå dem opp i lucides fulle register kostet 514 KiB i
+// forsidens preload-sett; ikonvelgeren i admin tilbyr derfor kun settet over,
+// slik at det ikke går an å velge et ikon som ikke kan rendres.
 export function getCategoryIcon(iconName: string | null | undefined): LucideIcon {
   if (!iconName) return Package;
-  return (
-    CATEGORY_ICON_MAP[iconName] ?? (LUCIDE_ICONS as Record<string, LucideIcon>)[iconName] ?? Package
-  );
+  return CATEGORY_ICON_MAP[iconName] ?? Package;
 }
 
 export function CategoryIcon({

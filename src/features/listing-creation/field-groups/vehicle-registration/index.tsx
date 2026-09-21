@@ -21,7 +21,7 @@ import {
 import { getMissingRequiredFilters, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { matchBrandAndModelInTitle } from "@/lib/vehicle/vehicle-brand-match";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryIcon } from "@/lib/category-icons";
 import {
   LEAF_LABELS_NB,
   VEHICLE_LEAF_SLUGS,
@@ -83,7 +83,7 @@ function ManualSpecSection({
   visibleKeys,
   allKeys,
   initialOpen = false,
-  hasErrors = false,
+  hasMissing = false,
   ...props
 }: {
   heading: string;
@@ -91,12 +91,16 @@ function ManualSpecSection({
   visibleKeys: readonly string[];
   allKeys: readonly string[];
   initialOpen?: boolean;
-  hasErrors?: boolean;
+  hasMissing?: boolean;
 } & Pick<
   WizardSharedProps,
   "categoryId" | "categories" | "attributes" | "onAttributesChange" | "attributesTouched"
 >) {
   const [open, setOpen] = useState(initialOpen);
+  /* Seksjonen står åpen så lenge den har et tomt påkrevd felt — et påkrevd
+     felt skal aldri ligge bak en lukket seksjon. Selve feilmarkeringen venter
+     til brukeren har forsøkt å gå videre (`attributesTouched`). */
+  const showError = hasMissing && props.attributesTouched;
   const optionalKeys = visibleKeys.filter(
     (key) =>
       allKeys.includes(key) &&
@@ -111,21 +115,21 @@ function ManualSpecSection({
 
   return (
     <details
-      open={open || hasErrors}
+      open={open || hasMissing}
       onToggle={(event) => setOpen(event.currentTarget.open)}
       aria-labelledby={sectionId}
       className="rounded-xl border border-border"
     >
       <summary
         aria-controls={contentId}
-        aria-describedby={hasErrors ? errorId : undefined}
+        aria-describedby={showError ? errorId : undefined}
         className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden"
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           <span id={sectionId} role="heading" aria-level={3} className="text-sm font-medium">
             {heading}
           </span>
-          {hasErrors && (
+          {showError && (
             <span id={errorId} role="status" className="text-sm font-medium text-destructive">
               Mangler påkrevde opplysninger
             </span>
@@ -228,14 +232,13 @@ export function VehicleRegistration(props: WizardSharedProps) {
     };
   }, [manualSpecKeys]);
   const missingManualSpecKeys = useMemo(() => {
-    if (!props.attributesTouched) return new Set<string>();
     return new Set(
       getMissingRequiredFilters(categoryId, allFilters ?? [], categoriesById, attributes, [
         ...HIDDEN_KEYS_FOR_MANUAL_SPECS,
         ...VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS,
       ]).map((filter) => filter.key),
     );
-  }, [props.attributesTouched, categoryId, allFilters, categoriesById, attributes]);
+  }, [categoryId, allFilters, categoriesById, attributes]);
   const leafBySlug = useMemo(() => vehicleLeafCategoriesBySlug(categories), [categories]);
   const currentLeafSlug = categoriesById.get(categoryId)?.slug as VehicleLeafSlug | undefined;
   const selectedLeafSlug: VehicleLeafSlug =
@@ -333,72 +336,11 @@ export function VehicleRegistration(props: WizardSharedProps) {
 
   return (
     <section className="space-y-5">
-      <div className="space-y-2">
-        <Label>Underkategori</Label>
-        <p className="text-xs text-muted-foreground">
-          Merke og modell under filtreres etter hvilken underkategori som er valgt. Velg en annen
-          hvis den markerte ikke stemmer.
-        </p>
-        <div
-          role="radiogroup"
-          aria-label="Underkategori"
-          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
-        >
-          {VEHICLE_LEAF_SLUGS.filter((slug) => leafBySlug.has(slug)).map((slug) => {
-            const leaf = leafBySlug.get(slug)!;
-            const Icon = getCategoryIcon(leaf.icon);
-            const selected = selectedLeafSlug === slug;
-            return (
-              <button
-                key={slug}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => selectSubcategory(leaf)}
-                className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors ${
-                  selected
-                    ? "border-primary bg-primary/10 text-primary font-medium"
-                    : "border-border hover:border-primary/40"
-                }`}
-              >
-                <Icon className="size-5" />
-                {LEAF_LABELS_NB[slug]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {!vehicleRegistered && (
-        <section className="space-y-4 border-t pt-4">
-          <VehicleBrandField
-            categoryGroup={categoryGroup}
-            value={brand}
-            onChange={(v) => setAttribute("brand", v)}
-            required
-            error={fieldError("brand")}
-          />
-          <VehicleModelWithClassField
-            categoryGroup={categoryGroup}
-            brandName={brand}
-            value={model}
-            onChange={(v) => setAttribute("model", v)}
-            required
-            error={fieldError("model")}
-          />
-          <ManualSpecSection
-            heading="Grunnfakta"
-            sectionId="vehicle-manual-grunnfakta-heading"
-            visibleKeys={manualSections.grunnfakta}
-            allKeys={manualSpecKeys}
-            initialOpen
-            hasErrors={manualSections.grunnfakta.some((key) => missingManualSpecKeys.has(key))}
-            {...props}
-          />
-        </section>
-      )}
-
-      <div className="space-y-3 border-t pt-4">
+      {/* Registreringsnummeret først: oppslaget avgjør uansett underkategorien
+          (se detectedSlug/categoryMismatch), så feltet under skal fylles ut før
+          brukeren gjetter. Underkategorien står likevel foran de manuelle
+          merke/modell-feltene, som filtreres av den. */}
+      <div className="space-y-3">
         <Label htmlFor="vehicle-reg-nr">
           Registreringsnummer
           {vehicleRegistered && <RequiredMark />}
@@ -483,7 +425,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 sectionId="vehicle-manual-drivlinje-heading"
                 visibleKeys={manualSections.drivlinje}
                 allKeys={manualSpecKeys}
-                hasErrors={manualSections.drivlinje.some((key) => missingManualSpecKeys.has(key))}
+                hasMissing={manualSections.drivlinje.some((key) => missingManualSpecKeys.has(key))}
                 {...props}
               />
               <ManualSpecSection
@@ -491,7 +433,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 sectionId="vehicle-manual-praktiske-heading"
                 visibleKeys={manualSections.praktiske}
                 allKeys={manualSpecKeys}
-                hasErrors={manualSections.praktiske.some((key) => missingManualSpecKeys.has(key))}
+                hasMissing={manualSections.praktiske.some((key) => missingManualSpecKeys.has(key))}
                 {...props}
               />
               <ManualSpecSection
@@ -499,13 +441,78 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 sectionId="vehicle-manual-flere-heading"
                 visibleKeys={manualSections.flere}
                 allKeys={manualSpecKeys}
-                hasErrors={manualSections.flere.some((key) => missingManualSpecKeys.has(key))}
+                hasMissing={manualSections.flere.some((key) => missingManualSpecKeys.has(key))}
                 {...props}
               />
             </div>
           </div>
         )}
       </div>
+
+      <div className="space-y-2 border-t pt-4">
+        <Label>Underkategori</Label>
+        <p className="text-xs text-muted-foreground">
+          Merke og modell under filtreres etter hvilken underkategori som er valgt. Velg en annen
+          hvis den markerte ikke stemmer.
+        </p>
+        <div
+          role="radiogroup"
+          aria-label="Underkategori"
+          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+        >
+          {VEHICLE_LEAF_SLUGS.filter((slug) => leafBySlug.has(slug)).map((slug) => {
+            const leaf = leafBySlug.get(slug)!;
+            const selected = selectedLeafSlug === slug;
+            return (
+              <button
+                key={slug}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => selectSubcategory(leaf)}
+                className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors ${
+                  selected
+                    ? "border-primary bg-primary/10 text-primary font-medium"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                <CategoryIcon iconName={leaf.icon} className="size-5" />
+                {LEAF_LABELS_NB[slug]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {!vehicleRegistered && (
+        <section className="space-y-4 border-t pt-4">
+          <VehicleBrandField
+            categoryGroup={categoryGroup}
+            value={brand}
+            onChange={(v) => setAttribute("brand", v)}
+            required
+            error={fieldError("brand")}
+          />
+          <VehicleModelWithClassField
+            categoryGroup={categoryGroup}
+            brandName={brand}
+            value={model}
+            onChange={(v) => setAttribute("model", v)}
+            required
+            error={fieldError("model")}
+          />
+          <ManualSpecSection
+            heading="Grunnfakta"
+            sectionId="vehicle-manual-grunnfakta-heading"
+            visibleKeys={manualSections.grunnfakta}
+            allKeys={manualSpecKeys}
+            initialOpen
+            hasMissing={manualSections.grunnfakta.some((key) => missingManualSpecKeys.has(key))}
+            {...props}
+          />
+        </section>
+      )}
+
       <AlertDialog open={!!lookup} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -365,6 +365,19 @@ html.native body::before {
 :root {
   --app-bottom-nav-h: calc(6rem + var(--safe-bottom));
 }
+
+/* Høyden på det klistrede sidehodet (SiteHeader, `sticky top-0 z-40`).
+   Andre sticky-elementer lenger ned på siden må forskyves like mye — ellers
+   legger headeren seg over dem, siden den har høyere z-index.
+   4.5rem innhold + 1px bunnramme. */
+:root {
+  --site-header-h: calc(4.5rem + 1px + var(--safe-top));
+}
+/* I Capacitor-WebView-en er det NativePageHeader (h-12 + 1px ramme) som er
+   klistret, ikke SiteHeader. */
+.native {
+  --site-header-h: calc(3rem + 1px + var(--safe-top));
+}
 .pb-bottom-nav {
   padding-bottom: var(--app-bottom-nav-h);
 }

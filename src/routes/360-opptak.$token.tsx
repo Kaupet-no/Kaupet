@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { getVehicle360CaptureSession } from "@/lib/vehicle/vehicle-360.functions";
 import { Vehicle360CaptureFlow } from "@/features/vehicle-360-capture/capture-flow";
@@ -29,7 +29,7 @@ function CapturePage() {
   );
 }
 
-function CaptureError({ error }: { error: Error }) {
+function CaptureError({ error }: ErrorComponentProps) {
   console.error(error);
   return (
     <div className="mx-auto max-w-md px-6 py-20 text-center">

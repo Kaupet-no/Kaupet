@@ -98,10 +98,7 @@ export function IntentTitleLanding({
         submit();
       }}
     >
-      <header className="space-y-2 text-left">
-        <p className="text-xs font-semibold tracking-[0.1em] text-brand-text uppercase">
-          Ny annonse
-        </p>
+      <header className="text-left">
         <h2 className="font-display text-4xl leading-[1.04] tracking-tight sm:text-5xl">
           {INTENT_HEADINGS[intent]}
         </h2>
@@ -164,14 +161,9 @@ export function IntentTitleLanding({
 
       <div className="grid gap-6 sm:grid-cols-[1.35fr_0.85fr] sm:items-end">
         <div className="w-full space-y-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <Label htmlFor="listing-title" className="text-sm font-medium">
-              Tittel
-            </Label>
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Du kan endre dette senere
-            </span>
-          </div>
+          <Label htmlFor="listing-title" className="text-sm font-medium">
+            Tittel
+          </Label>
           <Input
             ref={titleInputRef}
             id="listing-title"
@@ -188,6 +180,9 @@ export function IntentTitleLanding({
           />
           <p id="listing-title-help" className="text-sm text-muted-foreground">
             {INTENT_EXAMPLES[intent]}
+            {/* Skjult på mobil for å spare skjermplass — eksempelteksten er det
+                viktigste der. */}
+            <span className="hidden sm:inline"> · Du kan endre dette senere</span>
           </p>
           {error && (
             <p id="listing-title-error" className="text-sm text-destructive">

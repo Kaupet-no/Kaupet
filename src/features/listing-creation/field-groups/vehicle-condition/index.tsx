@@ -43,7 +43,12 @@ function VehicleConditionDetails({
           aria-required={!noKnownIssues}
           aria-invalid={!!errors.known_issues || !!knownIssuesExtraError}
           aria-describedby={
-            errors.known_issues || knownIssuesExtraError ? "known-issues-error" : undefined
+            [
+              errors.known_issues || knownIssuesExtraError ? "known-issues-error" : null,
+              !noKnownIssues ? "known-issues-hint" : null,
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
           }
           {...register("known_issues")}
         />
@@ -57,6 +62,11 @@ function VehicleConditionDetails({
             {knownIssuesExtraError}
           </p>
         )}
+        {!noKnownIssues && (
+          <p id="known-issues-hint" className="text-xs text-muted-foreground">
+            Obligatorisk med mindre du krysser av at kjøretøyet ikke har kjente feil eller mangler.
+          </p>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <Checkbox
             checked={!!noKnownIssues}
@@ -68,11 +78,6 @@ function VehicleConditionDetails({
           />
           Ingen kjente feil eller mangler
         </label>
-        {!noKnownIssues && (
-          <p className="text-xs text-muted-foreground">
-            Obligatorisk med mindre du krysser av at kjøretøyet ikke har kjente feil eller mangler.
-          </p>
-        )}
       </section>
 
       <section className="space-y-2">

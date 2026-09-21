@@ -1,4 +1,11 @@
-import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  type ErrorComponentProps,
+  Link,
+  notFound,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { z } from "zod";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { supabase } from "@/integrations/supabase/client";
@@ -125,7 +132,7 @@ function SubcategoryPage() {
   );
 }
 
-function SubcategoryErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+function SubcategoryErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   console.error(error);
   return (

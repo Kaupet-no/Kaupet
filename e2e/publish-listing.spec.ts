@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 import {
+  chooseCategory,
   clickNextAndWaitFor,
   fillDescriptionAndAdvance,
   fixMissingInformation,
@@ -45,22 +46,7 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   await goToNewListing(page);
 
   // Category must be chosen first — it's always the wizard's first step.
-  // Search directly for the test category above rather than drilling
-  // blind. Search matches across every level, so no drill-down is needed.
-  // Tiles carry a stable data-category-name attribute (see
-  // category-picker.tsx) instead of relying on the tile's accessible text,
-  // which is prefixed with a breadcrumb in search results.
-  const categorySearch = page.getByTestId("category-search-input");
-  await categorySearch.waitFor({ timeout: 10_000 });
-  await categorySearch.fill(TEST_CATEGORY_NAME);
-  const categoryTile = page.locator(`[data-category-name="${TEST_CATEGORY_NAME}"]`);
-  await categoryTile.click();
-  // No fixed delay: picking a leaf category unmounts the whole
-  // category-select step (after its own internal SELECTION_CONFIRM_MS
-  // checkmark delay), so waiting for the clicked tile to detach from the
-  // DOM is a direct signal that the wizard has moved on — no guessing at
-  // how long that takes.
-  await categoryTile.waitFor({ state: "detached" });
+  await chooseCategory(page, TEST_CATEGORY_NAME);
 
   // The title is part of the "Vis frem" task; condition, price, delivery and
   // location are grouped into the later "Gjør handelen enkel" task.
@@ -103,7 +89,14 @@ test("viser manglende opplysninger med snarvei til feltet", async ({ page }, tes
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
   await login(page, credentials.email, credentials.password);
-  await goToNewListing(page, "E2E statusannonse");
+  await goToNewListing(page);
+  // Publiseringsstatus rendres bak `categoryId &&` (ui-gjennomgangen, W2):
+  // antallet manglende opplysninger avhenger av kategorien, så panelet finnes
+  // ikke før en kategori er valgt. Tittelen fylles derfor på photos-steget
+  // i stedet for via ?title=, slik at den ikke teller som en mangel her.
+  await chooseCategory(page, TEST_CATEGORY_NAME);
+  await wizardStep(page, "photos").waitFor();
+  await page.getByTestId("listing-title-input").fill("E2E statusannonse");
   await publishingStatusButton(page).waitFor();
 
   await expect(publishingStatusButton(page)).toContainText(/opplysninger? mangler/);

@@ -144,13 +144,33 @@ describe("VehicleRegistration", () => {
     const details = [...document.querySelectorAll("details")];
     expect(details).toHaveLength(4);
     expect(details.every((section) => section.querySelector("summary"))).toBe(true);
-    expect(details.map((section) => section.open)).toEqual([true, false, false, false]);
+    // DOM-rekkefølge: registreringsnummer-blokken (Drivlinje/Praktiske/Flere)
+    // står først, deretter underkategori, så de manuelle feltene med Grunnfakta.
+    expect(details.map((section) => section.open)).toEqual([false, false, false, true]);
     const fields = screen.getAllByTestId("attribute-fields");
     expect(fields).toHaveLength(4);
     expect(fields.every((field) => field.dataset.required === "true")).toBe(true);
     expect(screen.getByText("Merke: tomt")).toBeTruthy();
     expect(screen.getByText("Modell: tomt")).toBeTruthy();
     expect(screen.queryByLabelText("Registreringsnummer")).toBeNull();
+  });
+
+  it("åpner seksjoner med tomme påkrevde felt før brukeren har forsøkt å gå videre", () => {
+    // attributesTouched er usann: et påkrevd felt som er tomt skal likevel
+    // ikke ligge bak en lukket seksjon.
+    categoryFilters.current = [requiredTextFilter("seats")];
+
+    render(
+      <VehicleRegistration {...props({ vehicleRegistered: false, attributesTouched: false })} />,
+    );
+
+    const openHeadings = [...document.querySelectorAll("details")]
+      .filter((section) => section.open)
+      .map((section) => section.querySelector("summary")?.textContent ?? "");
+
+    expect(openHeadings.some((heading) => heading.includes("Praktiske opplysninger"))).toBe(true);
+    // Feilmarkeringen venter fortsatt på et forsøk.
+    expect(screen.queryByText("Mangler påkrevde opplysninger")).toBeNull();
   });
 
   it("gjør sylindre, slagvolum og motorkode valgfrie for manuelle kjøretøy", () => {

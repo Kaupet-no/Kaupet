@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
-import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  type ErrorComponentProps,
+  Link,
+  useBlocker,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
@@ -20,11 +27,9 @@ import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
 import { isWtbRangeValue, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
 import {
   categoryBreadcrumb,
-  effectiveFiltersForCategory,
   vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { wtbCriteriaSummary } from "@/features/wtb/wtb-criteria-presentation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,7 +38,6 @@ import { formatErrorMessage } from "@/lib/errors";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
 import { ComposerStepIndicator } from "@/features/listing-creation/step-indicator";
-import { ComposerReview } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import {
   composerForwardStep,
@@ -87,7 +91,7 @@ export const Route = createFileRoute("/ny-ok-annonse")({
   errorComponent: NewWtbError,
 });
 
-function NewWtbError({ error, reset }: { error: Error; reset: () => void }) {
+function NewWtbError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
@@ -325,12 +329,6 @@ function NewWtbPage() {
   }, [computedTitle, vehicleGroup, titleManualOverride]);
 
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
-  const criteriaFilters = effectiveFiltersForCategory(
-    categoryId ?? null,
-    allFilters ?? [],
-    categoriesById,
-  );
-  const parsedMaxPrice = maxPriceNok === "" ? null : Number(maxPriceNok);
 
   useEffect(() => {
     if (categoryId || title.trim().length < 5) return;
@@ -667,6 +665,11 @@ function NewWtbPage() {
             current={stepIndex + 1}
             total={steps.length}
             label={STEP_META[step].title}
+            stepLabels={steps.map((s) => STEP_META[s].title)}
+            onSelectStep={(target) => {
+              setStepIndex(target - 1);
+              window.scrollTo({ top: 0 });
+            }}
           />
         }
         status={
@@ -1006,54 +1009,6 @@ function NewWtbPage() {
 
           {step === "review" && (
             <div className="space-y-6">
-              <ComposerReview
-                items={[
-                  {
-                    key: "category",
-                    label: "Kategori",
-                    value: categoryLabel || "Ikke valgt",
-                    onEdit: () => {
-                      returnToReviewRef.current = true;
-                      setStepIndex(0);
-                    },
-                  },
-                  {
-                    key: "criteria",
-                    label: "Kriterier",
-                    value: wtbCriteriaSummary(criteriaFilters, attributes),
-                    onEdit: () => {
-                      returnToReviewRef.current = true;
-                      setStepIndex(steps.indexOf("attributes"));
-                    },
-                  },
-                  {
-                    key: "title",
-                    label: "Hva du leter etter",
-                    value: title,
-                    onEdit: () => {
-                      returnToReviewRef.current = true;
-                      setStepIndex(steps.indexOf(native ? "title" : "category"));
-                    },
-                  },
-                  {
-                    key: "details",
-                    label: "Detaljer",
-                    value:
-                      [
-                        description || null,
-                        parsedMaxPrice !== null && Number.isFinite(parsedMaxPrice)
-                          ? `Maks ${parsedMaxPrice.toLocaleString("nb-NO")} kr`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "Ingen ekstra detaljer",
-                    onEdit: () => {
-                      returnToReviewRef.current = true;
-                      setStepIndex(steps.indexOf("details"));
-                    },
-                  },
-                ]}
-              />
               <label
                 htmlFor="notify-on-match"
                 aria-label="Varsle meg om matchende annonser"

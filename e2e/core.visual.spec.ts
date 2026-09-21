@@ -120,9 +120,6 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .filter({ hasText: /^(?:Publisert|Sist redigert)$/ })
     .locator("xpath=..")
     .locator("dd");
-  const profileDate = page
-    .locator('[aria-labelledby="listing-evidence-heading"] time')
-    .filter({ hasText: /^Registrert / });
   const memberSinceDate = page.locator("p").filter({ hasText: /^Medlem siden / });
   // Leveringsraden kommer fra CategoryBehavior, som avhenger av kategori- og
   // filterspørringene ($kaupetCode.tsx). Kontaktknappen og datoene over er
@@ -135,8 +132,6 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .locator("dd");
   await expect(publishedDate).toHaveCount(1);
   await expect(publishedDate).toBeVisible();
-  await expect(profileDate).toHaveCount(1);
-  await expect(profileDate).toBeVisible();
   await expect(memberSinceDate).toHaveCount(1);
   await expect(memberSinceDate).toBeVisible();
   await expect(deliveryFact).toHaveCount(1);
@@ -144,7 +139,7 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
   await expect(page).toHaveScreenshot("listing-detail.png", {
     animations: "disabled",
     fullPage: true,
-    mask: [publishedDate, profileDate, memberSinceDate],
+    mask: [publishedDate, memberSinceDate],
   });
 });
 

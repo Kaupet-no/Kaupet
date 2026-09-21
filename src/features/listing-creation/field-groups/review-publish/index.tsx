@@ -1,21 +1,11 @@
-import { useMemo, type RefObject } from "react";
+import { type RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
-import { formatAttributeValue } from "@/components/listing-detail/format-attribute-value";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  ComposerReview,
-  ComposerReviewStatuses,
-} from "@/features/listing-creation/composer-review";
-import { useAllCategoryFilters } from "@/hooks/use-category-filters";
-import {
-  effectiveFiltersForCategory,
-  filterDependencyMet,
-  type CategoryNode,
-} from "@/lib/category-filters";
+import { ComposerReviewStatuses } from "@/features/listing-creation/composer-review";
 
 import type { WizardSharedProps, ComposerReviewStatus } from "../types";
 import { Vehicle360Group } from "../vehicle-360";
@@ -69,7 +59,7 @@ export function ReviewPreview({
       listing={listing}
       preview
       signedImageUrl={images[0]?.previewUrl ?? null}
-      missingPriceLabel="Ingen pris"
+      missingPriceLabel="Pris ikke satt"
     />
   );
 
@@ -85,7 +75,9 @@ export function ReviewPreview({
         <button
           type="button"
           onClick={onPreview}
-          aria-label="Trykk for å forhåndsvise annonsen"
+          /* Navnet hentes fra den synlige teksten under kortet i stedet for en
+             egen aria-label — ellers leses den samme setningen to ganger. */
+          aria-labelledby={`${headingId}-action`}
           className="block w-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:max-w-[220px]"
         >
           {card}
@@ -94,7 +86,9 @@ export function ReviewPreview({
         <div className="sm:max-w-[220px]">{card}</div>
       )}
       {onPreview && (
-        <p className="text-xs text-muted-foreground">Trykk for å forhåndsvise annonsen</p>
+        <p id={`${headingId}-action`} className="text-xs text-muted-foreground">
+          Trykk for å forhåndsvise annonsen
+        </p>
       )}
     </section>
   );
@@ -139,31 +133,6 @@ type PublishActionsProps = {
  * renders it explicitly on the last page instead of via this wrapper.
  */
 export function ReviewPublishGroup(props: WizardSharedProps) {
-  const { data: categoryFilters = [] } = useAllCategoryFilters();
-  const categoriesById = useMemo(
-    () => new Map(props.categories.map((category) => [category.id, category as CategoryNode])),
-    [props.categories],
-  );
-  const attributeSummary = effectiveFiltersForCategory(
-    props.categoryId,
-    categoryFilters,
-    categoriesById,
-  )
-    .filter((filter) => filterDependencyMet(filter, props.attributes))
-    .map((filter) => {
-      const value = formatAttributeValue(filter, props.attributes[filter.key]);
-      return value ? `${filter.label_nb}: ${value}` : null;
-    })
-    .filter((value): value is string => value !== null)
-    .join(" · ");
-  const deliverySummary = props.behavior.requiresDeliveryMethod
-    ? props.canShip === "ship"
-      ? "Levering: Kan sendes"
-      : props.canShip === "pickup"
-        ? "Levering: Må hentes"
-        : "Levering: Ikke oppgitt"
-    : null;
-  const placeSummary = [props.postalCode, props.city].filter(Boolean).join(" ");
   const improvementGroups =
     props.improvementGroups ??
     props.improvementGroupKeys.map((key) => ({
@@ -264,56 +233,22 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
           )}
         </section>
       )}
-      <ComposerReview
-        items={[
-          {
-            key: "category",
-            label: "Kategori",
-            value: props.categoryLabel || "Ikke valgt",
-            onEdit: () => props.onEditReviewSection("category"),
-          },
-          {
-            key: "content",
-            label: "Tittel og bilder",
-            value: `${props.title || "Ingen tittel"} · ${props.images.length} ${props.images.length === 1 ? "bilde" : "bilder"}`,
-            onEdit: () => props.onEditReviewSection("content"),
-          },
-          {
-            key: "details",
-            label: "Pris og detaljer",
-            value:
-              [
-                props.previewPrice && `Pris: ${props.previewPrice}`,
-                props.subtitle && `Undertittel: ${props.subtitle}`,
-                props.description && `Beskrivelse: ${props.description}`,
-                attributeSummary,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "Ikke oppgitt",
-            onEdit: () => props.onEditReviewSection("details"),
-          },
-          {
-            key: "location",
-            label: "Sted og levering",
-            value: [`Sted: ${placeSummary || "Ikke oppgitt"}`, deliverySummary]
-              .filter(Boolean)
-              .join(" · "),
-            onEdit: () => props.onEditReviewSection("location"),
-          },
-        ]}
-      />
-      <ReviewPreview
-        images={props.images}
-        title={props.title}
-        subtitle={props.subtitle}
-        priceNok={props.priceNok}
-        isFree={props.isFree}
-        city={props.city}
-        postalCode={props.postalCode}
-        categorySlug={props.categorySlug}
-        attributes={props.attributes}
-        onPreview={props.onPreview}
-      />
+      {/* Asiden viser den samme forhåndsvisningen fra lg og opp, men finnes
+          verken i native eller under lg — der er denne den eneste. */}
+      <div className={props.native ? undefined : "lg:hidden"}>
+        <ReviewPreview
+          images={props.images}
+          title={props.title}
+          subtitle={props.subtitle}
+          priceNok={props.priceNok}
+          isFree={props.isFree}
+          city={props.city}
+          postalCode={props.postalCode}
+          categorySlug={props.categorySlug}
+          attributes={props.attributes}
+          onPreview={props.onPreview}
+        />
+      </div>
       {props.attributes.vehicle_lookup && (
         <p className="text-xs text-muted-foreground">
           Du er ansvarlig for at opplysningene i annonsen stemmer. Kontroller at opplysningene

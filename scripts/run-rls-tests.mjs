@@ -54,6 +54,7 @@ const result = spawnSync(
     "src/lib/rls.integration.test.ts",
     "src/lib/category-suggestion.integration.test.ts",
     "src/lib/listing-search-exclusion.integration.test.ts",
+    "src/lib/listing-search-semantics.integration.test.ts",
     "src/features/listing-bulk-import/listing-bulk-import.integration.test.ts",
   ],
   { stdio: "inherit", env: { ...process.env, ...localEnv } },

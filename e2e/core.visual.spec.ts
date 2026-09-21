@@ -2,6 +2,11 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const FILTER_QUERY = "e2efilterfixture";
+/** 1×1 gjennomsiktig PNG, brukt som stand-in for kartfliser. */
+const TRANSPARENT_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
 
 async function waitForHydration(page: Page) {
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
@@ -33,9 +38,13 @@ async function installDeterministicListingRoutes(page: Page) {
 
   // Kartflisene hentes fra Kartverket over nett, og hvor mange som rekker å
   // males før skjermbildet tas varierer fra kjøring til kjøring. Alle
-  // referansebildene er tatt uten fliser, så vi blokkerer dem i stedet for å
-  // la nettverket avgjøre om testen består.
-  await page.route("**/cache.kartverket.no/**", (route) => route.abort());
+  // referansebildene er tatt uten fliser, så vi svarer med en gjennomsiktig
+  // flis i stedet for å la nettverket avgjøre om testen består. En abort
+  // hadde gitt samme bilde, men Chromium logger da en console.error per flis,
+  // og fixtures.ts feiler testen på nettleserfeil.
+  await page.route("**/cache.kartverket.no/**", (route) =>
+    route.fulfill({ contentType: "image/png", body: TRANSPARENT_PNG }),
+  );
 
   await page.route("**/rest/v1/rpc/popular_listings_last_week", async (route) => {
     const payload = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;

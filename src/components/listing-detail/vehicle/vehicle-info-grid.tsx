@@ -174,7 +174,7 @@ export function VehicleInfoGrid({
   if (items.length === 0) return null;
 
   return (
-    <div className="@container mt-6">
+    <div className="@container">
       <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-4 @md:grid-cols-4">
         {items.map((item) => (
           <div key={item.key} className="flex min-w-0 flex-col items-start gap-1 text-sm">

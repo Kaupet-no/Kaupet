@@ -379,10 +379,7 @@ function WebLanding({
       <section aria-labelledby="category-heading" className="mx-auto max-w-6xl px-4 py-10 md:py-14">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-brand-text text-xs font-semibold tracking-wide uppercase">
-              Finn raskere
-            </p>
-            <h2 id="category-heading" className="mt-1 font-display text-3xl tracking-tight">
+            <h2 id="category-heading" className="font-display text-3xl tracking-tight">
               Utforsk kategorier
             </h2>
           </div>

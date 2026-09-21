@@ -455,36 +455,41 @@ function AuthPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Passord</Label>
+                {/* Grid i stedet for label-rad + felt: "Glemt passord?" skal ligge
+                    etter passordfeltet i DOM slik at Tab fra e-post går rett til
+                    feltet, men fortsatt vises oppe til høyre for labelen. */}
+                <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5">
+                  <Label htmlFor="password" className="col-start-1 row-start-1">
+                    Passord
+                  </Label>
+                  <div className="relative col-span-2 row-start-2">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      className="pr-10"
+                      aria-invalid={!!errors.password}
+                      aria-describedby={errors.password ? "password-error" : "password-hint"}
+                      {...register("password")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="native-touch-target absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Skjul passord" : "Vis passord"}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
                   {!isSignUp && (
                     <button
                       type="button"
-                      className="text-xs font-medium text-primary hover:underline"
+                      className="col-start-2 row-start-1 text-xs font-medium text-primary hover:underline"
                       onClick={() => goToMode("reset")}
                     >
                       Glemt passord?
                     </button>
                   )}
-                </div>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
-                    className="pr-10"
-                    aria-invalid={!!errors.password}
-                    aria-describedby={errors.password ? "password-error" : "password-hint"}
-                    {...register("password")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="native-touch-target absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Skjul passord" : "Vis passord"}
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
                 </div>
                 {errors.password ? (
                   <p id="password-error" className="text-sm text-destructive">

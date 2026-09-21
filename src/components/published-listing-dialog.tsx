@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, MapPin, Share2, X } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
@@ -7,6 +7,7 @@ import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/di
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { useListingPreview } from "@/hooks/use-listing-preview";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 type Props = {
   listingId: string;
@@ -28,8 +29,49 @@ export function PublishedListingDialog({
   canPromote = false,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false);
+  // Callback-ref framfor useRef: dialoginnholdet monteres i en portal etter
+  // at foreldrekomponenten har kjørt effektene sine, så en vanlig ref er
+  // fortsatt null når effekten under først kjører.
+  const [confettiCanvas, setConfettiCanvas] = useState<HTMLCanvasElement | null>(null);
+  const reducedMotion = useReducedMotion();
 
   const { listing, imgUrl } = useListingPreview(listingId, open);
+
+  useEffect(() => {
+    if (!open || reducedMotion || !confettiCanvas) return;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    void (async () => {
+      try {
+        const confetti = (await import("canvas-confetti")).default;
+        if (cancelled) return;
+        const fire = confetti.create(confettiCanvas, { resize: true, useWorker: false });
+        // Regn nedover fra toppen av dialogen: flere små skudd på tilfeldig
+        // x-posisjon i stedet for feedback-panelets enkeltskudd nedenfra.
+        for (let i = 0; i < 5; i++) {
+          timers.push(
+            setTimeout(() => {
+              if (cancelled) return;
+              void fire({
+                particleCount: 20,
+                spread: 100,
+                startVelocity: 12,
+                gravity: 0.9,
+                ticks: 200,
+                origin: { x: Math.random(), y: 0 },
+              });
+            }, i * 200),
+          );
+        }
+      } catch {
+        // Konfetti er dekorasjon — skal aldri blokkere dialogen.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, [open, reducedMotion, confettiCanvas]);
 
   return (
     <ResponsiveOverlay
@@ -39,7 +81,12 @@ export function PublishedListingDialog({
         if (!o) onClose();
       }}
     >
-      <ResponsiveOverlayContent className="sm:max-w-lg">
+      <ResponsiveOverlayContent className="relative sm:max-w-lg">
+        <canvas
+          ref={setConfettiCanvas}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-10 size-full"
+        />
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">
             Annonsen din er publisert, bra jobba! 🎉

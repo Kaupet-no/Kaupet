@@ -56,7 +56,6 @@ import { currentReturnTo } from "@/lib/auth-return";
 import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
-import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 import { toListingCardData } from "@/lib/listing-card-data";
 
 // This route serves two very different pages behind one dynamic segment: a
@@ -831,7 +830,6 @@ function ListingDetailPage() {
           shareOpen={shareOpen}
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
-          hasRegistryData={parseVehicleLookup(attributes.vehicle_lookup) != null}
           hideBusinessIdentity={!!organizationBrand}
         />
       }

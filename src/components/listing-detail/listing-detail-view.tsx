@@ -1,8 +1,11 @@
 import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
 import { ClientOnly, Link, useLocation } from "@tanstack/react-router";
-import { ChevronLeft, Loader2, MapPin, Maximize2 } from "lucide-react";
+import { ChevronLeft, Expand, Loader2, MapPin, Maximize2, Shrink } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useWideGallery } from "@/hooks/use-gallery-width";
 import { NativePageHeader } from "@/components/native-page-header";
 import { readLastSearchContext } from "@/lib/last-search-context";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
@@ -335,9 +338,13 @@ export function ListingDetailView({
     ? "Fritatt for omregistreringsavgift"
     : avgiftInkludert
       ? "Omregistreringsavgift inkludert i kjøpesummen (dekkes av selger)"
-      : buyerPaysAvgift
-        ? `Inkluderer ${omregistreringsavgiftKr!.toLocaleString("nb-NO")} kr i omregistreringsavgift som betales av kjøper ved eierskifte. Selgers pris: ${(priceNok ?? 0).toLocaleString("nb-NO")} kr.`
-        : null;
+      : null;
+  /** Når kjøper betaler avgiften er totalprisen satt sammen av to beløp, og
+   * begge fortjener sin egen linje i priskortet — en sammensatt setning
+   * tvinger leseren til å regne selv. */
+  const avgiftBreakdown = buyerPaysAvgift
+    ? { sellerPriceKr: priceNok ?? 0, avgiftKr: omregistreringsavgiftKr! }
+    : null;
 
   const totalPriceKr =
     isVehicleListing && priceNok != null
@@ -371,7 +378,7 @@ export function ListingDetailView({
       fieldKey="price"
       value={{ isFree, priceNok }}
       render={(v) => (
-        <p className="font-display text-lg font-semibold leading-tight text-primary">
+        <p className="font-display text-3xl font-semibold leading-tight text-primary">
           {v.isFree
             ? "Gis bort"
             : v.priceNok != null
@@ -480,6 +487,7 @@ export function ListingDetailView({
       driveType={driveType}
       axleConfig={axleConfig}
       avgiftNote={avgiftNote}
+      avgiftBreakdown={avgiftBreakdown}
       totalPriceKr={totalPriceKr}
       isNative={isNative}
     >
@@ -558,6 +566,7 @@ function ListingDetailViewBody({
   driveType,
   axleConfig,
   avgiftNote,
+  avgiftBreakdown,
   totalPriceKr,
   isNative,
   children,
@@ -615,6 +624,7 @@ function ListingDetailViewBody({
   driveType: string | null;
   axleConfig: string | null;
   avgiftNote: string | null;
+  avgiftBreakdown: { sellerPriceKr: number; avgiftKr: number } | null;
   totalPriceKr: number | null;
   isNative: boolean;
   children?: ReactNode;
@@ -634,6 +644,27 @@ function ListingDetailViewBody({
   // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
   // brukes) dersom slug mangler eller ikke finnes i tabellen.
   const vehicleLeafSlug = isVehicleListing ? (category?.slug as VehicleLeafSlug) : null;
+  const hasGalleryContent = has360 || sortedImages.length > 0;
+  const [wideGallery, setWideGallery] = useWideGallery();
+  // Bredde-valget gjelder bare der siden faktisk har to kolonner. Under md
+  // ville "én kolonne" bare flyttet prisen opp foran bildet uten å gjøre
+  // galleriet smalere, så der beholdes full bredde uansett hva som er lagret.
+  const isTwoColumn = useMediaQuery("(min-width: 768px)");
+  const galleryInColumn = !wideGallery && isTwoColumn;
+  const gallery = hasGalleryContent ? (
+    <ImageGallery
+      images={sortedImages}
+      imgUrls={imgUrls}
+      activeImage={activeImage}
+      onSelect={setActiveImage}
+      title={title}
+      onImageClick={setLightboxIndex}
+      thumbnailsOverlay={!galleryInColumn}
+      vehicle360={
+        has360 ? { frames: vehicle360Frames!, imgUrls: vehicle360ImgUrls ?? {} } : undefined
+      }
+    />
+  ) : null;
 
   return (
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
@@ -744,14 +775,6 @@ function ListingDetailViewBody({
                   }}
                 />
               )}
-              {isVehicleListing && !nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
-                <RegistrationPlate
-                  value={vehicleLookup.registrationNumber}
-                  className="h-7 shrink-0"
-                  editable={!!editCtx?.editMode}
-                  onEdit={() => editCtx?.openVehicleLookupModal()}
-                />
-              )}
             </div>
             {nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
               <div className="mt-2">
@@ -794,47 +817,96 @@ function ListingDetailViewBody({
               }}
             />
           </div>
-          {actionsMenuSlot && <div className="shrink-0 pt-0.5">{actionsMenuSlot}</div>}
+          <div className="flex shrink-0 items-center gap-2 pt-0.5">
+            {/* Skiltet hører sammen med tittelen, men står på samme linje som
+                handlingene til høyre i stedet for på tittellinjen — ellers
+                ligger de to på hver sin høyde i headeren. */}
+            {isVehicleListing && !nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
+              <RegistrationPlate
+                value={vehicleLookup.registrationNumber}
+                className="h-7 shrink-0"
+                editable={!!editCtx?.editMode}
+                onEdit={() => editCtx?.openVehicleLookupModal()}
+              />
+            )}
+            {/* Kun fra md og opp — under md er siden uansett én kolonne, så
+                bredde-valget ville ikke gjort noe. Står utenfor
+                actionsMenuSlot-betingelsen fordi menyen kun finnes for
+                innloggede, mens bredden gjelder alle. */}
+            {hasGalleryContent && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="hidden md:inline-flex"
+                aria-pressed={wideGallery}
+                aria-label={
+                  wideGallery ? "Vis galleriet i én kolonne" : "Vis galleriet i full bredde"
+                }
+                title={wideGallery ? "Vis galleriet i én kolonne" : "Vis galleriet i full bredde"}
+                onClick={() => setWideGallery(!wideGallery)}
+              >
+                {wideGallery ? (
+                  <Shrink className="size-4" aria-hidden />
+                ) : (
+                  <Expand className="size-4" aria-hidden />
+                )}
+              </Button>
+            )}
+            {actionsMenuSlot}
+          </div>
         </div>
       </header>
 
-      <div className="mt-6 grid gap-8 md:grid-cols-[1.4fr_1fr]">
-        <div className="min-w-0">
-          <div className="mb-8">
-            <ImageGallery
-              images={sortedImages}
-              imgUrls={imgUrls}
-              activeImage={activeImage}
-              onSelect={setActiveImage}
-              title={title}
-              onImageClick={has360 || sortedImages.length > 0 ? setLightboxIndex : undefined}
-              vehicle360={
-                has360 ? { frames: vehicle360Frames!, imgUrls: vehicle360ImgUrls ?? {} } : undefined
-              }
-              overlaySlot={
-                (has360 || sortedImages.length > 0) && (
-                  <div className="absolute -bottom-8 left-4 max-w-[calc(100%-2rem)] rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
-                    {statusBadge && <StatusBadge label={statusBadge} />}
-                    {priceBlock}
-                    {avgiftNote && (
-                      <p className="mt-1 text-xs leading-snug text-muted-foreground">
-                        {avgiftNote}
-                      </p>
-                    )}
-                  </div>
-                )
-              }
-            />
+      {/* Bildet er det viktigste i en annonse, så galleriet ligger over gridet
+          og går i full bredde. Velger brukeren én kolonne, flyttes det inn i
+          innholdskolonnen i stedet, slik at pris og sidepanel kommer opp ved
+          siden av det. Uten bilder rendres det ikke i det hele tatt. */}
+      {hasGalleryContent && !galleryInColumn && <div className="mb-8">{gallery}</div>}
+
+      {/* grid-rows-[auto_1fr]: prisraden tar bare høyden den trenger, ellers
+          strekkes den og sidepanelet under får et tomrom over seg. */}
+      <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem] md:grid-rows-[auto_1fr]">
+        {/* Egen grid-posisjon øverst til høyre i stedet for et kort som flyter
+            over bildet — og samtidig den ene varianten som dekker både med og
+            uten bilder. På mobil kollapser gridet til DOM-rekkefølge, så
+            prisen kommer rett under galleriet. */}
+        <div className="md:col-start-2 md:row-start-1">
+          <div className="rounded-xl border border-border bg-card p-4">
+            {statusBadge && <StatusBadge label={statusBadge} />}
+            {avgiftBreakdown && (
+              /* Samme etikettstil som tiles i faktarutenettet, ikke en
+                 versal "eyebrow" — se F1 i docs/plans/ui-gjennomgang.md. */
+              <p className="text-xs text-muted-foreground">Totalpris</p>
+            )}
+            {priceBlock}
+            {avgiftBreakdown && (
+              <dl className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Selgers pris</dt>
+                  <dd className="font-medium">
+                    {avgiftBreakdown.sellerPriceKr.toLocaleString("nb-NO")} kr
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Omregistreringsavgift</dt>
+                  <dd className="font-medium">
+                    {avgiftBreakdown.avgiftKr.toLocaleString("nb-NO")} kr
+                  </dd>
+                </div>
+                <p className="pt-1 text-xs leading-snug text-muted-foreground">
+                  Avgiften betales av kjøper ved eierskifte.
+                </p>
+              </dl>
+            )}
+            {avgiftNote && (
+              <p className="mt-2 text-xs leading-snug text-muted-foreground">{avgiftNote}</p>
+            )}
           </div>
+        </div>
 
-          {!has360 && sortedImages.length === 0 && (
-            <div>
-              {statusBadge && <StatusBadge label={statusBadge} />}
-              {priceBlock}
-              {avgiftNote && <p className="mt-1 text-xs text-muted-foreground">{avgiftNote}</p>}
-            </div>
-          )}
-
+        <div className="min-w-0 md:col-start-1 md:row-start-1 md:row-span-2">
+          {hasGalleryContent && galleryInColumn && <div className="mb-8">{gallery}</div>}
           {isVehicleListing && (
             <EditableRegion
               render={() => (
@@ -1021,7 +1093,7 @@ function ListingDetailViewBody({
             ))}
         </div>
 
-        <aside className="@container space-y-5">
+        <aside className="@container space-y-5 md:col-start-2 md:row-start-2">
           {organizationBrand && <ProffListingHeader organization={organizationBrand} />}
           {(() => {
             const { label, dateStr } = getListingDateMeta(

@@ -1865,14 +1865,19 @@ function NewListingPage() {
               </div>
             ) : undefined
           }
+          /* Ingen fremdriftsindikator før kategori er valgt — et løsrevet
+             "Kategori" under tittelen leses som en tom verdi, ikke som et steg. */
           progress={
             categoryId ? (
-              <StepIndicator step={step} pages={pages} />
-            ) : (
-              <nav aria-label="Annonseopprettelse">
-                <span className="text-sm font-medium">Kategori</span>
-              </nav>
-            )
+              <StepIndicator
+                step={step}
+                pages={pages}
+                onSelectStep={(target) => {
+                  setStep(target);
+                  window.scrollTo({ top: 0 });
+                }}
+              />
+            ) : undefined
           }
           status={
             draftSaveConflict ? (
@@ -1915,41 +1920,46 @@ function NewListingPage() {
           aside={
             !native ? (
               <>
-                <section aria-labelledby="desktop-publishing-status-title" className="space-y-2">
-                  <h2 id="desktop-publishing-status-title" className="text-lg font-semibold">
-                    Publiseringsstatus
-                  </h2>
-                  {missingPublishingCount > 0 ? (
-                    <button
-                      type="button"
-                      data-testid="publishing-status-button"
-                      aria-haspopup="dialog"
-                      onClick={() => setPublishingStatusOpen(true)}
-                      className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left transition-[background-color,border-color] duration-150 hover:border-primary/70 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span
-                          role="status"
-                          aria-live="polite"
-                          className="block text-sm font-medium text-foreground"
-                        >
-                          {publishingStatus}
+                {/* Antallet manglende opplysninger telles fra feltgruppene, og
+                    feltgruppene bestemmes av kategorien — før den er valgt ville
+                    tallet vært en gjetning som hopper så snart kategorien settes. */}
+                {categoryId && (
+                  <section aria-labelledby="desktop-publishing-status-title" className="space-y-2">
+                    <h2 id="desktop-publishing-status-title" className="text-lg font-semibold">
+                      Publiseringsstatus
+                    </h2>
+                    {missingPublishingCount > 0 ? (
+                      <button
+                        type="button"
+                        data-testid="publishing-status-button"
+                        aria-haspopup="dialog"
+                        onClick={() => setPublishingStatusOpen(true)}
+                        className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left transition-[background-color,border-color] duration-150 hover:border-primary/70 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span
+                            role="status"
+                            aria-live="polite"
+                            className="block text-sm font-medium text-foreground"
+                          >
+                            {publishingStatus}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            Trykk for å se hva som mangler
+                          </span>
                         </span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          Trykk for å se hva som mangler
-                        </span>
-                      </span>
-                      <ChevronRight
-                        className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
-                        aria-hidden
-                      />
-                    </button>
-                  ) : (
-                    <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                      {publishingStatus}
-                    </p>
-                  )}
-                </section>
+                        <ChevronRight
+                          className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
+                          aria-hidden
+                        />
+                      </button>
+                    ) : (
+                      <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                        {publishingStatus}
+                      </p>
+                    )}
+                  </section>
+                )}
                 <ReviewPreview
                   headingId="desktop-listing-preview-title"
                   images={images}

@@ -2,20 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ComposerReview, ComposerReviewStatuses } from "./composer-review";
-
-describe("ComposerReview", () => {
-  it("viser forståelige verdier og lar brukeren endre riktig seksjon", () => {
-    const onEdit = vi.fn();
-    render(
-      <ComposerReview items={[{ key: "title", label: "Tittel", value: "Trek sykkel", onEdit }]} />,
-    );
-
-    expect(screen.getByText("Trek sykkel")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Endre" }));
-    expect(onEdit).toHaveBeenCalledOnce();
-  });
-});
+import { ComposerReviewStatuses } from "./composer-review";
 
 describe("ComposerReviewStatuses", () => {
   it("skiller krav fra anbefalinger og tilbyr direkte retting", () => {

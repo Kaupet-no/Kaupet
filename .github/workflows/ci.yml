@@ -7,6 +7,11 @@ on:
     branches: [main, staging]
   workflow_dispatch:
 
+# Minste standard for et offentlig repo; jobber som trenger mer
+# eskalerer selv.
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Lint, typecheck, build
@@ -141,8 +146,9 @@ jobs:
     name: Android unit tests
     needs: verify
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      flavor: ${{ steps.env.outputs.flavor }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -227,39 +233,6 @@ jobs:
           name: android-debug-apk-${{ steps.env.outputs.flavor }}
           path: android/app/build/outputs/apk/${{ steps.env.outputs.flavor }}/debug/app-${{ steps.env.outputs.flavor }}-debug.apk
           retention-days: 14
-
-      - name: Les app-versjon
-        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
-        id: app_version
-        working-directory: android/app
-        run: |
-          name=$(grep -oP 'versionName\s+"\K[^"]+' build.gradle)
-          echo "full=$name.$(printf '%03d' "$GITHUB_RUN_NUMBER")" >> "$GITHUB_OUTPUT"
-          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      - name: Fjern gamle APK-assets fra releasen
-        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view "android-preview-${{ github.ref_name }}" --json assets \
-            --jq '.assets[].name' | while read -r name; do
-            gh release delete-asset "android-preview-${{ github.ref_name }}" "$name" -y
-          done
-
-      - name: Publish APK as GitHub release preview
-        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
-        with:
-          tag_name: android-preview-${{ github.ref_name }}
-          name: >-
-            Kaupet${{ steps.env.outputs.flavor == 'staging' && ' Staging' || '' }}
-            (${{ github.ref_name }}) —
-            v${{ steps.app_version.outputs.full }}
-            (${{ steps.app_version.outputs.sha }})
-          prerelease: true
-          files: android/app/build/outputs/apk/${{ steps.env.outputs.flavor }}/debug/app-${{ steps.env.outputs.flavor }}-debug.apk
 
   deploy:
     name: Deploy to Cloudflare Workers
@@ -352,6 +325,53 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  android-release:
+    # Egen jobb utelukkende for å holde `contents: write` unna jobben som
+    # bygger PR-levert kode og kjører `bun install`. Kjører bare på push.
+    name: Android release preview
+    needs: native-android
+    if: needs.native-android.outputs.android == 'true' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: android-debug-apk-${{ needs.native-android.outputs.flavor }}
+          path: apk
+
+      - name: Les app-versjon
+        id: app_version
+        working-directory: android/app
+        run: |
+          name=$(grep -oP 'versionName\s+"\K[^"]+' build.gradle)
+          echo "full=$name.$(printf '%03d' "$GITHUB_RUN_NUMBER")" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Fjern gamle APK-assets fra releasen
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "android-preview-${{ github.ref_name }}" --json assets \
+            --jq '.assets[].name' | while read -r name; do
+            gh release delete-asset "android-preview-${{ github.ref_name }}" "$name" -y
+          done
+
+      - name: Publish APK as GitHub release preview
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          tag_name: android-preview-${{ github.ref_name }}
+          name: >-
+            Kaupet${{ needs.native-android.outputs.flavor == 'staging' && ' Staging' || '' }}
+            (${{ github.ref_name }}) —
+            v${{ steps.app_version.outputs.full }}
+            (${{ steps.app_version.outputs.sha }})
+          prerelease: true
+          files: apk/app-${{ needs.native-android.outputs.flavor }}-debug.apk
 
   e2e:
     # Ingen `if`: workflowen trigges på pull_request, push og workflow_dispatch,

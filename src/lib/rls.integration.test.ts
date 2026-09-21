@@ -3502,14 +3502,16 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
 });
 
 // Radiusfilteret i search_listings_page har et forfilter på breddegrad
-// (20260921100000) som finnes utelukkende for å la planleggeren bruke
+// (20260921120000) som finnes utelukkende for å la planleggeren bruke
 // listings_active_lat_idx i stedet for å skanne hele tabellen. Forfilteret er
 // ment å være et supersett av sirkelen, så resultatsettet skal være identisk
 // med det eksakte haversine-uttrykket alene. De øvrige søketestene over
 // plasserer annonsene i eller rett ved sentrum av radiusen, og et punkt i
 // sentrum ligger innenfor enhver boks — også en for liten en. Disse testene
 // legger derfor annonser på hver sin side av radiusgrensen, der en boks med
-// feil størrelse eller feil radius faktisk gir feil svar.
+// feil størrelse eller feil radius faktisk gir feil svar. Testene er grønne
+// både med og uten forfilteret — de vokter at det ikke kutter treff nær
+// radiusgrensen, uavhengig av hvilken migrasjon som innfører det.
 describe.skipIf(!canRun)("Search RPC: radiusgrensen etter bounding box-forfilteret", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();

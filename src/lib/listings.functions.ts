@@ -825,7 +825,7 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
     // Unauthenticated (legacy /annonse/:id → /$kaupetCode redirect), so this
     // must not use service-role to reveal a draft/disabled listing's code —
     // same visibility RLS gives everyone else. See
-    // docs/SIKKERHETSVURDERING.md L-13.
+    // the internal security review, L-13.
     const { data: row, error } = await supabaseAdmin
       .from("listings")
       .select("kaupet_code")

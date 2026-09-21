@@ -2,7 +2,7 @@ import { hashRequestIp } from "@/lib/request-ip.server";
 
 /** Throws if the calling IP has exceeded `limit` calls to `bucket` within
  * `windowSeconds`. Backed by check_endpoint_rate_limit — see
- * docs/SIKKERHETSVURDERING.md M-9. */
+ * the internal security review, M-9. */
 export async function assertNotRateLimited(
   bucket: string,
   limit: number,

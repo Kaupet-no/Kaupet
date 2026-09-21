@@ -81,7 +81,7 @@ Serversiden er landet og inaktiv; klientsiden er bevisst ikke bygget ennå.
 - **Konsekvens i mellomtiden:** det finnes ingen automatisk KI på tittel lenger.
   Kategoriforslag mens brukeren skriver er ren intern stemmestatistikk
   (`suggestCategoryForTitle`). Det er den ønskede tilstanden, ikke en
-  regresjon — se M-9 i `docs/SIKKERHETSVURDERING.md`.
+  regresjon — se M-9 i den interne sikkerhetsvurderingen.
 
 Ikke slett endepunktene som "død kode" uten å lese § 4 først: de er
 reverseringspunktet funksjonen er designet rundt.

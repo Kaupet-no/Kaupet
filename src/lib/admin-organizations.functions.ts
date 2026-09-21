@@ -13,7 +13,7 @@ export type AdminUnverifiedOrganization = {
 };
 
 /** Newly registered organizations start unverified — see
- * docs/SIKKERHETSVURDERING.md M-4. Nothing ties the registrant to the actual
+ * the internal security review, M-4. Nothing ties the registrant to the actual
  * company, so a manual check here is the gate before they can create or
  * publish any listing under the company name. */
 export const adminListUnverifiedOrganizations = createServerFn({ method: "GET" })

@@ -416,7 +416,7 @@ function ListingDetailPage() {
       // organizations has commercial columns (selected_plan, proff_access_until,
       // ...) that must not be publicly readable — organizations_public is a
       // view exposing only the branding columns this page needs. See
-      // docs/SIKKERHETSVURDERING.md M-5.
+      // the internal security review, M-5.
       const organization = data.organization_id
         ? (
             await supabase

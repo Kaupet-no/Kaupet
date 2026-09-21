@@ -2,7 +2,7 @@
 -- a payment was created in. Reconcile/capture/refund/webhook previously
 -- re-derived the environment from the *current* request instead of the
 -- transaction, which let the same reference be processed against the wrong
--- environment depending on who triggered it. See docs/SIKKERHETSVURDERING.md K-1.
+-- environment depending on who triggered it. See the internal security review, K-1.
 
 -- Nullable: gifted promotions (is_gift = true) never touch Vipps and have no
 -- meaningful mode. Anything with a vipps_reference must set it.

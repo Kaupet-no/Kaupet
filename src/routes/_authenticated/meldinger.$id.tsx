@@ -41,6 +41,10 @@ import { useBusinessMembership } from "@/features/business-account/use-business-
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({
     meta: [{ title: "Samtale — Kaupet.no" }],
   }),

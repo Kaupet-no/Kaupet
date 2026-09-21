@@ -71,6 +71,10 @@ import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-sok")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({ meta: [{ title: "Mine søk — Kaupet.no" }] }),
   component: MineSokPage,
 });

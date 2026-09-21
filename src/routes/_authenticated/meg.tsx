@@ -51,6 +51,10 @@ import {
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/meg")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({ meta: [{ title: "Meg — Kaupet.no" }] }),
   component: MegPage,
 });

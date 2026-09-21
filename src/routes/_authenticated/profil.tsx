@@ -8,6 +8,10 @@ import { AccountSection } from "@/components/profil/account-section";
 import { NativePageHeader } from "@/components/native-page-header";
 
 export const Route = createFileRoute("/_authenticated/profil")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({
     meta: [{ title: "Min profil — Kaupet.no" }],
   }),

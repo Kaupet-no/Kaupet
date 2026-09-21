@@ -18,6 +18,10 @@ import { formatErrorMessage } from "@/lib/errors";
 import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/_authenticated/favoritter")({
+  // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
+  // for /mine-annonser; denne ruten beholder klientrendring inntil den er
+  // verifisert server-side.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Mine favoritter — Kaupet.no" },

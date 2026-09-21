@@ -43,6 +43,12 @@ export function useCategories() {
       if (error) throw error;
       return data ?? [];
     },
+    // Categories are near-static: they only change when an admin edits them,
+    // and every admin mutation that touches the table now invalidates this
+    // key (invalidateSharedCategoryQueries). A long staleTime therefore only
+    // delays propagation to *other* clients' already-open sessions, which is
+    // acceptable for this data — it saves a refetch on every screen change.
+    staleTime: 30 * 60_000,
   });
 }
 

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
+import { invalidateSharedCategoryQueries } from "@/lib/reference-query-invalidation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,7 @@ export function StagingSyncCard() {
       qc.invalidateQueries({ queryKey: ["admin", "site-settings"] });
       qc.invalidateQueries({ queryKey: ["site-settings"] });
       qc.invalidateQueries({ queryKey: ["admin", "category-sync-status"] });
+      invalidateSharedCategoryQueries(qc);
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke synkronisere")),
   });

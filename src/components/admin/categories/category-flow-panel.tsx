@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
 import { formatErrorMessage } from "@/lib/errors";
+import { invalidateSharedCategoryQueries } from "@/lib/reference-query-invalidation";
 import {
   DEFAULT_FIELD_GROUPS,
   normalizeFieldGroupKeys,
@@ -154,8 +155,10 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
-  const invalidate = () =>
+  const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "category-flow", category.id] });
+    invalidateSharedCategoryQueries(qc);
+  };
 
   const save = useMutation({
     mutationFn: async ({ nextFieldGroups }: { nextFieldGroups: string[] }) => {

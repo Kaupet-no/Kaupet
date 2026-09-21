@@ -150,7 +150,7 @@ export function ListingCardExpanded({
           className="flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           {(isVehicleListing || isBoatListing) && (
-            <div className="-mt-6">
+            <div>
               {isVehicleListing && (
                 <VehicleInfoGrid
                   vehicleLookup={vehicleLookup}

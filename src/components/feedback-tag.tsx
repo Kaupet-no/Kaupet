@@ -5,6 +5,7 @@ import { Loader2, MessageSquareHeart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { submitFeedback } from "@/lib/feedback.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -25,6 +26,7 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
   const submitFn = useServerFn(submitFeedback);
   const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(
     () => () => {
@@ -42,7 +44,7 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
       await submitFn({ data: { type, message: message.trim(), pageUrl } });
       setSent(true);
       try {
-        if (confettiCanvasRef.current) {
+        if (confettiCanvasRef.current && !reducedMotion) {
           const confetti = (await import("canvas-confetti")).default;
           const fire = confetti.create(confettiCanvasRef.current, {
             resize: true,

@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
-import { ListingEvidence } from "@/components/listing-detail/listing-evidence";
-import { mapListingFactSource } from "@/components/listing-detail/fact-source";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
 export type SellerIdentity =
@@ -37,7 +35,6 @@ export function SellerContactPanel({
   shareOpen,
   onShareOpenChange,
   isNative,
-  hasRegistryData,
   hideBusinessIdentity = false,
 }: {
   isLoggedIn: boolean;
@@ -51,20 +48,9 @@ export function SellerContactPanel({
   shareOpen: boolean;
   onShareOpenChange: (open: boolean) => void;
   isNative?: boolean;
-  hasRegistryData: boolean;
   /** The branded Proff block already owns the business identity. */
   hideBusinessIdentity?: boolean;
 }) {
-  const evidenceSources = [
-    ...(hasRegistryData ? [mapListingFactSource("vehicleLookup")] : []),
-    mapListingFactSource("sellerFields"),
-    ...(seller?.kind === "private" && seller.created_at
-      ? [mapListingFactSource("profileAge", seller.created_at)]
-      : seller?.kind === "private" && seller.review_count
-        ? [mapListingFactSource("reviews")]
-        : []),
-  ];
-
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
@@ -149,8 +135,6 @@ export function SellerContactPanel({
           )}
         </div>
       </div>
-
-      <ListingEvidence sources={evidenceSources} />
 
       {!isOwner && (
         <div className="mt-4 space-y-3">

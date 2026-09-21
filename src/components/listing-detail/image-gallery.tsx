@@ -83,6 +83,7 @@ export function ImageGallery({
   overlaySlot,
   vehicle360,
   showThumbnails = true,
+  thumbnailsOverlay = false,
   fit = "contain",
 }: {
   images: ListingImage[];
@@ -103,6 +104,11 @@ export function ImageGallery({
   /** Slått av i trange kontekster (f.eks. søkeresultat-kort) — piltastene og
    * karusellpilene er nok til å bla, thumbnail-raden tar mye vertikal plass. */
   showThumbnails?: boolean;
+  /** Legger thumbnail-raden nederst *oppå* hovedbildet i stedet for under
+   * det. Brukes når galleriet går i full bredde, der bildet ellers skyver
+   * raden langt ned. Kun fra md og opp — på en telefonskjerm spiser raden
+   * for mye av bildet. */
+  thumbnailsOverlay?: boolean;
   /** "contain" (standard, detaljsiden) viser hele bildet med en blurret
    * letterbox-bakgrunn der proporsjonen ikke fyller 4:3-boksen. "cover"
    * beskjærer i stedet bildet til å fylle boksen helt — for kompakte
@@ -156,9 +162,12 @@ export function ImageGallery({
     };
   }, [carouselApi, totalSlides]);
 
+  /* mt-3, ikke mt-10 som før: den gamle avstanden ga plass til priskortet
+     som hang ned under bildet (-bottom-8). Kortet har nå egen plass i gridet
+     på detaljsiden, så raden skal ligge tett på bildet. */
   const thumbnailStrip =
     showThumbnails && totalSlides > 1 ? (
-      <ScrollArrowRow className="mt-10">
+      <ScrollArrowRow className={thumbnailsOverlay ? "md:mt-0" : "mt-3"}>
         {has360 && (
           <button
             type="button"
@@ -265,8 +274,14 @@ export function ImageGallery({
             )}
           </Carousel>
           {overlaySlot}
+          {thumbnailsOverlay && thumbnailStrip && (
+            <div className="absolute inset-x-0 bottom-0 z-10 hidden rounded-b-xl bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-3 pt-12 md:block">
+              {thumbnailStrip}
+            </div>
+          )}
         </div>
-        {thumbnailStrip}
+        {/* Under md ligger raden alltid under bildet, også i overlay-modus. */}
+        <div className={thumbnailsOverlay ? "md:hidden" : undefined}>{thumbnailStrip}</div>
         {editCtx?.editMode && <ImageEditControls inline={inlineImages} />}
       </>
     );

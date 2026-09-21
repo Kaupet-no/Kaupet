@@ -13,9 +13,6 @@ export function HowItWorksSection() {
       <div className="mx-auto max-w-6xl px-4 py-16">
         <div className="grid items-center gap-10 md:grid-cols-[1.1fr_1fr]">
           <div>
-            <span className="text-brand-text mb-3 block text-xs font-semibold tracking-wide uppercase">
-              En litt annerledes markedsplass
-            </span>
             <h2 className="font-display text-3xl tracking-tight md:text-4xl">
               Bygget for et fritt og åpent internett
             </h2>

@@ -168,7 +168,7 @@ export function ListingComposerShell({
       {notice}
 
       {(progress || status) && (
-        <div className="sticky top-0 z-10 -mx-4 mt-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="sticky top-[var(--site-header-h)] z-10 -mx-4 mt-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           {progress}
           {status}
         </div>
@@ -247,9 +247,9 @@ export function ListingComposerShell({
 
         {showAside && aside && (
           <aside
-            aria-label="Forhåndsvisning og publiseringsstatus"
+            aria-label="Oppsummering av annonsen"
             data-composer-aside="desktop"
-            className="hidden min-w-0 space-y-6 rounded-2xl border border-border bg-background p-5 lg:sticky lg:top-24 lg:block"
+            className="hidden min-w-0 space-y-6 rounded-2xl border border-border bg-background p-5 lg:sticky lg:top-[calc(var(--site-header-h)+1.5rem)] lg:block"
           >
             {aside}
           </aside>

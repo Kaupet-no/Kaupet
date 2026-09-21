@@ -16,7 +16,7 @@ import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { CategorySuggestionDialog } from "@/components/category-suggestion-dialog";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/hooks/use-typewriter-text";
@@ -410,7 +410,6 @@ function WebLanding({
               <div key={i} className="min-h-20 animate-pulse rounded-xl bg-muted" />
             ))}
           {rootCategories.map((cat) => {
-            const Icon = getCategoryIcon(cat.icon);
             const active = activeCategory?.id === cat.id;
             const tint = cat.color ?? "var(--primary)";
             return (
@@ -433,7 +432,7 @@ function WebLanding({
                       : "bg-muted text-muted-foreground group-hover:bg-[var(--cat-tint)] group-hover:text-primary-foreground"
                   }`}
                 >
-                  <Icon className="size-4" />
+                  <CategoryIcon iconName={cat.icon} className="size-4" />
                 </span>
                 <span className="min-w-0 break-words text-sm font-medium leading-snug text-foreground">
                   {cat.name_nb}
@@ -513,7 +512,6 @@ function WebLanding({
                     >
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
                         {(childrenByParent.get(currentParent.id) ?? []).map((sub) => {
-                          const SubIcon = getCategoryIcon(sub.icon);
                           return (
                             <button
                               key={sub.id}
@@ -529,7 +527,7 @@ function WebLanding({
                                   } as React.CSSProperties
                                 }
                               >
-                                <SubIcon className="size-5" />
+                                <CategoryIcon iconName={sub.icon} className="size-5" />
                               </span>
                               <span className="break-words text-xs font-medium leading-snug text-foreground">
                                 {sub.name_nb}

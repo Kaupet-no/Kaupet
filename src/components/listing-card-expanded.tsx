@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { BoatInfoGrid, isBoatAttributes } from "@/components/listing-detail/boat/boat-info-grid";
@@ -16,7 +16,11 @@ import { signListingImageUrls } from "@/lib/storage";
 type Props = {
   listing: ListingCardData;
   linkState?: Record<string, unknown>;
-  onOpen?: () => void;
+  onOpen?: (position: number, resultCount: number) => void;
+  /** Kortets posisjon (1-basert) og totalt antall treff — sendes videre til
+   * onOpen ved klikk, se search_result_opened-sporingen i result-list. */
+  position?: number;
+  resultCount?: number;
   coverImageUrl?: string | null;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
@@ -26,10 +30,14 @@ type Props = {
  * its complete image gallery (lazy-loaded once scrolled into view; excludes
  * 360°, since `ImageGallery` only renders that when a `vehicle360` prop is
  * passed and we don't fetch/pass one here). */
-export function ListingCardExpanded({
+// Memoisert fordi hover-state i result-list ellers rendrer hele resultatlista
+// på nytt for hver musebevegelse mellom kort.
+export const ListingCardExpanded = memo(function ListingCardExpanded({
   listing,
   linkState,
   onOpen,
+  position = 0,
+  resultCount = 0,
   coverImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -92,7 +100,7 @@ export function ListingCardExpanded({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
-          onClick={onOpen}
+          onClick={() => onOpen?.(position, resultCount)}
           className="block pr-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <h3 className="text-lg font-medium leading-snug">{listing.title}</h3>
@@ -146,7 +154,7 @@ export function ListingCardExpanded({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
-          onClick={onOpen}
+          onClick={() => onOpen?.(position, resultCount)}
           className="flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           {(isVehicleListing || isBoatListing) && (
@@ -173,4 +181,4 @@ export function ListingCardExpanded({
       />
     </article>
   );
-}
+});

@@ -31,19 +31,28 @@ export type CategoryRecord = {
  * another, and the fragmentation meant every screen refetched independently
  * instead of sharing one cache entry.
  */
-export function useCategories() {
-  return useQuery({
-    queryKey: ["categories"],
-    queryFn: async (): Promise<CategoryRecord[]> => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+export const categoriesQueryOptions = {
+  queryKey: ["categories"] as const,
+  queryFn: async (): Promise<CategoryRecord[]> => {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order")
+      .order("name_nb");
+    if (error) throw error;
+    return data ?? [];
+  },
+  // categories endres kun via admin-UI-et i src/routes/_authenticated/admin/
+  // kategorier.tsx, som invaliderer sin egen ["admin", "categories"]-nøkkel —
+  // IKKE denne delte ["categories"]-nøkkelen. En admin-endring blir altså
+  // ikke synlig her før denne cachen selv går stale, så staleTime holdes
+  // konservativ (5 min, samme som gcTime-defaulten i router.tsx) i stedet
+  // for den lange verdien man ellers kunne satt for tilnærmet statiske data.
+  staleTime: 5 * 60_000,
+};
+
+export function useCategories(initialData?: CategoryRecord[]) {
+  return useQuery({ ...categoriesQueryOptions, initialData });
 }
 
 /**

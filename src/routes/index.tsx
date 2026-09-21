@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, FolderOpen, Search } from "lucide-react";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { HeaderSearchPortal } from "@/components/site-header";
@@ -36,7 +37,8 @@ import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown"
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
-import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { useAllVehicleBrands, allVehicleBrandsQueryOptions } from "@/lib/vehicle/vehicle-brands";
+import { categoriesQueryOptions } from "@/hooks/use-categories";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -49,6 +51,25 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
+  // Kategorirutenettet er det første brukeren ser på forsiden, og uten denne
+  // loaderen kan henting ikke engang starte før JS-en er lastet og hydrert
+  // (skjelett → useQuery → nettverkskall). Kun på serveren (samme mønster som
+  // __root.tsx sin loader): ved klient-navigasjon til "/" ville loaderen
+  // ellers gjort et unødvendig ekstra kall parallelt med at useCategories
+  // uansett har dataen i cache fra sist.
+  loader: async () => {
+    if (typeof window !== "undefined") return { categories: undefined };
+    // Forsiden må rendre selv om Supabase er utilgjengelig eller ukonfigurert:
+    // klienten som importeres her kaster ved første tilgang uten env-variabler,
+    // og workerd-smoke-testen i CI kjører den bygde workeren uten secrets.
+    // Faller vi tilbake til undefined, henter useLandingCategories dataen etter
+    // hydrering og har allerede en feil-/retry-sti (categoriesIsError).
+    try {
+      return { categories: await categoriesQueryOptions.queryFn() };
+    } catch {
+      return { categories: undefined };
+    }
+  },
   head: () => ({
     meta: [
       { title: "Kaupet.no — Gi tingene dine et nytt liv" },
@@ -114,10 +135,12 @@ function WebLanding({
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [qDraft, setQDraft] = useState("");
 
-  const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
-  const { data: vehicleBrands } = useAllVehicleBrands();
+  const { categories: ssrCategories } = Route.useLoaderData();
+  const { categories, categoriesIsError, refetchCategories, allFilters } =
+    useLandingCategories(ssrCategories);
 
   // Only colored root categories are presented as main categories on the landing
   // page; the catch-all "Annet" (no color) stays reachable via search but is not
@@ -201,6 +224,11 @@ function WebLanding({
   const feedListings = useMemo(() => feedPages?.pages.flatMap((p) => p.rows) ?? [], [feedPages]);
 
   const [qFocused, setQFocused] = useState(false);
+  // Kjøretøymerker (1000 rader, se vehicle-brands.ts) trengs først når
+  // brukeren faktisk sender et søk (handleSearchSubmit under), men vi starter
+  // hentingen så snart søkefeltet får fokus eller får tekst, slik at fokuset
+  // gir hentingen forsprang på tiden brukeren bruker på å skrive/lese.
+  const { data: vehicleBrands } = useAllVehicleBrands(qFocused || qDraft.length > 0);
   const heroSearchSentinelRef = useRef<HTMLFormElement>(null);
   const [heroSearchVisible, setHeroSearchVisible] = useState(true);
   useEffect(() => {
@@ -248,24 +276,34 @@ function WebLanding({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // When a main category is active, scope the search to just that category
-    // — /annonser already expands a parent category to include all of its
-    // children server-side, so listing it alone (not every subcategory
-    // slug too) is both sufficient and what the filter UI should display.
-    void submitSearch({
-      applied: {
-        value: {
-          ...defaultAdvancedSearchValue(),
-          categories: activeCategory ? [activeCategory.slug] : [],
+    void (async () => {
+      // Merkene hentes først ved søkeintensjon (se useAllVehicleBrands over),
+      // så et raskt søk kan rekke å bli sendt før hentingen er ferdig. Uten
+      // lista mister resolveTextToFilters merkegjenkjenningen stille, så her
+      // venter vi på den. Er den allerede i cache, koster ensureQueryData
+      // ingenting.
+      const brands =
+        vehicleBrands ??
+        (await queryClient.ensureQueryData(allVehicleBrandsQueryOptions).catch(() => []));
+      // When a main category is active, scope the search to just that category
+      // — /annonser already expands a parent category to include all of its
+      // children server-side, so listing it alone (not every subcategory
+      // slug too) is both sufficient and what the filter UI should display.
+      await submitSearch({
+        applied: {
+          value: {
+            ...defaultAdvancedSearchValue(),
+            categories: activeCategory ? [activeCategory.slug] : [],
+          },
+          attributes: {},
         },
-        attributes: {},
-      },
-      query: qDraft,
-      categories: categories ?? [],
-      vehicleBrands: vehicleBrands ?? [],
-      allFilters: allFilters ?? [],
-      commit: (search) => navigate({ to: "/annonser", search }),
-    });
+        query: qDraft,
+        categories: categories ?? [],
+        vehicleBrands: brands,
+        allFilters: allFilters ?? [],
+        commit: (search) => navigate({ to: "/annonser", search }),
+      });
+    })();
   };
 
   return (

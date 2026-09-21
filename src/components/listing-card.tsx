@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Gauge, ImageOff } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
@@ -71,7 +71,11 @@ type Props = {
   /** Renders the same static card surface for pre-publish previews. */
   preview?: boolean;
   linkState?: Record<string, unknown>;
-  onOpen?: () => void;
+  onOpen?: (position: number, resultCount: number) => void;
+  /** Kortets posisjon (1-basert) og totalt antall treff — sendes videre til
+   * onOpen ved klikk, se search_result_opened-sporingen i result-list. */
+  position?: number;
+  resultCount?: number;
   /** Pre-signed by a result-list batch. Undefined keeps the standalone-card
    * fallback; null means the batch found no usable image. */
   signedImageUrl?: string | null;
@@ -170,7 +174,9 @@ export function ListingCardContent({
   );
 }
 
-export function ListingCard({
+// Memoisert fordi hover-state i result-list ellers rendrer hele resultatlista
+// på nytt for hver musebevegelse mellom kort.
+export const ListingCard = memo(function ListingCard({
   listing,
   highlighted,
   onHoverChange,
@@ -178,6 +184,8 @@ export function ListingCard({
   preview = false,
   linkState,
   onOpen,
+  position = 0,
+  resultCount = 0,
   signedImageUrl,
   missingPriceLabel,
   knownFavorite,
@@ -239,7 +247,7 @@ export function ListingCard({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
-          onClick={onOpen}
+          onClick={() => onOpen?.(position, resultCount)}
           className={`${linkClass} flex min-w-0 flex-1 gap-3 p-2`}
         >
           <div
@@ -303,7 +311,7 @@ export function ListingCard({
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
         state={linkState}
-        onClick={onOpen}
+        onClick={() => onOpen?.(position, resultCount)}
         className={linkClass}
         aria-label={`${listing.title}, ${priceLabel}`}
       >
@@ -322,4 +330,4 @@ export function ListingCard({
       />
     </article>
   );
-}
+});

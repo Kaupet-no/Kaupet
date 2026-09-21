@@ -1,7 +1,7 @@
 -- organizations_public_select gave anon/authenticated unrestricted SELECT on
 -- every column of every row, including commercial state (selected_plan,
 -- proff_trial_*, proff_access_until) — anyone could dump the full customer
--- list with subscription status. See docs/SIKKERHETSVURDERING.md M-5.
+-- list with subscription status. See the internal security review, M-5.
 --
 -- Split the two concerns: the base table now requires membership (matching
 -- how organization_members is already scoped), and a definer-privileged view

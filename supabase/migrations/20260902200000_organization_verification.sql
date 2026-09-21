@@ -5,7 +5,7 @@
 -- 'unverified' and cannot create or update (including publish) any listing
 -- until an admin approves it. Existing organizations are grandfathered in as
 -- 'verified' — this is about new registrations, not retroactively
--- disrupting live businesses. See docs/SIKKERHETSVURDERING.md M-4.
+-- disrupting live businesses. See the internal security review, M-4.
 
 ALTER TABLE public.organizations
   ADD COLUMN verification_status text NOT NULL DEFAULT 'unverified'

@@ -3,7 +3,7 @@
 -- and isolates are recycled constantly, so an attacker almost always lands
 -- on a fresh one — the limit was close to a no-op. Move it to the database,
 -- same pattern as log_product_event_rate_limited /
--- log_listing_view_rate_limited. See docs/SIKKERHETSVURDERING.md M-8.
+-- log_listing_view_rate_limited. See the internal security review, M-8.
 
 CREATE TABLE public.feedback_rate_limits (
   key_hash text PRIMARY KEY CHECK (length(key_hash) = 64),

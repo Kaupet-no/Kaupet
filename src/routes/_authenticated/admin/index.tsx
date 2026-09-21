@@ -1,17 +1,10 @@
+import { lazy, Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, UserPlus, ListChecks, MessagesSquare, Loader2 } from "lucide-react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
 
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -22,6 +15,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+
+// recharts er ~95 KiB brotli og trengs ikke i første maling — kun
+// visningsgrafen under bruker den.
+const AdminViewsChart = lazy(() =>
+  import("./-admin-chart").then((m) => ({ default: m.AdminViewsChart })),
+);
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   head: () => ({ meta: [{ title: "Administrasjon — Kaupet.no" }] }),
@@ -116,27 +115,9 @@ function AdminDashboard() {
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={288}>
-              <LineChart data={timeseries.data ?? []}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="label" className="text-xs" />
-                <YAxis className="text-xs" allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="views"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<Skeleton className="h-[288px] w-full rounded-lg" />}>
+              <AdminViewsChart data={timeseries.data ?? []} />
+            </Suspense>
           )}
         </CardContent>
       </Card>

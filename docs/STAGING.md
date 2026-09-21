@@ -40,7 +40,7 @@ uten å måtte spørre noen.
 `supabase/config.toml` er kun lokal dev-config — de faktiske innstillingene
 for staging/produksjon bor i Supabase-dashbordet (**Authentication →
 Sign In / Providers → Email**) og kan ikke verifiseres fra repoet. Forvent
-og hold disse verdiene i produksjon (se docs/SIKKERHETSVURDERING.md L-15):
+og hold disse verdiene i produksjon (se den interne sikkerhetsvurderingen, L-15):
 
 - **`secure_password_change`: på.** Uten reauth ved passordbytte kan en
   kapret sesjon (stjålet token) endre passordet og låse ut den rettmessige

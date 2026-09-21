@@ -3501,6 +3501,127 @@ describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", ()
   });
 });
 
+// Radiusfilteret i search_listings_page har et forfilter på breddegrad
+// (20260921120000) som finnes utelukkende for å la planleggeren bruke
+// listings_active_lat_idx i stedet for å skanne hele tabellen. Forfilteret er
+// ment å være et supersett av sirkelen, så resultatsettet skal være identisk
+// med det eksakte haversine-uttrykket alene. De øvrige søketestene over
+// plasserer annonsene i eller rett ved sentrum av radiusen, og et punkt i
+// sentrum ligger innenfor enhver boks — også en for liten en. Disse testene
+// legger derfor annonser på hver sin side av radiusgrensen, der en boks med
+// feil størrelse eller feil radius faktisk gir feil svar. Testene er grønne
+// både med og uten forfilteret — de vokter at det ikke kutter treff nær
+// radiusgrensen, uavhengig av hvilken migrasjon som innfører det.
+describe.skipIf(!canRun)("Search RPC: radiusgrensen etter bounding box-forfilteret", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const userIds: string[] = [];
+  let categoryId: string;
+  const listingIds: string[] = [];
+
+  // Sentrum i Oslo. Alle testannonsene deler lengdegrad med sentrum, så
+  // haversine-uttrykket reduseres til |Δbreddegrad| × 111,1949 km — avstandene
+  // under er dermed eksakte, ikke omtrentlige.
+  const CENTER_LAT = 59.91;
+  const CENTER_LNG = 10.75;
+  const KM_PER_DEGREE_LAT = 111.1949;
+  const latAtDistance = (km: number) => CENTER_LAT + km / KM_PER_DEGREE_LAT;
+
+  beforeAll(async () => {
+    const { data: user, error: userError } = await admin.auth.admin.createUser({
+      email: `rls-search-radius-${suffix}@example.com`,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (userError) throw userError;
+    userIds.push(user.user!.id);
+    categoryId = await createTestCategory(admin, `search-radius-${suffix}`);
+
+    const { data, error } = await admin
+      .from("listings")
+      .insert([
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Radiustest innenfor",
+          is_free: false,
+          price_nok: 1_000,
+          status: "active",
+          condition: "good",
+          lat: latAtDistance(9.5),
+          lng: CENTER_LNG,
+          attributes: {},
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Radiustest utenfor",
+          is_free: false,
+          price_nok: 2_000,
+          status: "active",
+          condition: "good",
+          lat: latAtDistance(10.5),
+          lng: CENTER_LNG,
+          attributes: {},
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Radiustest naer sentrum",
+          is_free: false,
+          price_nok: 3_000,
+          status: "active",
+          condition: "good",
+          lat: latAtDistance(0.8),
+          lng: CENTER_LNG,
+          attributes: {},
+        },
+      ])
+      .select("id");
+    if (error) throw error;
+    listingIds.push(...data.map((listing) => listing.id));
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("listings").delete().in("id", listingIds);
+    await admin.from("categories").delete().eq("id", categoryId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  const titlesWithinRadius = async (radiusKm: number) => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { data, error } = await anon.rpc("search_listings_page", {
+      _category_ids: [categoryId],
+      _center_lat: CENTER_LAT,
+      _center_lng: CENTER_LNG,
+      _radius_km: radiusKm,
+      _sort: "new",
+    });
+    expect(error).toBeNull();
+    return (data ?? []).map((listing: { title: string }) => listing.title).sort();
+  };
+
+  it("beholder en annonse rett innenfor radiusen, og utelater en rett utenfor", async () => {
+    // 9,5 km inn i en radius på 10 ligger 0,0854° unna sentrum, mens boksen er
+    // 10/110,5 = 0,0905° høy. Marginen er under 6 %, så en boks som er regnet
+    // ut for lite — feil enhet, glemt klamping, eller en divisor over 110,574 —
+    // kutter denne annonsen selv om sirkelen fortsatt skulle inkludert den.
+    expect(await titlesWithinRadius(10)).toEqual([
+      "Radiustest innenfor",
+      "Radiustest naer sentrum",
+    ]);
+  });
+
+  it("klamper radiusen likt i boksen og i sirkelen", async () => {
+    // _radius_km under 1 klampes opp til 1 av LEAST(GREATEST(...)) i
+    // haversine-uttrykket. Forfilteret må klampe nøyaktig likt: brukte boksen
+    // den rå verdien 0,5 ville halvhøyden blitt 0,0045° og annonsen 0,8 km unna
+    // (0,0072°) falt utenfor — et treff sirkelen fortsatt regner som innenfor.
+    expect(await titlesWithinRadius(0.5)).toEqual(["Radiustest naer sentrum"]);
+  });
+});
+
 describe.skipIf(!canRun)("WTB search RPC: finds compound words (J4, twin of F1)", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();

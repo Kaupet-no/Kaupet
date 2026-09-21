@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 
-import { composerPage, goToNewWantListing, login } from "./pages/listing-wizard";
+import { composerPage, goBackToStep, goToNewWantListing, login } from "./pages/listing-wizard";
 import {
   advanceWantStep,
   publishWantAndExpectSuccess,
@@ -30,8 +30,9 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("1500");
   await advanceWantStep(page, "review");
 
-  const detailsRow = page.locator("dl > div").filter({ hasText: "Detaljer" });
-  await detailsRow.getByRole("button", { name: "Endre" }).click();
+  // Oppsummeringen med «Endre» per rad ble fjernet i ui-gjennomgangen (W9);
+  // stegtelleren er nå veien tilbake til et tidligere steg (W7/W8).
+  await goBackToStep(page, "Siste detaljer");
   await composerPage(page, "details").waitFor();
   await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("1200");
   await advanceWantStep(page, "review");

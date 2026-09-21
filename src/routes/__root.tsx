@@ -9,13 +9,12 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import interVariableFontUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import { SiteHeader } from "@/components/site-header";
 import { ModerationBanner } from "@/components/moderation-banner";
-import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
 import { getSessionUser } from "@/lib/current-user.functions";
@@ -32,13 +31,22 @@ import { setupNative } from "@/lib/native-setup";
 import { initUniversalLinkNavigation, hideNativeBootSplash } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
-import { AppBottomNav } from "@/components/app-bottom-nav";
 import { SearchPanelProvider } from "@/features/listing-search/search-panel/search-panel-context";
 import { FeedbackTag } from "@/components/feedback-tag";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
 import { isComposerRoute, isFocusedRoute } from "@/features/listing-creation/chrome-routes";
+
+// Lat-lastet: native-only bunnavigasjon (drar med seg ResponsiveOverlay) skal
+// ikke tynge rotsettet for webbrukere som aldri rendrer den.
+const AppBottomNav = lazy(() =>
+  import("@/components/app-bottom-nav").then((m) => ({ default: m.AppBottomNav })),
+);
+// Lat-lastet: ingen toast vises i første maling. Sonner replayer aktive
+// toasts til `Toaster` når den abonnerer, selv om de ble trigget før den
+// rakk å laste (se `Observer.subscribe` i sonner), så ingenting går tapt.
+const Toaster = lazy(() => import("@/components/ui/sonner").then((m) => ({ default: m.Toaster })));
 
 // Prøver å hente ut origin fra en env-variabel til et preconnect-hint. Skal
 // aldri kaste under SSR — hopper heller over hintet hvis variabelen mangler
@@ -328,7 +336,9 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider initialUser={ssrUser}>
           <RootBody native={native} />
-          <Toaster />
+          <Suspense fallback={null}>
+            <Toaster />
+          </Suspense>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
@@ -439,7 +449,11 @@ function RootBody({ native }: { native: boolean }) {
           </div>
         </footer>
       )}
-      {native && !bottomNavHidden && <AppBottomNav hidden={keyboardVisible} />}
+      {native && !bottomNavHidden && (
+        <Suspense fallback={null}>
+          <AppBottomNav hidden={keyboardVisible} />
+        </Suspense>
+      )}
       <FeedbackTag />
     </div>
   );

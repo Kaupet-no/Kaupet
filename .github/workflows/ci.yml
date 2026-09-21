@@ -354,8 +354,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   e2e:
+    # Ingen `if`: workflowen trigges på pull_request, push og workflow_dispatch,
+    # og E2E skal kjøre på alle tre. Tidligere sto push utenfor, så merge-
+    # commits til staging gikk inn uten at E2E kjørte — et grønt resultat på en
+    # PR sier bare at testene var grønne mot PR-ens base. Fem tester lå røde på
+    # staging i dagevis før noen oppdaget det (se #275).
+    #
+    # Merk at verken `deploy` eller `deploy-staging` har `needs: e2e`, så dette
+    # gater ikke utrulling — det gjør bruddet synlig i kjøringen. Skal E2E
+    # faktisk stoppe en staging-deploy, må e2e legges til i deploy-staging.
     name: E2E
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     needs: [verify, rls, native-android]
     runs-on: ubuntu-latest
     steps:

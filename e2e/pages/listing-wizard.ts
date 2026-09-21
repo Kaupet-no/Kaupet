@@ -200,3 +200,34 @@ export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
     .getByRole("heading", { name: "Annonsen din er publisert, bra jobba!" })
     .waitFor({ timeout: 20_000 });
 }
+
+/**
+ * Velger en kategori via søkefeltet på wizardens første steg.
+ *
+ * Søket treffer på tvers av alle nivåer, så det er ikke nødvendig å bore seg
+ * nedover. Flisene har et stabilt `data-category-name` (se category-picker.tsx)
+ * i stedet for tilgjengelig tekst, som i søketreff prefikses med et brødsmule-
+ * spor. Å vente på at flisen løsner fra DOM-en er et direkte signal om at
+ * wizarden har gått videre — steget avmonteres etter sin egen
+ * SELECTION_CONFIRM_MS-forsinkelse, og den lengden skal ingen test gjette på.
+ */
+export async function chooseCategory(page: Page, categoryName: string) {
+  const categorySearch = page.getByTestId("category-search-input");
+  await categorySearch.waitFor({ timeout: 10_000 });
+  await categorySearch.fill(categoryName);
+  const categoryTile = page.locator(`[data-category-name="${categoryName}"]`);
+  await categoryTile.click();
+  await categoryTile.waitFor({ state: "detached" });
+}
+
+/**
+ * Går tilbake til et tidligere steg via stegtelleren.
+ *
+ * Telleren ble gjort om til en meny i ui-gjennomgangen (W7/W8), samtidig som
+ * oppsummeringen med «Endre»-knapper per rad ble fjernet (W9). Menyelementene
+ * heter «<nummer>. <stegtittel>», så `stepLabel` matcher bare tittelen.
+ */
+export async function goBackToStep(page: Page, stepLabel: string) {
+  await page.getByRole("button", { name: /^Steg \d+ av \d+$/ }).click();
+  await page.getByRole("menuitem", { name: new RegExp(`\\d+\\. ${stepLabel}$`) }).click();
+}

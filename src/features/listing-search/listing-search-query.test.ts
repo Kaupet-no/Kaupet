@@ -4,6 +4,7 @@ import { searchSchema } from "@/features/listing-search/search-schema";
 import {
   buildListingsPriceMaxRpcArgs,
   buildListingsSearchRpcArgs,
+  listingsSearchReady,
 } from "@/features/listing-search/listing-search-query";
 
 describe("buildListingsSearchRpcArgs", () => {
@@ -97,5 +98,23 @@ describe("buildListingsSearchRpcArgs", () => {
         offset: 0,
       }),
     ).toBeNull();
+  });
+});
+
+describe("listingsSearchReady", () => {
+  const bil = { id: "1", slug: "bil", parent_id: null };
+
+  it("venter på kategorilista når en kategori er valgt", () => {
+    // `visibleCategories(data ?? [])` gir [] mens lista laster — ikke
+    // undefined. Å spørre da ga 0 treff for en kategori som har annonser, og
+    // svaret ble liggende i cachen etter at lista kom.
+    expect(listingsSearchReady(["bil"], undefined)).toBe(false);
+    expect(listingsSearchReady(["bil"], [])).toBe(false);
+    expect(listingsSearchReady(["bil"], [bil])).toBe(true);
+  });
+
+  it("trenger ingen kategoriliste når ingen kategori er valgt", () => {
+    expect(listingsSearchReady([], [])).toBe(true);
+    expect(listingsSearchReady([], undefined)).toBe(true);
   });
 });

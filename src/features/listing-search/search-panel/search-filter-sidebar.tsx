@@ -1,8 +1,12 @@
-import { RotateCcw, Save } from "lucide-react";
+import { useState } from "react";
+import { LayoutGrid, ListFilter, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { describeAttrValue } from "@/components/active-filters";
 import { cn } from "@/lib/utils";
 import {
+  conditionOptionsFor,
   defaultAdvancedSearchValue,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
@@ -31,10 +35,9 @@ type Props = {
  * filterdialog (`variant="inline"`). Én komponent, så de to bredene ikke kan
  * drifte fra hverandre.
  *
- * Komponenten eier ingen tilstand: `results.applied`/`onApply` er anvendt
- * søk i sidekolonnen (hvert valg gjelder umiddelbart) og dialogens utkast i
- * `inline` (der «Vis N annonser» committer). Seksjonene er
- * `SearchFilterSections` i `layout="expanded"` i begge.
+ * `results.applied`/`onApply` er anvendt søk i sidekolonnen (hvert valg
+ * gjelder umiddelbart) og dialogens utkast i `inline` (der «Vis N annonser»
+ * committer). Begge bruker de samme feltseksjonene; bare desktop grupperer dem.
  */
 export function SearchFilterSidebar({
   results,
@@ -44,10 +47,17 @@ export function SearchFilterSidebar({
   className,
 }: Props) {
   const { applied, onApply } = results;
+  const [group, setGroup] = useState<"basis" | "details" | "more">("basis");
 
   const setValue = (next: React.SetStateAction<AdvancedSearchValue>) => {
     const value = typeof next === "function" ? next(applied.value) : next;
-    onApply({ ...applied, value });
+    onApply({
+      value,
+      attributes:
+        value.categories.join("\0") === applied.value.categories.join("\0")
+          ? applied.attributes
+          : {},
+    });
   };
 
   const onAttributeChange = (key: string, value: AttributeFilterValue | undefined) => {
@@ -71,6 +81,114 @@ export function SearchFilterSidebar({
 
   const inline = variant === "inline";
   const Root = inline ? "div" : "aside";
+  const selectedCategories = categories.filter((category) =>
+    applied.value.categories.includes(category.slug),
+  );
+  const categoryLabel =
+    selectedCategories.length > 1
+      ? `${selectedCategories[0].name_nb} +${selectedCategories.length - 1}`
+      : (selectedCategories[0]?.name_nb ?? applied.value.categories[0] ?? "Kategori");
+  const summary: { key: string; label: string; onRemove?: () => void }[] = [];
+
+  if (applied.value.terms.length) {
+    summary.push({
+      key: "query",
+      label: `Søk: ${applied.value.terms.join(" ")}`,
+      onRemove: () => setValue((value) => ({ ...value, terms: [] })),
+    });
+  }
+  if (applied.value.categories.length) {
+    summary.push({
+      key: "category",
+      label: categoryLabel,
+      onRemove: results.categoryLocked
+        ? undefined
+        : () =>
+            onApply({
+              value: { ...applied.value, categories: [], catMode: "any" },
+              attributes: {},
+            }),
+    });
+  }
+  if (applied.value.location.lat != null) {
+    summary.push({
+      key: "location",
+      label: `${applied.value.location.label || "Valgt sted"} · ${applied.value.location.radius} km`,
+      onRemove: () =>
+        setValue((value) => ({
+          ...value,
+          location: { ...value.location, lat: null, lng: null, label: "" },
+        })),
+    });
+  }
+  if (applied.value.min != null || applied.value.max != null) {
+    const min = applied.value.min?.toLocaleString("nb-NO");
+    const max = applied.value.max?.toLocaleString("nb-NO");
+    summary.push({
+      key: "price",
+      label: min && max ? `${min}–${max} kr` : min ? `Fra ${min} kr` : `Maks ${max} kr`,
+      onRemove: () => setValue((value) => ({ ...value, min: null, max: null })),
+    });
+  }
+  if (!applied.value.includeFree) {
+    summary.push({
+      key: "free",
+      label: "Uten gratisannonser",
+      onRemove: () => setValue((value) => ({ ...value, includeFree: true })),
+    });
+  }
+  for (const condition of applied.value.conditions) {
+    summary.push({
+      key: `condition:${condition}`,
+      label:
+        conditionOptionsFor(applied.value.categories).find((option) => option.value === condition)
+          ?.label ?? condition,
+      onRemove: () =>
+        setValue((value) => ({
+          ...value,
+          conditions: value.conditions.filter((entry) => entry !== condition),
+        })),
+    });
+  }
+  for (const [key, value] of Object.entries(applied.attributes)) {
+    const filter = results.attributeFilters?.find((entry) => entry.key === key);
+    const label = filter?.label_nb ?? key;
+    const detail =
+      value.kind === "multiselect" || value.kind === "exclude"
+        ? value.values
+            .map(
+              (entry) =>
+                filter?.options?.find((option) => option.value === entry)?.label_nb ?? entry,
+            )
+            .join(", ")
+        : filter && value.kind !== "boolean"
+          ? describeAttrValue(filter, value)
+          : "";
+    summary.push({
+      key: `attribute:${key}`,
+      label: detail ? `${label}: ${detail}` : label,
+      onRemove: () => onAttributeChange(key, undefined),
+    });
+  }
+  if (applied.value.qMode === "any") {
+    summary.push({
+      key: "mode",
+      label: "Minst ett ord",
+      onRemove: () => setValue((value) => ({ ...value, qMode: "all" })),
+    });
+  }
+  for (const rule of applied.value.extraGroups) {
+    summary.push({
+      key: `rule:${rule.id}`,
+      label: `${rule.exclude ? "Uten" : "Med"} ${rule.terms.join(", ")}`,
+      onRemove: () =>
+        setValue((value) => ({
+          ...value,
+          extraGroups: value.extraGroups.filter((entry) => entry.id !== rule.id),
+        })),
+    });
+  }
+  const canReset = inline ? activeCount > 0 : summary.some((item) => item.onRemove);
 
   return (
     <Root
@@ -79,15 +197,15 @@ export function SearchFilterSidebar({
       className={cn(
         inline
           ? "min-h-0 flex-1 overflow-y-auto"
-          : "sticky top-20 hidden shrink-0 rounded-xl border border-border bg-card lg:block",
+          : "sticky top-20 hidden max-h-[calc(100dvh-6rem)] shrink-0 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-card shadow-sm lg:block",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-4 py-3">
-        <h2 className="text-sm font-semibold">
-          Filtre{activeCount > 0 ? ` · ${activeCount}` : ""}
+      <div className="flex items-center justify-between gap-2 px-5 pb-2 pt-5">
+        <h2 className="font-display text-xl tracking-tight">
+          Filtre{inline && activeCount > 0 ? ` · ${activeCount}` : ""}
         </h2>
-        {activeCount > 0 && (
+        {canReset && (
           <Button
             type="button"
             variant="ghost"
@@ -99,7 +217,13 @@ export function SearchFilterSidebar({
                 filterCount: 0,
                 resultCount: null,
               });
-              onApply({ value: defaultAdvancedSearchValue(), attributes: {} });
+              onApply({
+                value: {
+                  ...defaultAdvancedSearchValue(),
+                  categories: results.categoryLocked ? applied.value.categories : [],
+                },
+                attributes: {},
+              });
             }}
           >
             <RotateCcw className="size-3.5" />
@@ -108,34 +232,118 @@ export function SearchFilterSidebar({
         )}
       </div>
 
-      <div className="px-4 pb-4">
-        <SearchFilterSections
-          layout="expanded"
-          value={applied.value}
-          setValue={setValue}
-          categories={categories}
-          section="categories"
-          queryText={applied.value.terms.join(" ")}
-          attributeFilters={results.attributeFilters}
-          attributeValues={applied.attributes}
-          onAttributeChange={onAttributeChange}
-          attributeCounts={results.attributeCounts}
-          priceBounds={priceBounds}
-          includePrimary
-          hideCategory={results.categoryLocked}
-        />
-        {onSaveSearch && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4 w-full gap-1.5"
-            onClick={onSaveSearch}
+      {!inline && (
+        <div className="mx-5 mb-4 rounded-xl bg-primary/5 p-3">
+          <div className="flex items-center justify-between gap-2 text-xs font-medium">
+            <span>Søket ditt</span>
+            <span className="text-muted-foreground">{summary.length} aktive</span>
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Aktive filtre">
+            {summary.length ? (
+              summary.map((item) =>
+                item.onRemove ? (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={item.onRemove}
+                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-left text-xs hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Fjern ${item.label}`}
+                  >
+                    <span className="min-w-0 break-words">{item.label}</span>
+                    <X className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                ) : (
+                  <span
+                    key={item.key}
+                    className="rounded-full border border-border bg-background px-2.5 py-1 text-xs"
+                  >
+                    {item.label}
+                  </span>
+                ),
+              )
+            ) : (
+              <span className="text-xs text-muted-foreground">Ingen filtre valgt</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Tabs value={group} onValueChange={(next) => setGroup(next as typeof group)}>
+        {!inline && (
+          <TabsList
+            className="grid h-auto w-full grid-cols-3 gap-1 rounded-none border-b border-border bg-transparent px-4 pb-3"
+            aria-label="Filtergrupper"
           >
-            <Save className="size-4" /> Lagre søk
-          </Button>
+            {(
+              [
+                ["basis", "Basis", SlidersHorizontal],
+                ["details", "Detaljer", LayoutGrid],
+                ["more", "Mer", ListFilter],
+              ] as const
+            ).map(([key, label, Icon]) => (
+              <TabsTrigger
+                key={key}
+                value={key}
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-xs text-muted-foreground hover:bg-muted data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+              >
+                <Icon className="size-4" aria-hidden />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         )}
-      </div>
+
+        <TabsContent value={group} className="mt-0 px-5 pb-5 pt-4">
+          {!inline && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                {group === "basis" ? "Basis" : group === "details" ? "Detaljer" : "Mer"}
+              </p>
+              <h3 className="mt-1 font-display text-lg tracking-tight">
+                {group === "basis"
+                  ? "Start bredt"
+                  : group === "details"
+                    ? categoryLabel
+                    : "Finjuster søket"}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {group === "basis"
+                  ? "De vanligste avgrensningene på ett sted."
+                  : group === "details"
+                    ? "Filtre som passer valgt kategori."
+                    : "Bruk bare det du trenger."}
+              </p>
+            </div>
+          )}
+          <SearchFilterSections
+            layout="expanded"
+            desktopGroup={inline ? undefined : group}
+            value={applied.value}
+            setValue={setValue}
+            categories={categories}
+            section="categories"
+            queryText={applied.value.terms.join(" ")}
+            attributeFilters={results.attributeFilters}
+            attributeValues={applied.attributes}
+            onAttributeChange={onAttributeChange}
+            attributeCounts={results.attributeCounts}
+            priceBounds={priceBounds}
+            includePrimary
+            hideCategory={results.categoryLocked}
+          />
+          {onSaveSearch && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4 w-full gap-1.5"
+              onClick={onSaveSearch}
+            >
+              <Save className="size-4" /> Lagre søk
+            </Button>
+          )}
+        </TabsContent>
+      </Tabs>
     </Root>
   );
 }

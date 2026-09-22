@@ -104,6 +104,32 @@ describe("SearchPanel", () => {
       expect.objectContaining({ min: 100, categories: ["sykkel"] }),
     );
   });
+  it("fjerner gamle attributtfiltre når kategorien i utkastet endres", () => {
+    const onApply = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={[]}
+        allFilters={[]}
+        initialSection="categories"
+        results={{
+          applied: {
+            value: defaultAdvancedSearchValue(),
+            attributes: { brand: { kind: "select", value: "volvo" } },
+          },
+          onApply,
+          resultCount: 42,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Endre kategoriutkast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+
+    expect(onApply.mock.calls[0][0].value.categories).toEqual(["sykkel"]);
+    expect(onApply.mock.calls[0][0].attributes).toEqual({});
+  });
   it("sender query fra resultatpanelet som anvendt state", async () => {
     const onApply = vi.fn();
 

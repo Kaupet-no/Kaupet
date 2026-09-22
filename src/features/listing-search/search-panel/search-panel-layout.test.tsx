@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { type HTMLAttributes, type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
-import type { AppliedSearchState } from "@/features/listing-search/search-schema";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { SearchPanel } from "./search-panel";
@@ -130,15 +129,24 @@ function renderPanel(overrides?: Record<string, unknown>) {
 }
 
 describe("SearchPanel filteroppsett", () => {
-  it("viser nøyaktig de samme filtervalgene i dialogen som i desktops sidekolonne", () => {
+  it("viser mobilweb som arbeidsflate med samme grupper som desktop", () => {
     const sidebar = render(<SearchFilterSidebar results={results} categories={categories} />);
-    const sidebarFilters = sidebar.container.textContent ?? "";
+    expect(sidebar.getByText("Pris (NOK)")).toBeTruthy();
+    fireEvent.mouseDown(sidebar.getByRole("tab", { name: "Detaljer" }), { button: 0 });
+    expect(sidebar.getByText("Merke")).toBeTruthy();
+    expect(sidebar.queryByText("Rammestørrelse")).toBeNull();
+    fireEvent.mouseDown(sidebar.getByRole("tab", { name: "Mer" }), { button: 0 });
+    expect(sidebar.getByText("Rammestørrelse")).toBeTruthy();
     cleanup();
 
     renderPanel();
-    // Dialogen legger bare på tittel og «Vis N annonser» rundt det samme settet.
-    expect(document.body.textContent).toContain(sidebarFilters);
-    expect(sidebarFilters).toContain("Filtre · 1");
+    expect(screen.getByText("Pris (NOK)")).toBeTruthy();
+    expect(screen.getByText("Søket ditt")).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Detaljer" }), { button: 0 });
+    expect(screen.getByText("Merke")).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
+    expect(screen.getByText("Rammestørrelse")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
   });
 
   /* Kategorilandingssidene (`/bil-og-mc` osv.) har kategorien fra URL-en, og
@@ -146,81 +154,44 @@ describe("SearchPanel filteroppsett", () => {
      i panelet ville stått og ikke gjort noe — resten av filtersettet er likt. */
   it("skjuler kategorivalget når ruten eier kategorien", () => {
     renderPanel({ categoryLocked: true });
-    expect(document.querySelector('[data-section="categories"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: /Kategori/ })).toBeNull();
     // Resten av settet er uendret.
     expect(screen.getByText("Tilstand")).toBeTruthy();
     expect(screen.getByText("Sted")).toBeTruthy();
     cleanup();
 
     renderPanel();
-    expect(document.querySelector('[data-section="categories"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: /Kategori/ })).toBeTruthy();
   });
 
-  it("beholder skuffens drilldown-oversikt på native telefon", () => {
+  it("viser samme arbeidsflate på native telefon", () => {
     vi.mocked(useFormFactor).mockReturnValue("phone");
     renderPanel();
 
+    expect(screen.getByText("Søket ditt")).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
     expect(screen.getByText("Flere søkevalg")).toBeTruthy();
-    expect(screen.queryByText("Filtre · 1")).toBeNull();
+    expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
   });
 
-  it("anvender valg i dialogen med én gang, og viser kategoriens filtre uten commit", async () => {
-    // Sidekolonnen byttes ut med en stubb som viser hvilke filtre den faktisk
-    // fikk, og som kan velge kategori slik kategorivelgeren gjør (Radix' Select
-    // lar seg ikke drive i jsdom).
-    const seen: string[][] = [];
-    vi.doMock("./search-filter-sidebar", () => ({
-      SearchFilterSidebar: ({
-        results: r,
-      }: {
-        results: {
-          applied: AppliedSearchState;
-          onApply: (next: AppliedSearchState) => void;
-          attributeFilters?: Array<{ label_nb: string }>;
-        };
-      }) => {
-        seen.push((r.attributeFilters ?? []).map((filter) => filter.label_nb));
-        return (
-          <button
-            type="button"
-            onClick={() =>
-              r.onApply({ ...r.applied, value: { ...r.applied.value, categories: ["sykkel"] } })
-            }
-          >
-            Velg Sykkel
-          </button>
-        );
-      },
-    }));
-    vi.resetModules();
-    const { SearchPanel: Panel } = await import("./search-panel");
+  it("viser arbeidsflaten i dialog på native nettbrett", () => {
+    vi.mocked(useFormFactor).mockReturnValue("tablet");
+    renderPanel();
 
-    // Modellerer resultatsiden: `onApply` skriver til anvendt søk, som er det
-    // både dialogen og sidekolonnen leser.
-    function Page() {
-      const [applied, setApplied] = useState<AppliedSearchState>({
-        value: defaultAdvancedSearchValue(),
-        attributes: {},
-      });
-      return (
-        <Panel
-          open
-          onOpenChange={() => {}}
-          categories={categories}
-          allFilters={attributeFilters}
-          initialSection="categories"
-          results={{ applied, onApply: setApplied, attributeFilters: [], resultCount: 5 } as never}
-        />
-      );
-    }
+    expect(screen.getByText("Søket ditt")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Basis" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
+  });
 
-    render(<Page />);
-    expect(seen.at(-1)).not.toContain("Rammestørrelse");
+  it("bruker mobilweb-utkastet først når brukeren trykker Vis annonser", () => {
+    const onApply = vi.fn();
+    renderPanel({ onApply });
 
-    fireEvent.click(screen.getByRole("button", { name: "Velg Sykkel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Som ny" }));
+    expect(onApply).not.toHaveBeenCalled();
 
-    // Uten å trykke «Vis N annonser»: valget er anvendt (så sidekolonnen ser
-    // det ved en breddeendring), og kategoriens filtre er på plass.
-    expect(seen.at(-1)).toEqual(expect.arrayContaining(["Merke", "Rammestørrelse"]));
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+    expect(onApply).toHaveBeenCalledOnce();
+    expect(onApply.mock.calls[0][0].value.conditions).toEqual(["like_new"]);
   });
 });

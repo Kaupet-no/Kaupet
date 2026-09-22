@@ -140,7 +140,7 @@ export function SearchPanel({
   const [submitting, setSubmitting] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [section, setSection] = useState<SearchPanelSection>(initialSection);
-  const [snap, setSnap] = useState<number | string | null>(SNAP_POINTS[0]);
+  const [snap, setSnap] = useState<number | string | null>(results ? 1 : SNAP_POINTS[0]);
   const [draft, setDraft] = useState<AppliedSearchState>(() =>
     results ? cloneSearchState(results.applied) : createLaunchState(savedLocation),
   );
@@ -148,7 +148,13 @@ export function SearchPanel({
     setDraft((previous) => {
       const value = typeof next === "function" ? next(previous.value) : next;
       if (!results) onSavedLocationChange?.(value.location);
-      return { ...previous, value };
+      return {
+        value,
+        attributes:
+          value.categories.join("\0") === previous.value.categories.join("\0")
+            ? previous.attributes
+            : {},
+      };
     });
   const formFactor = useFormFactor();
   // Web og native nettbrett går via ResponsiveOverlay; native telefon får sin
@@ -156,10 +162,9 @@ export function SearchPanel({
   const isWeb = formFactor === "web" || formFactor === "desktop" || formFactor === "tablet";
   const narrow = useIsNarrow();
   const isTablet = formFactor === "tablet";
-  /* Nettleseren skal se de samme filtrene uansett bredde: dialogen på mobilweb
-     rendrer selve sidekolonne-komponenten (`SearchFilterSidebar`), ikke en
-     parallell filterliste. Native beholder skuffens drilldown-oversikt. */
-  const browserFilterLayout = !!results && (formFactor === "web" || formFactor === "desktop");
+  /* Desktop har umiddelbar anvendelse i sidekolonnen. Mobilweb og native
+     redigerer samme arbeidsflate som utkast frem til «Vis annonser». */
+  const browserFilterLayout = !!results && formFactor === "desktop";
   const inputRef = useRef<HTMLInputElement>(null);
   const close = (reason: "cancel" | "apply" = "cancel") => {
     if (reason === "cancel") handleOpenChange(false);
@@ -167,7 +172,7 @@ export function SearchPanel({
   };
   const dragGate = useSheetDragGate({
     activeSnapPoint: snap,
-    initialSnapPoint: SNAP_POINTS[0],
+    initialSnapPoint: results ? 1 : SNAP_POINTS[0],
     setActiveSnapPoint: setSnap,
     onClose: close,
   });
@@ -179,7 +184,7 @@ export function SearchPanel({
     if (!open) return;
     setLaunchQueryDraft(results ? results.applied.value.terms.join(" ") : "");
     setSection(initialSection);
-    setSnap(SNAP_POINTS[0]);
+    setSnap(results ? 1 : SNAP_POINTS[0]);
     setHistory(getSearchHistory());
     // Uten resultatflate bak er fritekst hele poenget — fokuser feltet. Over en
     // resultatliste ville tastaturet dekket akkurat det brukeren skal se.
@@ -205,12 +210,7 @@ export function SearchPanel({
       ),
     [allFilters, draft.attributes, launchQueryDraft, results?.attributeFilters],
   );
-  /* I nettleseren gjelder hvert valg umiddelbart, akkurat som i sidekolonnen —
-     ellers ville filtrene ligget usynlig i et utkast til brukeren fant
-     «Vis N annonser» nederst i en lang liste, og vært borte ved neste
-     breddeendring. Skuffen på native beholder utkastet: der dekker panelet
-     treffene, så et mellomsteg er riktig. `editedState` er tilstanden
-     seksjonene faktisk redigerer i begge tilfeller. */
+  /* Desktop bruker anvendt state; mobilweb og native redigerer utkastet. */
   const editedState = browserFilterLayout && results ? results.applied : draft;
 
   /* Kategorispesifikke filtre må følge tilstanden som redigeres, ikke URL-en:
@@ -232,7 +232,7 @@ export function SearchPanel({
   }, [editedCategoryIds, allFilters, categoryTree, results?.attributeFilters]);
   /* Fasett-tellingene er hentet for anvendt kategori. Viser vi dem under en
      annen kategoris filtre blir de direkte feil, så de utelates til utkastet
-     er committet (i nettleseren er de alltid i takt). */
+     er committet (på desktop er de alltid i takt). */
   const editedCategoriesMatchApplied =
     !results ||
     (results.applied.value.categories.length === editedState.value.categories.length &&
@@ -260,8 +260,7 @@ export function SearchPanel({
     updateDraftAttribute(key, values.length ? { ...current, values } : undefined);
   };
 
-  /* Leses fra `editedState` (anvendt i nettleseren, utkast i skuffen); `onX`-
-     handlerne skriver utkastet og nås bare fra skuffen, som er samme objekt. */
+  /* Desktop leser anvendt state, mens mobilweb og native leser utkastet. */
   const draftItems = results
     ? buildActiveFilterItems({
         search: {
@@ -297,7 +296,7 @@ export function SearchPanel({
   const hasDraftCriteria =
     draftItems.length > 0 ||
     Object.keys(draft.attributes).length > 0 ||
-    draft.value.categories.length > 0 ||
+    (!results?.categoryLocked && draft.value.categories.length > 0) ||
     draft.value.conditions.length > 0 ||
     draft.value.min != null ||
     draft.value.max != null ||
@@ -309,7 +308,7 @@ export function SearchPanel({
     ...valueToCriteria(editedState.value),
     attributes: editedState.attributes,
   };
-  // I nettleseren er treffet alltid i takt med filtrene — de anvendes direkte.
+  // På desktop er treffet alltid i takt med filtrene.
   const visibleResultCount =
     results && (browserFilterLayout || searchDraftMatchesApplied(draft, results.applied))
       ? results.resultCount
@@ -392,8 +391,8 @@ export function SearchPanel({
     void hapticImpact("medium");
     if (results) {
       setDraft((previous) => ({
-        ...previous,
         value: { ...previous.value, categories: [cat.slug] },
+        attributes: {},
       }));
       setLaunchQueryDraft((previous) => previous.trim());
       return;
@@ -446,34 +445,42 @@ export function SearchPanel({
       {results && !queryMode ? (
         /* `SearchFilterSidebar` har sin egen «Filtre · N»/«Nullstill»-header og
            «Lagre søk», så denne raden er bare for skuffen. */
-        !browserFilterLayout &&
-        hasDraftCriteria && (
-          <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3">
-            {user ? (
-              <button
-                type="button"
-                onClick={() => setSaveOpen(true)}
-                className="native-touch-target flex items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary hover:bg-muted"
-              >
-                <Save className="size-4" />
-                Lagre søk
-              </button>
-            ) : (
-              <span />
-            )}
-            {draftItems.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  void hapticImpact("light");
-                  setDraft({ value: defaultAdvancedSearchValue(), attributes: {} });
-                }}
-                className="native-touch-target flex shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <RotateCcw className="size-3.5" />
-                Nullstill
-              </button>
-            )}
+        !browserFilterLayout && (
+          <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+            <h2 className="font-display text-xl tracking-tight">Filtre</h2>
+            <div className="flex items-center gap-1">
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => setSaveOpen(true)}
+                  className="native-touch-target flex items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary hover:bg-muted"
+                >
+                  <Save className="size-4" />
+                  Lagre søk
+                </button>
+              ) : (
+                <span />
+              )}
+              {hasDraftCriteria && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void hapticImpact("light");
+                    setDraft({
+                      value: {
+                        ...defaultAdvancedSearchValue(),
+                        categories: results?.categoryLocked ? results.applied.value.categories : [],
+                      },
+                      attributes: {},
+                    });
+                  }}
+                  className="native-touch-target flex shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Nullstill
+                </button>
+              )}
+            </div>
           </div>
         )
       ) : !launchFilterMode ? (
@@ -544,6 +551,7 @@ export function SearchPanel({
         ) : (
           <SearchFilterSections
             key={`${open}-${section}`}
+            layout={results ? "workspace" : "drilldown"}
             value={draft.value}
             categories={categories}
             setValue={setDraftValue}
@@ -593,7 +601,7 @@ export function SearchPanel({
                   filterCount: draftItems.length,
                   resultCount: buttonResultCount ?? null,
                 });
-                // Nettleseren har allerede anvendt hvert valg — knappen lukker.
+                // Desktoppanelet har allerede anvendt valgene; mobil committer utkastet.
                 if (!browserFilterLayout) results.onApply(draft);
                 trackProductEvent("search_submitted", {
                   hasCategory: draft.value.categories.length > 0,
@@ -634,8 +642,10 @@ export function SearchPanel({
       {isWeb ? (
         <ResponsiveOverlay open={open} onOpenChange={handleOpenChange}>
           <ResponsiveOverlayContent
+            key={results ? "results" : "launch"}
             /* Mobilweb får skuffen dratt til fullhøyde, som i appen. */
             expandable={narrow}
+            initialSnapPoint={results && !browserFilterLayout ? 1 : undefined}
             className={
               /* Skuffen legger klassen på sin egen scrollende innerdiv og eier
                  høyde og scroll selv — Dialogens `max-h`/`overflow` hører bare
@@ -643,15 +653,15 @@ export function SearchPanel({
                  flex-kolonne begge steder, siden sidekolonne-innholdet er et
                  `flex-1`-barn med «Vis N annonser» under seg. */
               narrow
-                ? browserFilterLayout
-                  ? "flex flex-col"
+                ? results
+                  ? "flex min-h-0 flex-col overflow-hidden"
                   : undefined
-                : browserFilterLayout
+                : results
                   ? "flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg"
                   : "max-h-[85vh] overflow-y-auto sm:max-w-lg"
             }
           >
-            <DialogHeader>
+            <DialogHeader className={results && !browserFilterLayout ? "sr-only" : undefined}>
               <DialogTitle>Søk og filtrer</DialogTitle>
             </DialogHeader>
             {panelContent}

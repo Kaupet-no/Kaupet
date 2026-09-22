@@ -41,11 +41,52 @@ Object.defineProperty(navigator, "permissions", {
 afterEach(cleanup);
 
 describe("SearchFilterSidebar", () => {
+  it("fjerner kategori og tilhørende attributter fra oppsummeringen", () => {
+    const onApply = vi.fn();
+    const { getByRole } = render(
+      <SearchFilterSidebar
+        results={{
+          applied: {
+            value: { ...defaultAdvancedSearchValue(), categories: ["bil"] },
+            attributes: { make: { kind: "multiselect", values: ["volvo"] } },
+          },
+          onApply,
+        }}
+        categories={[{ id: "1", slug: "bil", name_nb: "Bil", parent_id: null }]}
+      />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "Fjern Bil" }));
+
+    expect(onApply.mock.calls[0][0].value.categories).toEqual([]);
+    expect(onApply.mock.calls[0][0].attributes).toEqual({});
+  });
+
+  it("lar brukeren fjerne et aktivt prisfilter fra oppsummeringen", () => {
+    const onApply = vi.fn();
+    const { getByRole } = render(
+      <SearchFilterSidebar
+        results={{
+          applied: {
+            value: { ...defaultAdvancedSearchValue(), max: 250_000 },
+            attributes: {},
+          },
+          onApply,
+        }}
+        categories={[]}
+      />,
+    );
+
+    fireEvent.click(getByRole("button", { name: /Fjern Maks 250/ }));
+
+    expect(onApply.mock.calls[0][0].value.max).toBeNull();
+  });
+
   /** Sidekolonnen har ikke «Vis annonser»-knapp — endringer må gjelde med én
    * gang, ellers blir filtrene stående uten vei ut. */
   it("bruker et valg umiddelbart i stedet for å samle opp et utkast", () => {
     const onApply = vi.fn();
-    const { getByLabelText } = render(
+    const { getByRole } = render(
       <SearchFilterSidebar
         results={{
           applied: { value: defaultAdvancedSearchValue(), attributes: {} },
@@ -55,7 +96,7 @@ describe("SearchFilterSidebar", () => {
       />,
     );
 
-    fireEvent.click(getByLabelText("Som ny"));
+    fireEvent.click(getByRole("button", { name: "Som ny" }));
 
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply.mock.calls[0][0].value.conditions).toEqual(["like_new"]);

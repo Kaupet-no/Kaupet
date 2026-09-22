@@ -62,7 +62,8 @@ jobs:
 
           ok=false
           for _ in $(seq 1 30); do
-            if body=$(curl -sS -f http://localhost:8788/ 2>/dev/null); then
+            if curl -sS -f -D headers.txt -o page.html http://localhost:8788/ 2>/dev/null; then
+              body=$(cat page.html)
               ok=true
               break
             fi
@@ -81,6 +82,21 @@ jobs:
             echo "Worker returnerte 200, men med SSR-fallback-feilsiden som body." >&2
             exit 1
           fi
+
+          # E2E kjører mot dev-serveren, så produksjons-CSP-en testes bare her:
+          # én CSP-header med nonce i script-src, og hvert inline-skript må
+          # bære den noncen — ellers blokkerer nettleseren hydreringen.
+          python3 - <<'PY'
+          import re, sys
+          csp = [l.split(":", 1)[1] for l in open("headers.txt") if l.lower().startswith("content-security-policy:")]
+          script_src = next((d for d in csp[0].split(";") if d.strip().startswith("script-src")), "") if len(csp) == 1 else ""
+          nonce = re.search(r"'nonce-([^']+)'", script_src)
+          inline = [t for t in re.findall(r"<script\b[^>]*>", open("page.html", encoding="utf-8").read()) if " src=" not in t]
+          missing = [t for t in inline if not nonce or f'nonce="{nonce.group(1)}"' not in t]
+          if len(csp) != 1 or not nonce or "unsafe-inline" in script_src or not inline or missing:
+              sys.exit(f"CSP-nonce-sjekk feilet: {len(csp)} CSP-header(e), script-src={script_src.strip()!r}, {len(inline)} inline-skript, uten riktig nonce: {missing[:3]}")
+          print(f"CSP-nonce OK: {len(inline)} inline-skript bærer noncen.")
+          PY
 
       - name: Bundle budget
         run: bun run check:bundle

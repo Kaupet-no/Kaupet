@@ -32,7 +32,6 @@ import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
-import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
 import { Route as BedriftOrganizationIdRouteImport } from './routes/bedrift.$organizationId'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as DesignBedriftPlanerRouteImport } from './routes/design/bedrift-planer'
@@ -172,11 +171,6 @@ const AuthenticatedVarslerRoute = AuthenticatedVarslerRouteImport.update({
 const AnnonseListingIdRoute = AnnonseListingIdRouteImport.update({
   id: '/annonse/$listingId',
   path: '/annonse/$listingId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnnonserFilterRoute = AnnonserFilterRouteImport.update({
-  id: '/annonser_/filter',
-  path: '/annonser/filter',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BedriftOrganizationIdRoute = BedriftOrganizationIdRouteImport.update({
@@ -344,7 +338,6 @@ export interface FileRoutesByFullPath {
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
-  '/annonser/filter': typeof AnnonserFilterRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
@@ -392,7 +385,6 @@ export interface FileRoutesByTo {
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
-  '/annonser/filter': typeof AnnonserFilterRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
@@ -444,7 +436,6 @@ export interface FileRoutesById {
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
-  '/annonser_/filter': typeof AnnonserFilterRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
@@ -496,7 +487,6 @@ export interface FileRouteTypes {
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
-    | '/annonser/filter'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/design/bedrift-planer'
@@ -544,7 +534,6 @@ export interface FileRouteTypes {
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
-    | '/annonser/filter'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/design/bedrift-planer'
@@ -595,7 +584,6 @@ export interface FileRouteTypes {
     | '/_authenticated/profil'
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
-    | '/annonser_/filter'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/design/bedrift-planer'
@@ -640,7 +628,6 @@ export interface RootRouteChildren {
   KaupetCodeSubRoute: typeof KaupetCodeSubRoute
   R360OpptakTokenRoute: typeof R360OpptakTokenRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
-  AnnonserFilterRoute: typeof AnnonserFilterRoute
   BedriftOrganizationIdRoute: typeof BedriftOrganizationIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   DesignBedriftPlanerRoute: typeof DesignBedriftPlanerRoute
@@ -812,13 +799,6 @@ declare module '@tanstack/react-router' {
       path: '/annonse/$listingId'
       fullPath: '/annonse/$listingId'
       preLoaderRoute: typeof AnnonseListingIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/annonser_/filter': {
-      id: '/annonser_/filter'
-      path: '/annonser/filter'
-      fullPath: '/annonser/filter'
-      preLoaderRoute: typeof AnnonserFilterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bedrift/$organizationId': {
@@ -1099,7 +1079,6 @@ const rootRouteChildren: RootRouteChildren = {
   KaupetCodeSubRoute: KaupetCodeSubRoute,
   R360OpptakTokenRoute: R360OpptakTokenRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
-  AnnonserFilterRoute: AnnonserFilterRoute,
   BedriftOrganizationIdRoute: BedriftOrganizationIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   DesignBedriftPlanerRoute: DesignBedriftPlanerRoute,

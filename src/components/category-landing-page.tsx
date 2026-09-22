@@ -4,16 +4,16 @@ import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { ActiveFilters } from "@/components/active-filters";
 import { ResultList } from "@/components/result-list";
+import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
 import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import { vehicleCategoryGroupFor, genericBrandFilterFor } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { SearchBar } from "@/components/search-bar";
-import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
+import { searchSchema } from "@/features/listing-search/search-schema";
 import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useIsDesktop } from "@/hooks/use-form-factor";
@@ -121,15 +121,12 @@ export function CategoryLandingPage({
     location,
     attrFilters,
     attrValues,
-    handleAttrValueChange,
     terms,
     updateSearch,
-    handleLocationChange,
     resetFilters,
     justCreatedKeys,
     removeAttrWithRestore,
     activeFilterCount,
-    facetCounts,
     applyPanelDraft,
     isLoading,
     fetchNextPage,
@@ -208,35 +205,6 @@ export function CategoryLandingPage({
               onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
             />
           )}
-          {/* Desktop web bruker SearchFilterSidebar (se under, samme som
-              /annonser); denne inline-kortlayouten er kun for mobil web, der
-              siden ikke har plass til en fast sidekolonne. */}
-          {!isNative && !isDesktop && (
-            <AttributeFilterChips
-              filters={attrFilters}
-              values={attrValues}
-              onChange={handleAttrValueChange}
-              isNative={isNative}
-              resultCount={totalCount ?? cards.length}
-              queryText={qDraft}
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              counts={facetCounts}
-              layout="card"
-              location={location}
-              onLocationChange={handleLocationChange}
-              onReset={resetFilters}
-            />
-          )}
-
           {/* Native (fase 12): aktive filtertagger bor i søkepanelet nå. */}
           {!isNative && (
             <ActiveFilters
@@ -295,6 +263,13 @@ export function CategoryLandingPage({
             }
             sort={search.sort}
             onSortChange={(s) => updateSearch({ sort: s })}
+            /* Samme filterinngang som /annonser: ett panel, ett filtersett.
+               Desktop har sidekolonnen, native har SearchSummaryPill. */
+            toolbarLead={
+              !isNative && !isDesktop ? (
+                <MobileFilterButton activeFilterCount={activeFilterCount} />
+              ) : undefined
+            }
           />
         </SearchResultsBody>
       </div>

@@ -11,6 +11,7 @@ import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { ActiveFilters } from "@/components/active-filters";
 import { ResultList } from "@/components/result-list";
 import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
+import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -450,6 +451,13 @@ function BrowsePage() {
     });
   }, [mounted, activeFilterCount, effectiveCategories.length, search.q]);
 
+  /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
+     trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.
+     Mobilweb bruker den delte knappen, som kategorilandingssidene også
+     bruker, slik at de to flatene ikke kan drifte fra hverandre. */
+  const mobileFilterButton =
+    !isNative && !isDesktop ? <MobileFilterButton activeFilterCount={activeFilterCount} /> : null;
+
   if (!mounted) {
     return <BrowsePageSkeleton />;
   }
@@ -553,34 +561,6 @@ function BrowsePage() {
                 </>
               )}
             </div>
-            {/* Desktop har filtrene stående i sidekolonnen — ingen knapp som
-                åpner en dialog over dem. */}
-            {!isNative && !isDesktop && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-10 shrink-0 gap-1.5 rounded-full px-3"
-                onClick={() => {
-                  trackProductEvent("search_filter_opened", {
-                    section: "categories",
-                    source: "filter_button",
-                    filterCount: activeFilterCount,
-                  });
-                  openPanel("categories");
-                }}
-                aria-label={
-                  activeFilterCount > 0
-                    ? `Filtrer, ${activeFilterCount} aktive`
-                    : "Filtrer annonser"
-                }
-              >
-                <SlidersHorizontal className="size-4" />
-                <span className="hidden sm:inline">
-                  Filtrer{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
-                </span>
-              </Button>
-            )}
           </div>
         </div>
         {!isNative && !isDesktop && !search.q.trim() && activeFilterCount === 0 && (
@@ -757,6 +737,9 @@ function BrowsePage() {
 
             {activeTab === "wtb" ? (
               <div className="mt-4">
+                {mobileFilterButton && (
+                  <div className="mb-3 flex justify-end">{mobileFilterButton}</div>
+                )}
                 {wtbLoading ? (
                   <div className="flex items-center justify-center py-16">
                     <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -828,6 +811,7 @@ function BrowsePage() {
                 sort={search.sort}
                 onSortChange={(s) => updateSearch({ sort: s })}
                 // Native (fase 12): "Lagre søk" flyttet inn i søkepanelet.
+                toolbarLead={mobileFilterButton}
                 toolbarExtra={
                   // Desktop har «Lagre søk» nederst i filterkolonnen.
                   user && !isNative && !isDesktop && hasSearchCriteria ? (

@@ -21,9 +21,13 @@ import {
   valueToCriteria,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
-import { findCategorySuggestion, type Category } from "@/lib/categories";
+import { buildTree, findCategorySuggestion, type Category } from "@/lib/categories";
 import type { LocationValue } from "@/components/location-filter";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import {
+  effectiveFiltersForCategories,
+  type AttributeFilterValue,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import type { AppliedSearchState } from "@/features/listing-search/search-schema";
 import { resolveAppliedSearch, submitSearch } from "@/features/listing-search/submit-search";
@@ -34,11 +38,12 @@ import {
 import { buildStructuredSearchSuggestions } from "@/features/listing-search/structured-search-suggestions";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAuth } from "@/hooks/use-auth";
-import { useFormFactor } from "@/hooks/use-form-factor";
+import { useFormFactor, useIsNarrow } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
+import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
 import { SearchSuggestionList, type SearchSuggestionGroup } from "../search-suggestion-list";
 import { buildActiveFilterItems } from "./active-filter-items";
@@ -66,6 +71,9 @@ export type SearchPanelResultsContext = {
   resultCount?: number;
   /** Highest matching listing price before the user's own maximum is applied. */
   availablePriceMax?: number | null;
+  /** Ruten eier kategorien (kategorilandingssidene) — skjul kategorivalget,
+   * siden siden uansett overstyrer det. Se `useSearchResultsShell`. */
+  categoryLocked?: boolean;
 };
 
 function cloneValue(value: AdvancedSearchValue): AdvancedSearchValue {
@@ -143,9 +151,15 @@ export function SearchPanel({
       return { ...previous, value };
     });
   const formFactor = useFormFactor();
-  // Web og native nettbrett får dialog; native telefon får dratt skuff.
+  // Web og native nettbrett går via ResponsiveOverlay; native telefon får sin
+  // egen dratte skuff. Overlayet velger selv skuff (smal) eller dialog (bred).
   const isWeb = formFactor === "web" || formFactor === "desktop" || formFactor === "tablet";
+  const narrow = useIsNarrow();
   const isTablet = formFactor === "tablet";
+  /* Nettleseren skal se de samme filtrene uansett bredde: dialogen på mobilweb
+     rendrer selve sidekolonne-komponenten (`SearchFilterSidebar`), ikke en
+     parallell filterliste. Native beholder skuffens drilldown-oversikt. */
+  const browserFilterLayout = !!results && (formFactor === "web" || formFactor === "desktop");
   const inputRef = useRef<HTMLInputElement>(null);
   const close = (reason: "cancel" | "apply" = "cancel") => {
     if (reason === "cancel") handleOpenChange(false);
@@ -191,6 +205,42 @@ export function SearchPanel({
       ),
     [allFilters, draft.attributes, launchQueryDraft, results?.attributeFilters],
   );
+  /* I nettleseren gjelder hvert valg umiddelbart, akkurat som i sidekolonnen —
+     ellers ville filtrene ligget usynlig i et utkast til brukeren fant
+     «Vis N annonser» nederst i en lang liste, og vært borte ved neste
+     breddeendring. Skuffen på native beholder utkastet: der dekker panelet
+     treffene, så et mellomsteg er riktig. `editedState` er tilstanden
+     seksjonene faktisk redigerer i begge tilfeller. */
+  const editedState = browserFilterLayout && results ? results.applied : draft;
+
+  /* Kategorispesifikke filtre må følge tilstanden som redigeres, ikke URL-en:
+     velger du en kategori i skuffen, skal filtrene under den dukke opp med én
+     gang. `results.attributeFilters` oppdateres først når utkastet committes —
+     det gjorde kategorivelgeren i panelet virkningsløs. */
+  const categoryTree = useMemo(() => buildTree(categories), [categories]);
+  const editedCategoryIds = useMemo(
+    () =>
+      editedState.value.categories
+        .map((slug) => categoryTree.bySlug.get(slug)?.id)
+        .filter((id): id is string => !!id),
+    [editedState.value.categories, categoryTree],
+  );
+  const draftAttributeFilters = useMemo(() => {
+    if (editedCategoryIds.length === 0)
+      return (results?.attributeFilters ?? allFilters) as CategoryFilter[];
+    return effectiveFiltersForCategories(editedCategoryIds, allFilters, categoryTree.byId);
+  }, [editedCategoryIds, allFilters, categoryTree, results?.attributeFilters]);
+  /* Fasett-tellingene er hentet for anvendt kategori. Viser vi dem under en
+     annen kategoris filtre blir de direkte feil, så de utelates til utkastet
+     er committet (i nettleseren er de alltid i takt). */
+  const editedCategoriesMatchApplied =
+    !results ||
+    (results.applied.value.categories.length === editedState.value.categories.length &&
+      results.applied.value.categories.every((slug) =>
+        editedState.value.categories.includes(slug),
+      ));
+  const draftAttributeCounts = editedCategoriesMatchApplied ? results?.attributeCounts : undefined;
+
   const updateDraftAttribute = (key: string, value: AttributeFilterValue | undefined) => {
     setDraft((previous) => {
       const next = { ...previous.attributes };
@@ -210,14 +260,16 @@ export function SearchPanel({
     updateDraftAttribute(key, values.length ? { ...current, values } : undefined);
   };
 
+  /* Leses fra `editedState` (anvendt i nettleseren, utkast i skuffen); `onX`-
+     handlerne skriver utkastet og nås bare fra skuffen, som er samme objekt. */
   const draftItems = results
     ? buildActiveFilterItems({
         search: {
-          q: draft.value.terms.join(" "),
-          qMode: draft.value.qMode,
-          extraGroups: draft.value.extraGroups,
+          q: editedState.value.terms.join(" "),
+          qMode: editedState.value.qMode,
+          extraGroups: editedState.value.extraGroups,
         },
-        terms: draft.value.terms,
+        terms: editedState.value.terms,
         onUpdate: (patch) =>
           setDraft((previous) => ({
             ...previous,
@@ -228,10 +280,10 @@ export function SearchPanel({
               extraGroups: patch.extraGroups ?? previous.value.extraGroups,
             },
           })),
-        attrFilters: results.attributeFilters,
-        attrValues: draft.attributes,
+        attrFilters: draftAttributeFilters,
+        attrValues: editedState.attributes,
         onRemoveAttr: removeDraftAttribute,
-        location: draft.value.location,
+        location: editedState.value.location,
         onRemoveLocation: () =>
           setDraft((previous) => ({
             ...previous,
@@ -253,10 +305,17 @@ export function SearchPanel({
     draft.value.location.lat != null ||
     draft.value.location.lng != null;
 
-  const draftCriteria = { ...valueToCriteria(draft.value), attributes: draft.attributes };
+  const draftCriteria = {
+    ...valueToCriteria(editedState.value),
+    attributes: editedState.attributes,
+  };
+  // I nettleseren er treffet alltid i takt med filtrene — de anvendes direkte.
   const visibleResultCount =
-    results && searchDraftMatchesApplied(draft, results.applied) ? results.resultCount : undefined;
-  const draftChanged = !!results && !searchDraftMatchesApplied(draft, results.applied);
+    results && (browserFilterLayout || searchDraftMatchesApplied(draft, results.applied))
+      ? results.resultCount
+      : undefined;
+  const draftChanged =
+    !!results && !browserFilterLayout && !searchDraftMatchesApplied(draft, results.applied);
   const draftCount = useDraftResultCount({
     draft,
     categories,
@@ -385,6 +444,9 @@ export function SearchPanel({
       {/* Fritekstfeltet brukes i launch-modus. Et stedspanel viser bare
           lokasjonskontrollen, slik at triggeren åpner riktig oppgave. */}
       {results && !queryMode ? (
+        /* `SearchFilterSidebar` har sin egen «Filtre · N»/«Nullstill»-header og
+           «Lagre søk», så denne raden er bare for skuffen. */
+        !browserFilterLayout &&
         hasDraftCriteria && (
           <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3">
             {user ? (
@@ -472,28 +534,38 @@ export function SearchPanel({
       {queryMode ? (
         queryContent
       ) : results || launchFilterMode ? (
-        <SearchFilterSections
-          key={`${open}-${section}`}
-          value={draft.value}
-          categories={categories}
-          setValue={setDraftValue}
-          section={section}
-          queryText={draft.value.terms.join(" ")}
-          attributeFilters={results?.attributeFilters ?? allFilters}
-          attributeValues={draft.attributes}
-          onAttributeChange={updateDraftAttribute}
-          attributeCounts={results?.attributeCounts}
-          priceBounds={
-            results
-              ? priceBoundsForMax(results.availablePriceMax, {
-                  min: draft.value.min ?? undefined,
-                  max: draft.value.max ?? undefined,
-                })
-              : undefined
-          }
-          activeItems={results ? draftItems : undefined}
-          includePrimary={!!results}
-        />
+        browserFilterLayout ? (
+          <SearchFilterSidebar
+            variant="inline"
+            results={{ ...results!, attributeFilters: draftAttributeFilters }}
+            categories={categories}
+            onSaveSearch={user ? () => setSaveOpen(true) : undefined}
+          />
+        ) : (
+          <SearchFilterSections
+            key={`${open}-${section}`}
+            value={draft.value}
+            categories={categories}
+            setValue={setDraftValue}
+            section={section}
+            queryText={draft.value.terms.join(" ")}
+            attributeFilters={draftAttributeFilters}
+            attributeValues={draft.attributes}
+            onAttributeChange={updateDraftAttribute}
+            attributeCounts={draftAttributeCounts}
+            priceBounds={
+              results
+                ? priceBoundsForMax(results.availablePriceMax, {
+                    min: draft.value.min ?? undefined,
+                    max: draft.value.max ?? undefined,
+                  })
+                : undefined
+            }
+            activeItems={results ? draftItems : undefined}
+            includePrimary={!!results}
+            hideCategory={results?.categoryLocked}
+          />
+        )
       ) : (
         <BrowseContent
           q={launchQueryDraft}
@@ -521,7 +593,8 @@ export function SearchPanel({
                   filterCount: draftItems.length,
                   resultCount: buttonResultCount ?? null,
                 });
-                results.onApply(draft);
+                // Nettleseren har allerede anvendt hvert valg — knappen lukker.
+                if (!browserFilterLayout) results.onApply(draft);
                 trackProductEvent("search_submitted", {
                   hasCategory: draft.value.categories.length > 0,
                   filterCount: draftItems.length,
@@ -560,7 +633,24 @@ export function SearchPanel({
     <>
       {isWeb ? (
         <ResponsiveOverlay open={open} onOpenChange={handleOpenChange}>
-          <ResponsiveOverlayContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <ResponsiveOverlayContent
+            /* Mobilweb får skuffen dratt til fullhøyde, som i appen. */
+            expandable={narrow}
+            className={
+              /* Skuffen legger klassen på sin egen scrollende innerdiv og eier
+                 høyde og scroll selv — Dialogens `max-h`/`overflow` hører bare
+                 hjemme i dialog-grenen. Filteroppsettet trenger likevel en
+                 flex-kolonne begge steder, siden sidekolonne-innholdet er et
+                 `flex-1`-barn med «Vis N annonser» under seg. */
+              narrow
+                ? browserFilterLayout
+                  ? "flex flex-col"
+                  : undefined
+                : browserFilterLayout
+                  ? "flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg"
+                  : "max-h-[85vh] overflow-y-auto sm:max-w-lg"
+            }
+          >
             <DialogHeader>
               <DialogTitle>Søk og filtrer</DialogTitle>
             </DialogHeader>

@@ -90,6 +90,10 @@ type Props = {
   onSortChange: (v: SortValue) => void;
   /** Extra toolbar actions (e.g. "Lagre søk") — annonser-specific, so left to the caller. */
   toolbarExtra?: ReactNode;
+  /** Innhold helt først i verktøylinja, ved siden av treffantallet. Filtrering
+   * er den viktigste kontrollen på en smal skjerm og skal ikke kunne skyves
+   * utenfor kanten av visningsvalg/sortering/kart, som `toolbarExtra` gjør. */
+  toolbarLead?: ReactNode;
 };
 
 /**
@@ -124,6 +128,7 @@ export function ResultList({
   sort,
   onSortChange,
   toolbarExtra,
+  toolbarLead,
 }: Props) {
   const formFactor = useFormFactor();
   const nativePhone = isNative && formFactor === "phone";
@@ -252,6 +257,7 @@ export function ResultList({
               ? "Søker…"
               : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
+          {toolbarLead}
         </div>
         <div className="flex items-center gap-2">
           {isNative ? (

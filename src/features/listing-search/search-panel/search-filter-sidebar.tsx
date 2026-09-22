@@ -18,19 +18,31 @@ type Props = {
   categories: Category[];
   /** «Lagre søk» — utelates for utloggede brukere. */
   onSaveSearch?: () => void;
+  /** "sidebar" er desktops sticky sidekolonne. "inline" er samme innhold uten
+   * kolonne-chrome, til bruk inne i mobilwebens filterdialog — se
+   * `SearchPanel`, som gir den et utkast i stedet for anvendt state. */
+  variant?: "sidebar" | "inline";
   className?: string;
 };
 
 /**
- * Filtrene som permanent sidekolonne på desktop, der skuffen/dialogen er feil
- * form: nettleserbrukeren skal se treffene endre seg mens hun filtrerer, ikke
- * lukke en modal for å oppdage resultatet.
+ * Hele filtersettet i nettleseren — permanent sidekolonne på desktop
+ * (`variant="sidebar"`), og nøyaktig det samme innholdet inne i mobilwebens
+ * filterdialog (`variant="inline"`). Én komponent, så de to bredene ikke kan
+ * drifte fra hverandre.
  *
- * Ingen eget utkast og ingen «Vis N annonser»-knapp — hvert valg gjelder
- * umiddelbart mot samme `onApply` som panelet bruker. Seksjonene er de samme
- * (`SearchFilterSections`), bare i `layout="expanded"`.
+ * Komponenten eier ingen tilstand: `results.applied`/`onApply` er anvendt
+ * søk i sidekolonnen (hvert valg gjelder umiddelbart) og dialogens utkast i
+ * `inline` (der «Vis N annonser» committer). Seksjonene er
+ * `SearchFilterSections` i `layout="expanded"` i begge.
  */
-export function SearchFilterSidebar({ results, categories, onSaveSearch, className }: Props) {
+export function SearchFilterSidebar({
+  results,
+  categories,
+  onSaveSearch,
+  variant = "sidebar",
+  className,
+}: Props) {
   const { applied, onApply } = results;
 
   const setValue = (next: React.SetStateAction<AdvancedSearchValue>) => {
@@ -57,12 +69,17 @@ export function SearchFilterSidebar({ results, categories, onSaveSearch, classNa
     (applied.value.location.lat != null ? 1 : 0) +
     applied.value.extraGroups.length;
 
+  const inline = variant === "inline";
+  const Root = inline ? "div" : "aside";
+
   return (
-    <aside
-      aria-label="Filtrer annonser"
-      data-testid="search-filter-sidebar"
+    <Root
+      aria-label={inline ? undefined : "Filtrer annonser"}
+      data-testid={inline ? undefined : "search-filter-sidebar"}
       className={cn(
-        "sticky top-20 hidden shrink-0 rounded-xl border border-border bg-card lg:block",
+        inline
+          ? "min-h-0 flex-1 overflow-y-auto"
+          : "sticky top-20 hidden shrink-0 rounded-xl border border-border bg-card lg:block",
         className,
       )}
     >
@@ -105,6 +122,7 @@ export function SearchFilterSidebar({ results, categories, onSaveSearch, classNa
           attributeCounts={results.attributeCounts}
           priceBounds={priceBounds}
           includePrimary
+          hideCategory={results.categoryLocked}
         />
         {onSaveSearch && (
           <Button
@@ -118,6 +136,6 @@ export function SearchFilterSidebar({ results, categories, onSaveSearch, classNa
           </Button>
         )}
       </div>
-    </aside>
+    </Root>
   );
 }

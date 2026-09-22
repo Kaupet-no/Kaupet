@@ -137,6 +137,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Kaupet.no er en åpen kildekode-markedsplass for kjøp og salg av brukte ting i Norge. Bygget av frivillige, for fellesskapet.",
       },
       { name: "author", content: "Kaupet.no" },
+      // Synlig i view-source på hver SSR-side, og AGPL §13-kildehenvisningen.
+      {
+        name: "generator",
+        content:
+          "Powered by Kaupet.no — https://kaupet.no (AGPL-3.0, https://github.com/Kaupet-no/Kaupet)",
+      },
       { property: "og:site_name", content: "Kaupet.no" },
       { property: "og:locale", content: "nb_NO" },
       { property: "og:type", content: "website" },

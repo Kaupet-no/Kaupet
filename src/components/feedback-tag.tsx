@@ -80,7 +80,7 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
         </p>
       ) : (
         <div className="space-y-3">
-          <div className="flex justify-center gap-3">
+          <div className="flex justify-start gap-3 pl-1">
             <button
               type="button"
               aria-label="Ros"
@@ -141,14 +141,17 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
 export function FeedbackTag() {
   const native = useIsNative();
   const [open, setOpen] = useState(false);
+  // Keeps the panel mounted through its slide-out; cleared on animationend.
+  const [closing, setClosing] = useState(false);
   const [overlapping, setOverlapping] = useState(false);
   const tagRef = useRef<HTMLDivElement>(null);
+  const close = () => setClosing(true);
 
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (tagRef.current && !tagRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        close();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -198,28 +201,39 @@ export function FeedbackTag() {
       }`}
     >
       {open ? (
-        <div className="w-72 rounded-l-xl border border-r-0 border-border bg-card p-4 shadow-lg duration-200 animate-in slide-in-from-right-4">
+        <div
+          onAnimationEnd={(e) => {
+            if (!closing || e.target !== e.currentTarget) return;
+            setClosing(false);
+            setOpen(false);
+          }}
+          className={`w-72 rounded-l-xl border border-r-0 border-border bg-card p-4 shadow-lg duration-200 ${
+            closing
+              ? "animate-out fill-mode-forwards slide-out-to-right-4 fade-out"
+              : "animate-in slide-in-from-right-4"
+          }`}
+        >
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-semibold">Vi vil gjerne høre fra deg!</p>
             <button
               type="button"
               aria-label="Lukk"
-              onClick={() => setOpen(false)}
+              onClick={close}
               className="rounded p-1 text-muted-foreground hover:bg-accent"
             >
               <X className="size-4" />
             </button>
           </div>
-          <FeedbackPanel onDone={() => setOpen(false)} />
+          <FeedbackPanel onDone={close} />
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Ris og Ros"
-          className="group flex h-10 w-10 items-center justify-center overflow-hidden rounded-l-md border border-r-0 border-border bg-card/95 text-muted-foreground shadow-md backdrop-blur transition-[width,color,background-color] duration-200 ease-out hover:w-28 hover:bg-card hover:text-foreground"
+          className="group flex h-10 w-10 animate-in items-center justify-center overflow-hidden rounded-l-md border slide-in-from-right-4 fade-in border-r-0 border-border bg-card/95 text-muted-foreground shadow-md backdrop-blur transition-[width,color,background-color] duration-200 ease-out hover:w-28 hover:bg-card hover:text-foreground"
         >
-          <MessageSquareHeart className="size-4 shrink-0 text-rose-500/80" />
+          <MessageSquareHeart className="size-4 shrink-0 text-primary/80" />
           <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-sm font-semibold tracking-wide opacity-0 transition-[max-width,margin-left,opacity] duration-200 ease-out group-hover:ml-1.5 group-hover:max-w-[5rem] group-hover:opacity-100">
             Ris og Ros
           </span>

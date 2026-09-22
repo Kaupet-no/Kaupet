@@ -11,7 +11,13 @@ export type SecurityHeaderEnv = {
    * en privat bucket og rendres som `<img>` med presignert S3-URL på
    * `https://<account>.r2.cloudflarestorage.com` (se `src/lib/r2.server.ts`). */
   r2AccountId?: string;
+  /** Request-local nonce for TanStack Start's SSR inline scripts. */
+  scriptNonce?: string;
 };
+
+// The root route's JSON-LD is static, so a hash covers it without weakening
+// script-src for arbitrary inline code.
+const ROOT_JSON_LD_HASH = "'sha256-LR2kHVcI8evMuo9ZNJ5xdPHkkPKsqFHzVrZCCNWuZ4k='";
 
 /** Kilder som mangler utelates framfor å slippe inn strengen "undefined" eller
  * et wildcard: en tom variabel skal blokkere domenet, ikke åpne det. */
@@ -30,6 +36,8 @@ function imgSrc({ r2PublicBaseUrl, r2AccountId }: SecurityHeaderEnv): string {
 }
 
 export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, string> {
+  const scriptNonce = env.scriptNonce ? `'nonce-${env.scriptNonce}'` : undefined;
+
   return {
     // Attribusjon på hvert svar, synlig i DevTools Network. Ren ASCII med vilje:
     // headerverdier er latin-1, så ingen em-dash her (til forskjell fra
@@ -40,16 +48,18 @@ export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, str
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-    // Enforce the policy. Keep the explicit inline allowance until SSR
-    // hydration/bootstrap has been migrated to nonces; report-only provided no
-    // protection at all.
+    // SSR hydration scripts carry the request-local nonce. Static assets use
+    // the same policy without a nonce; the Start middleware adds it for HTML.
     "content-security-policy": [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'self'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+      ["script-src 'self'", scriptNonce, "https://challenges.cloudflare.com"]
+        .concat(ROOT_JSON_LD_HASH)
+        .filter(Boolean)
+        .join(" "),
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       imgSrc(env),

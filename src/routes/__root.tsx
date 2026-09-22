@@ -123,7 +123,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   loader: async () => ({
     ssrUser: typeof window === "undefined" ? await getSessionUser() : undefined,
   }),
-  head: () => ({
+  head: ({ ssr }) => ({
     meta: [
       { charSet: "utf-8" },
       {
@@ -212,6 +212,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     scripts: [
       {
         type: "application/ld+json",
+        ...(ssr?.nonce ? { nonce: ssr.nonce } : {}),
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@graph": [

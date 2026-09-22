@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { buildSecurityHeaders } from "./security-headers";
 
 describe("buildSecurityHeaders", () => {
+  it("tillater SSR-script med nonce uten unsafe-inline", () => {
+    const csp = buildSecurityHeaders({ scriptNonce: "abc123" })["content-security-policy"];
+    const scriptSrcDirective = csp.split("; ").find((d) => d.startsWith("script-src "));
+
+    expect(scriptSrcDirective).toContain("'nonce-abc123'");
+    expect(scriptSrcDirective).toContain("'sha256-LR2kHVcI8evMuo9ZNJ5xdPHkkPKsqFHzVrZCCNWuZ4k='");
+    expect(scriptSrcDirective).not.toContain("unsafe-inline");
+  });
+
+  it("har ingen script unsafe-inline uten request-nonce heller", () => {
+    const csp = buildSecurityHeaders({})["content-security-policy"];
+    const scriptSrcDirective = csp.split("; ").find((d) => d.startsWith("script-src "));
+
+    expect(scriptSrcDirective).not.toContain("unsafe-inline");
+  });
+
   it("inkluderer både r2PublicBaseUrl og r2AccountId i img-src direktivet", () => {
     const headers = buildSecurityHeaders({
       r2PublicBaseUrl: "https://bilder.kaupet.no",

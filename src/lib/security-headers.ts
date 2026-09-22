@@ -31,6 +31,10 @@ function imgSrc({ r2PublicBaseUrl, r2AccountId }: SecurityHeaderEnv): string {
 
 export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, string> {
   return {
+    // Attribusjon på hvert svar, synlig i DevTools Network. Ren ASCII med vilje:
+    // headerverdier er latin-1, så ingen em-dash her (til forskjell fra
+    // `<meta name="generator">` og bundle-banneret i vite.config.ts).
+    "x-powered-by": "Kaupet.no - https://kaupet.no (AGPL-3.0, https://github.com/Kaupet-no/Kaupet)",
     "x-content-type-options": "nosniff",
     "x-frame-options": "SAMEORIGIN",
     "referrer-policy": "strict-origin-when-cross-origin",

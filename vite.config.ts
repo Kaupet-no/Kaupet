@@ -39,8 +39,24 @@ export default defineConfig(({ command, mode }) => {
     }
   }
 
+  // Attribution øverst i hver bygde JS-fil (se plugin-listen under), doblet
+  // som AGPL §13-kildehenvisning. `/*!` gjør den til en legal comment, som
+  // `comments.legal` under sørger for at minifikatoren i klientbygget beholder
+  // — uten den strippes alle kommentarer, også tredjepartenes @license.
+  const attributionBanner =
+    "/*! Powered by Kaupet.no — https://kaupet.no | AGPL-3.0, kildekode: https://github.com/Kaupet-no/Kaupet */";
+
   return {
     define: envDefine,
+    environments: {
+      client: {
+        build: {
+          rolldownOptions: {
+            output: { comments: { legal: true, annotation: false, jsdoc: false } },
+          },
+        },
+      },
+    },
     build: {
       rolldownOptions: {
         output: {
@@ -99,6 +115,13 @@ export default defineConfig(({ command, mode }) => {
     },
     server: { host: "::", port: 8080 },
     plugins: [
+      {
+        name: "kaupet-attribution-banner",
+        enforce: "post" as const,
+        renderChunk(code: string) {
+          return code.startsWith("/*!") ? null : `${attributionBanner}\n${code}`;
+        },
+      },
       tailwindcss(),
       tanstackStart({
         importProtection: {

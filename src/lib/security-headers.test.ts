@@ -16,6 +16,14 @@ describe("buildSecurityHeaders", () => {
     expect(imgSrcDirective).toContain("https://abc123.r2.cloudflarestorage.com");
   });
 
+  it("attribuerer Kaupet.no i x-powered-by med bare latin-1-tegn", () => {
+    const value = buildSecurityHeaders({})["x-powered-by"];
+
+    expect(value).toContain("Kaupet.no");
+    // Headerverdier er latin-1: ingen em-dash eller andre tegn over 0x7e.
+    expect(value).toMatch(/^[\x20-\x7e]+$/);
+  });
+
   it("inneholder aldri wildcard for alle r2.cloudflarestorage.com kontoer", () => {
     const headers = buildSecurityHeaders({
       r2PublicBaseUrl: "https://bilder.kaupet.no",

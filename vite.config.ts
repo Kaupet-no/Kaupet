@@ -57,6 +57,14 @@ export default defineConfig(({ command, mode }) => {
     define: envDefine,
     environments: {
       client: {
+        // start-client-core må serveres gjennom Vites transform-pipeline, ikke
+        // prebundles. Start-pluginen kompilerer bort server-grenen i
+        // createIsomorphicFn() (bl.a. getGlobalStartContext), og den
+        // transformen kjører ikke på moduler som havner i .vite/deps. Da
+        // overlever `import { AsyncLocalStorage } from "node:async_hooks"` via
+        // @tanstack/start-storage-context inn i nettleserbunten, og
+        // klientinngangen krasjer før hydrering — appen blir stående tom.
+        optimizeDeps: { exclude: ["@tanstack/start-client-core"] },
         build: {
           rolldownOptions: {
             output: { comments: { legal: true, annotation: false, jsdoc: false } },

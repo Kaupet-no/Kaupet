@@ -4,19 +4,62 @@
  * everything else uses production API + VIPPS_* secrets.
  * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/
  */
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { isTestHost } from "./env";
 
-/** Constant-time HMAC-SHA256 signature check for the Vipps webhook. */
-export function verifyVippsWebhookSignature(
-  secret: string,
-  signatureHeader: string,
-  rawBody: string,
-): boolean {
-  const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
-  const sigBuf = Buffer.from(signatureHeader);
-  const expBuf = Buffer.from(expected);
-  return sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf);
+/** Vipps retries are accepted by event id; only unseen events need freshness. */
+export const VIPPS_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
+
+export type VippsWebhookRequest = {
+  method: string;
+  pathAndQuery: string;
+  host: string;
+  date: string;
+  contentHash: string;
+  authorization: string;
+  rawBody: string;
+};
+
+const VIPPS_AUTH_PREFIX = "HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=";
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  return aBuf.length === bBuf.length && timingSafeEqual(aBuf, bBuf);
+}
+
+/** Constant-time canonical HMAC-SHA256 signature check for Vipps webhooks. */
+export function verifyVippsWebhookSignature(secret: string, request: VippsWebhookRequest): boolean {
+  const expectedContentHash = createHash("sha256").update(request.rawBody).digest("base64");
+  if (!timingSafeStringEqual(request.contentHash, expectedContentHash)) return false;
+
+  if (!request.authorization.startsWith(VIPPS_AUTH_PREFIX)) return false;
+  const signature = request.authorization.slice(VIPPS_AUTH_PREFIX.length);
+  if (!signature || signature.includes("&")) return false;
+
+  const signed = `${request.method}\n${request.pathAndQuery}\n${request.date};${request.host};${request.contentHash}`;
+  const expectedSignature = createHmac("sha256", secret).update(signed).digest("base64");
+  return timingSafeStringEqual(signature, expectedSignature);
+}
+
+/**
+ * Return the stable identity carried by a signed webhook payload.
+ * `pspReference` is required by the ePayment webhook contract and is unique
+ * per payment operation. Keep eventId/id for compatibility with older payloads.
+ */
+export function getVippsWebhookEventId(payload: Record<string, unknown>): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  for (const key of ["pspReference", "eventId", "id"]) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+/** Validate Vipps' signed RFC 1123 request date for a newly-seen webhook. */
+export function isFreshVippsWebhookDate(date: string, now = Date.now()): boolean {
+  const dateMs = Date.parse(date);
+  return Number.isFinite(dateMs) && Math.abs(now - dateMs) <= VIPPS_WEBHOOK_MAX_AGE_MS;
 }
 
 type VippsEnv = {

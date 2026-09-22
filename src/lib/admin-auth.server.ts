@@ -18,3 +18,21 @@ export async function requireAdminRole(
   }
   if (!data) throw new Error("Ikke autorisert");
 }
+
+/** Throws "Ikke autorisert" unless the given user has admin or demo role. */
+export async function requireAdminOrDemoRole(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .in("role", ["admin", "demo"])
+    .limit(1);
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error.server");
+    throw await toClientError("database", error);
+  }
+  if (!data || data.length === 0) throw new Error("Ikke autorisert");
+}

@@ -3,6 +3,7 @@ import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAdminOrDemoRole } from "@/lib/admin-auth.server";
 import { isTestHost } from "@/lib/env";
 import { logServerError } from "@/lib/server-error-log";
 import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
@@ -34,6 +35,17 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const host = (() => {
+      try {
+        return getRequestHost();
+      } catch {
+        return null;
+      }
+    })();
+    const { createVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
+    const vippsMode = getVippsMode(host);
+    if (vippsMode === "test") await requireAdminOrDemoRole(supabase, userId);
 
     // Verify ownership and active listing
     const { data: listing, error: lerr } = await supabase
@@ -72,16 +84,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (existing) {
       throw new Error("Denne annonsen har allerede en aktiv eller ventende fremheving");
     }
-
-    const { createVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
-    const host = (() => {
-      try {
-        return getRequestHost();
-      } catch {
-        return null;
-      }
-    })();
-    const vippsMode = getVippsMode(host);
 
     // Create pending row — vipps_mode is fixed at creation and reused for
     // reconcile/capture/refund/webhook, instead of re-derived per request.

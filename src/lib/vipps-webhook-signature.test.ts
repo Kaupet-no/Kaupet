@@ -1,29 +1,129 @@
-import { createHmac } from "crypto";
+import { createHash, createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
-import { verifyVippsWebhookSignature } from "./vipps.server";
+import {
+  getVippsWebhookEventId,
+  isFreshVippsWebhookDate,
+  verifyVippsWebhookSignature,
+} from "./vipps.server";
 
-const secret = "shared-secret";
-const body = JSON.stringify({ reference: "ref-1", name: "epayments.payment.authorized.v1" });
+const secret =
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+const body = '{"some-unique-content":"ee6e441b-cc4a-46f8-895d-a5af79bcc233/hello-world"}';
+const date = "Thu, 30 Mar 2023 08:38:32 GMT";
+const pathAndQuery = "/e2cee29b-012e-4f1d-8ef4-e95fd74a7a63";
+const host = "webhook.site";
+const contentHash = createHash("sha256").update(body).digest("base64");
+const canonicalAuthorization =
+  "HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=u4zz3dyO3c3xJwl36rPpn1n7WF75u6r2epjH70MZTGM=";
 
-function sign(s: string, b: string) {
-  return createHmac("sha256", s).update(b).digest("base64");
+function signedAuthorization(
+  s = secret,
+  overrides: Partial<{
+    method: string;
+    pathAndQuery: string;
+    date: string;
+    host: string;
+    contentHash: string;
+  }> = {},
+) {
+  const request = {
+    method: "POST",
+    pathAndQuery,
+    date,
+    host,
+    contentHash,
+    ...overrides,
+  };
+  const signed = `${request.method}\n${request.pathAndQuery}\n${request.date};${request.host};${request.contentHash}`;
+  return `HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${createHmac("sha256", s).update(signed).digest("base64")}`;
+}
+
+function request(
+  overrides: Partial<{
+    method: string;
+    pathAndQuery: string;
+    date: string;
+    host: string;
+    contentHash: string;
+    authorization: string;
+    rawBody: string;
+  }> = {},
+) {
+  return {
+    method: "POST",
+    pathAndQuery,
+    host,
+    date,
+    contentHash,
+    authorization: canonicalAuthorization,
+    rawBody: body,
+    ...overrides,
+  };
 }
 
 describe("verifyVippsWebhookSignature", () => {
-  it("accepts a correctly signed body", () => {
-    expect(verifyVippsWebhookSignature(secret, sign(secret, body), body)).toBe(true);
+  it("accepts Vipps' canonical fields with a fixed independently computed signature", () => {
+    expect(verifyVippsWebhookSignature(secret, request())).toBe(true);
   });
 
   it("rejects a signature computed with the wrong secret", () => {
-    expect(verifyVippsWebhookSignature(secret, sign("wrong-secret", body), body)).toBe(false);
+    expect(
+      verifyVippsWebhookSignature(secret, {
+        ...request(),
+        authorization: signedAuthorization("wrong-secret"),
+      }),
+    ).toBe(false);
   });
 
   it("rejects a signature computed over a tampered body", () => {
-    const tampered = JSON.stringify({ reference: "ref-1", name: "epayments.payment.cancelled.v1" });
-    expect(verifyVippsWebhookSignature(secret, sign(secret, body), tampered)).toBe(false);
+    expect(
+      verifyVippsWebhookSignature(secret, {
+        ...request(),
+        rawBody: `${body} `,
+      }),
+    ).toBe(false);
   });
 
-  it("rejects an empty signature header", () => {
-    expect(verifyVippsWebhookSignature(secret, "", body)).toBe(false);
+  it("rejects a changed path, date, or signature", () => {
+    expect(
+      verifyVippsWebhookSignature(secret, {
+        ...request(),
+        pathAndQuery: `${pathAndQuery}?replayed=true`,
+      }),
+    ).toBe(false);
+    expect(
+      verifyVippsWebhookSignature(secret, {
+        ...request(),
+        date: "Thu, 30 Mar 2023 08:38:33 GMT",
+      }),
+    ).toBe(false);
+    expect(verifyVippsWebhookSignature(secret, { ...request(), authorization: "" })).toBe(false);
+  });
+});
+
+describe("Vipps webhook replay protection", () => {
+  const now = Date.parse("2026-09-22T12:00:00.000Z");
+
+  it("uses Vipps' stable pspReference when eventId is absent", () => {
+    expect(getVippsWebhookEventId({ pspReference: "psp-123" })).toBe("psp-123");
+  });
+
+  it("prefers the protocol identity over legacy IDs", () => {
+    expect(getVippsWebhookEventId({ pspReference: "psp-123", eventId: "legacy-id" })).toBe(
+      "psp-123",
+    );
+  });
+
+  it("does not manufacture an event identity", () => {
+    expect(getVippsWebhookEventId({ reference: "ref-123", name: "AUTHORIZED" })).toBeNull();
+  });
+
+  it("accepts a fresh signed request date", () => {
+    expect(isFreshVippsWebhookDate("Tue, 22 Sep 2026 11:57:00 GMT", now)).toBe(true);
+  });
+
+  it("rejects an old or invalid signed request date", () => {
+    expect(isFreshVippsWebhookDate("Tue, 22 Sep 2026 11:54:59 GMT", now)).toBe(false);
+    expect(isFreshVippsWebhookDate("not-a-date", now)).toBe(false);
   });
 });

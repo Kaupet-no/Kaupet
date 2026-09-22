@@ -1,6 +1,7 @@
 import { RotateCcw, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   defaultAdvancedSearchValue,
   type AdvancedSearchValue,
@@ -17,6 +18,7 @@ type Props = {
   categories: Category[];
   /** «Lagre søk» — utelates for utloggede brukere. */
   onSaveSearch?: () => void;
+  className?: string;
 };
 
 /**
@@ -28,7 +30,7 @@ type Props = {
  * umiddelbart mot samme `onApply` som panelet bruker. Seksjonene er de samme
  * (`SearchFilterSections`), bare i `layout="expanded"`.
  */
-export function SearchFilterSidebar({ results, categories, onSaveSearch }: Props) {
+export function SearchFilterSidebar({ results, categories, onSaveSearch, className }: Props) {
   const { applied, onApply } = results;
 
   const setValue = (next: React.SetStateAction<AdvancedSearchValue>) => {
@@ -59,7 +61,10 @@ export function SearchFilterSidebar({ results, categories, onSaveSearch }: Props
     <aside
       aria-label="Filtrer annonser"
       data-testid="search-filter-sidebar"
-      className="sticky top-20 hidden shrink-0 rounded-xl border border-border bg-card lg:block"
+      className={cn(
+        "sticky top-20 hidden shrink-0 rounded-xl border border-border bg-card lg:block",
+        className,
+      )}
     >
       <div className="flex items-center justify-between gap-2 px-4 py-3">
         <h2 className="text-sm font-semibold">

@@ -406,6 +406,9 @@ export function ResultList({
       </div>
 
       <div
+        // Signal til SearchResultsBody (:has) om at kartet tar plass, slik at
+        // filterkolonnen vikes unna på skjermer under 2xl.
+        data-map-visible={isDesktop && desktopMapVisible && cards.length > 0 ? "" : undefined}
         className={`mt-4 grid gap-6 ${
           isDesktop && desktopMapVisible && cards.length > 0
             ? "lg:grid-cols-[1fr_420px]"

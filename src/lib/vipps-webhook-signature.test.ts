@@ -2,6 +2,7 @@ import { createHash, createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
 import {
   getVippsWebhookEventId,
+  getVippsWebhookRejectionReason,
   isFreshVippsWebhookDate,
   verifyVippsWebhookSignature,
 } from "./vipps.server";
@@ -98,6 +99,42 @@ describe("verifyVippsWebhookSignature", () => {
       }),
     ).toBe(false);
     expect(verifyVippsWebhookSignature(secret, { ...request(), authorization: "" })).toBe(false);
+  });
+});
+
+describe("getVippsWebhookRejectionReason", () => {
+  it("returns null for a valid request", () => {
+    expect(getVippsWebhookRejectionReason(secret, request())).toBeNull();
+  });
+
+  it("returns content_hash_mismatch for a tampered body", () => {
+    expect(getVippsWebhookRejectionReason(secret, { ...request(), rawBody: `${body} ` })).toBe(
+      "content_hash_mismatch",
+    );
+  });
+
+  it("returns unsupported_authorization for a non-HMAC-SHA256 scheme", () => {
+    expect(
+      getVippsWebhookRejectionReason(secret, { ...request(), authorization: "Bearer sometoken" }),
+    ).toBe("unsupported_authorization");
+  });
+
+  it("returns missing_signature when the signature is empty", () => {
+    expect(
+      getVippsWebhookRejectionReason(secret, {
+        ...request(),
+        authorization: "HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=",
+      }),
+    ).toBe("missing_signature");
+  });
+
+  it("returns signature_mismatch for a signature computed with the wrong secret", () => {
+    expect(
+      getVippsWebhookRejectionReason(secret, {
+        ...request(),
+        authorization: signedAuthorization("wrong-secret"),
+      }),
+    ).toBe("signature_mismatch");
   });
 });
 

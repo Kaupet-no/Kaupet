@@ -28,18 +28,37 @@ function timingSafeStringEqual(a: string, b: string): boolean {
   return aBuf.length === bBuf.length && timingSafeEqual(aBuf, bBuf);
 }
 
-/** Constant-time canonical HMAC-SHA256 signature check for Vipps webhooks. */
-export function verifyVippsWebhookSignature(secret: string, request: VippsWebhookRequest): boolean {
-  const expectedContentHash = createHash("sha256").update(request.rawBody).digest("base64");
-  if (!timingSafeStringEqual(request.contentHash, expectedContentHash)) return false;
+export type VippsWebhookRejectionReason =
+  | "content_hash_mismatch"
+  | "unsupported_authorization"
+  | "missing_signature"
+  | "signature_mismatch";
 
-  if (!request.authorization.startsWith(VIPPS_AUTH_PREFIX)) return false;
+/**
+ * Same canonical HMAC-SHA256 check as `verifyVippsWebhookSignature`, but
+ * returns which check failed (or null when valid) so callers can log a
+ * diagnosable reason without leaking secrets or signatures.
+ */
+export function getVippsWebhookRejectionReason(
+  secret: string,
+  request: VippsWebhookRequest,
+): VippsWebhookRejectionReason | null {
+  const expectedContentHash = createHash("sha256").update(request.rawBody).digest("base64");
+  if (!timingSafeStringEqual(request.contentHash, expectedContentHash))
+    return "content_hash_mismatch";
+
+  if (!request.authorization.startsWith(VIPPS_AUTH_PREFIX)) return "unsupported_authorization";
   const signature = request.authorization.slice(VIPPS_AUTH_PREFIX.length);
-  if (!signature || signature.includes("&")) return false;
+  if (!signature || signature.includes("&")) return "missing_signature";
 
   const signed = `${request.method}\n${request.pathAndQuery}\n${request.date};${request.host};${request.contentHash}`;
   const expectedSignature = createHmac("sha256", secret).update(signed).digest("base64");
-  return timingSafeStringEqual(signature, expectedSignature);
+  return timingSafeStringEqual(signature, expectedSignature) ? null : "signature_mismatch";
+}
+
+/** Constant-time canonical HMAC-SHA256 signature check for Vipps webhooks. */
+export function verifyVippsWebhookSignature(secret: string, request: VippsWebhookRequest): boolean {
+  return getVippsWebhookRejectionReason(secret, request) === null;
 }
 
 /**

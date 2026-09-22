@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           getVippsPayment,
           getVippsWebhookEventId,
           isFreshVippsWebhookDate,
-          verifyVippsWebhookSignature,
+          getVippsWebhookRejectionReason,
         } = await import("@/lib/vipps.server");
         const secret = await getVippsWebhookSecret(host);
         // Fail closed: an endpoint with no configured secret must not accept
@@ -33,18 +33,28 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const date = request.headers.get("x-ms-date") ?? "";
         const contentHash = request.headers.get("x-ms-content-sha256") ?? "";
         const authorization = request.headers.get("authorization") ?? "";
-        if (
-          !host ||
-          !verifyVippsWebhookSignature(secret, {
-            method: request.method,
-            pathAndQuery: `${url.pathname}${url.search}`,
+        const pathAndQuery = `${url.pathname}${url.search}`;
+        const rejectionReason = host
+          ? getVippsWebhookRejectionReason(secret, {
+              method: request.method,
+              pathAndQuery,
+              host,
+              date,
+              contentHash,
+              authorization,
+              rawBody: raw,
+            })
+          : null;
+        if (!host || rejectionReason) {
+          console.warn("[vipps webhook] signature rejected", {
+            reason: host ? rejectionReason : "missing_host",
             host,
-            date,
-            contentHash,
-            authorization,
-            rawBody: raw,
-          })
-        ) {
+            pathAndQuery,
+            method: request.method,
+            hasDateHeader: date !== "",
+            hasContentHashHeader: contentHash !== "",
+            authorizationScheme: authorization.split(" ")[0] || null,
+          });
           return new Response("Invalid signature", { status: 401 });
         }
 
@@ -82,6 +92,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // event so a known Vipps retry remains idempotent even after the
         // freshness window.
         if (!existing && !isFreshVippsWebhookDate(date)) {
+          console.warn("[vipps webhook] stale webhook", { date, host });
           return new Response("Stale webhook", { status: 401 });
         }
         if (!existing) {

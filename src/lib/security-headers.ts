@@ -11,6 +11,9 @@ export type SecurityHeaderEnv = {
    * en privat bucket og rendres som `<img>` med presignert S3-URL på
    * `https://<account>.r2.cloudflarestorage.com` (se `src/lib/r2.server.ts`). */
   r2AccountId?: string;
+  /** Supabase-URL-en klienten faktisk bruker (`VITE_SUPABASE_URL`). I prod
+   * dekkes den av `*.supabase.co`; lokalt/E2E er den `http://127.0.0.1:<port>`. */
+  supabaseUrl?: string;
   /** Request-local nonce for TanStack Start's SSR inline scripts. */
   scriptNonce?: string;
 };
@@ -30,6 +33,18 @@ function imgSrc({ r2PublicBaseUrl, r2AccountId }: SecurityHeaderEnv): string {
     // lagret som fulle Supabase Storage-URL-er i `profiles`.
     "https://*.supabase.co",
     "https://cache.kartverket.no",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function connectSrc({ supabaseUrl }: SecurityHeaderEnv): string {
+  const origin = supabaseUrl ? new URL(supabaseUrl).origin : undefined;
+  return [
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    origin,
+    origin?.replace(/^http/, "ws"),
+    "https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
   ]
     .filter(Boolean)
     .join(" ");
@@ -63,7 +78,7 @@ export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, str
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       imgSrc(env),
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
+      connectSrc(env),
       "frame-src https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "upgrade-insecure-requests",

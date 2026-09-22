@@ -74,4 +74,15 @@ describe("buildSecurityHeaders", () => {
 
     expect(imgSrcDirective).not.toContain("r2.cloudflarestorage.com");
   });
+
+  it("tillater den konfigurerte Supabase-URL-en i connect-src (lokal E2E)", () => {
+    const csp = buildSecurityHeaders({ supabaseUrl: "http://127.0.0.1:54321/" })[
+      "content-security-policy"
+    ];
+    const connectSrcDirective = csp.split("; ").find((d) => d.startsWith("connect-src "));
+
+    expect(connectSrcDirective).toContain(" http://127.0.0.1:54321 ");
+    expect(connectSrcDirective).toContain(" ws://127.0.0.1:54321 ");
+    expect(buildSecurityHeaders({})["content-security-policy"]).not.toContain("undefined");
+  });
 });

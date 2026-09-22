@@ -28,6 +28,7 @@ export default defineConfig(({ command, mode }) => {
   const securityHeaders = buildSecurityHeaders({
     r2PublicBaseUrl: env.VITE_R2_PUBLIC_BASE_URL,
     r2AccountId: allEnv.R2_ACCOUNT_ID,
+    supabaseUrl: env.VITE_SUPABASE_URL,
   });
   // CSP is request-specific for SSR: `src/server.ts` adds a nonce after the
   // Start response has rendered. Keeping a static CSP route rule would let

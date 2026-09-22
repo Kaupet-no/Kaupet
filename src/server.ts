@@ -48,6 +48,7 @@ export default {
         buildSecurityHeaders({
           r2PublicBaseUrl: import.meta.env.VITE_R2_PUBLIC_BASE_URL,
           r2AccountId: import.meta.env.R2_ACCOUNT_ID,
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
         })["content-security-policy"],
       );
       return response;

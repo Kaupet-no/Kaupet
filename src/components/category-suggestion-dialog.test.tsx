@@ -5,6 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const { submit } = vi.hoisted(() => ({ submit: vi.fn() }));
 
 vi.mock("@tanstack/react-start", () => ({
+  createIsomorphicFn: () => ({
+    server: (fn: (...args: unknown[]) => unknown) =>
+      Object.assign(fn, {
+        client: (clientFn: (...args: unknown[]) => unknown) => clientFn,
+      }),
+  }),
   createServerFn: () => {
     const fn = { validator: () => fn, handler: () => vi.fn() };
     return fn;

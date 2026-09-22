@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { hashRequestIp } from "@/lib/request-ip.server";
 
 /** Throws if the calling IP has exceeded `limit` calls to `bucket` within
@@ -17,7 +18,6 @@ export async function assertNotRateLimited(
     _window_seconds: windowSeconds,
   });
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error.server");
     throw await toClientError("database", error);
   }
   if (!allowed) throw new Error("For mange forespørsler. Prøv igjen senere.");
@@ -39,7 +39,6 @@ export async function assertUserNotRateLimited(
     _window_seconds: windowSeconds,
   });
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error.server");
     throw await toClientError("database", error);
   }
   if (!allowed) throw new Error("For mange forespørsler. Prøv igjen senere.");

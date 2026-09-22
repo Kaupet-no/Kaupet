@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  canPreviewDraft,
   composerFieldId,
   composerForwardStep,
   composerSwipeDirection,
@@ -34,12 +33,6 @@ describe("composerflyt fra preview og review", () => {
     },
     { groups: [{ key: "review-publish" }] },
   ];
-
-  it("tilbyr levende preview på første side etter innholdssiden", () => {
-    expect(canPreviewDraft(nativePages, 2, true)).toBe(false);
-    expect(canPreviewDraft(nativePages, 3, true)).toBe(true);
-    expect(canPreviewDraft(nativePages, 3, false)).toBe(false);
-  });
 
   it("åpner siden som eier reviewgruppen og returnerer etter siste grupperte side", () => {
     expect(reviewSectionSteps(nativePages, ["photos", "title"])).toEqual({ first: 2, last: 2 });

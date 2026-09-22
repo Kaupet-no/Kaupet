@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -16,7 +17,6 @@ export const getPromotionPricing = createServerFn({ method: "GET" }).handler(asy
     .eq("active", true)
     .order("duration_days");
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   return data ?? [];
@@ -54,7 +54,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .eq("id", data.listing_id)
       .maybeSingle();
     if (lerr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", lerr);
     }
     if (!listing) throw new Error("Annonsen finnes ikke");
@@ -69,7 +68,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .eq("active", true)
       .maybeSingle();
     if (perr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("createPromotionCheckout.getPricing", perr);
     }
     if (!pricing) throw new Error("Ugyldig pakkevarighet");
@@ -102,7 +100,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (ierr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", ierr);
     }
     const origin = host
@@ -182,7 +179,6 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!promo) throw new Error("Fant ikke kvittering");
@@ -220,7 +216,6 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!promo) throw new Error("Fant ikke fremheving");
@@ -278,7 +273,6 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
         .eq("id", promo.id)
         .eq("status", "pending");
       if (uerr) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", uerr);
       }
       return { status: "active" as const, expires_at: expires.toISOString() };
@@ -331,7 +325,6 @@ export const getMyActivePromotions = createServerFn({ method: "GET" })
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return data ?? [];
@@ -353,7 +346,6 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       _limit: data.limit ?? 2,
     });
     if (idErr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", idErr);
     }
     const ids = (idRows ?? []).map((r: { listing_id: string }) => r.listing_id);
@@ -367,7 +359,6 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       .in("id", ids)
       .eq("status", "active");
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return (listings ?? []).map((l) => {

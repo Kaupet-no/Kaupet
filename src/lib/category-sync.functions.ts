@@ -4,6 +4,7 @@
 // admin-panelet (src/routes/_authenticated/admin/kategorier.tsx) for å vise
 // synk-status og gjøre selve synken. Se supabase/migrations/20260804090000_
 // category_sync_status.sql for skjema og RPC.
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -34,23 +35,18 @@ async function fetchCategorySyncTables(client: SupabaseClient<Database>) {
       client.from("site_settings").select("default_search_examples").eq("id", true).single(),
     ]);
   if (categories.error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", categories.error);
   }
   if (categoryFilters.error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", categoryFilters.error);
   }
   if (categoryFlows.error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", categoryFlows.error);
   }
   if (filterSynonyms.error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", filterSynonyms.error);
   }
   if (siteSettings.error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", siteSettings.error);
   }
 
@@ -83,7 +79,6 @@ export const getCategorySyncStatus = createServerFn({ method: "GET" })
       supabaseAdmin.from("category_sync_status").select("last_synced_at").eq("id", true).single(),
     ]);
     if (status.error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", status.error);
     }
 
@@ -274,7 +269,6 @@ export const syncCategoriesFromStaging = createServerFn({ method: "POST" })
       p_synced_by: context.userId,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
 

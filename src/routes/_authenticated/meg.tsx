@@ -28,10 +28,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  isActiveBusinessMember,
-  useBusinessMembership,
-} from "@/features/business-account/use-business-membership";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { NativePageHeader } from "@/components/native-page-header";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { DevServerSwitch } from "@/components/dev-server-switch";
@@ -175,7 +172,7 @@ function MegPage() {
               label="Min profil"
               onClick={() => void navigate({ to: "/profil" })}
             />
-            {isActiveBusinessMember(businessMembership) && (
+            {businessMembership && (
               <NavRow
                 icon={<Building2 className="size-5 text-primary" />}
                 label="Bedriftskonsoll"

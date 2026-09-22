@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findModelContainedIn } from "@/lib/vehicle/vehicle-brand-match.functions";
+import { findModelContainedIn } from "@/lib/vehicle/vehicle-brand-match";
 
 const model = (name: string, id = name) => ({ id, name, class_id: null });
 

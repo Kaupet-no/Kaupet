@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -84,7 +85,6 @@ export const createWtbListing = createServerFn({ method: "POST" })
         .select("id")
         .single();
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", error);
       }
       return { id: row.id as string };
@@ -111,7 +111,6 @@ export const createWtbListing = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { id: row.id as string };
@@ -152,7 +151,6 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
         .select("id")
         .single();
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", error);
       }
       return { id: row.id as string };
@@ -173,7 +171,6 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { id: row.id as string };
@@ -194,7 +191,6 @@ export const getLatestWtbDraft = createServerFn({ method: "GET" })
       .limit(1)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return data;
@@ -212,7 +208,6 @@ export const discardWtbDraft = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("status", "draft");
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
   });
@@ -256,7 +251,6 @@ export const updateWtbListing = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", userId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
   });
@@ -274,7 +268,6 @@ export const deleteWtbListing = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", userId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
   });
@@ -292,7 +285,6 @@ export const getMyWtbListings = createServerFn({ method: "GET" })
       .eq("user_id", user!.id)
       .order("updated_at", { ascending: false });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     const rows = (data ?? []) as (WtbListing & {
@@ -335,7 +327,6 @@ export const listWtbListings = createServerFn({ method: "GET" })
       _offset: data.offset,
     });
     if (pageError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", pageError);
     }
     const matches = (page ?? []) as { id: string; total_count: number }[];
@@ -347,7 +338,6 @@ export const listWtbListings = createServerFn({ method: "GET" })
       .select("*, profiles(display_name, avatar_url), categories(name_nb, slug)")
       .in("id", ids);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     // .in() does not preserve the id list's order, so re-sort into the order
@@ -372,7 +362,6 @@ export const countWtbListings = createServerFn({ method: "GET" })
       _category_ids: data.categories?.length ? data.categories : undefined,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return (count as number | null) ?? 0;
@@ -435,7 +424,6 @@ export async function listWtbMatchNotifications(limit = 30, offset = 0) {
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   return (data ?? []) as WtbMatchNotification[];
@@ -447,7 +435,6 @@ export async function markWtbMatchNotificationRead(id: string) {
     .update({ read_at: new Date().toISOString() })
     .eq("id", id);
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
 }
@@ -458,7 +445,6 @@ export async function markAllWtbMatchNotificationsRead() {
     .update({ read_at: new Date().toISOString() })
     .is("read_at", null);
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
 }
@@ -466,7 +452,6 @@ export async function markAllWtbMatchNotificationsRead() {
 export async function deleteWtbMatchNotification(id: string) {
   const { error } = await supabase.from("wtb_match_notifications").delete().eq("id", id);
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
 }

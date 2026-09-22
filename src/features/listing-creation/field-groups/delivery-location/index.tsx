@@ -286,18 +286,18 @@ export function LocationGroup(props: WizardSharedProps) {
   const { setValue } = props;
   const { data: membership } = useBusinessMembership();
   const selectedLocationId = props.watch("organization_location_id") ?? "";
-  const locations = membership?.status === "active" ? membership.locations : [];
+  const locations = membership?.locations ?? [];
   const selectedLocation =
     locations.find((location) => location.id === selectedLocationId) ??
     locations.find((location) => location.is_default) ??
     locations[0];
 
   useEffect(() => {
-    if (membership?.status !== "active" || !selectedLocation || selectedLocationId) return;
+    if (!membership || !selectedLocation || selectedLocationId) return;
     setValue("organization_location_id", selectedLocation.id, { shouldDirty: false });
-  }, [membership?.status, setValue, selectedLocation, selectedLocationId]);
+  }, [membership, setValue, selectedLocation, selectedLocationId]);
 
-  if (membership?.status === "active") {
+  if (membership) {
     return (
       <section className="space-y-3">
         <div className="space-y-2">

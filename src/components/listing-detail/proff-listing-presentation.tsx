@@ -7,6 +7,7 @@ import type { ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resolveBrandColors } from "@/lib/brand-color";
+import { formatOrganizationNumber } from "@/lib/organization-number";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_PROFF_LISTING_CONCEPT,
@@ -38,11 +39,6 @@ function overtitleLabel(overtitle: ProffListingOvertitle): string {
     presentert_av: "Presentert av",
     bedriftsannonse: "Bedriftsannonse",
   }[overtitle];
-}
-
-function formatOrganizationNumber(value: string): string {
-  const digits = value.replace(/\D/gu, "");
-  return digits.replace(/(\d)(?=(\d{3})+$)/gu, "$1 ");
 }
 
 function brandStyle(

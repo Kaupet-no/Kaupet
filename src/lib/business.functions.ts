@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -44,13 +45,6 @@ export type OrganizationPermissions = {
   allowedCategoryIds: string[];
 };
 
-export type OrganizationLocationPermissions = {
-  role: "member" | "manager";
-  listingAccess: "own" | "all";
-  listingEditScope: "none" | "own" | "all";
-  chatAccess: "own" | "all";
-};
-
 /** Temporary wire-compatible shape while callers migrate to location scope. */
 export type OrganizationMemberPermissions = OrganizationPermissions & {
   listingAccess: "own" | "all";
@@ -82,7 +76,7 @@ const memberPermissionsSchema = z
       });
     }
   });
-function normalizeMemberPermissions(
+export function normalizeMemberPermissions(
   value: OrganizationMemberPermissions,
 ): OrganizationMemberPermissions {
   if (value.role === "superuser") {
@@ -126,7 +120,6 @@ async function requireOrganizationMember(userId: string) {
     .eq("status", "active")
     .maybeSingle();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   if (!membership) throw new Error(UNAUTHORIZED_MESSAGE);
@@ -134,7 +127,6 @@ async function requireOrganizationMember(userId: string) {
     _organization_id: membership.organization_id,
   });
   if (syncError) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", syncError);
   }
   return {
@@ -156,7 +148,6 @@ async function hasEffectiveProffAccess(supabaseAdmin: AdminClient, organizationI
     _organization_id: organizationId,
   });
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   return data === true;
@@ -202,7 +193,6 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       .eq("organization_number", organizationNumber)
       .maybeSingle();
     if (existingError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", existingError);
     }
     if (existing) {
@@ -236,7 +226,6 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       if (intentError.code === "23505") {
         throw new Error(`${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`);
       }
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("createBusinessSignupIntent", intentError);
     }
 
@@ -275,7 +264,6 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       .gt("expires_at", now)
       .maybeSingle();
     if (intentError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", intentError);
     }
     if (!intent) throw new Error("Registreringen er utløpt. Start på nytt.");
@@ -293,7 +281,6 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       .select("email")
       .maybeSingle();
     if (updateError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", updateError);
     }
     if (updated?.email === email) return { email };
@@ -306,7 +293,6 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
     if (reboundError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", reboundError);
     }
     if (rebound?.email === email) return { email };
@@ -322,7 +308,6 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
     .eq("id", organizationId)
     .single();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   return data;
@@ -387,7 +372,6 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
       if (data.locationId) assignmentsQuery = assignmentsQuery.eq("location_id", data.locationId);
       const { data: assignments, error: assignmentsError } = await assignmentsQuery;
       if (assignmentsError) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", assignmentsError);
       }
       if (!assignments?.length) throw new Error(UNAUTHORIZED_MESSAGE);
@@ -399,7 +383,6 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
 
     const { data: listings, error: listingsError } = await listingQuery;
     if (listingsError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", listingsError);
     }
     const rawListings = (listings ?? []) as unknown as Array<{
@@ -439,15 +422,12 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
           { data: [], error: null },
         ];
     if (statusHistoryError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", statusHistoryError);
     }
     if (salesError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", salesError);
     }
     if (viewEventsError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", viewEventsError);
     }
 
@@ -551,7 +531,6 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
       .eq("user_id", context.userId)
       .single();
     if (membershipError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", membershipError);
     }
     const { data: categories, error: categoriesError } = await supabaseAdmin
@@ -560,7 +539,6 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
       .eq("organization_id", organizationId)
       .eq("user_id", context.userId);
     if (categoriesError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", categoriesError);
     }
     const { data: locations, error: locationsError } = await supabaseAdmin
@@ -573,7 +551,6 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
       .order("is_default", { ascending: false })
       .order("name");
     if (locationsError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", locationsError);
     }
     const allowedCategoryIds = (categories ?? []).map((row) => row.category_id as string);
@@ -626,7 +603,6 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
         .eq("organization_id", organizationId)
         .maybeSingle();
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", error);
       }
       billingProfile = data;
@@ -693,7 +669,6 @@ export const updateBusinessProfile = createServerFn({ method: "POST" })
       .update(updates)
       .eq("id", organizationId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { organization: await getOrganization(supabaseAdmin, organizationId) };
@@ -717,7 +692,6 @@ export const updateOrganizationBillingEmail = createServerFn({ method: "POST" })
       )
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { billingProfile };
@@ -752,7 +726,6 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
         .eq("id", organizationId)
         .is("proff_trial_started_at", null);
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", error);
       }
     } else {
@@ -771,7 +744,6 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
         .update(updates)
         .eq("id", organizationId);
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", error);
       }
     }
@@ -780,7 +752,6 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
       _organization_id: organizationId,
     });
     if (syncError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", syncError);
     }
     return { organization: await getOrganization(supabaseAdmin, organizationId) };
@@ -806,7 +777,6 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
       _city: data.city,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { location };
@@ -832,7 +802,6 @@ export const updateOrganizationLocation = createServerFn({ method: "POST" })
       )
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { location };
@@ -861,7 +830,6 @@ export const setOrganizationLocationMember = createServerFn({ method: "POST" })
       _chat_access: data.chatAccess,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return {
@@ -881,7 +849,6 @@ export const removeOrganizationLocationMember = createServerFn({ method: "POST" 
       _user_id: data.userId,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return {
@@ -960,7 +927,6 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       ) {
         throw new Error(INVITE_EXISTING_MESSAGE);
       }
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("inviteOrganizationMember", inviteError);
     }
     const userId = invited.user?.id;
@@ -977,7 +943,6 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     if (memberError) {
       await supabaseAdmin.auth.admin.deleteUser(userId);
       if (memberError.code === "23505") throw new Error(INVITE_EXISTING_MESSAGE);
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("inviteOrganizationMember", memberError);
     }
     if (permissions.categoryAccess === "restricted") {
@@ -996,7 +961,6 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
           user_id: userId,
         });
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("inviteOrganizationMember", categoryError);
       }
     }
@@ -1041,7 +1005,6 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         user_id: userId,
       });
       await supabaseAdmin.auth.admin.deleteUser(userId);
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("inviteOrganizationMember", locationsError);
     }
     return { userId, email };
@@ -1058,7 +1021,6 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       .eq("status", "invited")
       .maybeSingle();
     if (lookupError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", lookupError);
     }
     if (!membership) throw new Error("Invitasjonen er ugyldig, utløpt eller allerede brukt.");
@@ -1067,7 +1029,6 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       _organization_id: organizationId,
     });
     if (syncError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", syncError);
     }
     if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
@@ -1082,7 +1043,6 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       .select("organization_id")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { organizationId: accepted.organization_id as string };
@@ -1098,7 +1058,6 @@ export const removeOrganizationMember = createServerFn({ method: "POST" })
       _user_id: data.userId,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { userId: data.userId };
@@ -1131,7 +1090,6 @@ async function findOpenProffOrder(
     .in("status", ["pending", "invoiced"])
     .maybeSingle();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   return (data as ProffOrder | null) ?? null;
@@ -1163,7 +1121,6 @@ export const requestProffSubscription = createServerFn({ method: "POST" })
       .eq("organization_id", organizationId)
       .single();
     if (profileError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", profileError);
     }
     const { data: inserted, error } = await supabaseAdmin
@@ -1204,7 +1161,6 @@ async function proffOrderRecipients(supabaseAdmin: AdminClient): Promise<string[
     .select("user_id")
     .eq("role", "admin");
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
 

@@ -31,8 +31,7 @@ export function SiteHeader() {
   const { user, loading: authLoading } = useAuth();
   const { data: businessMembership } = useBusinessMembership();
   const { openPanel } = useSearchPanel();
-  const businessPlan =
-    businessMembership?.status === "active" ? businessMembership.organization.selected_plan : null;
+  const businessPlan = businessMembership?.organization.selected_plan ?? null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur pt-safe">

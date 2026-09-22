@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -109,7 +110,6 @@ export const createReview = createServerFn({ method: "POST" })
       .eq("listing_id", data.listingId)
       .maybeSingle();
     if (saleErr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", saleErr);
     }
     if (!sale) throw new Error("Det finnes ingen bekreftet kjøper for denne annonsen");
@@ -138,7 +138,6 @@ export const createReview = createServerFn({ method: "POST" })
       if (error.code === "23505") {
         throw new Error("Du har allerede gitt en vurdering for dette salget");
       }
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { ok: true };
@@ -156,7 +155,6 @@ export const getMyReviewForListing = createServerFn({ method: "POST" })
       .eq("reviewer_id", userId)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return row ?? null;
@@ -172,7 +170,6 @@ export const getPublicProfile = createServerFn({ method: "POST" })
       .eq("id", data.userId)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!profile) return null;
@@ -219,7 +216,6 @@ export const getMyProfileStats = createServerFn({ method: "POST" })
       supabase.rpc("user_review_summary", { _user_id: userId }),
     ]);
     if (profileErr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", profileErr);
     }
 
@@ -267,7 +263,6 @@ export const listUserReviews = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
       if (e2) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", e2);
       }
       const ids = Array.from(new Set((plain ?? []).map((r) => r.reviewer_id)));

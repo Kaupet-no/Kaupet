@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 const supabaseAdmin = { from: vi.fn(), rpc: vi.fn() };
 
 vi.mock("@tanstack/react-start", () => ({
+  createIsomorphicFn: () => ({
+    server: (fn: (...args: unknown[]) => unknown) =>
+      Object.assign(fn, {
+        client: (clientFn: (...args: unknown[]) => unknown) => clientFn,
+      }),
+  }),
   createServerFn: () => {
     let validator: (input: unknown) => unknown = (input) => input;
     let handler: ((input: { data: unknown; context: unknown }) => unknown) | undefined;

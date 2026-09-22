@@ -4,12 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResultList } from "@/components/result-list";
 import type { AppliedSearchState } from "./search-schema";
-import {
-  bestZeroResultExpansion,
-  bestZeroResultExpansions,
-  buildZeroResultCandidates,
-  type ZeroResultExpansion,
-} from "./zero-result-expansion";
+import { bestZeroResultExpansions, buildZeroResultCandidates } from "./zero-result-expansion";
 
 afterEach(cleanup);
 
@@ -40,45 +35,6 @@ const applied: AppliedSearchState = {
 };
 
 describe("nulltreffutvidelse", () => {
-  it("velger høyeste dokumenterte ett-kriteriums effekt og utfører handlingen", () => {
-    const candidates = buildZeroResultCandidates(applied, []);
-    const counts = candidates.map((candidate) =>
-      candidate.key === "price" ? 12 : candidate.key === "attribute:fuel_type" ? 4 : 0,
-    );
-    const best = bestZeroResultExpansion(candidates, counts) as ZeroResultExpansion;
-    const onApply = vi.fn();
-    const { getByRole } = render(
-      <ResultList
-        isNative={false}
-        isDesktop={false}
-        q="volvo"
-        effectiveCategories={["bil"]}
-        cards={[]}
-        totalCount={0}
-        isLoading={false}
-        hasNextPage={false}
-        isFetchingNextPage={false}
-        fetchNextPage={vi.fn()}
-        resetFilters={vi.fn()}
-        mapListings={[]}
-        mapCenter={null}
-        radiusKm={10}
-        onMapApplyViewport={vi.fn()}
-        sort="new"
-        onSortChange={vi.fn()}
-        zeroResultExpansion={best}
-        onApplyZeroResultExpansion={onApply}
-      />,
-    );
-
-    expect(best.key).toBe("price");
-    expect(best.applied.value.max).toBeNull();
-    expect(best.applied.attributes.fuel_type).toEqual(applied.attributes.fuel_type);
-
-    fireEvent.click(getByRole("button", { name: "Vis 12 treff uten «prisfilteret»" }));
-    expect(onApply).toHaveBeenCalledWith(best);
-  });
-
   it("viser opptil tre dokumenterte måter å utvide nulltreffet på", () => {
     const candidates = buildZeroResultCandidates(applied, []);
     const options = bestZeroResultExpansions(

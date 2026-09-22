@@ -54,7 +54,7 @@ export type BusinessMembership = {
   organization_id: string;
   user_id: string;
   role: "superuser" | "member";
-  status: "invited" | "active" | "deactivated";
+  status: "active";
   can_create_listings: boolean;
   category_access: "all" | "restricted";
   allowed_category_ids: string[];
@@ -97,12 +97,4 @@ export function useBusinessMembership() {
       } as BusinessMembership;
     },
   });
-}
-
-export function isActiveBusinessMember(membership: BusinessMembership | null | undefined) {
-  return membership?.status === "active";
-}
-
-export function isActiveBusinessSuperuser(membership: BusinessMembership | null | undefined) {
-  return membership?.role === "superuser" && membership.status === "active";
 }

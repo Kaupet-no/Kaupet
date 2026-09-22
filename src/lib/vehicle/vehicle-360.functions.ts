@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -39,7 +40,6 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
       .eq("seller_id", userId)
       .maybeSingle();
     if (listingError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", listingError);
     }
     if (!listing) throw new Error("Fant ikke annonseutkastet");
@@ -50,7 +50,6 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
       .eq("listing_id", data.listingId)
       .maybeSingle();
     if (existingError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", existingError);
     }
     if (
@@ -82,7 +81,6 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
           expires_at: expiresAt,
         });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
 
@@ -102,7 +100,6 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!session) throw new Error("Fant ikke QR-koden. Be selger vise en ny på annonsen.");
@@ -114,7 +111,6 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
       .order("frame_order", { ascending: false })
       .limit(1);
     if (framesError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", framesError);
     }
 
@@ -185,7 +181,6 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       { _token: data.token, _ip_hash: await hashRequestIp() },
     );
     if (quotaError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", quotaError);
     }
     if (!listingId) {
@@ -209,14 +204,12 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       .eq("frame_order", data.frameOrder)
       .maybeSingle();
     if (previousError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", previousError);
     }
 
     try {
       await putObject("BILDER", path, bytes, data.contentType);
     } catch (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
 
@@ -254,7 +247,6 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
     if (sessionError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", sessionError);
     }
     if (!session) throw new Error("Opptaksøkten er utløpt eller allerede fullført");
@@ -264,7 +256,6 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
       .select("id", { count: "exact", head: true })
       .eq("listing_id", session.listing_id);
     if (countError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", countError);
     }
     if ((count ?? 0) < MIN_360_FRAMES) {
@@ -279,7 +270,6 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
       .select("id")
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!completed) throw new Error("Opptaksøkten er allerede fullført");
@@ -300,7 +290,6 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
       .eq("seller_id", userId)
       .maybeSingle();
     if (listingError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", listingError);
     }
     if (!listing) throw new Error("Fant ikke annonseutkastet");
@@ -311,7 +300,6 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
       .eq("listing_id", data.listingId)
       .order("frame_order", { ascending: true });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return frames ?? [];
@@ -331,7 +319,6 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       .eq("seller_id", userId)
       .maybeSingle();
     if (listingError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", listingError);
     }
     if (!listing) throw new Error("Fant ikke annonseutkastet");
@@ -341,7 +328,6 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       .select("storage_path")
       .eq("listing_id", data.listingId);
     if (framesError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", framesError);
     }
     if (frames && frames.length > 0) {
@@ -352,7 +338,6 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       .delete()
       .eq("listing_id", data.listingId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
 
@@ -362,7 +347,6 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
       .eq("listing_id", data.listingId)
       .is("used_at", null);
     if (expireError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", expireError);
     }
     return { ok: true as const };

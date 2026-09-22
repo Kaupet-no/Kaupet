@@ -72,7 +72,7 @@ function BusinessConsoleRoute() {
     );
   }
 
-  if (!membership || membership.status !== "active") {
+  if (!membership) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
         <Alert>

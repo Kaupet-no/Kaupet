@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -27,7 +28,6 @@ export const adminListUnverifiedOrganizations = createServerFn({ method: "GET" }
       .eq("verification_status", "unverified")
       .order("created_at", { ascending: true });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return (data ?? []) as AdminUnverifiedOrganization[];
@@ -45,7 +45,6 @@ export const adminVerifyOrganization = createServerFn({ method: "POST" })
       _organization_id: data.organizationId,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
   });

@@ -112,13 +112,6 @@ export function bestZeroResultExpansions(
     .slice(0, limit);
 }
 
-export function bestZeroResultExpansion(
-  candidates: Candidate[],
-  counts: Array<number | undefined>,
-): ZeroResultExpansion | undefined {
-  return bestZeroResultExpansions(candidates, counts, 1)[0];
-}
-
 export function useZeroResultExpansion({
   applied,
   filters,

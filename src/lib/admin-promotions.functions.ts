@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -15,7 +16,6 @@ export const adminListPromotionPricing = createServerFn({ method: "GET" })
       .select("id, duration_days, price_nok, active, updated_at")
       .order("duration_days");
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return data ?? [];
@@ -44,7 +44,6 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
       { onConflict: "duration_days" },
     );
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { ok: true };
@@ -85,7 +84,6 @@ export const adminListPromotions = createServerFn({ method: "GET" })
     }
     const { data: rows, error } = await q;
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id).filter(Boolean)));
@@ -96,7 +94,6 @@ export const adminListPromotions = createServerFn({ method: "GET" })
         .select("id, display_name")
         .in("id", userIds);
       if (perr) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", perr);
       }
       profilesById = new Map((profs ?? []).map((p) => [p.id, { display_name: p.display_name }]));
@@ -119,7 +116,6 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!promo) throw new Error("Fant ikke fremheving");
@@ -169,7 +165,6 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!promo) throw new Error("Fant ikke fremheving");
@@ -229,7 +224,6 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
       .eq("id", data.listing_id)
       .maybeSingle();
     if (lerr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", lerr);
     }
     if (!listing) throw new Error("Annonsen finnes ikke");
@@ -259,7 +253,6 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
       expires_at: expires.toISOString(),
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
 
@@ -291,7 +284,6 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
       .ilike("title", `%${data.q}%`)
       .limit(20);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     const sellerIds = Array.from(new Set((rows ?? []).map((r) => r.seller_id).filter(Boolean)));
@@ -302,7 +294,6 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
         .select("id, display_name")
         .in("id", sellerIds);
       if (perr) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", perr);
       }
       profilesById = new Map((profs ?? []).map((p) => [p.id, { display_name: p.display_name }]));

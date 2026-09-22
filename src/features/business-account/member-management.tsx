@@ -26,6 +26,7 @@ import type {
 } from "@/features/business-account/use-business-membership";
 import {
   inviteOrganizationMember,
+  normalizeMemberPermissions,
   removeOrganizationMember,
   setOrganizationLocationMember,
   type OrganizationMemberPermissions,
@@ -77,26 +78,6 @@ function permissionValue(member: OrganizationMember): OrganizationMemberPermissi
   };
 }
 
-function normalizePermissions(value: OrganizationMemberPermissions): OrganizationMemberPermissions {
-  if (value.role === "superuser") {
-    return {
-      ...value,
-      listingAccess: "all",
-      chatAccess: "all",
-      canCreateListings: true,
-      listingEditScope: "all",
-      categoryAccess: "all",
-      allowedCategoryIds: [],
-    };
-  }
-  return {
-    ...value,
-    listingAccess: value.listingEditScope === "all" ? "all" : value.listingAccess,
-    categoryAccess: value.canCreateListings ? value.categoryAccess : "all",
-    allowedCategoryIds: value.categoryAccess === "restricted" ? value.allowedCategoryIds : [],
-  };
-}
-
 function PermissionFields({
   value,
   categories,
@@ -109,7 +90,7 @@ function PermissionFields({
   collapsible?: boolean;
 }) {
   const update = (patch: Partial<OrganizationMemberPermissions>) =>
-    onChange(normalizePermissions({ ...value, ...patch }));
+    onChange(normalizeMemberPermissions({ ...value, ...patch }));
   const disabled = value.role === "superuser";
   const [showAdvanced, setShowAdvanced] = useState(!collapsible);
 
@@ -386,7 +367,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
       if (name.trim().length < 2) throw new Error("Navnet må være minst 2 tegn.");
       if (!/^\S+@\S+\.\S+$/u.test(email.trim()))
         throw new Error("Skriv inn en gyldig e-postadresse.");
-      const next = normalizePermissions(permissions);
+      const next = normalizeMemberPermissions(permissions);
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");
       const defaultLocation = locations.find((location) => location.is_default) ?? locations[0];
@@ -420,7 +401,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
   const updateMutation = useMutation({
     mutationFn: () => {
       if (!editing) throw new Error("Velg en bruker.");
-      const next = normalizePermissions(permissionValue(editing));
+      const next = normalizeMemberPermissions(permissionValue(editing));
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");
       return callUpdate({

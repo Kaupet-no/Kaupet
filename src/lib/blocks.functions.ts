@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -47,7 +48,6 @@ export const createBlock = createServerFn({ method: "POST" })
         .eq("id", data.conversationId)
         .maybeSingle();
       if (convErr) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", convErr);
       }
       if (!conv) throw new Error("Samtalen finnes ikke");
@@ -74,7 +74,6 @@ export const createBlock = createServerFn({ method: "POST" })
       if ((error as { code?: string }).code === "23505") {
         return { ok: true, alreadyBlocked: true };
       }
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("createBlock", error, { blocker_id: userId });
     }
     return { ok: true, alreadyBlocked: false };
@@ -90,7 +89,6 @@ export const deleteBlock = createServerFn({ method: "POST" })
       .eq("id", data.blockId)
       .eq("blocker_id", context.userId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { ok: true };
@@ -106,7 +104,6 @@ export const listMyBlocks = createServerFn({ method: "GET" })
       .eq("blocker_id", userId)
       .order("created_at", { ascending: false });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     const list = rows ?? [];
@@ -143,7 +140,6 @@ export const listBlocksAgainstMe = createServerFn({ method: "GET" })
       .select("scope, blocker_id, conversation_id")
       .eq("blocked_id", userId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return data ?? [];

@@ -73,9 +73,8 @@ export const MESSAGES_POLL_INTERVAL_MS = 5_000;
 function ConversationPage() {
   const { data: businessMembership } = useBusinessMembership();
   const isBusinessSuperuser =
-    businessMembership?.status === "active" &&
-    (businessMembership.role === "superuser" ||
-      businessMembership.locations.some((location) => location.permissions.chatAccess === "all"));
+    businessMembership?.role === "superuser" ||
+    businessMembership?.locations.some((location) => location.permissions.chatAccess === "all");
   const native = useIsNative();
   const isTablet = useFormFactor() === "tablet";
   const keyboardVisible = useKeyboardVisible();

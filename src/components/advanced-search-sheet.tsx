@@ -34,8 +34,6 @@ import { trackProductEvent } from "@/lib/product-analytics";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
-export { ModeToggle };
-
 import {
   BIL_OG_MC_SLUG,
   conditionOptionsFor,

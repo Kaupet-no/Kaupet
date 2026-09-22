@@ -4,8 +4,6 @@
 // vitest, CI og produksjon. Se AGENTS.md/PR-historikk for begrunnelsen.
 import { AwsClient } from "aws4fetch";
 
-export { publicImageUrl } from "./image-url";
-
 /** BILDER er den offentlige bucketen (annonsebilder m.m.), VEDLEGG er privat
  * (meldingsvedlegg m.m.). */
 export type R2BucketName = "BILDER" | "VEDLEGG";

@@ -8,6 +8,12 @@ const { assertUserNotRateLimited, maybeSingle, insert, supabaseAdmin } = vi.hois
 }));
 
 vi.mock("@tanstack/react-start", () => ({
+  createIsomorphicFn: () => ({
+    server: (fn: (...args: unknown[]) => unknown) =>
+      Object.assign(fn, {
+        client: (clientFn: (...args: unknown[]) => unknown) => clientFn,
+      }),
+  }),
   createServerFn: () => {
     let validator: (input: unknown) => unknown = (input) => input;
     let handler: ((input: { data: unknown; context: { userId: string } }) => unknown) | undefined;

@@ -28,10 +28,7 @@ import { clearMessageAttachmentUrlCache } from "@/lib/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  isActiveBusinessMember,
-  useBusinessMembership,
-} from "@/features/business-account/use-business-membership";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -152,7 +149,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <User className="size-4" /> Min profil
           </Link>
         </DropdownMenuItem>
-        {isActiveBusinessMember(businessMembership) && (
+        {businessMembership && (
           <DropdownMenuItem asChild>
             <Link to="/bedrift" search={{ tab: "oversikt" }} className="cursor-pointer">
               <Building2 className="size-4" /> Bedriftskonsoll

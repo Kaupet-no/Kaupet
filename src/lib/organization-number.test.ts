@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { isValidOrganizationNumber, normalizeOrganizationNumber } from "./organization-number";
+import {
+  formatOrganizationNumber,
+  isValidOrganizationNumber,
+  normalizeOrganizationNumber,
+} from "./organization-number";
 
 describe("organization number", () => {
   it("removes grouping whitespace without changing digits", () => {
     expect(normalizeOrganizationNumber(" 974 760 673 ")).toBe("974760673");
     expect(normalizeOrganizationNumber("974\t760\n673")).toBe("974760673");
+  });
+
+  it("formats digits in Norwegian grouping", () => {
+    expect(formatOrganizationNumber("974760673")).toBe("974 760 673");
+    expect(formatOrganizationNumber("974-760-673")).toBe("974 760 673");
   });
 
   it.each([

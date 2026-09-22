@@ -8,7 +8,6 @@ describe("buildSecurityHeaders", () => {
     const scriptSrcDirective = csp.split("; ").find((d) => d.startsWith("script-src "));
 
     expect(scriptSrcDirective).toContain("'nonce-abc123'");
-    expect(scriptSrcDirective).toContain("'sha256-LR2kHVcI8evMuo9ZNJ5xdPHkkPKsqFHzVrZCCNWuZ4k='");
     expect(scriptSrcDirective).not.toContain("unsafe-inline");
   });
 

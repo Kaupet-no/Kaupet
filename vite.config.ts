@@ -30,9 +30,10 @@ export default defineConfig(({ command, mode }) => {
     r2AccountId: allEnv.R2_ACCOUNT_ID,
     supabaseUrl: env.VITE_SUPABASE_URL,
   });
-  // CSP is request-specific for SSR: `src/server.ts` adds a nonce after the
-  // Start response has rendered. Keeping a static CSP route rule would let
-  // Nitro overwrite that nonce on the outer response.
+  // CSP is request-specific for SSR: `cspNonceMiddleware` in `src/start.ts`
+  // sets it with a nonce (`src/server.ts` only adds a nonce-less fallback).
+  // Keeping a static CSP route rule would let Nitro overwrite that nonce on
+  // the outer response.
   const staticSecurityHeaders = Object.fromEntries(
     Object.entries(securityHeaders).filter(([name]) => name !== "content-security-policy"),
   );

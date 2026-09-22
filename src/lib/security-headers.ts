@@ -18,10 +18,6 @@ export type SecurityHeaderEnv = {
   scriptNonce?: string;
 };
 
-// The root route's JSON-LD is static, so a hash covers it without weakening
-// script-src for arbitrary inline code.
-const ROOT_JSON_LD_HASH = "'sha256-LR2kHVcI8evMuo9ZNJ5xdPHkkPKsqFHzVrZCCNWuZ4k='";
-
 /** Kilder som mangler utelates framfor å slippe inn strengen "undefined" eller
  * et wildcard: en tom variabel skal blokkere domenet, ikke åpne det. */
 function imgSrc({ r2PublicBaseUrl, r2AccountId }: SecurityHeaderEnv): string {
@@ -72,7 +68,6 @@ export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, str
       "frame-ancestors 'self'",
       "form-action 'self'",
       ["script-src 'self'", scriptNonce, "https://challenges.cloudflare.com"]
-        .concat(ROOT_JSON_LD_HASH)
         .filter(Boolean)
         .join(" "),
       "style-src 'self' 'unsafe-inline'",

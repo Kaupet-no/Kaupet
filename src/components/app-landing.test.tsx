@@ -20,7 +20,11 @@ vi.mock("@tanstack/react-query", () => ({
     refetch: queryMocks.refetch,
   }),
 }));
-vi.mock("@/hooks/use-form-factor", () => ({ useFormFactor: () => "phone" }));
+vi.mock("@/hooks/use-form-factor", () => ({
+  useFormFactor: () => "phone",
+  useIsDesktop: () => false,
+  useIsNarrow: () => true,
+}));
 vi.mock("@/features/listing-search/search-panel/search-panel-context", () => ({
   useSearchPanel: () => ({
     openPanel,

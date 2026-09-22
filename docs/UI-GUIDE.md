@@ -40,7 +40,7 @@ Tre primitiver dekker det aller meste — velg ut fra hva flyten faktisk trenger
 
 ### Formatfaktor-responsive dialoger
 
-**Telefon** (native, < 768px) bruker `Sheet`; **nettbrett** (native, ≥ 768px) og **web** bruker `Dialog`. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt — den velger riktig primitiv automatisk:
+Grensen går på **bredde**, ikke plattform. **Smal skjerm** — native telefon eller nettleser < 1024px — bruker `Sheet` (bunn-skuff); **nettbrett** (native, ≥ 768px) og **desktop** (nettleser ≥ 1024px) bruker `Dialog`. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt — den velger riktig primitiv automatisk:
 
 ```tsx
 <ResponsiveOverlay open={open} onOpenChange={setOpen}>
@@ -55,7 +55,8 @@ Tre primitiver dekker det aller meste — velg ut fra hva flyten faktisk trenger
 
 `DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogFooter` fungerer uendret inni begge varianter, siden `Dialog` og `Sheet` er bygget på samme `@radix-ui/react-dialog`-primitiv.
 
-- Grenen går på `useFormFactor()` (`src/hooks/use-form-factor.ts`), ikke `useIsNative()`: en fullbredde bunn-skuff er riktig på 375px og feil på 1024px. Hooken returnerer `"phone" | "tablet" | "web"` og skal kalles der oppsettet faktisk forgrener — ikke spres som en `isTablet`-boolsk rundt i koden.
+- Grenen går på `useIsNarrow()` (`src/hooks/use-form-factor.ts`), ikke `useIsNative()`: en fullbredde bunn-skuff er riktig på 375px og feil på 1024px. kaupet.no i et 375px nettleservindu er samme lesesituasjon som appen på samme telefon, og skal se likedan ut. `useFormFactor()` returnerer `"phone" | "tablet" | "web" | "desktop"` og skal kalles der oppsettet faktisk forgrener — ikke spres som en `isTablet`-boolsk rundt i koden.
+- En skuff som er høyere enn sitt eget startdetent skal ha `expandable`, slik at brukeren kan dra den til fullhøyde. Merk at `SheetContent side="bottom"` legger `className` på sin egen scrollende innerdiv, ikke på skuff-containeren: `max-h`/`overflow-hidden` hører hjemme i dialog-grenen, ikke i skuff-grenen.
 - Bruk `ResponsiveOverlay` for alt brukervendt — en dialog som går rett på `Dialog` mister bottom-sheet-oppførselen native-appen ellers har (se `kaupet-code-dialog.tsx`).
 - Rene admin-flater (`src/routes/_authenticated/admin/**`) er unntaket og kan fortsette å bruke `Dialog` direkte, siden de uansett ikke kjører i native-appen (se `create-demo-user-dialog.tsx`).
 - Begge overlay-rotene (`ResponsiveOverlay` og `FullscreenOverlay`) gir seg selv en egen historikk-oppføring via `useOverlayHistory` (`src/hooks/use-overlay-history.ts`), slik at Android-tilbakeknappen og iOS' kantsveip lukker overlayet i stedet for å navigere siden bak det. Ikke gjenta `history.pushState`/`popstate` i en konsument. Trenger en flate å _ikke_ kunne lukkes med tilbake, sett `historyBack={false}` på `FullscreenOverlay` (kun onboardingen gjør det i dag).

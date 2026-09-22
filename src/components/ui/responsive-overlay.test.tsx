@@ -27,8 +27,9 @@ function setViewportWidth(width: number) {
 }
 
 describe("ResponsiveOverlay", () => {
-  it("renders as a centered Dialog on web", async () => {
+  it("renders as a centered Dialog on desktop web", async () => {
     isNativeMock.mockReturnValue(false);
+    setViewportWidth(1440);
     const { findByText, baseElement } = render(
       <ResponsiveOverlay open onOpenChange={() => {}}>
         <ResponsiveOverlayContent>innhold</ResponsiveOverlayContent>
@@ -37,6 +38,24 @@ describe("ResponsiveOverlay", () => {
 
     await findByText("innhold");
     expect(baseElement.querySelector('[class*="top-\\[50%\\]"]')).not.toBeNull();
+  });
+
+  /* Mobilweb er samme lesesituasjon som appen på samme telefon: en bunn-skuff,
+     ikke en sentrert dialog. Grensen går på bredde, ikke på `isNative()`. */
+  it("renders as a bottom Sheet on mobile web", async () => {
+    isNativeMock.mockReturnValue(false);
+    setViewportWidth(375);
+    const { findByText, baseElement } = render(
+      <ResponsiveOverlay open onOpenChange={() => {}}>
+        <ResponsiveOverlayContent>innhold</ResponsiveOverlayContent>
+      </ResponsiveOverlay>,
+    );
+
+    await findByText("innhold");
+    await waitFor(() => {
+      expect(baseElement.querySelector('[class*="rounded-t-2xl"]')).not.toBeNull();
+    });
+    expect(baseElement.querySelector('[class*="top-\\[50%\\]"]')).toBeNull();
   });
 
   it("renders as a bottom Sheet on a native phone", async () => {
@@ -71,6 +90,7 @@ describe("ResponsiveOverlay", () => {
   });
   it("closes with Escape and returns focus to the opener", async () => {
     isNativeMock.mockReturnValue(false);
+    setViewportWidth(1440);
     function Harness() {
       const [open, setOpen] = React.useState(false);
       return (

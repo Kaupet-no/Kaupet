@@ -3061,6 +3061,10 @@ export type Database = {
         Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
         Returns: boolean
       }
+      check_user_rate_limit: {
+        Args: { _bucket: string; _limit: number; _user_id: string; _window_seconds: number }
+        Returns: boolean
+      }
       compute_wtb_matches: {
         Args: {
           _attributes: Json

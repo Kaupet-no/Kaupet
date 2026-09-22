@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
 
 /**
  * Proposes a new brand/model, used only from the "we don't recognize this
@@ -38,6 +39,7 @@ export const createVehicleBrand = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertUserNotRateLimited(context.userId, "vehicle_suggestion", 10, 3600);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("vehicle_brands")
@@ -76,6 +78,7 @@ export const createVehicleModel = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertUserNotRateLimited(context.userId, "vehicle_suggestion", 10, 3600);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("vehicle_models")

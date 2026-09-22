@@ -1,10 +1,6 @@
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 import { findModelContainedIn } from "./vehicle-brand-match";
 
-// Re-eksportert for eksisterende importører; selve implementasjonen ligger i
-// den rene (klient-trygge) modulen ved siden av.
-export { findModelContainedIn };
-
 /** Matches a raw SVV brand/model string against already-approved
  * vehicle_brands/vehicle_models rows for the given category group. Used by
  * `lookupVehicleByRegNumber` — kept as a plain function so the caller

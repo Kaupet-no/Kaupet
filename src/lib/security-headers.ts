@@ -11,6 +11,11 @@ export type SecurityHeaderEnv = {
    * en privat bucket og rendres som `<img>` med presignert S3-URL på
    * `https://<account>.r2.cloudflarestorage.com` (se `src/lib/r2.server.ts`). */
   r2AccountId?: string;
+  /** Supabase-URL-en klienten faktisk bruker (`VITE_SUPABASE_URL`). I prod
+   * dekkes den av `*.supabase.co`; lokalt/E2E er den `http://127.0.0.1:<port>`. */
+  supabaseUrl?: string;
+  /** Request-local nonce for TanStack Start's SSR inline scripts. */
+  scriptNonce?: string;
 };
 
 /** Kilder som mangler utelates framfor å slippe inn strengen "undefined" eller
@@ -29,7 +34,21 @@ function imgSrc({ r2PublicBaseUrl, r2AccountId }: SecurityHeaderEnv): string {
     .join(" ");
 }
 
+function connectSrc({ supabaseUrl }: SecurityHeaderEnv): string {
+  const origin = supabaseUrl ? new URL(supabaseUrl).origin : undefined;
+  return [
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    origin,
+    origin?.replace(/^http/, "ws"),
+    "https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, string> {
+  const scriptNonce = env.scriptNonce ? `'nonce-${env.scriptNonce}'` : undefined;
+
   return {
     // Attribusjon på hvert svar, synlig i DevTools Network. Ren ASCII med vilje:
     // headerverdier er latin-1, så ingen em-dash her (til forskjell fra
@@ -40,20 +59,21 @@ export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, str
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-    // Enforce the policy. Keep the explicit inline allowance until SSR
-    // hydration/bootstrap has been migrated to nonces; report-only provided no
-    // protection at all.
+    // SSR hydration scripts carry the request-local nonce. Static assets use
+    // the same policy without a nonce; the Start middleware adds it for HTML.
     "content-security-policy": [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'self'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+      ["script-src 'self'", scriptNonce, "https://challenges.cloudflare.com"]
+        .filter(Boolean)
+        .join(" "),
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       imgSrc(env),
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
+      connectSrc(env),
       "frame-src https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "upgrade-insecure-requests",

@@ -60,6 +60,9 @@ type Props = {
    * samtidig og hvert valg gjelder umiddelbart. Samme seksjoner, samme
    * tilstand — bare kroppen skiller (se docs/ARCHITECTURE.md § plattform). */
   layout?: "drilldown" | "expanded";
+  /** Ruten eier kategorien (kategorilandingssidene) — da skjules kategori-
+   * valget helt, i stedet for å vise en velger siden overstyrer. */
+  hideCategory?: boolean;
   /** Aktive filtertagger — vises øverst med swipe-for-å-fjerne (fase 12).
    * Utelatt (ikke bare tom liste) skjuler seksjonen helt, for kallere som
    * ikke sporer aktive filtre som en flat liste (mine-sok.tsx). */
@@ -89,6 +92,7 @@ export function SearchFilterSections({
   priceBounds = PRICE_BOUNDS,
   includePrimary = false,
   layout = "drilldown",
+  hideCategory = false,
   activeItems,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
@@ -205,11 +209,13 @@ export function SearchFilterSections({
         <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
       )}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        <FilterOverviewRow
-          label="Kategori"
-          value={categorySummary}
-          onClick={() => openSection("categories")}
-        />
+        {!hideCategory && (
+          <FilterOverviewRow
+            label="Kategori"
+            value={categorySummary}
+            onClick={() => openSection("categories")}
+          />
+        )}
         <FilterOverviewRow
           label="Sted"
           value={locationSummary}
@@ -452,44 +458,48 @@ export function SearchFilterSections({
           står bare åpen så lenge ingen kategori er valgt. Etterpå holder en
           sammendragslinje med «Endre» — resten av filtrene er viktigere når
           kategorien først er satt. */}
-      <section data-section="categories" className={`${sectionClass} space-y-3`}>
-        {categoryEditOpen || !isCategorySelectionComplete(v.categories, categoryTree) ? (
-          <>
-            <CategorySlugPicker
-              categories={categories}
-              selected={v.categories}
-              onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
-            />
-            {v.categories.length > 0 && (
+      {!hideCategory && (
+        <section data-section="categories" className={`${sectionClass} space-y-3`}>
+          {categoryEditOpen || !isCategorySelectionComplete(v.categories, categoryTree) ? (
+            <>
+              <CategorySlugPicker
+                categories={categories}
+                selected={v.categories}
+                onChange={(slugs) =>
+                  setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))
+                }
+              />
+              {v.categories.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setCategoryEditOpen(false)}
+                >
+                  Ferdig
+                </Button>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <Label className={labelClass}>Kategori</Label>
+                <p className="truncate text-sm text-muted-foreground">{categorySummary}</p>
+              </div>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="w-full"
-                onClick={() => setCategoryEditOpen(false)}
+                className="shrink-0 px-2 text-primary"
+                onClick={() => setCategoryEditOpen(true)}
               >
-                Ferdig
+                Endre
               </Button>
-            )}
-          </>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <Label className={labelClass}>Kategori</Label>
-              <p className="truncate text-sm text-muted-foreground">{categorySummary}</p>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="shrink-0 px-2 text-primary"
-              onClick={() => setCategoryEditOpen(true)}
-            >
-              Endre
-            </Button>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
       <section data-section="conditions" className={`${sectionClass} space-y-2`}>
         <Label className={labelClass}>Tilstand</Label>
         {conditionOptions.map((condition) => (

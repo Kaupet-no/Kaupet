@@ -5,6 +5,12 @@ export function normalizeOrganizationNumber(value: string): string {
   return value.replace(/\s/g, "");
 }
 
+/** Formats a Norwegian organization number with three-digit grouping. */
+export function formatOrganizationNumber(value: string): string {
+  const digits = value.replace(/\D/gu, "");
+  return digits.replace(/(\d)(?=(\d{3})+$)/gu, "$1 ");
+}
+
 /** Validates the Norwegian organization-number Modulus-11 check digit. */
 export function isValidOrganizationNumber(value: string): boolean {
   const normalized = normalizeOrganizationNumber(value);

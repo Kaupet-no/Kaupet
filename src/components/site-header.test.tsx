@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { SiteHeader, HeaderSearchPortal } from "./site-header";
 
 type HeaderMembership = {
-  status: "active" | "deactivated";
+  status: "active";
   organization: { selected_plan: "proff_basis" | "proff" | null };
 };
 
@@ -150,10 +150,7 @@ describe("SiteHeader", () => {
   });
 
   it("viser vanlig Kaupet-logo når bedriftstilknytningen ikke er aktiv", () => {
-    headerMocks.membership = {
-      status: "deactivated",
-      organization: { selected_plan: "proff" },
-    };
+    headerMocks.membership = null;
 
     render(<SiteHeader />);
 

@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -68,7 +69,6 @@ async function resolveListingOwnership(
     .eq("status", "active")
     .maybeSingle();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   if (!membership) {
@@ -79,7 +79,6 @@ async function resolveListingOwnership(
       _organization_id: membership.organization_id,
     });
     if (syncError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", syncError);
     }
     const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc(
@@ -87,7 +86,6 @@ async function resolveListingOwnership(
       { _organization_id: membership.organization_id },
     );
     if (accessError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", accessError);
     }
     if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
@@ -104,7 +102,6 @@ async function resolveListingOwnership(
         .eq("category_id", categoryId)
         .maybeSingle();
       if (categoryError) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", categoryError);
       }
       if (!allowed) throw new Error("Du har ikke tilgang til denne kategorien.");
@@ -119,7 +116,6 @@ async function resolveListingOwnership(
     .eq("active", true)
     .maybeSingle();
   if (locationError) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", locationError);
   }
   if (!location) throw new Error("Lokasjonen finnes ikke eller er ikke aktiv.");
@@ -131,7 +127,6 @@ async function resolveListingOwnership(
       .eq("user_id", userId)
       .maybeSingle();
     if (assignmentError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", assignmentError);
     }
     if (!assignment) throw new Error("Du har ikke tilgang til denne lokasjonen.");
@@ -178,7 +173,6 @@ async function saveVisitingAddressSnapshot(
     city: location.city,
   });
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
 }
@@ -196,7 +190,6 @@ async function authorizeListingMutation(
     .eq("id", listingId)
     .maybeSingle();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", error);
   }
   if (!listing) throw new Error("Annonsen finnes ikke.");
@@ -216,7 +209,6 @@ async function authorizeListingMutation(
     },
   );
   if (permissionError) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("database", permissionError);
   }
   if (!allowed) throw new Error("Du har ikke tilgang til denne annonsen");
@@ -316,15 +308,12 @@ async function validateExistingListingForPublish(
     supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
   ]);
   if (filterError) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("republishListing.filters", filterError);
   }
   if (categoryError) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("republishListing.categories", categoryError);
   }
   if (flowError) {
-    const { toClientError } = await import("@/lib/to-client-error");
     throw await toClientError("republishListing.flows", flowError);
   }
 
@@ -464,7 +453,6 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         .select("id, kaupet_code, updated_at")
         .maybeSingle();
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("saveDraftListing.update", error, { listing_id: data.id });
       }
       if (!updated) {
@@ -511,7 +499,6 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .select("id, kaupet_code, updated_at")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return {
@@ -533,7 +520,6 @@ export const discardDraftListing = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("status", "draft");
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
   });
@@ -679,7 +665,6 @@ export const createListing = createServerFn({ method: "POST" })
         .select("id, kaupet_code")
         .single();
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("database", error);
       }
       await saveVisitingAddressSnapshot(
@@ -720,7 +705,6 @@ export const createListing = createServerFn({ method: "POST" })
       .select("id, kaupet_code")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     await saveVisitingAddressSnapshot(
@@ -778,7 +762,6 @@ export const republishListing = createServerFn({ method: "POST" })
       .select("id, status, published_at, expires_at")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("republishListing.update", error, { listing_id: data.id });
     }
 
@@ -812,7 +795,6 @@ export const updateListingStatus = createServerFn({ method: "POST" })
       .select("id, status")
       .single();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("updateListingStatus", error, { listing_id: data.id });
     }
     return updated;
@@ -833,7 +815,6 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
       .eq("status", "active")
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { kaupet_code: row?.kaupet_code ?? null };

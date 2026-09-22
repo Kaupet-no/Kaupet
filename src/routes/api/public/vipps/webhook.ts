@@ -14,8 +14,13 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const raw = await request.text();
         const host = request.headers.get("host");
 
-        const { getVippsWebhookSecret, getVippsPayment, verifyVippsWebhookSignature } =
-          await import("@/lib/vipps.server");
+        const {
+          getVippsWebhookSecret,
+          getVippsPayment,
+          getVippsWebhookEventId,
+          isFreshVippsWebhookDate,
+          getVippsWebhookRejectionReason,
+        } = await import("@/lib/vipps.server");
         const secret = await getVippsWebhookSecret(host);
         // Fail closed: an endpoint with no configured secret must not accept
         // unverified requests, since that would let anyone trigger processing
@@ -24,9 +29,32 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           console.error("[vipps webhook] no webhook secret configured, rejecting request");
           return new Response("Webhook not configured", { status: 401 });
         }
-        const sigHeader =
-          request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";
-        if (!verifyVippsWebhookSignature(secret, sigHeader, raw)) {
+        const url = new URL(request.url);
+        const date = request.headers.get("x-ms-date") ?? "";
+        const contentHash = request.headers.get("x-ms-content-sha256") ?? "";
+        const authorization = request.headers.get("authorization") ?? "";
+        const pathAndQuery = `${url.pathname}${url.search}`;
+        const rejectionReason = host
+          ? getVippsWebhookRejectionReason(secret, {
+              method: request.method,
+              pathAndQuery,
+              host,
+              date,
+              contentHash,
+              authorization,
+              rawBody: raw,
+            })
+          : null;
+        if (!host || rejectionReason) {
+          console.warn("[vipps webhook] signature rejected", {
+            reason: host ? rejectionReason : "missing_host",
+            host,
+            pathAndQuery,
+            method: request.method,
+            hasDateHeader: date !== "",
+            hasContentHashHeader: contentHash !== "",
+            authorizationScheme: authorization.split(" ")[0] || null,
+          });
           return new Response("Invalid signature", { status: 401 });
         }
 
@@ -44,11 +72,10 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
             : typeof payload?.eventName === "string"
               ? payload.eventName
               : undefined;
-        const eventIdRaw = payload?.eventId ?? payload?.id;
-        const eventId: string =
-          typeof eventIdRaw === "string"
-            ? eventIdRaw
-            : `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
+        const eventId = getVippsWebhookEventId(payload);
+        if (!eventId) {
+          return new Response("Missing webhook event identity", { status: 400 });
+        }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -60,6 +87,13 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           .maybeSingle();
         if (existing?.processed_at) {
           return new Response("ok", { status: 200 });
+        }
+        // The request date is covered by the HMAC. Check it only for a new
+        // event so a known Vipps retry remains idempotent even after the
+        // freshness window.
+        if (!existing && !isFreshVippsWebhookDate(date)) {
+          console.warn("[vipps webhook] stale webhook", { date, host });
+          return new Response("Stale webhook", { status: 401 });
         }
         if (!existing) {
           await supabaseAdmin.from("vipps_webhook_events").insert({

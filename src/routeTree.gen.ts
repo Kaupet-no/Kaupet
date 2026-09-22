@@ -35,7 +35,6 @@ import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingI
 import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
 import { Route as BedriftOrganizationIdRouteImport } from './routes/bedrift.$organizationId'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
-import { Route as DesignBedriftPlanerRouteImport } from './routes/design/bedrift-planer'
 import { Route as OkIdRouteImport } from './routes/ok.$id'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminBedrifterRouteImport } from './routes/_authenticated/admin/bedrifter'
@@ -187,11 +186,6 @@ const BedriftOrganizationIdRoute = BedriftOrganizationIdRouteImport.update({
 const BrukerIdRoute = BrukerIdRouteImport.update({
   id: '/bruker/$id',
   path: '/bruker/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DesignBedriftPlanerRoute = DesignBedriftPlanerRouteImport.update({
-  id: '/design/bedrift-planer',
-  path: '/design/bedrift-planer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OkIdRoute = OkIdRouteImport.update({
@@ -347,7 +341,6 @@ export interface FileRoutesByFullPath {
   '/annonser/filter': typeof AnnonserFilterRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
-  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
   '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
@@ -395,7 +388,6 @@ export interface FileRoutesByTo {
   '/annonser/filter': typeof AnnonserFilterRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
-  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
   '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
@@ -447,7 +439,6 @@ export interface FileRoutesById {
   '/annonser_/filter': typeof AnnonserFilterRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
-  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
   '/_authenticated/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
@@ -499,7 +490,6 @@ export interface FileRouteTypes {
     | '/annonser/filter'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
-    | '/design/bedrift-planer'
     | '/ok/$id'
     | '/admin/bedrifter'
     | '/admin/brukere'
@@ -547,7 +537,6 @@ export interface FileRouteTypes {
     | '/annonser/filter'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
-    | '/design/bedrift-planer'
     | '/ok/$id'
     | '/admin/bedrifter'
     | '/admin/brukere'
@@ -598,7 +587,6 @@ export interface FileRouteTypes {
     | '/annonser_/filter'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
-    | '/design/bedrift-planer'
     | '/ok/$id'
     | '/_authenticated/admin/bedrifter'
     | '/_authenticated/admin/brukere'
@@ -643,7 +631,6 @@ export interface RootRouteChildren {
   AnnonserFilterRoute: typeof AnnonserFilterRoute
   BedriftOrganizationIdRoute: typeof BedriftOrganizationIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
-  DesignBedriftPlanerRoute: typeof DesignBedriftPlanerRoute
   OkIdRoute: typeof OkIdRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
@@ -833,13 +820,6 @@ declare module '@tanstack/react-router' {
       path: '/bruker/$id'
       fullPath: '/bruker/$id'
       preLoaderRoute: typeof BrukerIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/design/bedrift-planer': {
-      id: '/design/bedrift-planer'
-      path: '/design/bedrift-planer'
-      fullPath: '/design/bedrift-planer'
-      preLoaderRoute: typeof DesignBedriftPlanerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ok/$id': {
@@ -1102,7 +1082,6 @@ const rootRouteChildren: RootRouteChildren = {
   AnnonserFilterRoute: AnnonserFilterRoute,
   BedriftOrganizationIdRoute: BedriftOrganizationIdRoute,
   BrukerIdRoute: BrukerIdRoute,
-  DesignBedriftPlanerRoute: DesignBedriftPlanerRoute,
   OkIdRoute: OkIdRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,

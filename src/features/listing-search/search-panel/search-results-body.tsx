@@ -29,7 +29,7 @@ export function SearchResultsBody({
       className={
         isNative
           ? undefined
-          : "mt-4 lg:grid lg:grid-cols-[290px_minmax(0,1fr)] lg:items-start lg:gap-8"
+          : "group/results mt-4 lg:grid lg:grid-cols-[290px_minmax(0,1fr)] lg:items-start lg:gap-8 max-2xl:has-[[data-map-visible]]:lg:grid-cols-[minmax(0,1fr)]"
       }
     >
       {isDesktop && !isNative && (
@@ -37,6 +37,7 @@ export function SearchResultsBody({
           results={searchPanelResults}
           categories={categories}
           onSaveSearch={onSaveSearch}
+          className="group-has-[[data-map-visible]]/results:max-2xl:hidden"
         />
       )}
       <div className="min-w-0">{children}</div>

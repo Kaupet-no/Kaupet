@@ -23,11 +23,20 @@ export default defineConfig(({ command, mode }) => {
   const envDefine = Object.fromEntries(
     Object.entries(env).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
   );
+  envDefine["import.meta.env.R2_ACCOUNT_ID"] = JSON.stringify(allEnv.R2_ACCOUNT_ID);
 
   const securityHeaders = buildSecurityHeaders({
     r2PublicBaseUrl: env.VITE_R2_PUBLIC_BASE_URL,
     r2AccountId: allEnv.R2_ACCOUNT_ID,
+    supabaseUrl: env.VITE_SUPABASE_URL,
   });
+  // CSP is request-specific for SSR: `cspNonceMiddleware` in `src/start.ts`
+  // sets it with a nonce (`src/server.ts` only adds a nonce-less fallback).
+  // Keeping a static CSP route rule would let Nitro overwrite that nonce on
+  // the outer response.
+  const staticSecurityHeaders = Object.fromEntries(
+    Object.entries(securityHeaders).filter(([name]) => name !== "content-security-policy"),
+  );
 
   if (command === "serve") {
     const missing = REQUIRED_DEV_SECRETS.filter((key) => !allEnv[key]);
@@ -50,6 +59,14 @@ export default defineConfig(({ command, mode }) => {
     define: envDefine,
     environments: {
       client: {
+        // start-client-core må serveres gjennom Vites transform-pipeline, ikke
+        // prebundles. Start-pluginen kompilerer bort server-grenen i
+        // createIsomorphicFn() (bl.a. getGlobalStartContext), og den
+        // transformen kjører ikke på moduler som havner i .vite/deps. Da
+        // overlever `import { AsyncLocalStorage } from "node:async_hooks"` via
+        // @tanstack/start-storage-context inn i nettleserbunten, og
+        // klientinngangen krasjer før hydrering — appen blir stående tom.
+        optimizeDeps: { exclude: ["@tanstack/start-client-core"] },
         build: {
           rolldownOptions: {
             output: { comments: { legal: true, annotation: false, jsdoc: false } },
@@ -147,7 +164,8 @@ export default defineConfig(({ command, mode }) => {
               // static asset serving would otherwise guess a generic content
               // type from the missing file extension.
               routeRules: {
-                "/**": { headers: securityHeaders },
+                "/assets/**": { headers: securityHeaders },
+                "/**": { headers: staticSecurityHeaders },
                 "/.well-known/apple-app-site-association": {
                   headers: { "content-type": "application/json" },
                 },

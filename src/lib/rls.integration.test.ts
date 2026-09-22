@@ -43,6 +43,17 @@ async function createTestCategory(admin: SupabaseClient, suffix: number | string
   return data.id;
 }
 
+async function createRlsUser(admin: SupabaseClient, email: string, userIds: string[]) {
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password: PASSWORD,
+    email_confirm: true,
+  });
+  if (error) throw error;
+  userIds.push(data.user!.id);
+  return data.user!.id;
+}
+
 /** With ~14 test groups each signing in 2-4 users, a full run does 60+
  * password sign-ins in well under a minute — enough to trip Supabase auth's
  * per-project rate limit on staging. Retries with backoff on a rate-limit
@@ -3120,6 +3131,7 @@ describe.skipIf(!canRun)(
     };
     const userIds: string[] = [];
     let categoryId: string;
+    let categoryFilterId: string;
 
     async function signIn(email: string) {
       return signInWithRetry(email);
@@ -3141,6 +3153,19 @@ describe.skipIf(!canRun)(
       await grantAdmin(admin, adminId);
 
       categoryId = await createTestCategory(admin, `taxonomy-${suffix}`);
+
+      const { data: filter, error: filterError } = await admin
+        .from("category_filters")
+        .insert({
+          category_id: categoryId,
+          key: `rls_taxonomy_filter_${suffix}`,
+          label_nb: "RLS taxonomy filter",
+          type: "text",
+        })
+        .select("id")
+        .single();
+      if (filterError) throw filterError;
+      categoryFilterId = filter.id;
     });
 
     afterAll(async () => {
@@ -3204,6 +3229,70 @@ describe.skipIf(!canRun)(
           .delete()
           .eq("id", data.id);
         expect(deleteErr).toBeNull();
+      }
+    });
+
+    it("allows only an admin to write category flows and filter synonyms", async () => {
+      const other = await signIn(emails.other);
+      const adminClient = await signIn(emails.admin);
+      const flow = {
+        category_id: categoryId,
+        field_groups: [
+          "photos",
+          "title",
+          "category-attributes",
+          "description-keywords",
+          "review-publish",
+        ],
+        sort_order: 99,
+      };
+
+      const { error: flowInsertError } = await other.from("category_flows").insert(flow);
+      expect(flowInsertError).not.toBeNull();
+      const { data: insertedFlow, error: adminFlowError } = await adminClient
+        .from("category_flows")
+        .insert(flow)
+        .select("id")
+        .single();
+      expect(adminFlowError).toBeNull();
+      expect(insertedFlow).not.toBeNull();
+
+      const { error: synonymInsertError } = await other.from("filter_synonyms").insert({
+        category_filter_id: categoryFilterId,
+        phrase: `uautorisert-${suffix}`,
+      });
+      expect(synonymInsertError).not.toBeNull();
+      const { data: insertedSynonym, error: adminSynonymError } = await adminClient
+        .from("filter_synonyms")
+        .insert({ category_filter_id: categoryFilterId, phrase: `admin-${suffix}` })
+        .select("id")
+        .single();
+      expect(adminSynonymError).toBeNull();
+      expect(insertedSynonym).not.toBeNull();
+
+      if (insertedFlow) {
+        const { error } = await adminClient
+          .from("category_flows")
+          .update({ sort_order: 100 })
+          .eq("id", insertedFlow.id);
+        expect(error).toBeNull();
+        const { error: deleteError } = await adminClient
+          .from("category_flows")
+          .delete()
+          .eq("id", insertedFlow.id);
+        expect(deleteError).toBeNull();
+      }
+      if (insertedSynonym) {
+        const { error } = await adminClient
+          .from("filter_synonyms")
+          .update({ phrase: `admin-endret-${suffix}` })
+          .eq("id", insertedSynonym.id);
+        expect(error).toBeNull();
+        const { error: deleteError } = await adminClient
+          .from("filter_synonyms")
+          .delete()
+          .eq("id", insertedSynonym.id);
+        expect(deleteError).toBeNull();
       }
     });
   },
@@ -4803,6 +4892,128 @@ describe.skipIf(!canRun)(
   },
 );
 
+describe.skipIf(!canRun)("RLS: authenticated write limits are isolated per user", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const userA = `11111111-1111-4111-8111-${String(suffix).slice(-12).padStart(12, "0")}`;
+  const userB = `22222222-2222-4222-8222-${String(suffix + 1)
+    .slice(-12)
+    .padStart(12, "0")}`;
+  const bucket = `user-write-test-${suffix}`;
+
+  it("allows the limit for user A without consuming user B's quota", async () => {
+    for (let i = 0; i < 3; i++) {
+      const { data, error } = await admin.rpc("check_user_rate_limit", {
+        _bucket: bucket,
+        _user_id: userA,
+        _limit: 3,
+        _window_seconds: 60,
+      });
+      expect(error).toBeNull();
+      expect(data).toBe(true);
+    }
+
+    const { data: exhausted, error: exhaustedError } = await admin.rpc("check_user_rate_limit", {
+      _bucket: bucket,
+      _user_id: userA,
+      _limit: 3,
+      _window_seconds: 60,
+    });
+    expect(exhaustedError).toBeNull();
+    expect(exhausted).toBe(false);
+
+    const { data: otherAllowed, error: otherError } = await admin.rpc("check_user_rate_limit", {
+      _bucket: bucket,
+      _user_id: userB,
+      _limit: 3,
+      _window_seconds: 60,
+    });
+    expect(otherError).toBeNull();
+    expect(otherAllowed).toBe(true);
+
+    const { error: cleanupError } = await admin
+      .from("endpoint_rate_limits")
+      .delete()
+      .eq("bucket", bucket);
+    expect(cleanupError).toBeNull();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: report submission enforces the per-user limit", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    first: `rls-report-limit-first-${suffix}@example.com`,
+    second: `rls-report-limit-second-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let listingId: string;
+
+  beforeAll(async () => {
+    const createUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+
+    const ownerId = await createUser(emails.first);
+    await createUser(emails.second);
+    const { data, error } = await admin
+      .from("listings")
+      .insert({
+        seller_id: ownerId,
+        title: `RLS report limit ${suffix}`,
+        price_nok: 100,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    listingId = data.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("reports").delete().in("reporter_id", userIds);
+    await admin
+      .from("endpoint_rate_limits")
+      .delete()
+      .eq("bucket", "report_submission")
+      .in(
+        "key_hash",
+        userIds.map((id) => createHash("sha256").update(id).digest("hex")),
+      );
+    await admin.from("listings").delete().eq("id", listingId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("rejects the 11th report from A while B can still submit", async () => {
+    const first = await signInWithRetry(emails.first);
+    const second = await signInWithRetry(emails.second);
+    const args = {
+      _listing_id: listingId,
+      _reason: "RLS test reason",
+      _comment: null,
+    };
+
+    for (let i = 0; i < 10; i++) {
+      const { error } = await first.rpc("submit_listing_report", args);
+      expect(error).toBeNull();
+    }
+
+    const { error: exhaustedError } = await first.rpc("submit_listing_report", args);
+    expect(exhaustedError?.message).toMatch(/rate_limited/);
+
+    const { error: secondError } = await second.rpc("submit_listing_report", args);
+    expect(secondError).toBeNull();
+  });
+});
+
 describe.skipIf(!canRun)(
   "RLS: an unverified organization cannot create or publish listings (M-4)",
   () => {
@@ -4929,6 +5140,619 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)("RLS: account deletion requests are private to their owner", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    owner: `rls-deletion-owner-${suffix}@example.com`,
+    other: `rls-deletion-other-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let ownerId: string;
+
+  beforeAll(async () => {
+    ownerId = await createRlsUser(admin, emails.owner, userIds);
+    await createRlsUser(admin, emails.other, userIds);
+    const { error } = await admin.from("account_deletions").insert({
+      user_id: ownerId,
+      confirmation_email: emails.owner,
+    });
+    if (error) throw error;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("account_deletions").delete().eq("user_id", ownerId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("viser bare eierens rad og skjuler den for annen bruker og anonym", async () => {
+    const owner = await signInWithRetry(emails.owner);
+    const other = await signInWithRetry(emails.other);
+    const anon = createClient(URL!, ANON_KEY!);
+    const ownerRead = await owner
+      .from("account_deletions")
+      .select("user_id")
+      .eq("user_id", ownerId);
+    const otherRead = await other
+      .from("account_deletions")
+      .select("user_id")
+      .eq("user_id", ownerId);
+    const anonRead = await anon.from("account_deletions").select("user_id").eq("user_id", ownerId);
+    expect(ownerRead.error).toBeNull();
+    expect(ownerRead.data).toHaveLength(1);
+    expect(otherRead.data).toHaveLength(0);
+    expect(anonRead.data).toHaveLength(0);
+  });
+
+  it("stenger direkte oppretting/oppdatering, men lar eieren slette egen forespørsel", async () => {
+    const owner = await signInWithRetry(emails.owner);
+    const { error: insertError } = await owner.from("account_deletions").insert({
+      user_id: ownerId,
+      confirmation_email: emails.owner,
+    });
+    expect(insertError).not.toBeNull();
+    const { error: updateError, count: updateCount } = await owner
+      .from("account_deletions")
+      .update({ confirmation_email: "endret@example.com" }, { count: "exact" })
+      .eq("user_id", ownerId);
+    expect(updateError).toBeNull();
+    expect(updateCount).toBe(0);
+    const { error: deleteError, count } = await owner
+      .from("account_deletions")
+      .delete({ count: "exact" })
+      .eq("user_id", ownerId);
+    expect(deleteError).toBeNull();
+    expect(count).toBe(1);
+    const { error: restoreError } = await admin.from("account_deletions").insert({
+      user_id: ownerId,
+      confirmation_email: emails.owner,
+    });
+    expect(restoreError).toBeNull();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: kategori-synkestatus er kun lesbar for administratorer", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    admin: `rls-sync-admin-${suffix}@example.com`,
+    other: `rls-sync-other-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+
+  beforeAll(async () => {
+    await createRlsUser(admin, emails.admin, userIds);
+    const otherId = await createRlsUser(admin, emails.other, userIds);
+    await grantAdmin(admin, userIds[0]!);
+    const { error } = await admin.from("category_sync_status").upsert({
+      id: true,
+      last_synced_at: new Date().toISOString(),
+      last_synced_by: otherId,
+    });
+    if (error) throw error;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("category_sync_status").delete().eq("id", true);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("viser status til admin, men ikke annen bruker eller anonym", async () => {
+    const adminClient = await signInWithRetry(emails.admin);
+    const other = await signInWithRetry(emails.other);
+    const anon = createClient(URL!, ANON_KEY!);
+    const adminRead = await adminClient.from("category_sync_status").select("id").eq("id", true);
+    const otherRead = await other.from("category_sync_status").select("id").eq("id", true);
+    const anonRead = await anon.from("category_sync_status").select("id").eq("id", true);
+    expect(adminRead.error).toBeNull();
+    expect(adminRead.data).toHaveLength(1);
+    expect(otherRead.data).toHaveLength(0);
+    expect(anonRead.data).toHaveLength(0);
+  });
+
+  it("blokkerer klient-skriving og lar service_role oppdatere status", async () => {
+    const client = await signInWithRetry(emails.admin);
+    const { error: clientError, count: clientCount } = await client
+      .from("category_sync_status")
+      .update({ last_synced_at: new Date().toISOString() }, { count: "exact" })
+      .eq("id", true);
+    expect(clientError).toBeNull();
+    expect(clientCount).toBe(0);
+    const { error: serviceError } = await admin
+      .from("category_sync_status")
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq("id", true);
+    expect(serviceError).toBeNull();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: interne logger, køer og rate-limit-tabeller er service-only", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const email = `rls-internal-${suffix}@example.com`;
+  const userIds: string[] = [];
+  let listingId: string;
+  let historyListingId: string;
+  let queueId: number;
+  let productEventId: number;
+  let vehicleLogId: string;
+
+  beforeAll(async () => {
+    const userId = await createRlsUser(admin, email, userIds);
+    const createListing = async (title: string) => {
+      const { data, error } = await admin
+        .from("listings")
+        .insert({ seller_id: userId, title, price_nok: 100, status: "draft" })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id;
+    };
+    historyListingId = await createListing(`RLS history ${suffix}`);
+    listingId = await createListing(`RLS queue ${suffix}`);
+    const { error: signupError } = await admin.from("business_signup_intents").insert({
+      organization_number: String(300_000_000 + (suffix % 600_000_000)),
+      legal_name: "RLS intern test",
+      email: `intern-${suffix}@example.com`,
+    });
+    if (signupError) throw signupError;
+    const { error: limitError } = await admin.from("listing_360_upload_rate_limits").insert({
+      scope: "ip",
+      key_hash: createHash("sha256").update(`360-${suffix}`).digest("hex"),
+    });
+    if (limitError) throw limitError;
+    const { error: eventLimitError } = await admin.from("product_event_rate_limits").insert({
+      key_hash: createHash("sha256").update(`event-${suffix}`).digest("hex"),
+    });
+    if (eventLimitError) throw eventLimitError;
+    const { data: event, error: eventError } = await admin
+      .from("product_events")
+      .insert({
+        event_name: "search_opened",
+        platform: "web",
+        path: "/rls-test",
+        properties: {},
+      })
+      .select("id")
+      .single();
+    if (eventError) throw eventError;
+    productEventId = event.id;
+    const { data: vehicleLog, error: vehicleLogError } = await admin
+      .from("vehicle_lookup_log")
+      .insert({ user_id: userId, registration_number: `RL${suffix}` })
+      .select("id")
+      .single();
+    if (vehicleLogError) throw vehicleLogError;
+    vehicleLogId = vehicleLog.id;
+    const { error: deleteError } = await admin.from("listings").delete().eq("id", listingId);
+    if (deleteError) throw deleteError;
+    const { data: queue, error: queueError } = await admin
+      .from("r2_delete_queue")
+      .select("id")
+      .eq("prefix", `${listingId}/`)
+      .single();
+    if (queueError) throw queueError;
+    queueId = queue.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("business_signup_intents").delete().like("email", `intern-${suffix}%`);
+    await admin
+      .from("listing_360_upload_rate_limits")
+      .delete()
+      .eq("key_hash", createHash("sha256").update(`360-${suffix}`).digest("hex"));
+    await admin.from("product_events").delete().eq("id", productEventId);
+    await admin
+      .from("product_event_rate_limits")
+      .delete()
+      .eq("key_hash", createHash("sha256").update(`event-${suffix}`).digest("hex"));
+    await admin.from("vehicle_lookup_log").delete().eq("id", vehicleLogId);
+    await admin.from("listings").delete().eq("id", historyListingId);
+    await admin
+      .from("r2_delete_queue")
+      .delete()
+      .in("prefix", [`${listingId}/`, `${historyListingId}/`]);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("skjuler alle service-only-tabeller for anonym og autentisert klient", async () => {
+    const client = await signInWithRetry(email);
+    const anon = createClient(URL!, ANON_KEY!);
+    for (const table of [
+      "business_signup_intents",
+      "listing_360_upload_rate_limits",
+      "listing_status_history",
+      "product_event_rate_limits",
+      "product_events",
+      "r2_delete_queue",
+      "vehicle_lookup_log",
+    ] as const) {
+      for (const candidate of [anon, client]) {
+        const { data, error } = await candidate.from(table).select("*").limit(1);
+        expect(error !== null || (data ?? []).length === 0, `${table} leaked a row`).toBe(true);
+      }
+    }
+  });
+
+  it("avviser klient-skriving mens service_role kan administrere kontrakten", async () => {
+    const client = await signInWithRetry(email);
+    const attempts = [
+      client
+        .from("business_signup_intents")
+        .insert({ organization_number: "301000000", legal_name: "client" }),
+      client
+        .from("listing_360_upload_rate_limits")
+        .insert({ scope: "ip", key_hash: "a".repeat(64) }),
+      client.from("product_event_rate_limits").insert({ key_hash: "b".repeat(64) }),
+      client.from("listing_status_history").insert({
+        listing_id: historyListingId,
+        status: "draft",
+        changed_at: new Date().toISOString(),
+      }),
+      client.from("product_events").insert({
+        event_name: "search_opened",
+        platform: "web",
+        path: "/client",
+        properties: {},
+      }),
+      client.from("r2_delete_queue").insert({ bucket: "BILDER", prefix: "client/" }),
+      client
+        .from("vehicle_lookup_log")
+        .insert({ user_id: userIds[0], registration_number: "CLIENT" }),
+    ];
+    for (const attempt of attempts) expect((await attempt).error).not.toBeNull();
+
+    const { data: history, error: historyError } = await admin
+      .from("listing_status_history")
+      .select("listing_id")
+      .eq("listing_id", historyListingId);
+    expect(historyError).toBeNull();
+    expect(history).toHaveLength(1);
+    const { error: queueUpdateError } = await admin
+      .from("r2_delete_queue")
+      .update({ attempts: 1 })
+      .eq("id", queueId);
+    expect(queueUpdateError).toBeNull();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: aktive priser og kjøretøykatalog er offentlig lesbare", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    admin: `rls-public-admin-${suffix}@example.com`,
+    other: `rls-public-other-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let activePricingId: string;
+  let inactivePricingId: string;
+  let brandId: string;
+  let classId: string;
+  let modelId: string;
+
+  beforeAll(async () => {
+    const adminId = await createRlsUser(admin, emails.admin, userIds);
+    await createRlsUser(admin, emails.other, userIds);
+    await grantAdmin(admin, adminId);
+    const { data: active, error: activeError } = await admin
+      .from("promotion_pricing")
+      .insert({ duration_days: 3, price_nok: 99, active: true })
+      .select("id")
+      .single();
+    if (activeError) throw activeError;
+    activePricingId = active.id;
+    const { data: inactive, error: inactiveError } = await admin
+      .from("promotion_pricing")
+      .insert({ duration_days: 4, price_nok: 100, active: false })
+      .select("id")
+      .single();
+    if (inactiveError) throw inactiveError;
+    inactivePricingId = inactive.id;
+    const { data: brand, error: brandError } = await admin
+      .from("vehicle_brands")
+      .insert({ name: `RLS Public Brand ${suffix}`, category_group: "bil", status: "approved" })
+      .select("id")
+      .single();
+    if (brandError) throw brandError;
+    brandId = brand.id;
+    const { data: vehicleClass, error: classError } = await admin
+      .from("vehicle_model_classes")
+      .insert({ brand_id: brandId, name: `RLS Class ${suffix}`, status: "approved" })
+      .select("id")
+      .single();
+    if (classError) throw classError;
+    classId = vehicleClass.id;
+    const { data: model, error: modelError } = await admin
+      .from("vehicle_models")
+      .insert({
+        brand_id: brandId,
+        class_id: classId,
+        name: `RLS Model ${suffix}`,
+        status: "approved",
+      })
+      .select("id")
+      .single();
+    if (modelError) throw modelError;
+    modelId = model.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("promotion_pricing").delete().in("id", [activePricingId, inactivePricingId]);
+    await admin.from("vehicle_models").delete().eq("id", modelId);
+    await admin.from("vehicle_model_classes").delete().eq("id", classId);
+    await admin.from("vehicle_brands").delete().eq("id", brandId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("viser aktiv pris og katalograder for anonym, men ikke inaktiv pris", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const active = await anon.from("promotion_pricing").select("id").eq("id", activePricingId);
+    const inactive = await anon.from("promotion_pricing").select("id").eq("id", inactivePricingId);
+    const classes = await anon.from("vehicle_model_classes").select("id").eq("id", classId);
+    const models = await anon.from("vehicle_models").select("id").eq("id", modelId);
+    expect(active.error).toBeNull();
+    expect(active.data).toHaveLength(1);
+    expect(inactive.error).toBeNull();
+    expect(inactive.data).toHaveLength(0);
+    expect(classes.data).toHaveLength(1);
+    expect(models.data).toHaveLength(1);
+  });
+
+  it("lar bare admin skrive priser, mens katalogmodeller ikke kan skrives direkte av klient", async () => {
+    const other = await signInWithRetry(emails.other);
+    const adminClient = await signInWithRetry(emails.admin);
+    const { error: pricingError, count: pricingCount } = await other
+      .from("promotion_pricing")
+      .update({ price_nok: 1 }, { count: "exact" })
+      .eq("id", activePricingId);
+    expect(pricingError).toBeNull();
+    expect(pricingCount).toBe(0);
+    const { data: inserted, error: adminPricingError } = await adminClient
+      .from("promotion_pricing")
+      .insert({ duration_days: 5, price_nok: 101, active: true })
+      .select("id")
+      .single();
+    expect(adminPricingError).toBeNull();
+    if (inserted) {
+      const { error } = await adminClient.from("promotion_pricing").delete().eq("id", inserted.id);
+      expect(error).toBeNull();
+    }
+    const { error: classInsertError } = await other.from("vehicle_model_classes").insert({
+      brand_id: brandId,
+      name: `client-class-${suffix}`,
+      status: "pending",
+      submitted_by: userIds[1],
+    });
+    expect(classInsertError).not.toBeNull();
+    const { error: modelInsertError } = await other.from("vehicle_models").insert({
+      brand_id: brandId,
+      name: `client-model-${suffix}`,
+      status: "pending",
+      submitted_by: userIds[1],
+    });
+    expect(modelInsertError).not.toBeNull();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbrukergrensen", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    owner: `rls-org-data-owner-${suffix}@example.com`,
+    member: `rls-org-data-member-${suffix}@example.com`,
+    outsider: `rls-org-data-outsider-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let organizationId: string;
+  let locationId: string;
+  let listingId: string;
+  let categoryId: string;
+  const importId = crypto.randomUUID();
+
+  beforeAll(async () => {
+    const ownerId = await createRlsUser(admin, emails.owner, userIds);
+    const memberId = await createRlsUser(admin, emails.member, userIds);
+    await createRlsUser(admin, emails.outsider, userIds);
+    const { data: organization, error: organizationError } = await admin
+      .from("organizations")
+      .insert({
+        organization_number: String(400_000_000 + (suffix % 500_000_000)),
+        legal_name: `RLS Org Data ${suffix}`,
+        display_name: `RLS Org Data ${suffix}`,
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 86_400_000).toISOString(),
+        verification_status: "verified",
+      })
+      .select("id")
+      .single();
+    if (organizationError) throw organizationError;
+    organizationId = organization.id;
+    const { data: location, error: locationError } = await admin
+      .from("organization_locations")
+      .insert({ organization_id: organizationId, name: "RLS lokasjon", is_default: true })
+      .select("id")
+      .single();
+    if (locationError) throw locationError;
+    locationId = location.id;
+    const { error: membersError } = await admin.from("organization_members").insert([
+      { organization_id: organizationId, user_id: ownerId, role: "superuser", status: "active" },
+      { organization_id: organizationId, user_id: memberId, role: "member", status: "active" },
+    ]);
+    if (membersError) throw membersError;
+    const { error: locationMemberError } = await admin
+      .from("organization_location_members")
+      .insert({
+        organization_id: organizationId,
+        location_id: locationId,
+        user_id: memberId,
+        role: "member",
+      });
+    if (locationMemberError) throw locationMemberError;
+    categoryId = await createTestCategory(admin, `org-data-${suffix}`);
+    const { error: billingError } = await admin.from("organization_billing_profiles").insert({
+      organization_id: organizationId,
+      billing_email: emails.owner,
+    });
+    if (billingError) throw billingError;
+    const { data: subscription, error: subscriptionError } = await admin
+      .from("organization_location_subscriptions")
+      .insert({ location_id: locationId, next_period_start: new Date().toISOString() })
+      .select("id")
+      .single();
+    if (subscriptionError) throw subscriptionError;
+    const { error: chargeError } = await admin.from("organization_location_charge_periods").insert({
+      subscription_id: subscription.id,
+      period_start: new Date().toISOString(),
+      period_end: new Date(Date.now() + 86_400_000).toISOString(),
+      amount_ex_vat_nok: 249,
+    });
+    if (chargeError) throw chargeError;
+    const { error: categoryError } = await admin.from("organization_member_categories").insert({
+      organization_id: organizationId,
+      user_id: memberId,
+      category_id: categoryId,
+    });
+    if (categoryError) throw categoryError;
+    const { error: importError } = await admin.from("organization_listing_imports").insert({
+      organization_id: organizationId,
+      user_id: memberId,
+      import_id: importId,
+      external_id: `external-${suffix}`,
+      status: "processing",
+    });
+    if (importError) throw importError;
+    const { data: listing, error: listingError } = await admin
+      .from("listings")
+      .insert({
+        seller_id: memberId,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+        title: `RLS visiting address ${suffix}`,
+        price_nok: 100,
+        status: "active",
+        show_visiting_address: true,
+      })
+      .select("id")
+      .single();
+    if (listingError) throw listingError;
+    listingId = listing.id;
+    const { error: addressError } = await admin.from("listing_visiting_addresses").insert({
+      listing_id: listingId,
+      address_line: "Testgata 1",
+      postal_code: "0001",
+      city: "Oslo",
+    });
+    if (addressError) throw addressError;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("organizations").delete().eq("id", organizationId);
+    await admin.from("r2_delete_queue").delete().like("prefix", `${organizationId}/%`);
+    await admin.from("r2_delete_queue").delete().eq("prefix", `${listingId}/`);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("viser private billing/fakturadata bare til superbruker og adresse offentlig når flagget er satt", async () => {
+    const owner = await signInWithRetry(emails.owner);
+    const member = await signInWithRetry(emails.member);
+    const outsider = await signInWithRetry(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const ownerBilling = await owner
+      .from("organization_billing_profiles")
+      .select("organization_id")
+      .eq("organization_id", organizationId);
+    const memberBilling = await member
+      .from("organization_billing_profiles")
+      .select("organization_id")
+      .eq("organization_id", organizationId);
+    const ownerSubscription = await owner
+      .from("organization_location_subscriptions")
+      .select("id")
+      .eq("location_id", locationId);
+    const memberSubscription = await member
+      .from("organization_location_subscriptions")
+      .select("id")
+      .eq("location_id", locationId);
+    const ownerCharge = await owner
+      .from("organization_location_charge_periods")
+      .select("id")
+      .limit(1);
+    const memberCharge = await member
+      .from("organization_location_charge_periods")
+      .select("id")
+      .limit(1);
+    const outsiderCategories = await outsider
+      .from("organization_member_categories")
+      .select("category_id")
+      .eq("organization_id", organizationId);
+    const anonymousAddress = await anon
+      .from("listing_visiting_addresses")
+      .select("listing_id")
+      .eq("listing_id", listingId);
+    expect(ownerBilling.error).toBeNull();
+    expect(memberBilling.error).toBeNull();
+    expect(ownerSubscription.error).toBeNull();
+    expect(memberSubscription.error).toBeNull();
+    expect(ownerCharge.error).toBeNull();
+    expect(memberCharge.error).toBeNull();
+    expect(outsiderCategories.error).toBeNull();
+    expect(anonymousAddress.error).toBeNull();
+    expect(ownerBilling.data).toHaveLength(1);
+    expect(memberBilling.data).toHaveLength(0);
+    expect(ownerSubscription.data).toHaveLength(1);
+    expect(memberSubscription.data).toHaveLength(0);
+    expect(ownerCharge.data).toHaveLength(1);
+    expect(memberCharge.data).toHaveLength(0);
+    expect(outsiderCategories.data).toHaveLength(0);
+    expect(anonymousAddress.data).toHaveLength(1);
+  });
+
+  it("viser egne medlemskategorier og importstatus til aktivt medlem, men blokkerer klient-skriving", async () => {
+    const member = await signInWithRetry(emails.member);
+    const memberCategories = await member
+      .from("organization_member_categories")
+      .select("category_id")
+      .eq("organization_id", organizationId);
+    const imports = await member
+      .from("organization_listing_imports")
+      .select("import_id")
+      .eq("organization_id", organizationId);
+    expect(memberCategories.data).toHaveLength(1);
+    expect(imports.data).toHaveLength(1);
+    const { error: billingWrite } = await member
+      .from("organization_billing_profiles")
+      .update({ billing_email: emails.member })
+      .eq("organization_id", organizationId);
+    const { error: categoryWrite } = await member
+      .from("organization_member_categories")
+      .insert({ organization_id: organizationId, user_id: userIds[1], category_id: categoryId });
+    const { error: importWrite } = await member.from("organization_listing_imports").insert({
+      organization_id: organizationId,
+      user_id: userIds[1],
+      import_id: crypto.randomUUID(),
+      external_id: "client",
+      status: "processing",
+    });
+    const { error: addressWrite } = await member
+      .from("listing_visiting_addresses")
+      .insert({ listing_id: listingId, address_line: "Hacket", postal_code: "0001", city: "Oslo" });
+    expect(billingWrite).not.toBeNull();
+    expect(categoryWrite).not.toBeNull();
+    expect(importWrite).not.toBeNull();
+    expect(addressWrite).not.toBeNull();
+    const { error: serviceUpdate } = await admin
+      .from("organization_billing_profiles")
+      .update({ billing_email: emails.owner })
+      .eq("organization_id", organizationId);
+    expect(serviceUpdate).toBeNull();
+  });
+});
 
 // Shared cleanup for every createTestCategory() call above, so each of the
 // call sites doesn't need its own category teardown. Runs after all

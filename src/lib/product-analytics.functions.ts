@@ -1,6 +1,6 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { productEventSchema } from "./product-analytics-schema";
-export { productEventNames } from "./product-analytics-schema";
 export type { ProductEventName, ProductEventProperties } from "./product-analytics-schema";
 
 /** Records a deliberately small, non-identifying product event. Telemetry is
@@ -20,7 +20,6 @@ export const logProductEvent = createServerFn({ method: "POST" })
       _properties: data.properties,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
   });

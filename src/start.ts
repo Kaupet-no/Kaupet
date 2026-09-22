@@ -1,9 +1,29 @@
 import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requestBodyExceedsLimit } from "@/lib/request-size.server";
+import { buildSecurityHeaders } from "@/lib/security-headers";
+
+const cspNonceMiddleware = createMiddleware().server(async ({ next }) => {
+  const nonce = crypto.randomUUID().replaceAll("-", "");
+  const headers = buildSecurityHeaders({
+    r2PublicBaseUrl: import.meta.env.VITE_R2_PUBLIC_BASE_URL,
+    r2AccountId: import.meta.env.R2_ACCOUNT_ID,
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+    scriptNonce: nonce,
+  });
+  const response = await next({ context: { cspNonce: nonce } });
+  if (response instanceof Response) {
+    response.headers.set("content-security-policy", headers["content-security-policy"]);
+  } else if (response?.response instanceof Response) {
+    response.response.headers.set("content-security-policy", headers["content-security-policy"]);
+  } else {
+    setResponseHeader("content-security-policy", headers["content-security-policy"]);
+  }
+  return response;
+});
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -99,5 +119,11 @@ const csrfMiddleware = createCsrfMiddleware({
 
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, requestSizeMiddleware, ipBanMiddleware, csrfMiddleware],
+  requestMiddleware: [
+    cspNonceMiddleware,
+    errorMiddleware,
+    requestSizeMiddleware,
+    ipBanMiddleware,
+    csrfMiddleware,
+  ],
 }));

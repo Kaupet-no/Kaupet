@@ -19,6 +19,20 @@ type SearchRequestInput = {
 
 type SearchScopeInput = Omit<SearchRequestInput, "limit" | "offset">;
 
+/**
+ * Om kategorilista er klar til å slå opp slugs i. Den lastes asynkront, og
+ * `visibleCategories(data ?? [])` gir en TOM liste mens den laster — ikke
+ * `undefined`. Uten denne sjekken ble en tom liste tolket som «ingen kategori
+ * matcher slug-en», som ga 0 treff for en kategori som faktisk har annonser,
+ * og svaret ble cachet under en nøkkel som ikke endrer seg når lista kommer.
+ */
+export function listingsSearchReady(
+  effectiveCategories: string[],
+  categories: Pick<Category, "id" | "slug" | "parent_id">[] | undefined,
+): boolean {
+  return effectiveCategories.length === 0 || (categories?.length ?? 0) > 0;
+}
+
 /** Builds the one canonical argument set for `search_listings_page` so the
  * result list and draft result count cannot drift as filters evolve. `null`
  * means the selected category slugs resolve to no category IDs. */

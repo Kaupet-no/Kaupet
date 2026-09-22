@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { lookupPostalCode } from "@/lib/geocode";
@@ -24,7 +25,6 @@ export async function organizationListingLocation(
     .eq("active", true)
     .single();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error.server");
     throw await toClientError("database", error);
   }
 

@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { useFormFactor } from "@/hooks/use-form-factor";
+import { useIsNarrow } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -13,18 +13,19 @@ type Props = {
 };
 
 /**
- * Bottom Sheet på telefon, sentrert Dialog på nettbrett og web. En
+ * Bottom Sheet på smal skjerm, sentrert Dialog på nettbrett og desktop. En
  * fullbredde bunn-skuff er riktig på 375px og feil på 1024px — derfor
- * formatfaktor, ikke bare `isNative()`. Begge bygger på samme
+ * bredde (`useIsNarrow`), ikke `isNative()`: mobilweb og appen er samme
+ * lesesituasjon og skal se like ut. Begge bygger på samme
  * @radix-ui/react-dialog-primitiv, så DialogHeader/DialogTitle/
  * DialogDescription/DialogFooter virker som barn uansett hvilken som rendres.
  */
 export function ResponsiveOverlay({ open, onOpenChange, children }: Props) {
-  const phone = useFormFactor() === "phone";
+  const narrow = useIsNarrow();
   // Egen historikk-oppføring: Android-tilbake/iOS-sveip lukker overlayet i
   // stedet for å navigere siden bak det.
   useOverlayHistory(open, () => onOpenChange(false));
-  const Root = phone ? Sheet : Dialog;
+  const Root = narrow ? Sheet : Dialog;
   return (
     <Root open={open} onOpenChange={onOpenChange}>
       {children}
@@ -47,7 +48,7 @@ export function ResponsiveOverlayContent({
      * utenfor dialogens fokusfelle) får tak i noden. */
     ref?: React.Ref<HTMLDivElement>;
   }) {
-  const phone = useFormFactor() === "phone";
+  const narrow = useIsNarrow();
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
   const focusProps = {
     onOpenAutoFocus: (event: Event) => {
@@ -64,7 +65,7 @@ export function ResponsiveOverlayContent({
     },
   };
 
-  if (phone) {
+  if (narrow) {
     return (
       <SheetContent
         side="bottom"

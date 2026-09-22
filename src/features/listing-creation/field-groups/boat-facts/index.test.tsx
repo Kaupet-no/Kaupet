@@ -11,6 +11,12 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@tanstack/react-start", () => ({
+  createIsomorphicFn: () => ({
+    server: (fn: (...args: unknown[]) => unknown) =>
+      Object.assign(fn, {
+        client: (clientFn: (...args: unknown[]) => unknown) => clientFn,
+      }),
+  }),
   createServerFn: () => ({
     validator: () => ({ handler: () => vi.fn() }),
   }),

@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -46,7 +47,6 @@ export const createDemoUser = createServerFn({ method: "POST" })
       _user_id: userId,
     });
     if (roleAssignErr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", roleAssignErr);
     }
 

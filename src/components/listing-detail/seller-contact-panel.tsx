@@ -5,6 +5,7 @@ import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
+import { formatOrganizationNumber } from "@/lib/organization-number";
 
 export type SellerIdentity =
   | {
@@ -113,8 +114,7 @@ export function SellerContactPanel({
                   <span className="text-xs text-muted-foreground">Bedrift</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Org.nr.{" "}
-                  {seller.organizationNumber.replace(/\D/g, "").replace(/(\d{3})(?=\d)/g, "$1 ")}
+                  Org.nr. {formatOrganizationNumber(seller.organizationNumber)}
                 </p>
                 {seller.visitingAddress && (
                   <p className="text-xs text-muted-foreground">

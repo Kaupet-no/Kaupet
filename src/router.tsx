@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import { getGlobalStartContext } from "@tanstack/start-client-core";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
@@ -14,6 +15,8 @@ export const getRouter = () => {
     },
   });
 
+  const cspNonce = getGlobalStartContext()?.cspNonce;
+
   const router = createRouter({
     routeTree,
     context: { queryClient },
@@ -27,6 +30,10 @@ export const getRouter = () => {
     defaultPreloadDelay: 150,
     defaultPreloadStaleTime: 30_000,
   });
+
+  if (typeof window === "undefined" && typeof cspNonce === "string") {
+    router.options.ssr = { ...router.options.ssr, nonce: cspNonce };
+  }
 
   return router;
 };

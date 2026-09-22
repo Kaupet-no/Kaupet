@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -59,7 +60,6 @@ export const adminListProffOrders = createServerFn({ method: "GET" })
     if (data.status) query = query.eq("status", data.status);
     const { data: orders, error } = await query;
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return (orders ?? []) as unknown as AdminProffOrder[];
@@ -86,7 +86,6 @@ export const adminMarkProffOrderInvoiced = createServerFn({ method: "POST" })
       .select("id")
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!updated) throw new Error("Bestillingen er ikke lenger til fakturering.");
@@ -117,7 +116,6 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
       .select("id, organization_id, term")
       .maybeSingle();
     if (claimError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", claimError);
     }
     if (!claimed) throw new Error("Bestillingen er allerede registrert betalt eller kansellert.");
@@ -129,7 +127,6 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
       })
       .single();
     if (extendError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", extendError);
     }
 
@@ -138,7 +135,6 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
       .update({ period_start: period.period_start, period_end: period.period_end })
       .eq("id", claimed.id);
     if (periodError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", periodError);
     }
 
@@ -161,7 +157,6 @@ export const adminCancelProffOrder = createServerFn({ method: "POST" })
       .select("id")
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     if (!cancelled) throw new Error("Bestillingen kan ikke kanselleres.");
@@ -195,7 +190,6 @@ export const adminListLocationCharges = createServerFn({ method: "GET" })
       .lte("next_period_start", new Date().toISOString())
       .order("next_period_start");
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     const rows = (data ?? []) as unknown as Array<{
@@ -218,7 +212,6 @@ export const adminListLocationCharges = createServerFn({ method: "GET" })
       .select("organization_id, billing_email")
       .in("organization_id", organizationIds);
     if (profilesError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", profilesError);
     }
     const billingEmails = new Map(
@@ -268,7 +261,6 @@ export const adminMarkLocationChargeInvoiced = createServerFn({ method: "POST" }
       },
     );
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return {

@@ -252,6 +252,12 @@ export function useSearchResultsShell({
     attributeCounts: facetCounts,
     resultCount: totalCount ?? cards.length,
     availablePriceMax,
+    /* Samme fakta som `canRemoveCategoryInZeroResultExpansion`: en
+       kategorilandingsside har kategorien sin fra URL-en, og `effectiveSearch`
+       der overstyrer `categories` ubetinget. En kategorivelger i panelet ville
+       derfor ikke gjort noe i det hele tatt — den skjules i stedet for å stå
+       og lyve. Underkategorier velges i heroens chips på de sidene. */
+    categoryLocked: !canRemoveCategoryInZeroResultExpansion,
   };
   useRegisterSearchPanelResults(searchPanelResults);
 

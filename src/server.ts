@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { buildSecurityHeaders } from "./lib/security-headers";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -39,16 +40,32 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const applyFallbackSecurityHeaders = (response: Response) => {
+      if (response.headers.has("content-security-policy")) return response;
+
+      response.headers.set(
+        "content-security-policy",
+        buildSecurityHeaders({
+          r2PublicBaseUrl: import.meta.env.VITE_R2_PUBLIC_BASE_URL,
+          r2AccountId: import.meta.env.R2_ACCOUNT_ID,
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        })["content-security-policy"],
+      );
+      return response;
+    };
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return applyFallbackSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return applyFallbackSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };

@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -23,7 +24,6 @@ export const getSaleForListing = createServerFn({ method: "POST" })
       .eq("listing_id", data.listingId)
       .maybeSingle();
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return sale ?? null;
@@ -40,7 +40,6 @@ export const confirmBuyer = createServerFn({ method: "POST" })
       .eq("id", data.conversationId)
       .maybeSingle();
     if (convErr) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", convErr);
     }
     if (!conv) throw new Error("Samtalen finnes ikke");
@@ -60,7 +59,6 @@ export const confirmBuyer = createServerFn({ method: "POST" })
       if (insErr.code === "23505") {
         throw new Error("Det finnes allerede en bekreftet kjøper for denne annonsen");
       }
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", insErr);
     }
     return { ok: true };
@@ -98,7 +96,6 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
       .delete()
       .eq("listing_id", data.listingId);
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     return { ok: true };

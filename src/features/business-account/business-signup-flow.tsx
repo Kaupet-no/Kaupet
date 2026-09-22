@@ -10,7 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { bindBusinessSignupEmail, lookupBusinessOrganization } from "@/lib/business.functions";
-import { isValidOrganizationNumber, normalizeOrganizationNumber } from "@/lib/organization-number";
+import {
+  formatOrganizationNumber,
+  isValidOrganizationNumber,
+  normalizeOrganizationNumber,
+} from "@/lib/organization-number";
 import { passwordSchema } from "@/lib/auth-schemas";
 import { passwordStrength } from "@/lib/password-strength";
 import { formatErrorMessage } from "@/lib/errors";
@@ -47,11 +51,6 @@ const profileSchema = z.object({
   }),
 });
 type ProfileForm = z.infer<typeof profileSchema>;
-
-function formattedOrganizationNumber(value: string): string {
-  const normalized = normalizeOrganizationNumber(value);
-  return normalized.replace(/^(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3");
-}
 
 function webOrigin(): string {
   return isNative() ? "https://kaupet.no" : window.location.origin;
@@ -319,7 +318,7 @@ export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () =>
             <div className="mt-2 flex justify-between gap-4">
               <dt className="text-muted-foreground">Organisasjonsnummer</dt>
               <dd className="font-medium">
-                {formattedOrganizationNumber(organization.organizationNumber)}
+                {formatOrganizationNumber(organization.organizationNumber)}
               </dd>
             </div>
             {(organization.postalCode || organization.city) && (

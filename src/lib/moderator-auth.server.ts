@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -12,7 +13,6 @@ export async function requireAdminOrModeratorRole(
     .in("role", ["admin", "moderator"])
     .maybeSingle();
   if (error) {
-    const { toClientError } = await import("@/lib/to-client-error.server");
     throw await toClientError("database", error);
   }
   if (!data) throw new Error("Ikke autorisert");

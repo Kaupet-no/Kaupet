@@ -80,7 +80,7 @@ export function OpenSourceCtaSection() {
           </div>
           <div className="flex flex-wrap gap-3 md:justify-end">
             <Button asChild size="lg" variant="secondary">
-              <a href="https://github.com/Kaupet-no/kaupet" target="_blank" rel="noreferrer">
+              <a href="https://github.com/Kaupet-no/kaupet#readme" target="_blank" rel="noreferrer">
                 Bidra på GitHub
               </a>
             </Button>

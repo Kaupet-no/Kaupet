@@ -47,3 +47,17 @@ export function useFormFactor(): FormFactor {
 export function useIsDesktop(): boolean {
   return useFormFactor() === "desktop";
 }
+
+/**
+ * Smal skjerm — native telefon eller nettleser < 1024px. Flatene der en
+ * bunn-skuff er riktig og en sentrert dialog er feil.
+ *
+ * Grensen går på bredde, ikke plattform: kaupet.no i et 375px nettleservindu
+ * er samme lesesituasjon som appen på samme telefon, og brukeren skal kjenne
+ * igjen overlayet mellom de to. Nettbrett (native, ≥ 768px) er bevisst ikke
+ * smalt — der er dialogen fortsatt riktig.
+ */
+export function useIsNarrow(): boolean {
+  const factor = useFormFactor();
+  return factor === "phone" || factor === "web";
+}

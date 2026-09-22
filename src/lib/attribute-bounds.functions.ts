@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -16,7 +17,6 @@ export const getAttributeRangeBounds = createServerFn({ method: "GET" })
       cat_id: data.categoryId,
     });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
     const map: AttributeRangeBoundsMap = {};

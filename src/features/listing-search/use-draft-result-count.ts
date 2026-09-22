@@ -8,6 +8,7 @@ import {
 } from "@/features/listing-search/search-schema";
 import {
   buildListingsSearchRpcArgs,
+  listingsSearchReady,
   runListingsSearch,
 } from "@/features/listing-search/listing-search-query";
 
@@ -58,7 +59,9 @@ export function useDraftResultCount({
 
   const query = useQuery({
     queryKey: ["draft-listing-count", search],
-    enabled,
+    // Samme grunn som i useListingsQuery: en ulastet kategoriliste er ikke
+    // "ingen treff" (se listingsSearchReady).
+    enabled: enabled && listingsSearchReady(draft.value.categories, categories),
     staleTime: 30_000,
     queryFn: ({ signal }) => countDraftListings({ ...debouncedInput, categories }, signal),
   });

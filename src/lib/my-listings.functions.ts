@@ -1,3 +1,4 @@
+import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 
 import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
@@ -34,13 +35,11 @@ export const getMyListingRows = createServerFn({ method: "GET" }).handler(
       .eq("seller_id", userId)
       .order("created_at", { ascending: false });
     if (error) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", error);
     }
 
     const { data: counts, error: countsError } = await supabase.rpc("my_listing_counts");
     if (countsError) {
-      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("database", countsError);
     }
 

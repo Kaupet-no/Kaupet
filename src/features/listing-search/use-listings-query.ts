@@ -4,6 +4,7 @@ import type { ListingsPage } from "@/features/listing-search/search-schema";
 import {
   buildListingsPriceMaxRpcArgs,
   buildListingsSearchRpcArgs,
+  listingsSearchReady,
   runListingsSearch,
   type ListingsSearchParams,
 } from "@/features/listing-search/listing-search-query";
@@ -37,7 +38,7 @@ export function useListingsQuery({
     // svar hentes i stedet for å oppdateres live. Behold forrige svar til
     // det nye er klart.
     placeholderData: keepPreviousData,
-    enabled: effectiveCategories.length === 0 || !!categories,
+    enabled: listingsSearchReady(effectiveCategories, categories),
     initialPageParam: 0,
     getNextPageParam: (lastPage: ListingsPage) => lastPage.nextOffset ?? undefined,
     queryFn: async ({ pageParam, signal }): Promise<ListingsPage> => {
@@ -100,7 +101,7 @@ export function useListingsPriceMax({
   return useQuery({
     queryKey: ["listings-price-max", priceSearch, effectiveCategories, terms],
     placeholderData: keepPreviousData,
-    enabled: effectiveCategories.length === 0 || !!categories,
+    enabled: listingsSearchReady(effectiveCategories, categories),
     queryFn: async ({ signal }) => {
       const args = buildListingsPriceMaxRpcArgs({
         search,

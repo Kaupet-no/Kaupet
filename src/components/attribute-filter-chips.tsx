@@ -155,6 +155,7 @@ export function SecondaryCategoryFilters({
   isNative = false,
   includePrimary = false,
   autoFocusSearch,
+  compactRanges = false,
 }: {
   /** Full filter set for the category — split into primary/secondary here,
    * same as `AttributeFilterChips`. */
@@ -176,6 +177,7 @@ export function SecondaryCategoryFilters({
    * med `isNative={!expanded}`, så autofokus der ville rykket siden ned til
    * feltet hver gang en hovedkategori velges. Send `false` eksplisitt der. */
   autoFocusSearch?: boolean;
+  compactRanges?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const { secondary: secondaryOnly } = splitPrimaryFilters(filters);
@@ -226,6 +228,7 @@ export function SecondaryCategoryFilters({
             onChange={onChange}
             counts={counts}
             isNative={isNative}
+            compactRanges={compactRanges}
           />
         </div>
       )}

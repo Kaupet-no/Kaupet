@@ -124,9 +124,11 @@ export function useTextToFilterPipeline({
 
     const applied: Record<string, string> = {};
     const criteria: InterpretedCriterion[] = [];
+    const appliedSynonymMatches: NonNullable<typeof activeSynonymMatches> = [];
 
     if (hasSynonyms) {
       for (const m of activeSynonymMatches!) {
+        if (m.filterKey === "color") continue;
         const filter =
           attrFilters.find((f) => f.key === m.filterKey) ??
           allFilters.find((f) => f.key === m.filterKey);
@@ -142,6 +144,7 @@ export function useTextToFilterPipeline({
               });
             }
             applied[`${m.filterKey}:!${m.optionValue}`] = m.matchedText;
+            appliedSynonymMatches.push(m);
             criteria.push({
               kind: "attribute",
               key: m.filterKey,
@@ -155,6 +158,7 @@ export function useTextToFilterPipeline({
         if (filter.type === "boolean") {
           handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
           applied[`${m.filterKey}:`] = m.matchedText;
+          appliedSynonymMatches.push(m);
           criteria.push({
             kind: "attribute",
             key: m.filterKey,
@@ -165,6 +169,7 @@ export function useTextToFilterPipeline({
         } else if (filter.type === "select" && m.optionValue) {
           handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
           applied[`${m.filterKey}:`] = m.matchedText;
+          appliedSynonymMatches.push(m);
           criteria.push({
             kind: "attribute",
             key: m.filterKey,
@@ -182,6 +187,7 @@ export function useTextToFilterPipeline({
             });
           }
           applied[`${m.filterKey}:${m.optionValue}`] = m.matchedText;
+          appliedSynonymMatches.push(m);
           criteria.push({
             kind: "attribute",
             key: m.filterKey,
@@ -230,11 +236,13 @@ export function useTextToFilterPipeline({
       });
     }
 
+    if (appliedSynonymMatches.length === 0 && !hasNumeric && !hasPrice) return;
+
     onInterpreted?.(criteria);
     if (Object.keys(applied).length > 0) onApplied?.(applied);
 
     let nextQ = qDraft;
-    if (hasSynonyms) nextQ = removeMatchedWords(nextQ, activeSynonymMatches!);
+    if (appliedSynonymMatches.length > 0) nextQ = removeMatchedWords(nextQ, appliedSynonymMatches);
     if (hasNumeric) nextQ = removeNumericMatches(nextQ, activeNumericMatches);
     if (hasPrice) {
       nextQ = removeNumericMatches(

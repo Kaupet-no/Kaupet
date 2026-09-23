@@ -104,22 +104,19 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await expect(applyButton).toBeVisible({ timeout: 10_000 });
   await expect(applyButton).toHaveText(`Vis ${filterFixture.total} annonser`);
 
-  const conditionButton = page.getByRole("button", { name: /Tilstand/ });
-  await expectNativeTouchTarget(conditionButton);
-  await conditionButton.click();
-  await expectNativeTouchTarget(page.getByRole("option", { name: "Helt ny" }));
-  await page.getByRole("button", { name: "Bruk valg" }).click();
+  const newCondition = page.getByRole("group", { name: "Velg tilstand" }).getByRole("button", {
+    name: "Helt ny",
+  });
+  await expectNativeTouchTarget(newCondition);
+  await newCondition.click();
+  await expect(newCondition).toHaveAttribute("aria-pressed", "true");
+  await newCondition.click();
 
-  await expect(page.getByRole("button", { name: /Alle kategorier/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Bil og MC" })).not.toBeVisible();
-  await page.getByRole("button", { name: /Alle kategorier/ }).click();
+  await page.getByRole("button", { name: /Kategori/ }).click();
   await expect(page.getByRole("heading", { name: "Velg kategori" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bil og MC" })).toBeVisible();
-  await page.getByRole("button", { name: "Ferdig" }).click();
+  await page.getByRole("button", { name: "Tilbake til filteroversikt" }).click();
 
-  await expect(page.getByRole("button", { name: /Alle filtre/ })).toBeVisible();
-
-  await page.getByRole("button", { name: /^Pris/ }).click();
   await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
   await expect(

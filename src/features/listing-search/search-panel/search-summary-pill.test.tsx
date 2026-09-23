@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SearchSummaryPill } from "./search-summary-pill";
 
 vi.mock("@/lib/haptics", () => ({ hapticImpact: vi.fn() }));
+afterEach(cleanup);
 
 describe("SearchSummaryPill", () => {
   it("skiller query- og filterhandlingen og viser aktivt filterantall", () => {
@@ -25,5 +26,40 @@ describe("SearchSummaryPill", () => {
 
     expect(onOpenQuery).toHaveBeenCalledOnce();
     expect(onOpenFilters).toHaveBeenCalledOnce();
+  });
+
+  it("viser søkeregler ved søket uten å telle dem som filtre", () => {
+    const onOpenRules = vi.fn();
+    render(
+      <SearchSummaryPill
+        q="lampe"
+        filterCount={0}
+        searchRuleCount={2}
+        onOpenQuery={() => {}}
+        onOpenRules={onOpenRules}
+        onOpenFilters={() => {}}
+      />,
+    );
+
+    const rules = screen.getByRole("button", { name: "Søkeregler, egne regler aktive" });
+    expect(rules.className).toContain("bg-primary");
+    fireEvent.click(rules);
+    expect(onOpenRules).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Filtrer" })).toBeTruthy();
+  });
+
+  it("lar standard søkeregler stå uten fyll", () => {
+    render(
+      <SearchSummaryPill
+        q="lampe"
+        filterCount={0}
+        onOpenQuery={() => {}}
+        onOpenRules={() => {}}
+        onOpenFilters={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Søkeregler" }).className).not.toContain(
+      "bg-primary",
+    );
   });
 });

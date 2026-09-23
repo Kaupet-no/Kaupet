@@ -163,15 +163,19 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
 type RadiusPickerProps = {
   value: number;
   onChange: (v: number) => void;
+  compact?: boolean;
 };
 
 export function RadiusPicker({
   value,
   onChange,
   disabled,
+  compact = false,
 }: RadiusPickerProps & { disabled?: boolean }) {
   return (
-    <div className={`w-full space-y-3 p-2 ${disabled ? "opacity-50" : ""}`}>
+    <div
+      className={`w-full ${compact ? "space-y-2" : "space-y-3 p-2"} ${disabled ? "opacity-50" : ""}`}
+    >
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium">Radius / omkrets</span>
         <span className="font-display text-sm">{value} km</span>
@@ -181,9 +185,9 @@ export function RadiusPicker({
           <Button
             key={radius}
             type="button"
-            size="default"
+            size={compact ? "sm" : "default"}
             variant={value === radius ? "default" : "outline"}
-            className="min-h-13 px-2"
+            className={compact ? "h-9 px-2" : "min-h-13 px-2"}
             disabled={disabled}
             onClick={() => onChange(radius)}
           >

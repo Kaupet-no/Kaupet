@@ -13,6 +13,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialSection: SearchPanelSection;
+  initialQuery?: string;
   results?: SearchPanelResultsContext;
   savedLocation: LocationValue;
   onSavedLocationChange: (location: LocationValue) => void;

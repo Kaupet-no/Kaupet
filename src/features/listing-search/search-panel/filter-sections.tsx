@@ -653,7 +653,7 @@ export function SearchFilterSections({
             key={condition.value}
             type="button"
             aria-pressed={v.conditions.includes(condition.value)}
-            className={`${desktopGroup ? "min-h-9 rounded-md px-3" : "min-h-11 rounded-full px-4"} border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${v.conditions.includes(condition.value) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-accent hover:text-accent-foreground"}`}
+            className={`min-h-12 ${desktopGroup ? "rounded-md px-3" : "rounded-full px-4"} border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${v.conditions.includes(condition.value) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-accent hover:text-accent-foreground"}`}
             onClick={() =>
               setV((prev) => ({
                 ...prev,

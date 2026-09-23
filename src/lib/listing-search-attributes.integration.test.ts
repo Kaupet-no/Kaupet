@@ -12,6 +12,7 @@ describe.skipIf(!canRun)("fritekstsøk i annonseattributter", () => {
   const anon = canRun ? createClient<Database>(url!, anonKey!) : null!;
   const suffix = Date.now();
   let userId: string;
+  let categoryAdminId: string;
   let categoryIds: string[] = [];
   let filterId: string;
   let listingIds: string[] = [];
@@ -24,6 +25,18 @@ describe.skipIf(!canRun)("fritekstsøk i annonseattributter", () => {
     });
     if (userError) throw userError;
     userId = user.user!.id;
+
+    const { data: categoryAdmin, error: adminError } = await admin.auth.admin.createUser({
+      email: `search-filter-admin-${suffix}@example.com`,
+      password: "test-password-12345",
+      email_confirm: true,
+    });
+    if (adminError) throw adminError;
+    categoryAdminId = categoryAdmin.user!.id;
+    const { error: roleError } = await admin
+      .from("user_roles")
+      .insert({ user_id: categoryAdminId, role: "admin" });
+    if (roleError) throw roleError;
 
     const { data: categories, error: categoryError } = await admin
       .from("categories")
@@ -78,6 +91,10 @@ describe.skipIf(!canRun)("fritekstsøk i annonseattributter", () => {
     if (listingIds.length) await admin.from("listings").delete().in("id", listingIds);
     if (filterId) await admin.from("category_filters").delete().eq("id", filterId);
     if (categoryIds.length) await admin.from("categories").delete().in("id", categoryIds);
+    if (categoryAdminId) {
+      await admin.from("user_roles").delete().eq("user_id", categoryAdminId);
+      await admin.auth.admin.deleteUser(categoryAdminId);
+    }
     if (userId) await admin.auth.admin.deleteUser(userId);
   });
 
@@ -99,5 +116,46 @@ describe.skipIf(!canRun)("fritekstsøk i annonseattributter", () => {
       .filter((id) => listingIds.includes(id))
       .sort();
     expect(ownIds).toEqual(listingIds.slice(0, 3).sort());
+  });
+
+  it("oppdaterer fritekstsøket når en admin endrer en opsjonsetikett", async () => {
+    const { data: before } = await admin
+      .from("listings")
+      .select("updated_at")
+      .eq("id", listingIds[0])
+      .single();
+    const categoryAdmin = createClient<Database>(url!, anonKey!);
+    const { error: signInError } = await categoryAdmin.auth.signInWithPassword({
+      email: `search-filter-admin-${suffix}@example.com`,
+      password: "test-password-12345",
+    });
+    expect(signInError).toBeNull();
+    const { error } = await categoryAdmin
+      .from("category_filters")
+      .update({ options: [{ value: "red", label_nb: "Koboltblå" }] })
+      .eq("id", filterId);
+    expect(error).toBeNull();
+
+    const { data, error: searchError } = await anon.rpc("search_listings_page", {
+      _include_groups: [{ mode: "all", terms: ["Koboltblå"] }],
+      _category_ids: categoryIds,
+      _sort: "new",
+    });
+    expect(searchError).toBeNull();
+    expect(data?.map(({ id }) => id)).toContain(listingIds[0]);
+
+    const { data: oldLabel } = await anon.rpc("search_listings_page", {
+      _include_groups: [{ mode: "all", terms: ["Rød"] }],
+      _category_ids: [categoryIds[0]],
+      _sort: "new",
+    });
+    expect(oldLabel?.map(({ id }) => id)).not.toContain(listingIds[0]);
+
+    const { data: after } = await admin
+      .from("listings")
+      .select("updated_at")
+      .eq("id", listingIds[0])
+      .single();
+    expect(after?.updated_at).toBe(before?.updated_at);
   });
 });

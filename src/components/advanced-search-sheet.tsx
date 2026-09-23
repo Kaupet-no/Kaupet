@@ -320,11 +320,15 @@ export function CategorySlugPicker({
   /** Icon row (matching the web hero's category picker) instead of a select
    * dropdown, for the native filter panel — see `SearchFilterSections`. */
   variant = "select",
+  showLabel = true,
+  compact = false,
 }: {
   categories: Category[];
   selected: string[];
   onChange: (slugs: string[]) => void;
   variant?: "select" | "icons";
+  showLabel?: boolean;
+  compact?: boolean;
 }) {
   const ALL = "__all__";
   const parents = useMemo(() => categories.filter((c) => c.parent_id == null), [categories]);
@@ -382,9 +386,14 @@ export function CategorySlugPicker({
 
   return (
     <section className="space-y-2">
-      <Label className="text-sm font-medium">Kategori</Label>
+      {showLabel && <Label className="text-sm font-medium">Kategori</Label>}
       {variant === "icons" ? (
-        <NativeCategoryDrilldown categories={categories} selected={selected} onChange={onChange} />
+        <NativeCategoryDrilldown
+          categories={categories}
+          selected={selected}
+          onChange={onChange}
+          compact={compact}
+        />
       ) : (
         <>
           <Select value={mainSlug || ALL} onValueChange={onMainChange}>
@@ -426,12 +435,25 @@ function NativeCategoryDrilldown({
   categories,
   selected,
   onChange,
+  compact,
 }: {
   categories: Category[];
   selected: string[];
   onChange: (slugs: string[]) => void;
+  compact: boolean;
 }) {
-  const [path, setPath] = useState<Category[]>([]);
+  const [path, setPath] = useState<Category[]>(() => {
+    const branch: Category[] = [];
+    let current = categories.find((category) => selected.includes(category.slug));
+    while (current) {
+      branch.unshift(current);
+      current = categories.find((category) => category.id === current?.parent_id);
+    }
+    if (branch.length && !categories.some((category) => category.parent_id === branch.at(-1)?.id)) {
+      branch.pop();
+    }
+    return branch;
+  });
   const [query, setQuery] = useState("");
   const childrenByParent = useMemo(() => {
     const map = new Map<string | null, Category[]>();
@@ -487,7 +509,7 @@ function NativeCategoryDrilldown({
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Søk i kategorier"
           aria-label="Søk i kategorier"
-          className="h-12 pl-9"
+          className={compact ? "h-9 pl-9" : "h-12 pl-9"}
         />
       </div>
       {selectedCategories.length > 0 && (
@@ -496,12 +518,12 @@ function NativeCategoryDrilldown({
           {selectedCategories.map((category) => (
             <div
               key={category.id}
-              className="flex min-h-12 items-center gap-3 rounded-xl bg-primary/10 px-4 text-sm"
+              className={`flex items-center gap-3 text-sm ${compact ? "min-h-9 rounded-md border border-primary bg-primary px-3 text-primary-foreground" : "min-h-12 rounded-xl bg-primary/10 px-4"}`}
             >
               <span className="min-w-0 flex-1">{category.name_nb}</span>
               <button
                 type="button"
-                className="native-touch-target shrink-0 px-2 text-primary"
+                className={`native-touch-target shrink-0 px-2 ${compact ? "text-primary-foreground" : "text-primary"}`}
                 aria-label={`Fjern ${category.name_nb}`}
                 onClick={() => onChange(selected.filter((slug) => slug !== category.slug))}
               >
@@ -532,7 +554,7 @@ function NativeCategoryDrilldown({
           type="button"
           aria-pressed={selectedSet.has(mainCategory!.slug)}
           onClick={() => onChange([mainCategory!.slug])}
-          className="native-touch-target flex min-h-14 w-full items-center justify-between rounded-xl border border-dashed border-primary/50 px-4 text-left text-sm font-medium text-primary"
+          className={`native-touch-target flex w-full items-center justify-between border text-left text-sm font-medium ${compact ? "min-h-9 rounded-md border-border bg-background px-3 text-foreground hover:bg-accent" : "min-h-14 rounded-xl border-dashed border-primary/50 px-4 text-primary"}`}
         >
           <span>Alt i {mainCategory!.name_nb}</span>
           <span>Velg</span>
@@ -547,8 +569,14 @@ function NativeCategoryDrilldown({
               type="button"
               aria-pressed={!hasChildren(category.id) ? isSelected : undefined}
               onClick={() => toggleCategory(category)}
-              className={`native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl px-4 text-left text-base ${
-                isSelected ? "bg-primary/10 font-medium text-primary" : "bg-muted"
+              className={`native-touch-target flex w-full items-center gap-2 border text-left text-sm ${compact ? "min-h-9 rounded-md px-3" : "min-h-14 rounded-xl px-4"} ${
+                isSelected
+                  ? compact
+                    ? "border-primary bg-primary font-medium text-primary-foreground"
+                    : "border-transparent bg-primary/10 font-medium text-primary"
+                  : compact
+                    ? "border-border bg-background text-foreground hover:bg-accent"
+                    : "border-transparent bg-muted"
               }`}
             >
               <span className="min-w-0 flex-1">{category.name_nb}</span>

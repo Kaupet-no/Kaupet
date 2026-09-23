@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderOpen, Save, SlidersHorizontal, X } from "lucide-react";
+import { FolderOpen, Save, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
@@ -245,6 +245,9 @@ function BrowsePage() {
   // its vocabulary lookup, so "cruisecontrol" would just fall through to a
   // plain text search that finds nothing. See matchVehicleBrandPhrase.
   const advancedSearchCount = (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0);
+  const hasExtraSearchRules =
+    search.qMode === "any" || search.extraGroups.some((group) => group.terms.length > 0);
+  const ordinaryFilterCount = Math.max(0, activeFilterCount - advancedSearchCount);
   const { data: vehicleBrands } = useAllVehicleBrands();
   const submitQuery = () => {
     void hapticImpact("medium");
@@ -456,7 +459,7 @@ function BrowsePage() {
      Mobilweb bruker den delte knappen, som kategorilandingssidene også
      bruker, slik at de to flatene ikke kan drifte fra hverandre. */
   const mobileFilterButton =
-    !isNative && !isDesktop ? <MobileFilterButton activeFilterCount={activeFilterCount} /> : null;
+    !isNative && !isDesktop ? <MobileFilterButton activeFilterCount={ordinaryFilterCount} /> : null;
 
   if (!mounted) {
     return <BrowsePageSkeleton />;
@@ -497,7 +500,8 @@ function BrowsePage() {
               {isNative ? (
                 <SearchSummaryPill
                   q={qDraft}
-                  filterCount={activeFilterCount}
+                  filterCount={ordinaryFilterCount}
+                  searchRuleCount={hasExtraSearchRules ? 1 : 0}
                   onOpenQuery={() => {
                     trackProductEvent("search_filter_opened", {
                       section: "query",
@@ -505,6 +509,14 @@ function BrowsePage() {
                       filterCount: activeFilterCount,
                     });
                     openPanel("query");
+                  }}
+                  onOpenRules={() => {
+                    trackProductEvent("search_filter_opened", {
+                      section: "search",
+                      source: "summary",
+                      filterCount: activeFilterCount,
+                    });
+                    openPanel("search");
                   }}
                   onOpenFilters={() => {
                     trackProductEvent("search_filter_opened", {
@@ -527,7 +539,24 @@ function BrowsePage() {
                     onSubmitQ={submitQuery}
                     qMode={search.qMode}
                     onQModeChange={(m) => updateSearch({ qMode: m })}
-                    showQMode={false}
+                    showQMode={isDesktop}
+                    extraGroups={isDesktop ? search.extraGroups : undefined}
+                    onExtraGroupsChange={
+                      isDesktop ? (extraGroups) => updateSearch({ extraGroups }) : undefined
+                    }
+                    onOpenRules={
+                      isDesktop
+                        ? undefined
+                        : () => {
+                            trackProductEvent("search_filter_opened", {
+                              section: "search",
+                              source: "advanced_search",
+                              filterCount: activeFilterCount,
+                            });
+                            openPanel("search", qDraft);
+                          }
+                    }
+                    rulesActive={hasExtraSearchRules}
                     categorySuggestion={
                       categoryMatch
                         ? {
@@ -538,63 +567,11 @@ function BrowsePage() {
                     }
                     filterSuggestions={filterSuggestions}
                   />
-                  {!isDesktop && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="mt-1 h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        trackProductEvent("search_filter_opened", {
-                          section: "search",
-                          source: "advanced_search",
-                          filterCount: activeFilterCount,
-                        });
-                        openPanel("search");
-                      }}
-                    >
-                      <SlidersHorizontal className="size-3.5" aria-hidden />
-                      Flere søkevalg
-                      {advancedSearchCount > 0 ? ` · ${advancedSearchCount}` : ""}
-                    </Button>
-                  )}
                 </>
               )}
             </div>
           </div>
         </div>
-        {!isNative && !isDesktop && !search.q.trim() && activeFilterCount === 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Start med</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 rounded-full bg-muted px-3"
-              onClick={() => openPanel("categories")}
-            >
-              Velg kategori
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 rounded-full bg-muted px-3"
-              onClick={() => openPanel("location")}
-            >
-              Nær meg
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 rounded-full bg-muted px-3"
-              onClick={() => updateSearch({ max: 1000 })}
-            >
-              Under 1 000 kr
-            </Button>
-          </div>
-        )}
         {interpretedCriteria.length > 0 && (
           <div className="rounded-lg border border-border/70 bg-card/50 px-3 py-2">
             <SearchInterpretation

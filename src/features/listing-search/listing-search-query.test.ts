@@ -63,6 +63,29 @@ describe("buildListingsSearchRpcArgs", () => {
     });
   });
 
+  it("samler lagrede regler av samme type slik de vises i ett felt", () => {
+    const search = searchSchema.parse({
+      q: "gul",
+      qMode: "any",
+      extraGroups: [
+        { id: "first", mode: "any", exclude: false, terms: ["grønn"] },
+        { id: "second", mode: "any", exclude: false, terms: ["gul", "blå"] },
+        { id: "excluded", mode: "all", exclude: true, terms: ["kopi", "defekt"] },
+      ],
+    });
+    const args = buildListingsSearchRpcArgs({
+      search,
+      categories: [],
+      effectiveCategories: [],
+      terms: ["gul"],
+      limit: 1,
+      offset: 0,
+    });
+    expect(args?._include_groups).toEqual([{ mode: "any", terms: ["gul", "grønn", "blå"] }]);
+    expect(args?._exclude_any_terms).toEqual(["kopi", "defekt"]);
+    expect(args?._exclude_all_groups).toEqual([]);
+  });
+
   it("fjerner valgt maksimum når den tilgjengelige høyeste prisen beregnes", () => {
     const search = searchSchema.parse({
       categories: ["bil"],

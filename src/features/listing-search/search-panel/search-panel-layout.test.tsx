@@ -170,8 +170,75 @@ describe("SearchPanel filteroppsett", () => {
 
     expect(screen.getByText("Søket ditt")).toBeTruthy();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
-    expect(screen.getByText("Flere søkevalg")).toBeTruthy();
+    expect(screen.queryByText("Flere søkevalg")).toBeNull();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
+  });
+
+  it("viser aktive søkeregler ved native-søkefeltet", () => {
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={categories}
+        allFilters={attributeFilters}
+        initialSection="query"
+        results={{
+          onApply: () => {},
+          resultCount: 5,
+          applied: {
+            value: {
+              ...defaultAdvancedSearchValue(),
+              terms: ["vintage", "lampe"],
+              qMode: "any",
+              extraGroups: [{ id: "exclude", mode: "any", exclude: true, terms: ["kopi"] }],
+            },
+            attributes: {},
+          },
+        }}
+      />,
+    );
+
+    const rules = screen.getByRole("button", { name: "Søkeregler, egne regler aktive" });
+    expect(rules.getAttribute("aria-expanded")).toBe("false");
+    expect(rules.className).toContain("bg-primary");
+    fireEvent.click(rules);
+    expect(rules.getAttribute("aria-expanded")).toBe("true");
+    expect((screen.getByRole("textbox", { name: "Kan inneholde" }) as HTMLInputElement).value).toBe(
+      "vintage lampe",
+    );
+    expect(
+      (screen.getByRole("textbox", { name: "Skal ikke inneholde" }) as HTMLInputElement).value,
+    ).toBe("kopi");
+    expect(screen.getByRole("button", { name: /Vis 5 annonser/ })).toBeTruthy();
+  });
+
+  it("bevarer søkeregler når native-filtre nullstilles", () => {
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    const onApply = vi.fn();
+    renderPanel({
+      onApply,
+      applied: {
+        value: {
+          ...defaultAdvancedSearchValue(),
+          categories: ["sykkel"],
+          qMode: "any",
+          extraGroups: [{ id: "exclude", mode: "any", exclude: true, terms: ["kopi"] }],
+        },
+        attributes: {},
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Nullstill" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+
+    expect(onApply.mock.calls[0][0].value).toEqual(
+      expect.objectContaining({
+        categories: [],
+        qMode: "any",
+        extraGroups: [{ id: "exclude", mode: "any", exclude: true, terms: ["kopi"] }],
+      }),
+    );
   });
 
   it("viser arbeidsflaten i dialog på native nettbrett", () => {
@@ -181,6 +248,19 @@ describe("SearchPanel filteroppsett", () => {
     expect(screen.getByText("Søket ditt")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Basis" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
+    cleanup();
+
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={categories}
+        allFilters={attributeFilters}
+        initialSection="query"
+        results={results}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Søkeregler" })).toBeTruthy();
   });
 
   it("bruker mobilweb-utkastet først når brukeren trykker Vis annonser", () => {
@@ -193,5 +273,43 @@ describe("SearchPanel filteroppsett", () => {
     fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
     expect(onApply).toHaveBeenCalledOnce();
     expect(onApply.mock.calls[0][0].value.conditions).toEqual(["like_new"]);
+  });
+
+  it("samler ord per søkeregel i mobilweb-skuffen og anvender dem samlet", () => {
+    const onApply = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={categories}
+        allFilters={attributeFilters}
+        initialSection="search"
+        initialQuery="retro lampe"
+        results={{ ...(results as object), onApply } as never}
+      />,
+    );
+
+    expect(
+      (screen.getByRole("textbox", { name: "Skal inneholde" }) as HTMLInputElement).value,
+    ).toBe("retro lampe");
+    fireEvent.change(screen.getByRole("textbox", { name: "Kan inneholde" }), {
+      target: { value: "vintage, messing" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Skal ikke inneholde" }), {
+      target: { value: "kopi replika" },
+    });
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        value: expect.objectContaining({
+          terms: ["retro", "lampe"],
+          extraGroups: expect.arrayContaining([
+            expect.objectContaining({ mode: "any", exclude: false, terms: ["vintage", "messing"] }),
+            expect.objectContaining({ exclude: true, terms: ["kopi", "replika"] }),
+          ]),
+        }),
+      }),
+    );
   });
 });

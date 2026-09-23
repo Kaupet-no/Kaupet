@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CategorySlugPicker } from "./advanced-search-sheet";
 
@@ -11,6 +11,8 @@ const categories = [
   { id: "tv", slug: "tv-og-lyd", name_nb: "TV og lyd", parent_id: "electronics" },
   { id: "televisions", slug: "tv", name_nb: "TV", parent_id: "tv" },
 ];
+
+afterEach(cleanup);
 
 describe("CategorySlugPicker", () => {
   it("bruker native drill-down uten ankret underkategori-dropdown", () => {
@@ -58,5 +60,19 @@ describe("CategorySlugPicker", () => {
 
     expect(onChange).toHaveBeenCalledWith([]);
     expect(screen.queryByLabelText("Valgte kategorier")).toBeNull();
+  });
+
+  it("åpner på nivået til valgt kategori", () => {
+    const view = render(
+      <CategorySlugPicker
+        categories={categories}
+        selected={["tv"]}
+        onChange={() => {}}
+        variant="icons"
+      />,
+    );
+
+    expect(view.getByText("Elektronikk › TV og lyd")).toBeTruthy();
+    expect(view.getByRole("button", { name: "TV" })).toBeTruthy();
   });
 });

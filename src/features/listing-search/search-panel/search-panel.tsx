@@ -8,6 +8,7 @@ import {
   Save,
   Search as SearchIcon,
   SlidersHorizontal,
+  Waypoints,
   X,
 } from "lucide-react";
 
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Input } from "@/components/ui/input";
+import { SearchRuleFields } from "@/components/search-rule-fields";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import {
   defaultAdvancedSearchValue,
@@ -107,6 +109,7 @@ type Props = {
   allFilters: CategoryFilter[];
   /** Fanen panelet åpner på — lar sammendrag-pillen hoppe rett til Pris/Sted. */
   initialSection?: SearchPanelSection;
+  initialQuery?: string;
   results?: SearchPanelResultsContext;
   savedLocation?: LocationValue;
   onSavedLocationChange?: (location: LocationValue) => void;
@@ -128,6 +131,7 @@ export function SearchPanel({
   categories,
   allFilters,
   initialSection = "query",
+  initialQuery,
   results,
   savedLocation,
   onSavedLocationChange,
@@ -135,11 +139,16 @@ export function SearchPanel({
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: vehicleBrands } = useAllVehicleBrands();
+  const formFactor = useFormFactor();
+  const nativeSearchLayout = formFactor === "phone" || formFactor === "tablet";
   const [launchQueryDraft, setLaunchQueryDraft] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
-  const [section, setSection] = useState<SearchPanelSection>(initialSection);
+  const [section, setSection] = useState<SearchPanelSection>(
+    nativeSearchLayout && initialSection === "search" ? "query" : initialSection,
+  );
+  const [rulesOpen, setRulesOpen] = useState(initialSection === "search");
   const [snap, setSnap] = useState<number | string | null>(results ? 1 : SNAP_POINTS[0]);
   const [draft, setDraft] = useState<AppliedSearchState>(() =>
     results ? cloneSearchState(results.applied) : createLaunchState(savedLocation),
@@ -156,7 +165,6 @@ export function SearchPanel({
             : {},
       };
     });
-  const formFactor = useFormFactor();
   // Web og native nettbrett går via ResponsiveOverlay; native telefon får sin
   // egen dratte skuff. Overlayet velger selv skuff (smal) eller dialog (bred).
   const isWeb = formFactor === "web" || formFactor === "desktop" || formFactor === "tablet";
@@ -182,8 +190,16 @@ export function SearchPanel({
 
   useEffect(() => {
     if (!open) return;
-    setLaunchQueryDraft(results ? results.applied.value.terms.join(" ") : "");
-    setSection(initialSection);
+    setLaunchQueryDraft(initialQuery ?? (results ? results.applied.value.terms.join(" ") : ""));
+    setSection(nativeSearchLayout && initialSection === "search" ? "query" : initialSection);
+    setRulesOpen(initialSection === "search");
+    setDraft(() => {
+      const next = results ? cloneSearchState(results.applied) : createLaunchState(savedLocation);
+      if (initialQuery !== undefined) {
+        next.value.terms = initialQuery.trim().split(/\s+/).filter(Boolean);
+      }
+      return next;
+    });
     setSnap(results ? 1 : SNAP_POINTS[0]);
     setHistory(getSearchHistory());
     // Uten resultatflate bak er fritekst hele poenget — fokuser feltet. Over en
@@ -192,7 +208,7 @@ export function SearchPanel({
     const t = setTimeout(() => inputRef.current?.focus(), 150);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialSection]);
+  }, [open, initialSection, initialQuery]);
 
   const categorySuggestion = useMemo(
     () =>
@@ -200,6 +216,14 @@ export function SearchPanel({
     [launchQueryDraft, categories],
   );
   const queryMode = section === "query";
+  const rulesActive =
+    draft.value.qMode === "any" || draft.value.extraGroups.some((group) => group.terms.length > 0);
+  const setRuleQuery = (q: string) => {
+    setDraftValue((previous) => ({ ...previous, terms: q.split(/\s+/).filter(Boolean) }));
+    if (nativeSearchLayout) setLaunchQueryDraft(q);
+  };
+  const setRuleGroups = (extraGroups: AdvancedSearchValue["extraGroups"]) =>
+    setDraftValue((previous) => ({ ...previous, extraGroups }));
   const { data: listingSuggestions = [] } = useSearchSuggestions(queryMode ? launchQueryDraft : "");
   const structuredSuggestions = useMemo(
     () =>
@@ -294,7 +318,7 @@ export function SearchPanel({
       })
     : [];
   const hasDraftCriteria =
-    draftItems.length > 0 ||
+    (!nativeSearchLayout && draftItems.length > 0) ||
     Object.keys(draft.attributes).length > 0 ||
     (!results?.categoryLocked && draft.value.categories.length > 0) ||
     draft.value.conditions.length > 0 ||
@@ -447,9 +471,11 @@ export function SearchPanel({
            «Lagre søk», så denne raden er bare for skuffen. */
         !browserFilterLayout && (
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-            <h2 className="font-display text-xl tracking-tight">Filtre</h2>
+            <h2 className="font-display text-xl tracking-tight">
+              {section === "search" ? "Søkeregler" : "Filtre"}
+            </h2>
             <div className="flex items-center gap-1">
-              {user ? (
+              {user && section !== "search" ? (
                 <button
                   type="button"
                   onClick={() => setSaveOpen(true)}
@@ -461,18 +487,21 @@ export function SearchPanel({
               ) : (
                 <span />
               )}
-              {hasDraftCriteria && (
+              {hasDraftCriteria && section !== "search" && (
                 <button
                   type="button"
                   onClick={() => {
                     void hapticImpact("light");
-                    setDraft({
+                    setDraft((previous) => ({
                       value: {
                         ...defaultAdvancedSearchValue(),
+                        terms: nativeSearchLayout ? previous.value.terms : [],
+                        qMode: nativeSearchLayout ? previous.value.qMode : "all",
+                        extraGroups: nativeSearchLayout ? previous.value.extraGroups : [],
                         categories: results?.categoryLocked ? results.applied.value.categories : [],
                       },
                       attributes: {},
-                    });
+                    }));
                   }}
                   className="native-touch-target flex shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
@@ -485,29 +514,64 @@ export function SearchPanel({
         )
       ) : !launchFilterMode ? (
         <div className="flex items-center gap-2 px-4 pb-3 pt-3">
-          <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="flex min-w-0 flex-1 items-center rounded-xl bg-muted pl-3">
+            <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             <Input
               ref={inputRef}
               type="search"
               value={launchQueryDraft}
-              onChange={(e) => setLaunchQueryDraft(e.target.value)}
-              onFocus={() => setSnap(1)}
+              onChange={(e) => {
+                setLaunchQueryDraft(e.target.value);
+                if (nativeSearchLayout) {
+                  setDraftValue((previous) => ({
+                    ...previous,
+                    terms: e.target.value.trim().split(/\s+/).filter(Boolean),
+                  }));
+                }
+              }}
+              onFocus={() => {
+                setSnap(1);
+                setRulesOpen(false);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void submitText(launchQueryDraft);
               }}
               placeholder="Søk etter merke, type, sted eller pris"
-              className="h-11 border-0 bg-muted pl-9 pr-11 text-base focus-visible:ring-0"
+              className="h-12 min-w-0 flex-1 border-0 bg-transparent px-2 text-base focus-visible:ring-0"
               aria-label="Søk i annonser"
             />
             {launchQueryDraft && (
               <button
                 type="button"
-                onClick={() => setLaunchQueryDraft("")}
-                className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setLaunchQueryDraft("");
+                  if (nativeSearchLayout) {
+                    setDraftValue((previous) => ({ ...previous, terms: [] }));
+                  }
+                }}
+                className="native-touch-target flex size-12 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
                 aria-label="Tøm søkefelt"
               >
                 <X className="size-4" />
+              </button>
+            )}
+            {nativeSearchLayout && queryMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  inputRef.current?.blur();
+                  setSnap(1);
+                  setRulesOpen((previous) => !previous);
+                }}
+                aria-label={rulesActive ? "Søkeregler, egne regler aktive" : "Søkeregler"}
+                aria-expanded={rulesOpen}
+                className={`native-touch-target mr-1 flex size-12 shrink-0 items-center justify-center rounded-full border ${
+                  rulesActive
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-primary"
+                }`}
+              >
+                <Waypoints className="size-4" aria-hidden />
               </button>
             )}
           </div>
@@ -524,6 +588,20 @@ export function SearchPanel({
         </div>
       ) : null}
 
+      {nativeSearchLayout && queryMode && rulesOpen && (
+        <section className="flex-1 overflow-y-auto border-t border-border px-4 py-5">
+          <h3 className="mb-4 font-display text-xl">Søkeregler</h3>
+          <SearchRuleFields
+            q={launchQueryDraft}
+            qMode={draft.value.qMode}
+            extraGroups={draft.value.extraGroups}
+            onQChange={setRuleQuery}
+            onExtraGroupsChange={setRuleGroups}
+            mobile
+          />
+        </section>
+      )}
+
       {categorySuggestion && !launchFilterMode && !queryMode && (
         <button
           type="button"
@@ -539,7 +617,9 @@ export function SearchPanel({
       )}
 
       {queryMode ? (
-        queryContent
+        nativeSearchLayout && rulesOpen ? null : (
+          queryContent
+        )
       ) : results || launchFilterMode ? (
         browserFilterLayout ? (
           <SearchFilterSidebar
@@ -548,6 +628,17 @@ export function SearchPanel({
             categories={categories}
             onSaveSearch={user ? () => setSaveOpen(true) : undefined}
           />
+        ) : section === "search" ? (
+          <div className="flex-1 overflow-y-auto px-4 py-5">
+            <SearchRuleFields
+              q={draft.value.terms.join(" ")}
+              qMode={draft.value.qMode}
+              extraGroups={draft.value.extraGroups}
+              onQChange={setRuleQuery}
+              onExtraGroupsChange={setRuleGroups}
+              mobile
+            />
+          </div>
         ) : (
           <SearchFilterSections
             key={`${open}-${section}`}
@@ -572,6 +663,7 @@ export function SearchPanel({
             activeItems={results ? draftItems : undefined}
             includePrimary={!!results}
             hideCategory={results?.categoryLocked}
+            hideSearchOptions={nativeSearchLayout}
           />
         )
       ) : (
@@ -588,13 +680,17 @@ export function SearchPanel({
         />
       )}
 
-      {(results || launchFilterMode) && (
+      {(results || launchFilterMode || (nativeSearchLayout && rulesOpen)) && (
         <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,var(--safe-bottom))]">
           <Button
             type="button"
             data-testid="search-filter-apply-button"
             size="lg"
             onClick={() => {
+              if (queryMode && nativeSearchLayout) {
+                void submitText(launchQueryDraft);
+                return;
+              }
               if (results) {
                 trackProductEvent("search_filter_applied", {
                   section,

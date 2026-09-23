@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, FolderOpen, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import {
+  ChevronDown,
+  FolderOpen,
+  Search as SearchIcon,
+  SlidersHorizontal,
+  Waypoints,
+} from "lucide-react";
 import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
 import { trackProductEvent } from "@/lib/product-analytics";
@@ -7,9 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchRuleFields } from "@/components/search-rule-fields";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { TermGroupEditor } from "@/components/term-group-editor";
-import { describeTermGroup, type TermGroup } from "@/lib/term-groups";
+import type { TermGroup } from "@/lib/term-groups";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import {
   SearchSuggestionList,
@@ -35,15 +48,14 @@ type Props = {
   onSubmitQ: () => void;
   qMode: "all" | "any";
   onQModeChange: (v: "all" | "any") => void;
-  /** Show the "Alle ord"/"Minst ett"-toggle for the "Hva" field — only
-   * relevant once the advanced search panel is open, since that's where the
-   * extra search lines that make the distinction matter live. */
+  /** Show the word matching selector inside the search field. */
   showQMode?: boolean;
-  /** Extra search rules ("Ekstra regler") — optional so callers that don't
-   * need them (none currently) aren't forced to wire up empty state. When
-   * provided, "Flere søkevalg" reveals both this and `qMode`. */
+  /** Extra search rules — optional so callers without a search builder keep
+   * the plain query field. */
   extraGroups?: TermGroup[];
   onExtraGroupsChange?: (groups: TermGroup[]) => void;
+  onOpenRules?: () => void;
+  rulesActive?: boolean;
   categorySuggestion?: { label: string; onSelect: () => void };
   filterSuggestions?: Array<{ id: string; label: string; onSelect: () => void }>;
 };
@@ -66,14 +78,48 @@ export function SearchBar({
   showQMode = false,
   extraGroups,
   onExtraGroupsChange,
+  onOpenRules,
+  rulesActive = false,
   categorySuggestion,
   filterSuggestions = [],
 }: Props) {
   const [qFocused, setQFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const showMoreButton = !showQMode && extraGroups != null && onExtraGroupsChange != null;
-  const moreCount = (extraGroups?.length ?? 0) + (qMode === "any" ? 1 : 0);
+  const showSearchBuilder = extraGroups != null && onExtraGroupsChange != null;
+  const moreCount =
+    new Set((extraGroups ?? []).map((group) => (group.exclude ? "exclude" : group.mode))).size +
+    (!showQMode && qMode === "any" ? 1 : 0);
+  const ruleTypes = ["all", "any", "exclude"] as const;
+  const ruleLabels = {
+    all: "Skal inneholde",
+    any: "Kan inneholde",
+    exclude: "Skal ikke inneholde",
+  };
+  const termsFor = (type: (typeof ruleTypes)[number]) => [
+    ...(type === qMode ? q.trim().split(/\s+/).filter(Boolean) : []),
+    ...(extraGroups ?? [])
+      .filter((group) =>
+        type === "exclude" ? group.exclude : !group.exclude && group.mode === type,
+      )
+      .flatMap((group) => group.terms),
+  ];
+  const queryDisplay =
+    extraGroups?.some((group) => group.terms.length) && !qFocused
+      ? [
+          termsFor(qMode).join(" "),
+          ...ruleTypes.flatMap((type) =>
+            type === qMode
+              ? []
+              : termsFor(type).length
+                ? [`${ruleLabels[type]}: ${termsFor(type).join(", ")}`]
+                : [],
+          ),
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : q;
   const firstSuggestionRef = useRef<HTMLElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const defaultSearchExamples = useDefaultSearchExamples();
   const placeholderExamples = useMemo(
@@ -196,14 +242,16 @@ export function SearchBar({
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        searchInputRef.current?.blur();
+        setQFocused(false);
         onSubmitQ();
       }}
     >
       <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm transition-shadow focus-within:shadow-md focus-within:ring-2 focus-within:ring-ring hover:shadow-md">
-        <div className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full px-4 py-1.5">
-          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+        <div className="relative flex min-w-0 flex-1 items-center rounded-full px-4 py-1.5">
           <Input
-            value={q}
+            ref={searchInputRef}
+            value={queryDisplay}
             onChange={(e) => onQChange(e.target.value)}
             onFocus={() => {
               setPlaceholderIndex(0);
@@ -239,30 +287,45 @@ export function SearchBar({
 
         {showQMode && (
           <div className="shrink-0">
-            <ModeToggle
-              value={qMode}
-              onChange={onQModeChange}
-              labels={["Alle ordene", "Minst ett ord"]}
-            />
+            <Select value={qMode} onValueChange={(value: "all" | "any") => onQModeChange(value)}>
+              <SelectTrigger aria-label="Søkeord" className="h-9 w-auto border-0 shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle ordene</SelectItem>
+                <SelectItem value="any">Minst ett ord</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        )}
+
+        {onOpenRules && (
+          <Button
+            type="button"
+            size="icon"
+            variant={rulesActive ? "default" : "ghost"}
+            className={`size-12 shrink-0 rounded-full border ${
+              rulesActive ? "border-primary" : "border-border"
+            }`}
+            onClick={onOpenRules}
+            aria-label={rulesActive ? "Søkeregler, egne regler aktive" : "Søkeregler"}
+          >
+            <Waypoints className="size-4" aria-hidden />
+          </Button>
         )}
 
         <Button
           type="submit"
           size="sm"
-          className="h-10 shrink-0 rounded-full px-3 sm:px-5"
+          className="size-12 shrink-0 rounded-full p-0 sm:h-10 sm:w-auto sm:px-5"
           aria-label="Søk"
         >
           <SearchIcon className="size-4" /> <span className="hidden sm:inline">Søk</span>
         </Button>
       </div>
 
-      {showMoreButton && (
-        <Collapsible
-          key={moreCount > 0 ? "active" : "default"}
-          defaultOpen={moreCount > 0}
-          className="px-4"
-        >
+      {showSearchBuilder && (
+        <Collapsible defaultOpen={moreCount > 0} className="px-4">
           <CollapsibleTrigger asChild>
             <Button
               type="button"
@@ -270,34 +333,34 @@ export function SearchBar({
               size="sm"
               className="group gap-1 px-0 text-primary"
             >
-              Flere søkevalg{moreCount > 0 ? ` (${moreCount})` : ""}
+              Legg til flere søkeregler{moreCount > 0 ? ` (${moreCount})` : ""}
               <ChevronDown
                 className="size-4 transition-transform group-data-[state=open]:rotate-180"
                 aria-hidden
               />
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="density-task mt-2 space-y-4 border-t border-border px-4">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="text-sm font-medium">Søket skal matche</Label>
-              <ModeToggle
-                value={qMode}
-                onChange={onQModeChange}
-                labels={["Alle ordene", "Minst ett ord"]}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Ekstra regler</Label>
-              <TermGroupEditor groups={extraGroups ?? []} onChange={onExtraGroupsChange!} />
-            </div>
+          <CollapsibleContent className="mt-1 space-y-3 px-4 py-3">
+            {!showQMode && (
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm font-medium">Ordene i søkefeltet</Label>
+                <ModeToggle
+                  value={qMode}
+                  onChange={onQModeChange}
+                  labels={["Alle ordene", "Minst ett ord"]}
+                />
+              </div>
+            )}
+            <SearchRuleFields
+              q={q}
+              qMode={qMode}
+              extraGroups={extraGroups ?? []}
+              onQChange={onQChange}
+              onExtraGroupsChange={onExtraGroupsChange!}
+              onSubmit={onSubmitQ}
+            />
           </CollapsibleContent>
         </Collapsible>
-      )}
-
-      {showQMode && q.trim() && (
-        <p className="mt-1.5 px-4 text-xs text-muted-foreground">
-          {describeTermGroup({ id: "", mode: qMode, exclude: false, terms: [] })}
-        </p>
       )}
     </form>
   );

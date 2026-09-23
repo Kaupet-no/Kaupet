@@ -25,6 +25,7 @@ export function RangeFilterField({
   value,
   onChange,
   disabled = false,
+  compact = false,
 }: {
   label: string;
   bounds: RangeBounds;
@@ -34,6 +35,7 @@ export function RangeFilterField({
   /** Greys out the slider/inputs — for a field that only makes sense once a
    * sibling toggle is on (e.g. "Tillatt hengervekt" needs "Hengerfeste"). */
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const [minDraft, setMinDraft] = useState(value.min != null ? String(value.min) : "");
   const [maxDraft, setMaxDraft] = useState(value.max != null ? String(value.max) : "");
@@ -70,7 +72,7 @@ export function RangeFilterField({
   };
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-2" : "space-y-4"}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <Label className="font-semibold">{label}</Label>
         <span className="text-xs tabular-nums text-muted-foreground">
@@ -86,7 +88,7 @@ export function RangeFilterField({
             inputMode="numeric"
             aria-label={`Fra ${label.toLowerCase()}`}
             placeholder="Ingen grense"
-            className="rounded-xl bg-background tabular-nums"
+            className={`${compact ? "h-9 rounded-md text-sm" : "rounded-xl"} bg-background tabular-nums`}
             value={formatThousands(minDraft, bounds.max, bounds.noGrouping)}
             onChange={(e) => setMinDraft(digitsOnlyClamped(e.target.value, bounds.max))}
             onBlur={() => commit(minDraft, maxDraft)}
@@ -100,7 +102,7 @@ export function RangeFilterField({
             inputMode="numeric"
             aria-label={`Til ${label.toLowerCase()}`}
             placeholder="Ingen grense"
-            className="rounded-xl bg-background tabular-nums"
+            className={`${compact ? "h-9 rounded-md text-sm" : "rounded-xl"} bg-background tabular-nums`}
             value={formatThousands(maxDraft, bounds.max, bounds.noGrouping)}
             onChange={(e) => setMaxDraft(digitsOnlyClamped(e.target.value, bounds.max))}
             onBlur={() => commit(minDraft, maxDraft)}
@@ -109,7 +111,7 @@ export function RangeFilterField({
           />
         </div>
       </div>
-      <div className="px-3 py-3">
+      <div className={compact ? "px-3 py-1" : "px-3 py-3"}>
         <RangeSlider
           min={bounds.min}
           max={bounds.max}

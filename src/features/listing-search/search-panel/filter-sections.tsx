@@ -84,6 +84,8 @@ type Props = {
    * Utelatt (ikke bare tom liste) skjuler seksjonen helt, for kallere som
    * ikke sporer aktive filtre som en flat liste (mine-sok.tsx). */
   activeItems?: ActiveFilterItem[];
+  /** Native-søket viser disse valgene ved søkefeltet i stedet. */
+  hideSearchOptions?: boolean;
 };
 
 /**
@@ -112,9 +114,9 @@ export function SearchFilterSections({
   desktopGroup,
   hideCategory = false,
   activeItems,
+  hideSearchOptions = false,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
-  const [categoryOpen, setCategoryOpen] = useState(false);
   const [conditionsOpen, setConditionsOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(
@@ -131,6 +133,7 @@ export function SearchFilterSections({
   const workspace = layout === "workspace";
   /** I sidekolonnen står alt åpent; i skuffen vises én seksjon om gangen. */
   const showSection = (key: SearchFilterSection) => {
+    if (hideSearchOptions && key === "search") return false;
     if (workspace && overviewOpen) return mobileGroup === "basis" && key === "price";
     if (!expanded) return activeSection === key;
     if (!desktopGroup) return true;
@@ -139,7 +142,7 @@ export function SearchFilterSections({
     return key === "attributes" || key === "search";
   };
   const sectionClass = expanded
-    ? "scroll-mt-2 space-y-4 border-t border-border/70 pt-6 first:border-0 first:pt-0"
+    ? `scroll-mt-2 border-t border-border/70 first:border-0 first:pt-0 ${desktopGroup ? "space-y-3 pt-4" : "space-y-4 pt-6"}`
     : "density-task mt-4 scroll-mt-2 space-y-5";
   const labelClass = expanded ? "text-sm font-semibold tracking-tight" : "text-base font-semibold";
 
@@ -233,10 +236,6 @@ export function SearchFilterSections({
   };
 
   const openSection = (next: SearchFilterSection, attributeKey?: string) => {
-    if (next === "categories") {
-      setCategoryOpen(true);
-      return;
-    }
     setActiveAttributeKey(attributeKey ?? null);
     setActiveSection(next);
     setOverviewOpen(false);
@@ -309,12 +308,14 @@ export function SearchFilterSections({
           icon={SlidersHorizontal}
           active={advancedFilterCount > 0}
         />
-        <FilterOverviewRow
-          label="Flere søkevalg"
-          value={advancedSearchSummary || "Ingen"}
-          onClick={() => openSection("search")}
-          active={Boolean(advancedSearchSummary)}
-        />
+        {!hideSearchOptions && (
+          <FilterOverviewRow
+            label="Flere søkevalg"
+            value={advancedSearchSummary || "Ingen"}
+            onClick={() => openSection("search")}
+            active={Boolean(advancedSearchSummary)}
+          />
+        )}
       </div>
     </div>
   );
@@ -326,9 +327,7 @@ export function SearchFilterSections({
       {showSection("location") && (
         <section
           data-section="location"
-          className={
-            desktopGroup === "basis" ? "border-b border-border" : `${sectionClass} space-y-4`
-          }
+          className={desktopGroup === "basis" ? undefined : `${sectionClass} space-y-4`}
         >
           {desktopGroup === "basis" ? (
             <button
@@ -348,6 +347,7 @@ export function SearchFilterSections({
               {locationActive && (
                 <RadiusPicker
                   value={location.radius}
+                  compact={Boolean(desktopGroup)}
                   onChange={(r) => onLocationChange({ ...location, radius: r })}
                 />
               )}
@@ -363,6 +363,7 @@ export function SearchFilterSections({
                 "Pris (NOK)"-label rett under. */}
             <RangeFilterField
               label="Pris (NOK)"
+              compact={Boolean(desktopGroup)}
               bounds={priceBounds}
               value={{ min: v.min ?? undefined, max: v.max ?? undefined }}
               onChange={({ min, max }) =>
@@ -377,8 +378,8 @@ export function SearchFilterSections({
                     key={max}
                     type="button"
                     variant={v.max === max ? "default" : "secondary"}
-                    size="default"
-                    className="min-h-12 flex-1 rounded-full px-3 text-xs"
+                    size={desktopGroup ? "sm" : "default"}
+                    className={`${desktopGroup ? "h-9" : "min-h-12 rounded-full"} flex-1 px-3 text-xs`}
                     disabled={v.min != null && max < v.min}
                     onClick={() => setV((previous) => ({ ...previous, max }))}
                     aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
@@ -432,6 +433,7 @@ export function SearchFilterSections({
                 onChange={onAttributeChange!}
                 counts={attributeCounts}
                 isNative={!expanded}
+                compactRanges={Boolean(desktopGroup)}
               />
             ) : desktopGroup === "details" ? (
               splitPrimaryFilters(attributeFilters!).primary.length > 0 ? (
@@ -442,6 +444,7 @@ export function SearchFilterSections({
                     values={attributeValues!}
                     onChange={onAttributeChange!}
                     counts={attributeCounts}
+                    compactRanges={Boolean(desktopGroup)}
                   />
                 </div>
               ) : (
@@ -461,6 +464,7 @@ export function SearchFilterSections({
                    filtrene ligger bak et trykk — ikke der alle står synlige. */
                 queryText={expanded ? undefined : (queryText ?? v.terms.join(" "))}
                 isNative={!expanded}
+                compactRanges={Boolean(desktopGroup)}
                 includePrimary={desktopGroup === "more" ? false : includePrimary}
                 // Denne seksjonen er alltid synlig i sidekolonnen (ikke bak et
                 // eksplisitt "åpne filter"-trykk), så autofokus her ville
@@ -472,7 +476,7 @@ export function SearchFilterSections({
           ) : (
             <button
               type="button"
-              onClick={() => !expanded && setCategoryOpen(true)}
+              onClick={() => !expanded && openSection("categories")}
               disabled={expanded}
               className="native-touch-target flex w-full items-center rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground disabled:cursor-default"
             >
@@ -517,7 +521,7 @@ export function SearchFilterSections({
                     className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
                   >
                     {g.exclude
-                      ? "Skal ikke inneholde"
+                      ? "Skjul annonser som inneholder"
                       : g.mode === "all"
                         ? "Må inneholde"
                         : "Kan inneholde"}
@@ -556,14 +560,9 @@ export function SearchFilterSections({
     </>
   );
 
-  /** Kategori og tilstand er egne ark i skuffen, men hører hjemme rett i
-   * sidekolonnen — ingen grunn til å åpne en dialog for dem der. */
+  /** Kategori redigeres i den aktive filterflaten på begge skjermstørrelser. */
   const categoryField = (
     <>
-      {/* Kategorivelgeren er høy (hovedkategori + underkategoriliste), så den
-          står bare åpen så lenge ingen kategori er valgt. Etterpå holder en
-          sammendragslinje med «Endre» — resten av filtrene er viktigere når
-          kategorien først er satt. */}
       {!hideCategory && (
         <section
           data-section="categories"
@@ -572,16 +571,37 @@ export function SearchFilterSections({
           }
         >
           {desktopGroup === "basis" ? (
-            <button
-              type="button"
-              onClick={() => setCategoryOpen(true)}
-              className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="font-medium">Kategori</span>
-              <span className="min-w-0 text-right text-muted-foreground">
-                {categorySummary} <ChevronRight className="inline size-4" aria-hidden />
-              </span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setCategoryEditOpen((open) => !open)}
+                aria-expanded={categoryEditOpen}
+                className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="font-medium">Kategori</span>
+                <span className="min-w-0 text-right text-muted-foreground">
+                  {categorySummary}{" "}
+                  <ChevronRight
+                    className={`inline size-4 transition-transform ${categoryEditOpen ? "rotate-90" : ""}`}
+                    aria-hidden
+                  />
+                </span>
+              </button>
+              {categoryEditOpen && (
+                <div className="pb-4">
+                  <CategorySlugPicker
+                    categories={categories}
+                    selected={v.categories}
+                    onChange={(slugs) =>
+                      setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))
+                    }
+                    variant="icons"
+                    showLabel={false}
+                    compact
+                  />
+                </div>
+              )}
+            </>
           ) : categoryEditOpen || !isCategorySelectionComplete(v.categories, categoryTree) ? (
             <>
               <CategorySlugPicker
@@ -633,7 +653,7 @@ export function SearchFilterSections({
             key={condition.value}
             type="button"
             aria-pressed={v.conditions.includes(condition.value)}
-            className={`min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${v.conditions.includes(condition.value) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:border-primary/50 hover:bg-muted"}`}
+            className={`${desktopGroup ? "min-h-9 rounded-md px-3" : "min-h-11 rounded-full px-4"} border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${v.conditions.includes(condition.value) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-accent hover:text-accent-foreground"}`}
             onClick={() =>
               setV((prev) => ({
                 ...prev,
@@ -778,13 +798,15 @@ export function SearchFilterSections({
                 active={advancedFilterCount > 0}
                 quiet
               />
-              <FilterOverviewRow
-                label="Flere søkevalg"
-                value={advancedSearchSummary || "Ingen"}
-                onClick={() => openSection("search")}
-                active={Boolean(advancedSearchSummary)}
-                quiet
-              />
+              {!hideSearchOptions && (
+                <FilterOverviewRow
+                  label="Flere søkevalg"
+                  value={advancedSearchSummary || "Ingen"}
+                  onClick={() => openSection("search")}
+                  active={Boolean(advancedSearchSummary)}
+                  quiet
+                />
+              )}
             </div>
           )}
         </TabsContent>
@@ -816,6 +838,24 @@ export function SearchFilterSections({
         ) : (
           overview
         )
+      ) : activeSection === "categories" && !hideCategory ? (
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 pb-[calc(6rem+var(--safe-bottom))]">
+          <button
+            type="button"
+            onClick={() => setOverviewOpen(true)}
+            className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
+          >
+            Tilbake til filteroversikt
+          </button>
+          <h2 className="mb-4 font-display text-2xl tracking-tight">Velg kategori</h2>
+          <CategorySlugPicker
+            categories={categories}
+            selected={v.categories}
+            onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
+            variant="icons"
+            showLabel={false}
+          />
+        </div>
       ) : (
         <div className="@container flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+var(--safe-bottom))]">
           <button
@@ -831,24 +871,6 @@ export function SearchFilterSections({
 
       {desktopGroup ? (
         <>
-          <ResponsiveOverlay open={categoryOpen} onOpenChange={setCategoryOpen}>
-            <ResponsiveOverlayContent className="max-h-[min(85dvh,48rem)] overflow-y-auto sm:max-w-xl">
-              <DialogHeader>
-                <DialogTitle>Velg kategori</DialogTitle>
-              </DialogHeader>
-              <CategorySlugPicker
-                categories={categories}
-                selected={v.categories}
-                onChange={(slugs) =>
-                  setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))
-                }
-                variant="icons"
-              />
-              <Button type="button" onClick={() => setCategoryOpen(false)}>
-                Ferdig
-              </Button>
-            </ResponsiveOverlayContent>
-          </ResponsiveOverlay>
           <ResponsiveOverlay open={locationOpen} onOpenChange={setLocationOpen}>
             <ResponsiveOverlayContent className="sm:max-w-md">
               <DialogHeader>
@@ -858,6 +880,7 @@ export function SearchFilterSections({
               {locationActive && (
                 <RadiusPicker
                   value={location.radius}
+                  compact
                   onChange={(r) => onLocationChange({ ...location, radius: r })}
                 />
               )}
@@ -867,28 +890,7 @@ export function SearchFilterSections({
             </ResponsiveOverlayContent>
           </ResponsiveOverlay>
         </>
-      ) : (
-        <NativeSheet
-          open={categoryOpen}
-          onOpenChange={setCategoryOpen}
-          title="Velg kategori"
-          titleVisible
-          expandable
-          className="overflow-y-auto"
-        >
-          <div className="mt-4">
-            <CategorySlugPicker
-              categories={categories}
-              selected={v.categories}
-              onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
-              variant="icons"
-            />
-          </div>
-          <Button type="button" className="mt-6 w-full" onClick={() => setCategoryOpen(false)}>
-            Ferdig
-          </Button>
-        </NativeSheet>
-      )}
+      ) : null}
 
       <NativeChoiceSheet
         open={conditionsOpen}
@@ -978,27 +980,44 @@ function FilterOverviewRow({
   );
 }
 
-function TermGroupSheet({
+export function TermGroupSheet({
   group,
   onClose,
   onSave,
+  onRemove,
+  title = "Flere søkevalg",
 }: {
   group: TermGroup | null;
   onClose: () => void;
   onSave: (g: TermGroup) => void;
+  onRemove?: (id: string) => void;
+  title?: string;
 }) {
   if (!group) return null;
-  return <OpenTermGroupSheet key={group.id} group={group} onClose={onClose} onSave={onSave} />;
+  return (
+    <OpenTermGroupSheet
+      key={group.id}
+      group={group}
+      onClose={onClose}
+      onSave={onSave}
+      onRemove={onRemove}
+      title={title}
+    />
+  );
 }
 
 function OpenTermGroupSheet({
   group,
   onClose,
   onSave,
+  onRemove,
+  title,
 }: {
   group: TermGroup;
   onClose: () => void;
   onSave: (g: TermGroup) => void;
+  onRemove?: (id: string) => void;
+  title: string;
 }) {
   const [draft, setDraft] = useState<TermGroup>(group);
 
@@ -1013,13 +1032,17 @@ function OpenTermGroupSheet({
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title="Flere søkevalg"
+      title={title}
       titleVisible
       expandable
       className="overflow-y-auto"
     >
       <div className="mt-4">
-        <TermGroupRow group={draft} onChange={updateDraft} />
+        <TermGroupRow
+          group={draft}
+          onChange={updateDraft}
+          onRemove={onRemove ? () => onRemove(group.id) : undefined}
+        />
       </div>
 
       <Button

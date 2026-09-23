@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { LayoutGrid, ListFilter, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,32 @@ export function SearchFilterSidebar({
 
   const inline = variant === "inline";
   const Root = inline ? "div" : "aside";
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (inline || !sidebarRef.current) return;
+    const sidebar = sidebarRef.current;
+    const updateHeight = () => {
+      const top = Math.max(
+        sidebar.getBoundingClientRect().top,
+        parseFloat(getComputedStyle(sidebar).top) || 0,
+      );
+      const bottom = Math.min(
+        window.innerHeight,
+        sidebar.parentElement?.getBoundingClientRect().bottom ?? window.innerHeight,
+      );
+      sidebar.style.maxHeight = `${Math.max(0, bottom - top - 12)}px`;
+    };
+    updateHeight();
+    window.addEventListener("scroll", updateHeight, { passive: true });
+    window.addEventListener("resize", updateHeight);
+    const observer = new ResizeObserver(updateHeight);
+    if (sidebar.parentElement) observer.observe(sidebar.parentElement);
+    return () => {
+      window.removeEventListener("scroll", updateHeight);
+      window.removeEventListener("resize", updateHeight);
+      observer.disconnect();
+    };
+  }, [inline]);
   const selectedCategories = categories.filter((category) =>
     applied.value.categories.includes(category.slug),
   );
@@ -188,162 +214,176 @@ export function SearchFilterSidebar({
         })),
     });
   }
-  const canReset = inline ? activeCount > 0 : summary.some((item) => item.onRemove);
+  const canReset = inline
+    ? activeCount > 0
+    : summary.some(
+        (item) =>
+          item.onRemove &&
+          item.key !== "query" &&
+          item.key !== "mode" &&
+          !item.key.startsWith("rule:"),
+      );
 
   return (
     <Root
+      ref={(node) => {
+        sidebarRef.current = node;
+      }}
       aria-label={inline ? undefined : "Filtrer annonser"}
       data-testid={inline ? undefined : "search-filter-sidebar"}
       className={cn(
         inline
           ? "min-h-0 flex-1 overflow-y-auto"
-          : "sticky top-20 hidden max-h-[calc(100dvh-6rem)] shrink-0 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-card shadow-sm lg:block",
+          : "sticky top-[calc(var(--site-header-h)+0.75rem)] hidden max-h-[calc(100dvh-var(--site-header-h)-1.5rem)] min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm lg:flex",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-5 pb-2 pt-5">
-        <h2 className="font-display text-xl tracking-tight">
-          Filtre{inline && activeCount > 0 ? ` · ${activeCount}` : ""}
-        </h2>
-        {canReset && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-muted-foreground"
-            onClick={() => {
-              trackProductEvent("search_filter_applied", {
-                section: "categories",
-                filterCount: 0,
-                resultCount: null,
-              });
-              onApply({
-                value: {
-                  ...defaultAdvancedSearchValue(),
-                  categories: results.categoryLocked ? applied.value.categories : [],
-                },
-                attributes: {},
-              });
-            }}
-          >
-            <RotateCcw className="size-3.5" />
-            Nullstill
-          </Button>
-        )}
-      </div>
-
-      {!inline && (
-        <div className="mx-5 mb-4 rounded-xl bg-primary/5 p-3">
-          <div className="flex items-center justify-between gap-2 text-xs font-medium">
-            <span>Søket ditt</span>
-            <span className="text-muted-foreground">{summary.length} aktive</span>
-          </div>
-          <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Aktive filtre">
-            {summary.length ? (
-              summary.map((item) =>
-                item.onRemove ? (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={item.onRemove}
-                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-left text-xs hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`Fjern ${item.label}`}
-                  >
-                    <span className="min-w-0 break-words">{item.label}</span>
-                    <X className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-                  </button>
-                ) : (
-                  <span
-                    key={item.key}
-                    className="rounded-full border border-border bg-background px-2.5 py-1 text-xs"
-                  >
-                    {item.label}
-                  </span>
-                ),
-              )
-            ) : (
-              <span className="text-xs text-muted-foreground">Ingen filtre valgt</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      <Tabs value={group} onValueChange={(next) => setGroup(next as typeof group)}>
-        {!inline && (
-          <TabsList
-            className="grid h-auto w-full grid-cols-3 gap-1 rounded-none border-b border-border bg-transparent px-4 pb-3"
-            aria-label="Filtergrupper"
-          >
-            {(
-              [
-                ["basis", "Basis", SlidersHorizontal],
-                ["details", "Detaljer", LayoutGrid],
-                ["more", "Mer", ListFilter],
-              ] as const
-            ).map(([key, label, Icon]) => (
-              <TabsTrigger
-                key={key}
-                value={key}
-                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-xs text-muted-foreground hover:bg-muted data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-              >
-                <Icon className="size-4" aria-hidden />
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        )}
-
-        <TabsContent value={group} className="mt-0 px-5 pb-5 pt-4">
-          {!inline && (
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-                {group === "basis" ? "Basis" : group === "details" ? "Detaljer" : "Mer"}
-              </p>
-              <h3 className="mt-1 font-display text-lg tracking-tight">
-                {group === "basis"
-                  ? "Start bredt"
-                  : group === "details"
-                    ? categoryLabel
-                    : "Finjuster søket"}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {group === "basis"
-                  ? "De vanligste avgrensningene på ett sted."
-                  : group === "details"
-                    ? "Filtre som passer valgt kategori."
-                    : "Bruk bare det du trenger."}
-              </p>
-            </div>
+      <div className={inline ? undefined : "flex min-h-0 flex-1 flex-col"}>
+        <div
+          className={cn(
+            "flex items-center justify-between gap-2 px-5 pb-2 pt-5",
+            !inline && "shrink-0",
           )}
-          <SearchFilterSections
-            layout="expanded"
-            desktopGroup={inline ? undefined : group}
-            value={applied.value}
-            setValue={setValue}
-            categories={categories}
-            section="categories"
-            queryText={applied.value.terms.join(" ")}
-            attributeFilters={results.attributeFilters}
-            attributeValues={applied.attributes}
-            onAttributeChange={onAttributeChange}
-            attributeCounts={results.attributeCounts}
-            priceBounds={priceBounds}
-            includePrimary
-            hideCategory={results.categoryLocked}
-          />
-          {onSaveSearch && (
+        >
+          <h2 className={inline ? "font-display text-xl tracking-tight" : "text-sm font-semibold"}>
+            Filtre{inline && activeCount > 0 ? ` · ${activeCount}` : ""}
+          </h2>
+          {canReset && (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="mt-4 w-full gap-1.5"
-              onClick={onSaveSearch}
+              className="h-8 gap-1.5 px-2 text-muted-foreground"
+              onClick={() => {
+                trackProductEvent("search_filter_applied", {
+                  section: "categories",
+                  filterCount: 0,
+                  resultCount: null,
+                });
+                onApply({
+                  value: {
+                    ...defaultAdvancedSearchValue(),
+                    terms: inline ? [] : applied.value.terms,
+                    qMode: inline ? "all" : applied.value.qMode,
+                    extraGroups: inline ? [] : applied.value.extraGroups,
+                    categories: results.categoryLocked ? applied.value.categories : [],
+                  },
+                  attributes: {},
+                });
+              }}
             >
-              <Save className="size-4" /> Lagre søk
+              <RotateCcw className="size-3.5" />
+              Nullstill
             </Button>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+
+        {!inline && (
+          <div className="mx-5 mb-4 shrink-0 rounded-xl bg-primary/5 p-3">
+            <div className="flex items-center justify-between gap-2 text-xs font-medium">
+              <span>Søket ditt</span>
+              <span className="text-muted-foreground">{summary.length} aktive</span>
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Aktive filtre">
+              {summary.length ? (
+                summary.map((item) =>
+                  item.onRemove ? (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={item.onRemove}
+                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-left text-xs hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Fjern ${item.label}`}
+                    >
+                      <span className="min-w-0 break-words">{item.label}</span>
+                      <X className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                    </button>
+                  ) : (
+                    <span
+                      key={item.key}
+                      className="rounded-full border border-border bg-background px-2.5 py-1 text-xs"
+                    >
+                      {item.label}
+                    </span>
+                  ),
+                )
+              ) : (
+                <span className="text-xs text-muted-foreground">Ingen filtre valgt</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <Tabs
+          value={group}
+          onValueChange={(next) => setGroup(next as typeof group)}
+          className={inline ? undefined : "flex min-h-0 flex-1 flex-col"}
+        >
+          {!inline && (
+            <TabsList
+              className="grid h-auto w-full shrink-0 grid-cols-3 gap-1 rounded-none border-b border-border bg-transparent px-4 pb-2"
+              aria-label="Filtergrupper"
+            >
+              {(
+                [
+                  ["basis", "Basis", SlidersHorizontal],
+                  ["details", "Detaljer", LayoutGrid],
+                  ["more", "Mer", ListFilter],
+                ] as const
+              ).map(([key, label, Icon]) => (
+                <TabsTrigger
+                  key={key}
+                  value={key}
+                  className="flex min-h-9 items-center justify-center gap-1 rounded-md px-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                >
+                  <Icon className="size-3.5" aria-hidden />
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
+
+          <TabsContent
+            key={group}
+            value={group}
+            className={cn(
+              "mt-0 px-5 pb-5 pt-4",
+              !inline && "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+            )}
+          >
+            <SearchFilterSections
+              layout="expanded"
+              desktopGroup={inline ? undefined : group}
+              value={applied.value}
+              setValue={setValue}
+              categories={categories}
+              section="categories"
+              queryText={applied.value.terms.join(" ")}
+              attributeFilters={results.attributeFilters}
+              attributeValues={applied.attributes}
+              onAttributeChange={onAttributeChange}
+              attributeCounts={results.attributeCounts}
+              priceBounds={priceBounds}
+              includePrimary
+              hideCategory={results.categoryLocked}
+              hideSearchOptions={!inline}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+      {onSaveSearch && (
+        <div className={inline ? "px-5 pb-5" : "shrink-0 border-t border-border bg-card px-5 py-3"}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5"
+            onClick={onSaveSearch}
+          >
+            <Save className="size-4" /> Lagre søk
+          </Button>
+        </div>
+      )}
     </Root>
   );
 }

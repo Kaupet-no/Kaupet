@@ -130,6 +130,7 @@ export function ImageUploader({
   uploadProgress?: { done: number; total: number } | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const captureInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
 
@@ -181,6 +182,15 @@ export function ImageUploader({
     e.target.value = "";
   };
 
+  const pickNative = async (source: "camera" | "gallery") => {
+    try {
+      const file = await pickNativePhoto(source);
+      if (file) await addFiles([file]);
+    } catch (e: unknown) {
+      showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
@@ -226,76 +236,107 @@ export function ImageUploader({
 
   return (
     <div className="space-y-3" data-composer-no-swipe>
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition-[background-color,border-color,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${
-          dragOver
-            ? "border-primary bg-primary/5"
-            : "border-border bg-surface hover:border-primary/40"
-        }`}
-      >
-        <ImagePlus className="mb-2 size-7 text-muted-foreground" />
-        <p className="text-sm font-medium">
-          {dragOver ? "Slipp her for å laste opp" : "Legg til bilder"}
-        </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={IMAGE_ACCEPT}
-          multiple
-          onChange={handleFileInput}
-          aria-label="Velg bilder"
-          className="hidden"
-        />
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMAGE_ACCEPT}
+        multiple
+        onChange={handleFileInput}
+        aria-label="Velg bilder"
+        className="hidden"
+      />
+      <input
+        ref={captureInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileInput}
+        aria-label="Ta bilde"
+        data-testid="image-capture-input"
+        className="hidden"
+      />
 
-        {/* On native: camera is primary action */}
-        {isNative() ? (
-          <div className="mt-4 flex flex-col gap-2">
+      {isNative() ? (
+        // Native: to store, tydelige handlinger — kamera direkte, galleri direkte.
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="default"
+            className="gap-2"
+            onClick={() => void pickNative("camera")}
+            disabled={processing}
+          >
+            <Camera className="size-4" /> Ta bilde
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void pickNative("gallery")}
+            disabled={processing}
+          >
+            Velg fra bilder
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* Web, smal skjerm: samme to store handlinger som native. */}
+          <div className="flex flex-col gap-2 sm:hidden">
             <Button
               type="button"
               variant="default"
-              size="sm"
               className="gap-2"
-              onClick={async () => {
-                try {
-                  const file = await pickNativePhoto();
-                  if (file) await addFiles([file]);
-                } catch (e: unknown) {
-                  showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
-                }
-              }}
+              onClick={() => captureInputRef.current?.click()}
               disabled={processing}
             >
-              <Camera className="size-4" /> Ta bilde / velg fra galleri
+              <Camera className="size-4" /> Ta bilde
             </Button>
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={() => inputRef.current?.click()}
               disabled={processing}
             >
-              Velg fra filer
+              Velg fra bilder
             </Button>
           </div>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => inputRef.current?.click()}
-            disabled={processing}
+
+          {/* Desktop: rolig slippsone med hårstrek-ramme. */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`hidden flex-col items-center justify-center rounded-lg border px-6 py-6 text-center transition-[background-color,border-color,opacity,transform] duration-150 ease-out motion-reduce:transition-none sm:flex ${
+              dragOver
+                ? "border-primary bg-primary/5"
+                : "border-border bg-surface hover:border-primary/40"
+            }`}
           >
-            Velg bilder
-          </Button>
-        )}
-      </div>
+            <ImagePlus className="mb-2 size-7 text-muted-foreground" />
+            <p className="text-sm font-medium">
+              {dragOver ? "Slipp her for å laste opp" : "Legg til bilder"}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => inputRef.current?.click()}
+              disabled={processing}
+            >
+              Velg bilder
+            </Button>
+          </div>
+        </>
+      )}
+
+      {images.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Tips: Ta ett bilde av hele tingen i dagslys, og et nærbilde av eventuelle skader.
+        </p>
+      )}
 
       {processing && (
         <p className="text-sm font-medium text-primary" role="status" aria-live="polite">

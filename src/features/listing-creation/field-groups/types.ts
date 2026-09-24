@@ -221,6 +221,10 @@ export type WizardSharedProps = {
   images: PendingImage[];
   setImages: (images: PendingImage[]) => void;
   uploadProgress: { done: number; total: number } | null;
+  /** True once the user has pressed "Neste" on the bildesteget with no
+   * images and not yet confirmed — drives the inline "fortsett uten
+   * bilder"-melding (erstatter den tidligere no-image-dialog.tsx). */
+  noImageConfirmPending: boolean;
   /** Persisted draft listing id, if the draft has been saved to Supabase yet
    * (requires a title of at least 5 characters — see `ensureDraftId`). Used
    * by the vehicle 360° QR capture panel to know which listing to attach

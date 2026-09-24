@@ -90,7 +90,6 @@ import { ListingComposerShell } from "@/features/listing-creation/listing-compos
 import { ListingStrengthIndicator } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
-import { NoImageDialog } from "@/features/listing-creation/no-image-dialog";
 import {
   focusComposerField,
   reviewSectionSteps,
@@ -199,8 +198,11 @@ function NewListingPage() {
   const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const authResumeHandledRef = useRef(false);
   const bypassNavigationBlockerRef = useRef(false);
-  const noImagePromptShownRef = useRef(false);
-  const [showNoImageDialog, setShowNoImageDialog] = useState(false);
+  // Inline erstatning for den tidligere no-image-dialog.tsx: første "Neste"
+  // uten bilder setter denne til true (viser en melding ved bildefeltet og
+  // bytter Neste-knappen til "Fortsett uten bilder"), andre trykk går videre
+  // — se goToNextPage.
+  const [noImageConfirmPending, setNoImageConfirmPending] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
     field: string;
     message: string;
@@ -942,7 +944,7 @@ function NewListingPage() {
     const result = group.validateExtra?.(publishingValidationContext);
     if (
       !result ||
-      result === "SHOW_NO_IMAGE_DIALOG" ||
+      result === "CONFIRM_NO_IMAGE" ||
       (typeof result === "string" && result === missingFilterMessage)
     )
       continue;
@@ -1138,9 +1140,7 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  async function goToNextPage(options?: {
-    skipImageCheck?: boolean;
-  }): Promise<ComposerNavigationResult> {
+  async function goToNextPage(): Promise<ComposerNavigationResult> {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
 
@@ -1235,17 +1235,16 @@ function NewListingPage() {
     setExtraFieldError(null);
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
-      if (result === "SHOW_NO_IMAGE_DIALOG") {
+      if (result === "CONFIRM_NO_IMAGE") {
         if (native) continue;
-        if (options?.skipImageCheck || noImagePromptShownRef.current) continue;
-        noImagePromptShownRef.current = true;
+        if (noImageConfirmPending) continue;
+        setNoImageConfirmPending(true);
         trackProductEvent("listing_creation_step_completed", {
           kind: "sell",
           action: "validation_prompt",
           step: currentStepKey,
           reason: "image",
         });
-        setShowNoImageDialog(true);
         return "blocked";
       }
       if (typeof result === "string") {
@@ -1296,13 +1295,11 @@ function NewListingPage() {
     return "advanced";
   }
 
-  async function attemptNextPage(options?: {
-    skipImageCheck?: boolean;
-  }): Promise<ComposerNavigationResult> {
+  async function attemptNextPage(): Promise<ComposerNavigationResult> {
     if (forwardAttemptPendingRef.current) return "busy";
     forwardAttemptPendingRef.current = true;
     try {
-      const result = await goToNextPage(options);
+      const result = await goToNextPage();
       if (result === "blocked" && native) setValidationAttempt((attempt) => attempt + 1);
       return result;
     } finally {
@@ -1717,6 +1714,7 @@ function NewListingPage() {
     images,
     setImages,
     uploadProgress,
+    noImageConfirmPending,
     draftId,
     ensureDraftId,
 
@@ -1847,6 +1845,11 @@ function NewListingPage() {
       });
     },
   );
+  // Neste-knappen på bildesteget bytter til "Fortsett uten bilder" (samme
+  // testid som den tidligere no-image-dialog.tsx sin bekreft-knapp) etter
+  // det første trykket uten bilder — se goToNextPage.
+  const awaitingNoImageConfirm =
+    noImageConfirmPending && images.length === 0 && groups.some((g) => g.key === "photos");
   const composerFooter = (
     <>
       {!native && !isFirst && !isCategoryConfirmPage && (
@@ -1857,7 +1860,9 @@ function NewListingPage() {
       {isCategoryConfirmPage ? null : !isLast ? (
         <Button
           type="button"
-          data-testid="wizard-next-button"
+          data-testid={
+            awaitingNoImageConfirm ? "continue-without-image-button" : "wizard-next-button"
+          }
           disabled={vehicleLookupLoading}
           onClick={() => void attemptNextPage()}
           className={
@@ -1870,7 +1875,11 @@ function NewListingPage() {
             "Slår opp kjøretøy…"
           ) : (
             <>
-              {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups)}`}{" "}
+              {awaitingNoImageConfirm
+                ? "Fortsett uten bilder"
+                : native
+                  ? "Fortsett"
+                  : `Neste: ${pageLabel(nextGroups)}`}{" "}
               <ChevronRight className="size-4" aria-hidden />
             </>
           )}
@@ -2240,15 +2249,6 @@ function NewListingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <NoImageDialog
-        open={showNoImageDialog}
-        onOpenChange={setShowNoImageDialog}
-        onContinue={() => {
-          setShowNoImageDialog(false);
-          void goToNextPage({ skipImageCheck: true });
-        }}
-      />
 
       <AlertDialog open={draftDiscardConfirmOpen} onOpenChange={setDraftDiscardConfirmOpen}>
         <AlertDialogContent>

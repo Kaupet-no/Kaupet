@@ -52,7 +52,7 @@ export type FieldGroup = {
   fieldsToValidate?: (keyof ListingFormShape)[];
   validateExtra?: (
     ctx: ValidateCtx,
-  ) => "SHOW_NO_IMAGE_DIALOG" | string | { field: string; message: string } | null;
+  ) => "CONFIRM_NO_IMAGE" | string | { field: string; message: string } | null;
 };
 
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
@@ -72,7 +72,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     key: "photos",
     classification: "recommendedForTrust",
     Component: PhotosGroup,
-    validateExtra: (ctx) => (ctx.images.length === 0 ? "SHOW_NO_IMAGE_DIALOG" : null),
+    validateExtra: (ctx) => (ctx.images.length === 0 ? "CONFIRM_NO_IMAGE" : null),
   },
   title: {
     key: "title",

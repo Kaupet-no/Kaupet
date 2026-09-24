@@ -102,7 +102,8 @@ export function PhotosGroup({
   images,
   setImages,
   uploadProgress,
-}: Pick<WizardSharedProps, "images" | "setImages" | "uploadProgress">) {
+  noImageConfirmPending,
+}: Pick<WizardSharedProps, "images" | "setImages" | "uploadProgress" | "noImageConfirmPending">) {
   return (
     <section className="space-y-2">
       <Label>Legg til bilder</Label>
@@ -110,6 +111,11 @@ export function PhotosGroup({
         Gode bilder gjør det enklere å vurdere annonsen.
       </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
+      {noImageConfirmPending && images.length === 0 && (
+        <p role="status" className="text-sm text-foreground">
+          Annonser med bilder får flere henvendelser. Du kan legge til bilder senere.
+        </p>
+      )}
     </section>
   );
 }

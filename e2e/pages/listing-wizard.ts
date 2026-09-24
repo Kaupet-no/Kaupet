@@ -187,9 +187,7 @@ export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
   // Feilgjetting: en rask dobbeltklikk skal fortsatt starte nøyaktig én
   // publisering og ikke konkurrere om Turnstile-tokenet.
   await page.getByTestId("publish-anyway-button").dblclick();
-  await page
-    .getByRole("heading", { name: "Annonsen din er publisert, bra jobba!" })
-    .waitFor({ timeout: 20_000 });
+  await page.getByRole("heading", { name: "Lappen henger ute" }).waitFor({ timeout: 20_000 });
 }
 
 /**

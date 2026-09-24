@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -1417,7 +1417,6 @@ function NewListingPage() {
         isVehicle,
       });
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
-      showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
       setPublishedCode(result.kaupet_code);
       setPublishedOpen(true);

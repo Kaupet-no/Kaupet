@@ -540,6 +540,15 @@ html.native body::before {
   filter: invert(1) grayscale(1) brightness(0.78) contrast(0.82);
 }
 
+@keyframes lappen-pin-in {
+  from {
+    transform: scale(0.96) rotate(0deg);
+  }
+  to {
+    transform: scale(1) rotate(-1.5deg);
+  }
+}
+
 @keyframes fab-icon-in {
   from {
     transform: rotate(-45deg) scale(0.6);

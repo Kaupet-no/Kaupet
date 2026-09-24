@@ -4,12 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PublishedListingDialog } from "./published-listing-dialog";
 
-const confettiCreate = vi.hoisted(() => vi.fn(() => vi.fn()));
-const reducedMotion = vi.hoisted(() => ({ current: false }));
-
-vi.mock("canvas-confetti", () => ({ default: { create: confettiCreate } }));
-vi.mock("@/hooks/use-reduced-motion", () => ({
-  useReducedMotion: () => reducedMotion.current,
+vi.mock("@/lib/qr", () => ({
+  QR_SIZE: 320,
+  generateBrandedQrDataUrl: vi.fn(() => Promise.resolve("data:image/png;base64,qr")),
 }));
 vi.mock("@/hooks/use-listing-preview", () => ({
   useListingPreview: () => ({
@@ -19,7 +16,7 @@ vi.mock("@/hooks/use-listing-preview", () => ({
       is_free: false,
       city: "Oslo",
       cover_path: null,
-      kaupet_code: "ABC123",
+      kaupet_code: "48210937",
     },
     imgUrl: null,
   }),
@@ -39,25 +36,33 @@ function renderDialog() {
 
 afterEach(() => {
   cleanup();
-  confettiCreate.mockClear();
-  reducedMotion.current = false;
 });
 
 describe("PublishedListingDialog", () => {
-  it("feirer publiseringen med konfetti", async () => {
+  it("viser Lappen med formatert Kaupet-kode og uten konfetti", async () => {
     renderDialog();
 
-    expect(screen.getByText(/Annonsen din er publisert/)).toBeTruthy();
-    await waitFor(() => expect(confettiCreate).toHaveBeenCalledOnce());
+    expect(screen.getByRole("heading", { name: "Lappen henger ute" })).toBeTruthy();
+    expect(screen.getByText("4821 0937")).toBeTruthy();
+    expect(document.querySelector("canvas")).toBeNull();
+    await waitFor(() => expect(screen.getByAltText("QR-kode til annonsen")).toBeTruthy());
   });
 
-  it("hopper over animasjonen når brukeren har bedt om redusert bevegelse", async () => {
-    reducedMotion.current = true;
+  it("har «Del lappen» som primærhandling", () => {
     renderDialog();
 
-    // Dialogen skal fortsatt vise bekreftelsen — det er kun animasjonen som utgår.
-    expect(screen.getByText(/Annonsen din er publisert/)).toBeTruthy();
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(confettiCreate).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Del lappen/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Se annonsen/ })).toBeTruthy();
+  });
+
+  it("kopierer koden ved klikk og viser kortvarig status", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    renderDialog();
+    screen.getByRole("button", { name: "Kopier Kaupet-kode" }).click();
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("48210937"));
+    await waitFor(() => expect(screen.getByText("Kopiert")).toBeTruthy());
   });
 });

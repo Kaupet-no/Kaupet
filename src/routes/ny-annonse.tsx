@@ -1905,19 +1905,23 @@ function NewListingPage() {
               </div>
             ) : undefined
           }
-          /* Ingen fremdriftsindikator før kategori er valgt — et løsrevet
-             "Kategori" under tittelen leses som en tom verdi, ikke som et steg. */
+          /* Stegantallet er ikke kjent før kategori er valgt (flyten er
+             kategoriavhengig) — StepIndicator viser da "Steg 1" uten "av Y"
+             i stedet for et tall som kan endre seg når kategorien velges. */
           progress={
-            categoryId ? (
-              <StepIndicator
-                step={step}
-                pages={pages}
-                onSelectStep={(target) => {
-                  setStep(target);
-                  window.scrollTo({ top: 0 });
-                }}
-              />
-            ) : undefined
+            <StepIndicator
+              step={step}
+              pages={pages}
+              flowKnown={!!categoryId}
+              onSelectStep={
+                categoryId
+                  ? (target) => {
+                      setStep(target);
+                      window.scrollTo({ top: 0 });
+                    }
+                  : undefined
+              }
+            />
           }
           status={
             draftSaveConflict ? (

@@ -38,9 +38,9 @@ it("gir innholdssidene de fire delte oppgavenavnene", () => {
   const pages = resolveWizardPages(DEFAULT_FIELD_GROUPS, { native: false });
 
   expect(pages.map((keys) => pageLabel(fieldGroupsForKeys(keys)))).toEqual([
-    "Vis frem",
-    "Gjør søkbar",
-    "Gjør handelen enkel",
+    "Bilder",
+    "Om tingen",
+    "Pris og henting",
     "Se over",
   ]);
   expect(pages[1]).toContain("category-attributes");

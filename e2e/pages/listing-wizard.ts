@@ -151,7 +151,7 @@ export function wizardStep(page: Page, groupKey: string) {
  * Fills and advances past the Beskrivelse-steget, which is identical
  * between the generic and kjøretøy-flyten. Assumes the wizard is already
  * showing the page containing the description field. The generic flow's
- * "Gjør søkbar" page may start with category attributes, so the stable
+ * "Om tingen" page may start with category attributes, so the stable
  * textarea test id—not the page wrapper key—is the boundary used here.
  * Vehicle callers differ in how many transitions it takes to get to their
  * vehicle-facts page, so that transition remains each caller's responsibility.
@@ -169,7 +169,7 @@ export async function fillDescriptionAndAdvance(
 /**
  * Publishes from the flow's final page. Vehicle pages also keep
  * delivery/location on this page; generic listings arrive here from their
- * separate "Gjør handelen enkel" page.
+ * separate "Pris og henting" page.
  *
  * Publishing without having opened the preview first prompts a "want to
  * preview before publishing?" dialog rather than publishing immediately.

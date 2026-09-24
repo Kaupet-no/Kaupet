@@ -97,7 +97,7 @@ afterEach(() => {
 });
 
 describe("VehicleFactsGroup", () => {
-  it("viser påkrevde SVV-felt som mangler på siden Gjør søkbar", () => {
+  it("viser påkrevde SVV-felt som mangler på siden Om tingen", () => {
     categoryFilters.current = [requiredFilter("fuel_type")];
 
     render(<VehicleFactsGroup {...props()} />);

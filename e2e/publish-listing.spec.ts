@@ -48,8 +48,8 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   // Category must be chosen first — it's always the wizard's first step.
   await chooseCategory(page, TEST_CATEGORY_NAME);
 
-  // The title is part of the "Vis frem" task; condition, price, delivery and
-  // location are grouped into the later "Gjør handelen enkel" task.
+  // The title is part of the "Bilder" task; condition, price, delivery and
+  // location are grouped into the later "Pris og henting" task.
   await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
 
@@ -64,8 +64,8 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
     "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
   );
 
-  // "Gis bort gratis" now belongs to the "Gjør handelen enkel" task, not
-  // "Vis frem". Selecting it satisfies the optional-price validation without
+  // "Gis bort gratis" now belongs to the "Pris og henting" task, not
+  // "Bilder". Selecting it satisfies the optional-price validation without
   // changing the publish contract this golden path proves.
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
   // Delivery method is required for every non-vehicle, non-boat category

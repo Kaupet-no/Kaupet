@@ -117,9 +117,32 @@ describe("ListingComposerShell", () => {
     expect(screen.getByRole("button", { name: "Publiser" })).toBeTruthy();
   });
 
-  it("lar webfooteren være uten native kontrollrad", () => {
-    renderShell({ native: false });
-    expect(screen.queryByRole("button", { name: "Avbryt annonseopprettelse" })).toBeNull();
+  it("viser Tilbake-chevron i webtoppstripa på et mellomsteg, ikke på første steg", () => {
+    const { onBack, rerender } = renderShell({ native: false });
+    fireEvent.click(screen.getByRole("button", { name: "Tilbake" }));
+    expect(onBack).toHaveBeenCalledOnce();
+
+    rerender(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="title"
+        pageTitle="Tittel"
+        native={false}
+        onBack={vi.fn()}
+        onCancel={vi.fn()}
+        footer={<button type="button">Fortsett</button>}
+        firstStep
+      >
+        Innhold
+      </ListingComposerShell>,
+    );
+    expect(screen.queryByRole("button", { name: "Tilbake" })).toBeNull();
+  });
+
+  it("lar webfooteren være uten native kontrollrad, men viser lukk-knapp i toppstripa", () => {
+    const { onCancel } = renderShell({ native: false });
+    fireEvent.click(screen.getByRole("button", { name: "Avbryt annonseopprettelse" }));
+    expect(onCancel).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
   });
 

@@ -1755,7 +1755,7 @@ function NewListingPage() {
   const composerFooter = (
     <>
       {!native && !isFirst && !isCategoryConfirmPage && (
-        <Button type="button" variant="ghost" onClick={goBack}>
+        <Button type="button" variant="ghost" onClick={goBack} className="hidden lg:inline-flex">
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
@@ -1765,7 +1765,11 @@ function NewListingPage() {
           data-testid="wizard-next-button"
           disabled={vehicleLookupLoading}
           onClick={() => void attemptNextPage()}
-          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
+          className={
+            native
+              ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
+              : "w-full h-14 text-base lg:h-11 lg:w-auto lg:text-sm"
+          }
         >
           {vehicleLookupLoading ? (
             "Slår opp kjøretøy…"

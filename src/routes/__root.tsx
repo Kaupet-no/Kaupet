@@ -405,7 +405,7 @@ function RootBody({ native }: { native: boolean }) {
         </a>
       )}
       {isTest && <TestEnvBanner />}
-      {!native && <SiteHeader />}
+      {!native && !composerRoute && <SiteHeader />}
       <ModerationBanner />
       <main
         id="main-content"
@@ -414,7 +414,7 @@ function RootBody({ native }: { native: boolean }) {
         <Outlet />
       </main>
 
-      {!native && (
+      {!native && !composerRoute && (
         <footer className="border-t border-border bg-surface">
           <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

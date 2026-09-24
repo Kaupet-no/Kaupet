@@ -378,6 +378,17 @@ html.native body::before {
 .native {
   --site-header-h: calc(3rem + 1px + var(--safe-top));
 }
+/* Composer-rutene (/ny-annonse, /ny-ok-annonse) skjuler SiteHeader og viser i
+   stedet sin egen slanke toppstripe (ListingComposerShell) — sticky-elementer
+   i shellen (progress-stripa, desktop-aside) må forskyves etter DEN høyden på
+   web. Native bruker fortsatt NativePageHeader og er uendret (mer spesifikk
+   selektor enn `.composer-route` alene, så den vinner for native). */
+.composer-route {
+  --site-header-h: calc(3.5rem + 1px + var(--safe-top));
+}
+.native .composer-route {
+  --site-header-h: calc(3rem + 1px + var(--safe-top));
+}
 .pb-bottom-nav {
   padding-bottom: var(--app-bottom-nav-h);
 }

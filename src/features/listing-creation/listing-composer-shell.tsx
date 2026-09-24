@@ -129,6 +129,42 @@ export function ListingComposerShell({
         native && "native-composer-shell flex flex-col",
       )}
     >
+      {!native && (
+        <div className="sticky top-0 z-40 -mx-4 -mt-6 mb-4 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-4 pt-safe backdrop-blur">
+          {onBack && !firstStep && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="-ml-2 shrink-0 lg:hidden"
+              aria-label={backLabel || "Tilbake"}
+            >
+              <ChevronLeft className="size-5" aria-hidden />
+            </Button>
+          )}
+          <span className="flex shrink-0 items-baseline gap-0.5">
+            <span className="font-display text-lg font-semibold tracking-tight text-primary">
+              kaupet
+            </span>
+            <span className="font-display text-lg text-brand">.</span>
+            <span className="font-display text-sm text-muted-foreground">no</span>
+          </span>
+          <span className="truncate text-sm text-muted-foreground">Ny annonse</span>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {status}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onCancel}
+              aria-label="Avbryt annonseopprettelse"
+            >
+              <X className="size-5" aria-hidden />
+            </Button>
+          </div>
+        </div>
+      )}
       <NativePageHeader
         title={title || "Ny annonse"}
         backLabel={backLabel}
@@ -167,10 +203,9 @@ export function ListingComposerShell({
       )}
       {notice}
 
-      {(progress || status) && (
+      {progress && (
         <div className="sticky top-[var(--site-header-h)] z-10 -mx-4 mt-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           {progress}
-          {status}
         </div>
       )}
 
@@ -217,7 +252,7 @@ export function ListingComposerShell({
               "[&_button]:min-h-12 [&_button]:min-w-12",
               native
                 ? "px-safe pb-safe shrink-0 border-t border-border bg-background/95 pt-3 backdrop-blur"
-                : "sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:static lg:z-auto lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-6 lg:backdrop-blur-none",
+                : "sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-4 pt-3 pb-3 max-lg:pb-[max(0.75rem,var(--safe-bottom))] backdrop-blur lg:static lg:z-auto lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-6 lg:backdrop-blur-none",
               !native && (firstStep ? "justify-end" : "justify-between"),
             )}
           >

@@ -552,7 +552,7 @@ function NewWtbPage() {
   const footer = (
     <>
       {!native && stepIndex > 0 && !isCategoryConfirmStep && (
-        <Button type="button" variant="ghost" onClick={goBack}>
+        <Button type="button" variant="ghost" onClick={goBack} className="hidden lg:inline-flex">
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
@@ -566,7 +566,11 @@ function NewWtbPage() {
               ? "wtb-continue-requirement"
               : undefined
           }
-          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
+          className={
+            native
+              ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
+              : "w-full h-14 text-base lg:h-11 lg:w-auto lg:text-sm"
+          }
         >
           {native ? "Fortsett" : `Neste: ${STEP_META[steps[stepIndex + 1]].title}`}{" "}
           <ChevronRight className="size-4" aria-hidden />
@@ -604,7 +608,11 @@ function NewWtbPage() {
             },
           )}
           disabled={isPending}
-          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : "gap-2"}
+          className={
+            native
+              ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
+              : "w-full h-14 gap-2 text-base lg:h-11 lg:w-auto lg:text-sm"
+          }
         >
           {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {user ? (native ? "Publiser" : "Publiser ønskes kjøpt") : "Logg inn og publiser"}

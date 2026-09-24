@@ -295,10 +295,16 @@ export function PublishActions({
 
   return (
     <>
-      <Button type="button" variant="ghost" onClick={onCancel} disabled={mutationIsPending}>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={onCancel}
+        disabled={mutationIsPending}
+        className="hidden lg:inline-flex"
+      >
         Avbryt
       </Button>
-      <div className="flex items-center gap-3">
+      <div className="flex w-full items-center gap-3 lg:w-auto">
         {turnstileEnabled && (
           <Turnstile
             ref={turnstileRef}
@@ -306,7 +312,12 @@ export function PublishActions({
             options={{ appearance: "interaction-only", action: "kaupet" }}
           />
         )}
-        <Button type="submit" data-testid="publish-listing-button" disabled={mutationIsPending}>
+        <Button
+          type="submit"
+          data-testid="publish-listing-button"
+          disabled={mutationIsPending}
+          className="h-14 w-full text-base lg:h-11 lg:w-auto lg:text-sm"
+        >
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
           {isGuest ? "Logg inn og publiser" : "Publiser annonse"}
         </Button>

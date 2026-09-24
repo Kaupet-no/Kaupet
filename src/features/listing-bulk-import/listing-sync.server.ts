@@ -272,6 +272,11 @@ async function callUpsert(
   dryRun: boolean,
 ): Promise<ListingSyncResult> {
   const category = resolveCategory(row.category, ctx.categories)!;
+  // Steg 4: her skal `row.imageUrls` (validert i import-schema.ts: kun
+  // https://, maks 2048 tegn, maks MAX_IMPORT_IMAGES per rad) legges i kø som
+  // bildejobber (`listing_image_jobs`) for annonsen RPC-en oppretter/
+  // oppdaterer under. I dag tas de bare imot her og går ingen vei videre —
+  // ingen bilder legges til `listing_images`.
   const { data, error } = await supabaseAdmin.rpc("upsert_listing_from_external", {
     _organization_id: ctx.organizationId,
     _user_id: ctx.userId,
@@ -296,6 +301,7 @@ async function callUpsert(
       no_known_issues: row.noKnownIssues ?? false,
       maintenance_history: row.maintenanceHistory ?? "",
       attributes: row.attributes,
+      status: row.status ?? "",
     },
     _mode: mode,
     _show_visiting_address: ctx.showVisitingAddress,
@@ -403,6 +409,14 @@ export async function syncListings(
         }
         const normalized = validated.row;
         const wouldCreate = !existingRefs.has(normalized.externalId);
+        if (wouldCreate && (normalized.status === "sold" || normalized.status === "archived")) {
+          return {
+            rowNumber,
+            externalId: normalized.externalId,
+            status: "failed",
+            error: "En ny annonse kan ikke opprettes som solgt eller arkivert.",
+          };
+        }
         if (wouldCreate && !dryRun) {
           if (remainingNewListings <= 0) {
             return {

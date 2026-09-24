@@ -2,11 +2,18 @@ import { z } from "zod";
 
 import { attributesSchema } from "@/lib/category-filters";
 import { INTEGRATION_LIMITS } from "@/lib/integration-limits";
+import { MAX_LISTING_IMAGES } from "@/lib/storage";
 
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
 /** Samme tall som håndheves server-/API-side (`INTEGRATION_LIMITS.maxBatchRows`),
  * gjenbrukt her slik at malen og klientparseren aldri kan avvike fra grensen. */
 export const MAX_IMPORT_ROWS = INTEGRATION_LIMITS.maxBatchRows;
+/** Samme grense som gjelder for bilder lastet opp gjennom veiviseren
+ * (`MAX_LISTING_IMAGES` i `src/lib/storage.ts`), gjenbrukt her slik at
+ * malen/parseren aldri kan avvike fra det som faktisk håndheves. */
+export const MAX_IMPORT_IMAGES = MAX_LISTING_IMAGES;
+/** Maks lengde på én bilde-URL i `images`-kolonnen. */
+export const MAX_IMPORT_IMAGE_URL_LENGTH = 2048;
 
 export const BULK_IMPORT_COLUMNS = [
   "external_id",
@@ -20,6 +27,8 @@ export const BULK_IMPORT_COLUMNS = [
   "known_issues",
   "no_known_issues",
   "maintenance_history",
+  "status",
+  "images",
   "attributes",
 ] as const;
 
@@ -46,6 +55,12 @@ export type BulkImportRow = {
   knownIssues?: string;
   noKnownIssues?: boolean;
   maintenanceHistory?: string;
+  /** Tom/ikke satt = ingen statusendring (en ny annonse blir aktiv). */
+  status?: "active" | "sold" | "archived";
+  /** Bilde-URL-er fra `images`-kolonnen, `;`-separert i filen. Serveren tar
+   * foreløpig bare imot disse (se `// Steg 4:`-kommentaren i
+   * `listing-sync.server.ts`) — selve bildehentingen er ikke bygget ennå. */
+  imageUrls: string[];
   attributes: Record<string, string | number | boolean | string[]>;
 };
 
@@ -67,6 +82,36 @@ export function parseCondition(value: unknown): BulkImportRow["condition"] | und
     ([machine, label]) => machine === normalized || label.toLocaleLowerCase("nb-NO") === normalized,
   );
   return entry?.[0] as BulkImportRow["condition"] | undefined;
+}
+
+/** Nedtrekksetikettene malens `status`-kolonne tilbyr, per `listings.status`-
+ * verdi. Tom celle betyr «ingen endring», så `expired`/`disabled` har bevisst
+ * ingen etikett her — de kan ikke settes fra filen. */
+export const LISTING_STATUS_LABELS_NB: Record<NonNullable<BulkImportRow["status"]>, string> = {
+  active: "Aktiv",
+  sold: "Solgt",
+  archived: "Arkivert",
+};
+
+/** Godtar både maskinverdien og den norske etiketten fra malens nedtrekksliste. */
+export function parseListingStatus(value: unknown): BulkImportRow["status"] | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLocaleLowerCase("nb-NO");
+  if (!normalized) return undefined;
+  const entry = Object.entries(LISTING_STATUS_LABELS_NB).find(
+    ([machine, label]) => machine === normalized || label.toLocaleLowerCase("nb-NO") === normalized,
+  );
+  return entry?.[0] as BulkImportRow["status"] | undefined;
+}
+
+/** `images`-kolonnen: bilde-URL-er skilt med semikolon. Tomme deler
+ * ignoreres (f.eks. avsluttende `;`). */
+export function parseImageUrls(value: unknown): string[] {
+  if (typeof value !== "string") return [];
+  return value
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
 }
 
 export type BulkImportRowError = {
@@ -107,6 +152,37 @@ const rowSchema = z.object({
     .trim()
     .max(2000, "Vedlikeholdshistorikk kan ha maks 2000 tegn.")
     .optional(),
+  status: z
+    .enum(["active", "sold", "archived"], {
+      errorMap: () => ({ message: "Ugyldig status." }),
+    })
+    .optional(),
+  imageUrls: z
+    .array(
+      z
+        .string()
+        .trim()
+        .max(
+          MAX_IMPORT_IMAGE_URL_LENGTH,
+          `Bilde-URL kan ha maks ${MAX_IMPORT_IMAGE_URL_LENGTH} tegn.`,
+        )
+        .refine((value) => value.startsWith("https://"), {
+          message: "Bilde-URL må starte med https://.",
+        })
+        .refine(
+          (value) => {
+            try {
+              new URL(value);
+              return true;
+            } catch {
+              return false;
+            }
+          },
+          { message: "Bilde-URL er ikke en gyldig URL." },
+        ),
+    )
+    .max(MAX_IMPORT_IMAGES, `Maks ${MAX_IMPORT_IMAGES} bilder per annonse.`)
+    .default([]),
   attributes: attributesSchema,
 });
 
@@ -161,6 +237,8 @@ export function normalizeBulkImportRow(
     ...(input.maintenanceHistory
       ? { maintenanceHistory: String(input.maintenanceHistory).trim() }
       : {}),
+    ...(input.status ? { status: input.status as BulkImportRow["status"] } : {}),
+    imageUrls: Array.isArray(input.imageUrls) ? input.imageUrls.map((url) => String(url)) : [],
     attributes:
       attributes && typeof attributes === "object"
         ? (attributes as BulkImportRow["attributes"])

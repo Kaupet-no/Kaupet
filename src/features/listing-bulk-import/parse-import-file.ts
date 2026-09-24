@@ -6,8 +6,11 @@ import {
   RETIRED_IMPORT_COLUMNS,
   normalizeBulkImportRow,
   CONDITION_LABELS_NB,
+  LISTING_STATUS_LABELS_NB,
   parseBoolean,
   parseCondition,
+  parseImageUrls,
+  parseListingStatus,
   parsePriceNok,
   validateBulkImportRow,
   type BulkImportRow,
@@ -277,6 +280,16 @@ function mapRows(
         message: `Ukjent tilstand. Velg en av: ${Object.values(CONDITION_LABELS_NB).join(", ")}.`,
       });
     }
+    const statusCell = (raw.status ?? "").trim();
+    const status = parseListingStatus(statusCell);
+    if (statusCell !== "" && status === undefined) {
+      errors.push({
+        rowNumber,
+        field: "status",
+        message: `Ukjent status. Velg en av: ${Object.values(LISTING_STATUS_LABELS_NB).join(", ")}.`,
+      });
+    }
+    const imageUrls = parseImageUrls(raw.images);
     const input = {
       externalId: raw.external_id,
       category: raw.category,
@@ -294,6 +307,8 @@ function mapRows(
         errors,
       ),
       maintenanceHistory: raw.maintenance_history || undefined,
+      status,
+      imageUrls,
       attributes,
     };
     const rowErrors = validateBulkImportRow(input, rowNumber);

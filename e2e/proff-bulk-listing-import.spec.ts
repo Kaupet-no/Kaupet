@@ -58,15 +58,69 @@ test.describe("Proff masseimport", () => {
     writeFileSync(csvPath, validCsv);
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await expect(page.getByText("2 gyldige · 0 ugyldige")).toBeVisible();
-    await page.getByRole("button", { name: "Opprett annonser" }).click();
-    await expect(page.getByText(/Du er i ferd med å opprette 2 annonser/)).toBeVisible();
-    await page.getByRole("button", { name: "Bekreft oppretting" }).click();
+    // Dry-run-forhåndsvisningen kjører automatisk og markerer begge radene
+    // som nye før noe er skrevet til databasen.
+    await expect(page.getByText("Ny").first()).toBeVisible();
+    await page.getByRole("button", { name: "Start import" }).click();
+    await expect(page.getByText(/Du er i ferd med å importere 2 rader/)).toBeVisible();
+    await page.getByRole("button", { name: "Bekreft import" }).click();
     const result = page.locator("section").filter({ hasText: "Import ferdig" });
     await expect(result).toContainText("Opprettet");
     await expect(result).toContainText("2");
     await result.getByRole("link", { name: "Åpne annonsen" }).first().click();
     await expect(page.getByRole("heading", { name: "Bulk annonse én" })).toBeVisible();
     await expect(page.getByText("1 200 kr")).toBeVisible();
+  });
+
+  test("samme fil lastet opp på nytt gir uendret/finnes allerede og ingen nye annonser", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      skipNonDesktop(testInfo.project.name),
+      "Masseimportens E2E-fixture bruker desktop-Proff.",
+    );
+    const credentials = users["desktop-web"];
+    if (!credentials) throw new Error("Mangler desktop E2E-bruker");
+    await login(page, credentials.email, credentials.password);
+    await page.goto("/bedrift?tab=annonser");
+    await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+    const csvPath = testInfo.outputPath("bulk-import-repeat.csv");
+    // Egen external_id-serie enn de andre testene i denne filen, slik at
+    // testene ikke kolliderer når de kjører mot samme organisasjon.
+    const repeatCsv = [
+      "external_id;category;title;description;price;condition;can_ship",
+      "bulk-repeat-1;e2e-test-listing;Bulk gjentatt annonse;Dette er en gyldig beskrivelse fra masseimport.;1500;good;nei",
+    ].join("\n");
+    writeFileSync(csvPath, repeatCsv);
+
+    // Første opplasting: raden er ny og opprettes.
+    await page.getByRole("button", { name: "Importer annonser" }).click();
+    await page.getByLabel("Velg importfil").setInputFiles(csvPath);
+    await expect(page.getByText("1 gyldige · 0 ugyldige")).toBeVisible();
+    await expect(page.getByText("Ny")).toBeVisible();
+    await page.getByRole("button", { name: "Start import" }).click();
+    await page.getByRole("button", { name: "Bekreft import" }).click();
+    await expect(page.locator("section").filter({ hasText: "Import ferdig" })).toContainText(
+      "Opprettet",
+    );
+
+    // Andre opplasting av samme fil, i standardmodus (opprett og oppdater):
+    // radens external_id finnes fra før, og innholdet er uendret.
+    await page.getByRole("button", { name: "Importer en ny fil" }).click();
+    await page.getByLabel("Velg importfil").setInputFiles(csvPath);
+    await expect(page.getByText("1 gyldige · 0 ugyldige")).toBeVisible();
+    await expect(page.getByText("Uendret")).toBeVisible();
+    await page.getByRole("button", { name: "Start import" }).click();
+    await page.getByRole("button", { name: "Bekreft import" }).click();
+    const secondResult = page.locator("section").filter({ hasText: "Import ferdig" });
+    await expect(secondResult).toContainText("Uendret");
+
+    // Tredje opplasting i «Kun nye annonser»-modus: raden finnes fra før og
+    // skal vises som duplikat i forhåndsvisningen, uten å opprette noe nytt.
+    await page.getByRole("button", { name: "Importer en ny fil" }).click();
+    await page.getByLabel("Velg importfil").setInputFiles(csvPath);
+    await page.getByRole("radio", { name: /Kun nye annonser/ }).click();
+    await expect(page.getByText("Finnes allerede")).toBeVisible();
   });
 
   test("deaktiverer oppretting når én rad er ugyldig", async ({ page }, testInfo) => {
@@ -87,7 +141,7 @@ test.describe("Proff masseimport", () => {
     );
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await expect(page.getByText("0 gyldige · 1 ugyldige")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Opprett annonser" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Start import" })).toBeDisabled();
     await expect(page.getByText("Tittelen må ha minst 5 tegn.")).toBeVisible();
   });
 });

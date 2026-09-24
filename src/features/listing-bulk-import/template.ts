@@ -4,7 +4,13 @@ import {
   type CategoryFilter,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { BULK_IMPORT_COLUMNS, CONDITION_LABELS_NB, MAX_IMPORT_ROWS } from "./import-schema";
+import {
+  BULK_IMPORT_COLUMNS,
+  CONDITION_LABELS_NB,
+  LISTING_STATUS_LABELS_NB,
+  MAX_IMPORT_IMAGES,
+  MAX_IMPORT_ROWS,
+} from "./import-schema";
 import { PROFF_LOGO, proffLogoPng } from "./proff-logo";
 import {
   columnLetter,
@@ -51,6 +57,8 @@ const BASE_COLUMNS: BaseColumn[] = [
     list: "Liste_janei",
   },
   { column: "maintenance_history", label: "Vedlikeholdshistorikk", required: false, width: 28 },
+  { column: "status", label: "Status", required: false, width: 14, list: "Liste_status" },
+  { column: "images", label: "Bilde-URL-er", required: false, width: 40 },
   { column: "attributes", label: "Ekstra felt (JSON)", required: false, width: 30 },
 ];
 
@@ -181,11 +189,15 @@ function coverSheet(selected: BulkImportTemplateCategory | null, pickableCount: 
     blank(8),
     wide("Godt å vite", STYLE.heading),
     wide(
-      `Maks ${MAX_IMPORT_ROWS} annonser og 5 MB per fil. Pris oppgis i hele kroner. Bilder og bilde-URL-er importeres ikke — dem legger du til på annonsen etterpå.`,
+      `Maks ${MAX_IMPORT_ROWS} annonser og 5 MB per fil. Pris oppgis i hele kroner.`,
       STYLE.muted,
     ),
     wide(
-      "Ekstern ID er din egen referanse (varenummer, SKU eller lager-ID). Den må være unik i filen, og gjør at samme annonse kjennes igjen hvis du sender inn filen på nytt.",
+      "Ekstern ID er din egen referanse (varenummer, SKU eller lager-ID). Den må være unik i filen, og gjør at samme annonse kjennes igjen hvis du sender inn filen på nytt. Sender du filen på nytt oppdateres eller fornyes annonsene i stedet for å opprettes på nytt.",
+      STYLE.muted,
+    ),
+    wide(
+      `Status settes til Aktiv hvis den står tom (nye annonser). En annonse kan ikke opprettes som Solgt eller Arkivert — den må finnes fra før. Bilde-URL-er skilles med semikolon (;), må starte med https:// og er maks ${MAX_IMPORT_IMAGES} per annonse.`,
       STYLE.muted,
     ),
     wide(
@@ -230,6 +242,7 @@ function coverSheet(selected: BulkImportTemplateCategory | null, pickableCount: 
       15: 32,
       16: 32,
       17: 32,
+      18: 32,
     },
     merges: [
       "B4:H4",
@@ -240,7 +253,8 @@ function coverSheet(selected: BulkImportTemplateCategory | null, pickableCount: 
       "B15:H15",
       "B16:H16",
       "B17:H17",
-      "B19:H19",
+      "B18:H18",
+      "B20:H20",
     ],
     showGridLines: false,
     image: {
@@ -382,6 +396,7 @@ function listsSheet(
   const columns: { name: string; values: string[] }[] = [
     { name: "Liste_kategori", values: categories.map((category) => category.slug) },
     { name: "Liste_tilstand", values: Object.values(CONDITION_LABELS_NB) },
+    { name: "Liste_status", values: Object.values(LISTING_STATUS_LABELS_NB) },
     { name: "Liste_janei", values: ["ja", "nei"] },
     ...attributeFilters
       .filter((filter) => filter.type === "select" && filter.options?.length)

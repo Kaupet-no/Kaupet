@@ -379,6 +379,7 @@ export function BusinessConsole({
           onOpenChange={setImportOpen}
           locations={locations}
           selectedLocationId={selectedLocationId === "all" ? null : selectedLocationId}
+          organizationId={organization.id}
         />
       )}
     </div>

@@ -17,6 +17,7 @@ function makeRow(overrides: Partial<BulkImportRow> = {}): BulkImportRow {
     priceNok: 4500,
     condition: "good",
     canShip: true,
+    imageUrls: [],
     attributes: {},
     ...overrides,
   };
@@ -223,6 +224,120 @@ describe("syncListings", () => {
       error: "Raden kunne ikke opprettes. Kontroller feltene og prøv igjen.",
     });
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sender status videre til RPC-en", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["existing-ref"],
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "updated", listing_id: "listing-1" }, error: null };
+      },
+    });
+    await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "existing-ref", status: "sold" })],
+      mode: "upsert",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      expect.objectContaining({ _listing: expect.objectContaining({ status: "sold" }) }),
+    );
+  });
+
+  it("sender tom status videre når raden ikke har status satt", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["existing-ref"],
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "updated", listing_id: "listing-1" }, error: null };
+      },
+    });
+    await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "existing-ref" })],
+      mode: "upsert",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      expect.objectContaining({ _listing: expect.objectContaining({ status: "" }) }),
+    );
+  });
+
+  it("avviser en ny annonse (ukjent referanse) med status solgt eller arkivert, uten å ringe RPC-en", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "created", listing_id: "listing-1" }, error: null };
+      },
+    });
+    const results = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [
+        makeRow({ rowNumber: 2, externalId: "new-ref-sold", status: "sold" }),
+        makeRow({ rowNumber: 3, externalId: "new-ref-archived", status: "archived" }),
+      ],
+      mode: "upsert",
+    });
+    expect(results).toEqual([
+      {
+        rowNumber: 2,
+        externalId: "new-ref-sold",
+        status: "failed",
+        error: "En ny annonse kan ikke opprettes som solgt eller arkivert.",
+      },
+      {
+        rowNumber: 3,
+        externalId: "new-ref-archived",
+        status: "failed",
+        error: "En ny annonse kan ikke opprettes som solgt eller arkivert.",
+      },
+    ]);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("avviser samme (ny annonse + solgt/arkivert) også i dry-run, uten å ringe RPC-en", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "created" }, error: null };
+      },
+    });
+    const results = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "new-ref", status: "archived" })],
+      mode: "create",
+      dryRun: true,
+    });
+    expect(results[0]).toMatchObject({
+      status: "failed",
+      error: "En ny annonse kan ikke opprettes som solgt eller arkivert.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("tar imot imageUrls uten å feile (steg 4 håndterer selve bildehentingen)", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "created", listing_id: "listing-1" }, error: null };
+      },
+    });
+    const results = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [
+        makeRow({
+          externalId: "with-images",
+          imageUrls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
+        }),
+      ],
+      mode: "create",
+    });
+    expect(results[0]).toMatchObject({ status: "created" });
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("maskerer interne feil (kastet unntak) fra RPC-kallet", async () => {

@@ -235,4 +235,67 @@ describe("bulk import parser", () => {
       parseImportFile(file("annonser.csv", `${baseHeader}\n"uavsluttet`)),
     ).rejects.toBeInstanceOf(ImportFileError);
   });
+
+  it("leser status- og images-kolonnene, inkludert norske statusetiketter", async () => {
+    // Kolonnen images kan selv inneholde semikolon (flere URL-er) i en fil
+    // som ellers bruker semikolon som CSV-skilletegn — cellen må derfor
+    // være sitert, akkurat som en flerverdi-attributtkolonne.
+    const csv = [
+      `${baseHeader};status;images`,
+      'id-1;sykler;En fin sykkel;Dette er en god beskrivelse av varen.;4500;Solgt;"https://example.com/a.jpg;https://example.com/b.jpg"',
+    ].join("\n");
+    const parsed = await parseImportFile(file("annonser.csv", csv));
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0]?.status).toBe("sold");
+    expect(parsed.rows[0]?.imageUrls).toEqual([
+      "https://example.com/a.jpg",
+      "https://example.com/b.jpg",
+    ]);
+  });
+
+  it("gir tom status og imageUrls som tom liste når kolonnene ikke fylles ut", async () => {
+    const csv = [`${baseHeader};status;images`, `${validRow};;`].join("\n");
+    const parsed = await parseImportFile(file("annonser.csv", csv));
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0]?.status).toBeUndefined();
+    expect(parsed.rows[0]?.imageUrls).toEqual([]);
+  });
+
+  it("avviser en ukjent statusverdi med en norsk feilmelding", async () => {
+    const csv = [`${baseHeader};status`, `${validRow};ukjent`].join("\n");
+    const parsed = await parseImportFile(file("annonser.csv", csv));
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.errors).toEqual([
+      { rowNumber: 2, field: "status", message: expect.stringContaining("Ukjent status") },
+    ]);
+  });
+
+  it("avviser http:// bilde-URL-er", async () => {
+    const csv = [`${baseHeader};images`, `${validRow};http://example.com/a.jpg`].join("\n");
+    const parsed = await parseImportFile(file("annonser.csv", csv));
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.errors).toEqual([
+      {
+        rowNumber: 2,
+        field: "imageUrls",
+        message: "Bilde-URL må starte med https://.",
+      },
+    ]);
+  });
+
+  it("avviser mer enn 20 bilde-URL-er per rad", async () => {
+    const urls = Array.from({ length: 21 }, (_, index) => `https://example.com/${index}.jpg`).join(
+      ";",
+    );
+    const csv = [`${baseHeader};images`, `${validRow};"${urls}"`].join("\n");
+    const parsed = await parseImportFile(file("annonser.csv", csv));
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.errors).toEqual([
+      {
+        rowNumber: 2,
+        field: "imageUrls",
+        message: "Maks 20 bilder per annonse.",
+      },
+    ]);
+  });
 });

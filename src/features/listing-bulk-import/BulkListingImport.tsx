@@ -205,6 +205,8 @@ export function BulkListingImport({
   };
 
   const createdCount = results?.filter((result) => result.status === "created").length ?? 0;
+  const updatedCount = results?.filter((result) => result.status === "updated").length ?? 0;
+  const unchangedCount = results?.filter((result) => result.status === "unchanged").length ?? 0;
   const duplicateCount = results?.filter((result) => result.status === "duplicate").length ?? 0;
   const failedCount = results?.filter((result) => result.status === "failed").length ?? 0;
   const pending = createImport.isPending;
@@ -517,6 +519,8 @@ export function BulkListingImport({
             <ImportResult
               results={results}
               createdCount={createdCount}
+              updatedCount={updatedCount}
+              unchangedCount={unchangedCount}
               duplicateCount={duplicateCount}
               failedCount={failedCount}
               onDownloadErrors={downloadErrors}
@@ -560,9 +564,20 @@ export function BulkListingImport({
   );
 }
 
+/** Norske etiketter for radstatusene `syncListings` kan returnere. */
+const RESULT_STATUS_LABELS_NB: Record<BulkImportResult["status"], string> = {
+  created: "Opprettet",
+  updated: "Oppdatert",
+  unchanged: "Uendret",
+  duplicate: "Duplikat",
+  failed: "Feilet",
+};
+
 function ImportResult({
   results,
   createdCount,
+  updatedCount,
+  unchangedCount,
   duplicateCount,
   failedCount,
   onDownloadErrors,
@@ -571,6 +586,8 @@ function ImportResult({
 }: {
   results: BulkImportResult[];
   createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
   duplicateCount: number;
   failedCount: number;
   onDownloadErrors: () => void;
@@ -589,6 +606,8 @@ function ImportResult({
             label="Opprettet"
             count={createdCount}
           />
+          {updatedCount > 0 && <ResultCount label="Oppdatert" count={updatedCount} />}
+          {unchangedCount > 0 && <ResultCount label="Uendret" count={unchangedCount} />}
           <ResultCount label="Duplikat" count={duplicateCount} />
           <ResultCount icon={<XCircle className="size-4" />} label="Feilet" count={failedCount} />
         </div>
@@ -608,13 +627,7 @@ function ImportResult({
               <TableRow key={`${result.rowNumber}-${result.externalId}`}>
                 <TableCell>{result.rowNumber}</TableCell>
                 <TableCell>{result.externalId}</TableCell>
-                <TableCell>
-                  {result.status === "created"
-                    ? "Opprettet"
-                    : result.status === "duplicate"
-                      ? "Duplikat"
-                      : "Feilet"}
-                </TableCell>
+                <TableCell>{RESULT_STATUS_LABELS_NB[result.status]}</TableCell>
                 <TableCell>
                   {result.kaupetCode ? (
                     <Link

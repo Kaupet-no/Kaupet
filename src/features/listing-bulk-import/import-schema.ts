@@ -1,9 +1,12 @@
 import { z } from "zod";
 
 import { attributesSchema } from "@/lib/category-filters";
+import { INTEGRATION_LIMITS } from "@/lib/integration-limits";
 
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
-export const MAX_IMPORT_ROWS = 500;
+/** Samme tall som håndheves server-/API-side (`INTEGRATION_LIMITS.maxBatchRows`),
+ * gjenbrukt her slik at malen og klientparseren aldri kan avvike fra grensen. */
+export const MAX_IMPORT_ROWS = INTEGRATION_LIMITS.maxBatchRows;
 
 export const BULK_IMPORT_COLUMNS = [
   "external_id",

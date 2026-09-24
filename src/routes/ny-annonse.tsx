@@ -83,6 +83,11 @@ import type {
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
 import { trackProductEvent } from "@/lib/product-analytics";
+import {
+  clearFlowTimer,
+  computeDurationMs,
+  getOrStartFlowTimer,
+} from "@/features/listing-creation/flow-timing";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
@@ -198,6 +203,12 @@ function NewListingPage() {
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
   useEffect(() => trackProductEvent("listing_creation_started", { kind: "sell" }), []);
+  // V6-måling: tidspunktet flyten startet (første montering i økten, se
+  // flow-timing.ts) og om brukeren har gjenopprettet et utkast — sendes som
+  // durationMs/hadDraftRestore på listing_published for å måle median tid
+  // til publisert og frafall.
+  const flowStartedAtRef = useRef<number>(getOrStartFlowTimer());
+  const hadDraftRestoreRef = useRef(false);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
@@ -1057,6 +1068,7 @@ function NewListingPage() {
 
   function restoreDraft() {
     setDraftDecisionPrompt(false);
+    hadDraftRestoreRef.current = true;
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "draft_restored",
@@ -1433,7 +1445,11 @@ function NewListingPage() {
         action: "success",
         imageCount: images.length,
         isVehicle,
+        durationMs: computeDurationMs(flowStartedAtRef.current),
+        entry: fromLanding ? "landing" : "direct",
+        hadDraftRestore: hadDraftRestoreRef.current,
       });
+      clearFlowTimer();
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       setPublishedId(result.id);
       setPublishedCode(result.kaupet_code);

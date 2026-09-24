@@ -13,6 +13,7 @@ import {
   MapPin,
   MessageCircle,
   Palette,
+  Plug,
   RotateCcw,
   Settings2,
   Users,
@@ -55,6 +56,8 @@ import { BusinessMessagesPanel } from "@/features/business-account/business-mess
 import { BusinessProfileForm } from "@/features/business-account/business-profile-form";
 import { LocationContactsPanel } from "@/features/business-account/location-contacts-panel";
 import { BusinessAdminPanel } from "@/features/business-account/business-admin-panel";
+import { isBusinessTabVisible } from "@/features/business-account/business-tabs";
+import { IntegrationsPanel } from "@/features/business-account/integrations-panel";
 import { MemberManagement } from "@/features/business-account/member-management";
 import {
   getBusinessListingStats,
@@ -82,7 +85,13 @@ const BusinessConsoleChart = lazy(() =>
 );
 
 export type BusinessTab =
-  "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "administrer" | "brukere";
+  | "oversikt"
+  | "annonser"
+  | "meldinger"
+  | "bedriftsprofil"
+  | "administrer"
+  | "brukere"
+  | "integrasjoner";
 type Props = {
   organization: BusinessOrganization;
   locations: BusinessLocation[];
@@ -102,6 +111,7 @@ const TAB_LABELS: Record<BusinessTab, string> = {
   bedriftsprofil: "Bedriftsprofil",
   administrer: "Administrer",
   brukere: "Brukere",
+  integrasjoner: "Integrasjoner",
 };
 const TAB_ICONS: Record<BusinessTab, typeof LayoutDashboard> = {
   oversikt: LayoutDashboard,
@@ -110,6 +120,7 @@ const TAB_ICONS: Record<BusinessTab, typeof LayoutDashboard> = {
   bedriftsprofil: Palette,
   administrer: Settings2,
   brukere: Users,
+  integrasjoner: Plug,
 };
 
 export function BusinessConsole({
@@ -196,11 +207,7 @@ export function BusinessConsole({
   const effectiveListingEditScope =
     selectedLocation?.permissions.listingEditScope ?? (role === "superuser" ? "all" : "none");
 
-  const visibleTab =
-    ((!effectiveProff || role !== "superuser") && tab === "brukere") ||
-    (role !== "superuser" && tab === "administrer")
-      ? "oversikt"
-      : tab;
+  const visibleTab = isBusinessTabVisible(tab, { role, effectiveProff }) ? tab : "oversikt";
   const activeTab = pendingTab ?? visibleTab;
   const tabsListRef = useRef<HTMLDivElement>(null);
   const previousVisibleTabRef = useRef(visibleTab);
@@ -295,11 +302,7 @@ export function BusinessConsole({
               aria-label="Bedriftskonsoll"
             >
               {(Object.keys(TAB_LABELS) as BusinessTab[])
-                .filter((value) => {
-                  if (value === "brukere") return effectiveProff && role === "superuser";
-                  if (value === "administrer") return role === "superuser";
-                  return true;
-                })
+                .filter((value) => isBusinessTabVisible(value, { role, effectiveProff }))
                 .map((value) => {
                   const Icon = TAB_ICONS[value];
                   return (
@@ -364,12 +367,10 @@ export function BusinessConsole({
               )}
             </TabsContent>
             <TabsContent value="administrer" className="mt-0">
-              <BusinessAdminPanel
-                organizationId={organization.id}
-                locations={locations}
-                billingProfile={billingProfile}
-                effectiveProff={effectiveProff}
-              />
+              <BusinessAdminPanel locations={locations} billingProfile={billingProfile} />
+            </TabsContent>
+            <TabsContent value="integrasjoner" className="mt-0">
+              <IntegrationsPanel organizationId={organization.id} locations={locations} />
             </TabsContent>
             <TabsContent value="brukere" className="mt-0">
               <MemberManagement

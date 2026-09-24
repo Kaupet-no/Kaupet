@@ -15,6 +15,7 @@ const TABS: BusinessTab[] = [
   "bedriftsprofil",
   "administrer",
   "brukere",
+  "integrasjoner",
 ];
 
 export const Route = createFileRoute("/_authenticated/bedrift/")({

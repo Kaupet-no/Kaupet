@@ -12,7 +12,6 @@ import type {
   BusinessLocation,
   BusinessMembership,
 } from "@/features/business-account/use-business-membership";
-import { IntegrationsPanel } from "@/features/business-account/integrations-panel";
 import {
   createOrganizationLocation,
   updateOrganizationBillingEmail,
@@ -77,21 +76,11 @@ function SaveState({ pending, saved }: { pending: boolean; saved: boolean }) {
 }
 
 type Props = {
-  organizationId: string;
   locations: BusinessLocation[];
   billingProfile: BusinessMembership["billingProfile"];
-  /** «Integrasjoner»-seksjonen (API-nøkler) vises kun for superbrukere med
-   * aktiv Proff-tilgang — se planens fase 4. Fanen er allerede begrenset til
-   * superbrukere i business-console.tsx; dette begrenser i tillegg til Proff. */
-  effectiveProff: boolean;
 };
 
-export function BusinessAdminPanel({
-  organizationId,
-  locations,
-  billingProfile,
-  effectiveProff,
-}: Props) {
+export function BusinessAdminPanel({ locations, billingProfile }: Props) {
   const queryClient = useQueryClient();
   const canManageLocations = Boolean(billingProfile);
   const [billingEmail, setBillingEmail] = useState(billingProfile?.billing_email ?? "");
@@ -408,10 +397,6 @@ export function BusinessAdminPanel({
             </div>
           </div>
         </PanelSection>
-      )}
-
-      {effectiveProff && (
-        <IntegrationsPanel organizationId={organizationId} locations={locations} />
       )}
     </section>
   );

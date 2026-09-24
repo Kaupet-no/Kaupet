@@ -73,7 +73,7 @@ export const Route = createFileRoute("/api/public/api-keys/expiry-notify")({
         const body =
           `API-nøkkelen «${key.name}» utløper ${dateLabel}. ` +
           "Opprett en ny nøkkel i god tid og bytt den ut i integrasjonen, slik at synken ikke stopper.";
-        const url = "/bedrift?tab=administrer";
+        const url = "/bedrift?tab=integrasjoner";
 
         const { sendNotificationEmail } = await import("@/lib/email.server");
         for (const member of superusers) {

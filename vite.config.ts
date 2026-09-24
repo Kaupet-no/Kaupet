@@ -66,7 +66,73 @@ export default defineConfig(({ command, mode }) => {
         // overlever `import { AsyncLocalStorage } from "node:async_hooks"` via
         // @tanstack/start-storage-context inn i nettleserbunten, og
         // klientinngangen krasjer før hydrering — appen blir stående tom.
-        optimizeDeps: { exclude: ["@tanstack/start-client-core"] },
+        //
+        // `include`: Vites innledende skanning finner nesten ingen av disse (inngangen
+        // er virtuell), så de oppdages først når en rute som bruker dem lastes. Hver
+        // sen oppdagelse re-optimaliserer og gir «504 Outdated Optimize Dep» på moduler
+        // nettleseren allerede har lastet — det avbrøt E2E-kjøringer i CI (ferske
+        // dev-servere uten .vite-cache). Listen er hentet fra dev-serverens
+        // «dependencies optimized»-logg; legg til nye klientpakker her ved behov.
+        optimizeDeps: {
+          exclude: ["@tanstack/start-client-core"],
+          include: [
+            "@capacitor/app",
+            "@capacitor/camera",
+            "@capacitor/core",
+            "@capacitor/geolocation",
+            "@capacitor/haptics",
+            "@capacitor/keyboard",
+            "@capacitor/push-notifications",
+            "@capacitor/screen-orientation",
+            "@capacitor/share",
+            "@capacitor/splash-screen",
+            "@capacitor/status-bar",
+            "@dnd-kit/core",
+            "@dnd-kit/sortable",
+            "@dnd-kit/utilities",
+            "@hookform/resolvers/zod",
+            "@marsidev/react-turnstile",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-avatar",
+            "@radix-ui/react-checkbox",
+            "@radix-ui/react-collapsible",
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-label",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-progress",
+            "@radix-ui/react-select",
+            "@radix-ui/react-slider",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-switch",
+            "@radix-ui/react-tabs",
+            "@supabase/ssr",
+            "@supabase/supabase-js",
+            "@tanstack/history",
+            "@tanstack/react-query",
+            "@tanstack/router-core",
+            "@tanstack/router-core/isServer",
+            "@tanstack/router-core/ssr/client",
+            "@tanstack/router-core/ssr/server",
+            "browser-image-compression",
+            "canvas-confetti",
+            "class-variance-authority",
+            "clsx",
+            "cmdk",
+            "date-fns",
+            "date-fns/locale",
+            "embla-carousel-react",
+            "h3-v2",
+            "lucide-react",
+            "qrcode/lib/browser.js",
+            "react-hook-form",
+            "seroval",
+            "sonner",
+            "tailwind-merge",
+            "vaul",
+            "zod",
+          ],
+        },
         build: {
           rolldownOptions: {
             output: { comments: { legal: true, annotation: false, jsdoc: false } },

@@ -364,7 +364,12 @@ export function BusinessConsole({
               )}
             </TabsContent>
             <TabsContent value="administrer" className="mt-0">
-              <BusinessAdminPanel locations={locations} billingProfile={billingProfile} />
+              <BusinessAdminPanel
+                organizationId={organization.id}
+                locations={locations}
+                billingProfile={billingProfile}
+                effectiveProff={effectiveProff}
+              />
             </TabsContent>
             <TabsContent value="brukere" className="mt-0">
               <MemberManagement

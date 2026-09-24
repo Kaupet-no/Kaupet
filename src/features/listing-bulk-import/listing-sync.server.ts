@@ -264,7 +264,7 @@ export function validateSyncRow(
  * UTC-døgn, ikke Europe/Oslo: enklere å implementere og verifisere (ingen
  * sommertid-/DST-logikk), og i praksis forskyver det kun grensedøgnet med
  * 1–2 timer i norsk lokaltid, som er akseptabelt for en misbruksgrense. */
-function startOfUtcDayIso(now = new Date()): string {
+export function startOfUtcDayIso(now = new Date()): string {
   return new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   ).toISOString();

@@ -345,6 +345,12 @@ jobs:
           else
             echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
           fi
+          # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
+          if [ -n "${{ secrets.API_KEY_EXPIRY_SECRET }}" ]; then
+            echo "${{ secrets.API_KEY_EXPIRY_SECRET }}" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no
+          else
+            echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -622,6 +628,12 @@ jobs:
             echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no-staging
           else
             echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
+          fi
+          # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
+          if [ -n "${{ secrets.API_KEY_EXPIRY_SECRET }}" ]; then
+            echo "${{ secrets.API_KEY_EXPIRY_SECRET }}" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no-staging
+          else
+            echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
           fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

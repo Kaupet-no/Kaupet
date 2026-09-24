@@ -1380,6 +1380,75 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_api_keys: {
+        Row: {
+          acting_user_id: string
+          created_at: string
+          created_by: string
+          default_location_id: string
+          expires_at: string
+          expiry_notified_14_at: string | null
+          expiry_notified_3_at: string | null
+          id: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          scopes: string[]
+        }
+        Insert: {
+          acting_user_id: string
+          created_at?: string
+          created_by: string
+          default_location_id: string
+          expires_at: string
+          expiry_notified_14_at?: string | null
+          expiry_notified_3_at?: string | null
+          id?: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          organization_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes: string[]
+        }
+        Update: {
+          acting_user_id?: string
+          created_at?: string
+          created_by?: string
+          default_location_id?: string
+          expires_at?: string
+          expiry_notified_14_at?: string | null
+          expiry_notified_3_at?: string | null
+          id?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          organization_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_api_keys_default_location_fk"
+            columns: ["default_location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "organization_api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_billing_profiles: {
         Row: {
           address_line: string | null
@@ -3252,6 +3321,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      consume_rate_limit: {
+        Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
+        Returns: { allowed: boolean; count: number; limit: number; reset_at: string }[]
+      }
       consume_vehicle_360_upload_slot: {
         Args: { _ip_hash: string; _token: string }
         Returns: string
@@ -3279,6 +3352,42 @@ export type Database = {
             }
             Returns: Json
           }
+      create_organization_api_key: {
+        Args: {
+          _default_location_id: string
+          _key_hash: string
+          _key_prefix: string
+          _lifetime_days: number
+          _name: string
+          _organization_id: string
+          _scopes: string[]
+          _user_id: string
+        }
+        Returns: {
+          acting_user_id: string
+          created_at: string
+          created_by: string
+          default_location_id: string
+          expires_at: string
+          expiry_notified_14_at: string | null
+          expiry_notified_3_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          scopes: string[]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_api_keys"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_organization_location: {
         Args: {
           _address_line: string
@@ -3471,6 +3580,11 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      notify_expiring_organization_api_keys: { Args: never; Returns: undefined }
+      peek_rate_limit: {
+        Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
+        Returns: { count: number; limit: number; reset_at: string }[]
+      }
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
         Returns: {
@@ -3530,6 +3644,21 @@ export type Database = {
         Returns: Json
       }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
+      resolve_organization_api_key: {
+        Args: { _key_hash: string }
+        Returns: {
+          acting_user_id: string | null
+          default_location_id: string | null
+          key_id: string | null
+          organization_id: string | null
+          reason: string
+          scopes: string[] | null
+        }[]
+      }
+      revoke_organization_api_key: {
+        Args: { _key_id: string; _user_id: string }
+        Returns: undefined
+      }
       purge_endpoint_rate_limits: { Args: never; Returns: undefined }
       send_message_rate_limited: {
         Args: {

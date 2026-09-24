@@ -26,7 +26,11 @@ Det autentiseres med en organisasjonseid API-nøkkel (`Authorization: Bearer
 kpt_live_…`, `src/lib/api-keys.server.ts`) i stedet for en brukersesjon, men
 går gjennom akkurat den samme tjenestelogikken og de samme RPC-ene som
 Excel-bulkimporten (`src/features/listing-bulk-import/listing-sync.server.ts`)
-— se § 3 for grensen dette introduserer.
+— se § 3 for grensen dette introduserer. Samme nøkler/scope/rategrenser
+eksponeres også som en **MCP-server** (`POST /api/mcp`, stateless
+Streamable HTTP, se docs/PROFF-API.md sin MCP-seksjon) for AI-agenter/LLM-
+klienter — tynne verktøy-innpakninger (`src/features/listing-api/mcp-tools.ts`)
+rundt de samme funksjonene REST-et bruker.
 
 Eksterne tredjepartstjenester (kalt kun server-side, se § 3):
 

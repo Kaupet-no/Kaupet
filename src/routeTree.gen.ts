@@ -33,6 +33,7 @@ import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as BedriftOrganizationIdRouteImport } from './routes/bedrift.$organizationId'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as OkIdRouteImport } from './routes/ok.$id'
@@ -188,6 +189,11 @@ const AnnonseListingIdRoute = AnnonseListingIdRouteImport.update({
 const AnnonserFilterRoute = AnnonserFilterRouteImport.update({
   id: '/annonser_/filter',
   path: '/annonser/filter',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BedriftOrganizationIdRoute = BedriftOrganizationIdRouteImport.update({
@@ -415,6 +421,7 @@ export interface FileRoutesByFullPath {
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/ok/$id': typeof OkIdRoute
@@ -474,6 +481,7 @@ export interface FileRoutesByTo {
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/ok/$id': typeof OkIdRoute
@@ -537,6 +545,7 @@ export interface FileRoutesById {
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser_/filter': typeof AnnonserFilterRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/ok/$id': typeof OkIdRoute
@@ -600,6 +609,7 @@ export interface FileRouteTypes {
     | '/varsler'
     | '/annonse/$listingId'
     | '/annonser/filter'
+    | '/api/mcp'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/ok/$id'
@@ -659,6 +669,7 @@ export interface FileRouteTypes {
     | '/varsler'
     | '/annonse/$listingId'
     | '/annonser/filter'
+    | '/api/mcp'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/ok/$id'
@@ -721,6 +732,7 @@ export interface FileRouteTypes {
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
     | '/annonser_/filter'
+    | '/api/mcp'
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/ok/$id'
@@ -777,6 +789,7 @@ export interface RootRouteChildren {
   R360OpptakTokenRoute: typeof R360OpptakTokenRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   AnnonserFilterRoute: typeof AnnonserFilterRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   BedriftOrganizationIdRoute: typeof BedriftOrganizationIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   OkIdRoute: typeof OkIdRoute
@@ -966,6 +979,13 @@ declare module '@tanstack/react-router' {
       path: '/annonser/filter'
       fullPath: '/annonser/filter'
       preLoaderRoute: typeof AnnonserFilterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bedrift/$organizationId': {
@@ -1324,6 +1344,7 @@ const rootRouteChildren: RootRouteChildren = {
   R360OpptakTokenRoute: R360OpptakTokenRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   AnnonserFilterRoute: AnnonserFilterRoute,
+  ApiMcpRoute: ApiMcpRoute,
   BedriftOrganizationIdRoute: BedriftOrganizationIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   OkIdRoute: OkIdRoute,

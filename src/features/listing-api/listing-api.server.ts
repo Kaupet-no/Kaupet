@@ -163,9 +163,23 @@ export function mapApiBodyToRow(
 /** Kjører kun zod-skjemaet (ikke forretningsreglene — de sjekkes uansett av
  * `syncListings`), og kaster en `ListingApiError` MED feltnavn for første
  * feilende felt. Gir presise `422`-er for åpenbare feil (manglende tittel,
- * negativ pris o.l.) uten å duplisere skjemaet. */
-function assertSchemaValid(row: BulkImportRow): void {
-  const parsed = bulkImportRowSchema.safeParse(row);
+ * negativ pris o.l.) uten å duplisere skjemaet.
+ *
+ * `allowDraftStatus`: kun MCP-verktøyet `upsert_listing` (og `validate_listing`)
+ * setter denne — `bulkImportRowSchema.status` (delt med Excel-importen)
+ * godtar bare active/sold/archived, men `upsert_listing_from_external`
+ * (20260924100000_listing_external_sync.sql, linje ~150) har alltid støttet
+ * `status: 'draft'` ved OPPRETTELSE av en ny annonse — det er kun REST- og
+ * Excel-lagene som aldri har sendt den verdien videre. Vi validerer derfor
+ * resten av raden som normalt, men hopper over enum-sjekken når verdien er
+ * nøyaktig «draft». Sender man «draft» ved OPPDATERING av en eksisterende
+ * annonse, avviser RPC-en det uansett (fanget, graceful 422 — se
+ * `callUpsert`/`upsert_listing_from_external`s `EXCEPTION WHEN OTHERS`), så
+ * det er trygt å ikke skille de to tilfellene her. */
+function assertSchemaValid(row: BulkImportRow, allowDraftStatus = false): void {
+  const isDraft = allowDraftStatus && (row.status as string) === "draft";
+  const rowToValidate = isDraft ? { ...row, status: undefined } : row;
+  const parsed = bulkImportRowSchema.safeParse(rowToValidate);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const field = String(issue?.path?.[0] ?? "") || undefined;
@@ -415,8 +429,12 @@ export async function upsertListingApi(params: {
   externalRef: string;
   body: unknown;
   dryRun: boolean;
+  /** Kun satt av MCP-verktøyene (`mcp-tools.ts`) — se `assertSchemaValid`.
+   * REST-endepunktet (`/api/v1/listings/{externalRef}`) sender aldri denne,
+   * så REST-oppførselen er uendret. */
+  allowDraftStatus?: boolean;
 }): Promise<UpsertListingApiResult> {
-  const { auth, externalRef, body, dryRun } = params;
+  const { auth, externalRef, body, dryRun, allowDraftStatus } = params;
   if (!externalRef || externalRef.trim().length === 0 || externalRef.length > 120) {
     throw new ListingApiError(
       422,
@@ -430,7 +448,7 @@ export async function upsertListingApi(params: {
   const { supabaseAdmin, ctx } = await resolveActorAndContext(auth, locationId);
 
   const row = mapApiBodyToRow(body, externalRef, 1);
-  assertSchemaValid(row);
+  assertSchemaValid(row, allowDraftStatus);
 
   const { syncListings } = await loadDeps();
   const importId = crypto.randomUUID();

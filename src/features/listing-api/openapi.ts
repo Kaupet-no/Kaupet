@@ -30,7 +30,11 @@ const errorSchema = {
   },
 } as const;
 
-const listingBodySchema = {
+// Eksportert (ikke bare brukt internt her) slik at MCP-verktøyene
+// (`src/features/listing-api/mcp-tools.ts`) kan bygge sine `inputSchema`-er
+// fra akkurat samme felt-/grense-definisjoner som REST-et dokumenterer her —
+// se docs/PROFF-API.md sin MCP-seksjon.
+export const listingBodySchema = {
   type: "object",
   required: ["category", "title", "description", "price"],
   properties: {

@@ -250,3 +250,111 @@ curl -X POST "https://kaupet.no/api/v1/listings/SKU-1042/status" \
 curl "https://kaupet.no/api/v1/listings/SKU-1042" \
   -H "Authorization: Bearer $KAUPET_API_KEY"
 ```
+
+## MCP (for AI-agenter/LLM-klienter)
+
+**`POST /api/mcp`** er en [MCP](https://modelcontextprotocol.io)-server (Model
+Context Protocol) over samme tjenestelag som REST-API-et over — samme
+API-nøkkel, samme scope/rategrenser, samme forretningsregler (idempotens,
+kategorivalidering, fornyelse, bildekø). Bruk denne når en LLM-klient
+(Claude Desktop, Claude Code, andre MCP-verktøy) skal opprette/vedlikeholde
+annonser på vegne av deg, i stedet for å implementere REST-kallene selv.
+
+- **Transport**: «Streamable HTTP», **stateless** — ingen sesjon
+  (`Mcp-Session-Id`) å opprette/gjenbruke, og alltid ett enkelt JSON-svar
+  (ikke SSE). `GET`/`DELETE` gir `405` (ingen strøm å åpne, ingen sesjon å
+  avslutte).
+- **Autentisering**: samme `Authorization: Bearer kpt_live_…`-header som
+  REST-API-et, sendt på **hvert** kall (også `initialize`) — det finnes ingen
+  egen MCP-innlogging/OAuth i v1. En manglende/ugyldig nøkkel gir `401` med
+  `WWW-Authenticate: Bearer`, før JSON-RPC-meldingen i det hele tatt tolkes.
+- **Scope/rategrense**: hvert verktøy krever samme scope som REST-endepunktet
+  det speiler, og telles mot samme `read`/`write`/`batch`-bøtte (se
+  verktøylisten under). Verktøyfeil — forretningsfeil, valideringsfeil,
+  manglende scope, rategrensen nådd — kommer tilbake som et **`tools/call`-
+  resultat med `isError: true`** og en norsk feiltekst (aldri som en
+  JSON-RPC-protokollfeil), slik at en LLM-klient kan lese og resonnere over
+  feilen direkte.
+
+### Koble til fra en MCP-klient
+
+**Claude Desktop / Claude Code** (`claude_desktop_config.json` eller
+`.mcp.json`) — en HTTP-basert MCP-server med en fast header, ingen egen
+prosess å starte:
+
+```json
+{
+  "mcpServers": {
+    "kaupet-proff": {
+      "type": "http",
+      "url": "https://kaupet.no/api/mcp",
+      "headers": {
+        "Authorization": "Bearer kpt_live_..."
+      }
+    }
+  }
+}
+```
+
+Bytt ut `kpt_live_...` med en nøkkel opprettet i **Bedriftskonsoll →
+Integrasjoner** (se «Kom i gang» øverst i dette dokumentet — samme nøkler som
+REST-API-et, ingen egen MCP-nøkkeltype).
+
+### Verktøy
+
+| Verktøy               | Scope             | Rategrense | Beskrivelse                                                                |
+| --------------------- | ----------------- | ---------- | -------------------------------------------------------------------------- |
+| `list_categories`     | `listings:read`   | `read`     | Alle kategorier (id, slug, navn, overkategori)                             |
+| `get_category_fields` | `listings:read`   | `read`     | Felt/krav/tillatte verdier for en kategori                                 |
+| `list_locations`      | `listings:read`   | `read`     | Organisasjonens lokasjoner                                                 |
+| `list_listings`       | `listings:read`   | `read`     | Paginert liste over maskinelt opprettede annonser                          |
+| `get_listing`         | `listings:read`   | `read`     | Én annonse, inkludert bildejobbstatus                                      |
+| `validate_listing`    | `listings:write`* | `read`*    | Valider en annonse UTEN å lagre (dryRun) — se merknad under                |
+| `upsert_listing`      | `listings:write`  | `write`    | Opprett/oppdater én annonse — se «Utkast som default» under                |
+| `set_listing_status`  | `listings:write`  | `write`    | Sett status (`active`/`sold`/`archived`) — slik du PUBLISERER et utkast    |
+| `renew_listings`      | `listings:write`  | `batch`    | Forny `expires_at` for en liste `externalRef`-er                           |
+| `add_listing_images`  | `listings:write`  | `write`    | Erstatt hele bildesettet (URL-liste), asynkron behandling som i veiviseren |
+
+`*` `validate_listing` krever `listings:write` (den kjører nøyaktig de samme
+aktør-/kategori-/attributt-sjekkene som en ekte `upsert_listing`), men telles
+mot den **lesegrensen**, ikke skrive-/batch-budsjettet — den skriver
+ingenting (dryRun stopper før databasen endres), og en organisasjon skal
+kunne validere så mye den vil uten å bruke av sitt langt strammere
+skrive-budsjett.
+
+Hvert verktøys fulle `inputSchema`/`outputSchema` (JSON Schema) fås fra en
+`tools/list`-forespørsel mot serveren — de er konsistente med feltene/
+grensene REST-et dokumenterer over (samme `category`/`title`/`description`/
+`price`/… felt som `ListingBody` i `GET /api/v1/openapi.json`).
+
+### Utkast som default (viktig sikkerhetsvalg)
+
+`upsert_listing` er bevisst mer forsiktig enn REST-endepunktet når det
+kommer til AI-agenter: en **NY** annonse opprettes som **utkast**
+(`status: "draft"`, ikke synlig for kjøpere) med mindre kallet eksplisitt
+sender `publish: true`. Dette hindrer at en agent ved en feil publiserer noe
+til det offentlige markedet uten et bevisst valg fra kunden.
+
+- En **eksisterende** annonse endrer aldri status implisitt — `upsert_listing`
+  uten `status`/`publish` lar den beholde statusen den allerede har.
+- Svarteksten fra `upsert_listing` sier alltid tydelig om annonsen ble
+  opprettet som utkast eller publisert.
+- For å publisere en annonse som ligger som utkast: kall `set_listing_status`
+  med `{ "externalRef": "...", "status": "active" }`.
+- `draft` kan **kun** settes ved opprettelse av en helt ny annonse (via
+  `upsert_listing`/`validate_listing`, eksplisitt eller via default-en over)
+  — akkurat som REST-et allerede krever at `sold`/`archived` bare kan settes
+  på en annonse som finnes fra før, kan en eksisterende annonse ikke settes
+  TILBAKE til utkast.
+
+### Ikke støttet i v1
+
+- **OAuth/dynamisk klientregistrering** — kun statiske API-nøkler
+  (`Authorization: Bearer`), samme som REST-API-et. Ingen
+  `.well-known/oauth-authorization-server`.
+- **Sesjoner/SSE** — stateless, ett JSON-svar per kall. `Mcp-Session-Id`
+  ignoreres om den sendes.
+- **Batch-forespørsler på JSON-RPC-nivå** (en JSON-array med flere kall i
+  samme HTTP-forespørsel) — send ett kall per HTTP-forespørsel. Skal du
+  opprette/oppdatere mange annonser i ett kall, bruk REST-ets
+  `POST /listings/batch` i stedet — det finnes ikke som eget MCP-verktøy i v1.

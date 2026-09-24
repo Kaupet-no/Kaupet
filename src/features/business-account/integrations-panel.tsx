@@ -457,7 +457,9 @@ export function IntegrationsPanel({
           >
             last ned OpenAPI-spesifikasjonen
           </a>
-          .
+          . AI-agenter/LLM-klienter kan i stedet koble seg til{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">POST /api/mcp</code> (MCP, samme
+          nøkkel) — se MCP-seksjonen i API-dokumentasjonen.
         </p>
         {revokeMutation.error && (
           <Alert variant="destructive">

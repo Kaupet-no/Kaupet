@@ -48,6 +48,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
+import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const wtbSchema = z.object({
@@ -203,6 +204,7 @@ function NewWtbPage() {
   const [published, setPublished] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
+  const [guestPublishSheetOpen, setGuestPublishSheetOpen] = useState(false);
   const returnToReviewRef = useRef(false);
   const forwardBusyRef = useRef(false);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
@@ -455,6 +457,17 @@ function NewWtbPage() {
   }
   useComposerHistoryBack(stepIndex === 0, goBack);
 
+  // Brukt av GuestPublishSheet: samme redirect-flyt som ble kalt direkte før
+  // arket erstattet det umiddelbare navigasjonshoppet.
+  function goToAuthFromGuestSheet(mode: "signin" | "signup") {
+    if (!flushLocalDraft()) return;
+    bypassNavigationBlockerRef.current = true;
+    void navigate({
+      to: "/auth",
+      search: { mode, returnTo: authResumeReturnTo(currentReturnTo()) },
+    });
+  }
+
   function handleInvalid(fields: FieldErrors<WtbForm>) {
     const targetStep = fields.title
       ? steps.indexOf(native ? "title" : "category")
@@ -579,15 +592,9 @@ function NewWtbPage() {
         <Button
           type="button"
           onClick={handleSubmit(
-            // eslint-disable-next-line react-hooks/refs -- callback runs only on submit
             (values) => {
               if (!user) {
-                if (!flushLocalDraft()) return;
-                bypassNavigationBlockerRef.current = true;
-                void navigate({
-                  to: "/auth",
-                  search: { mode: "signin", returnTo: authResumeReturnTo(currentReturnTo()) },
-                });
+                setGuestPublishSheetOpen(true);
                 return;
               }
               trackProductEvent("listing_creation_step_completed", {
@@ -1069,6 +1076,13 @@ function NewWtbPage() {
         }}
         isSavingDraft={isSaving}
         saveDraftLabel="Lagre som utkast"
+      />
+
+      <GuestPublishSheet
+        open={guestPublishSheetOpen}
+        onOpenChange={setGuestPublishSheetOpen}
+        onSignIn={() => goToAuthFromGuestSheet("signin")}
+        onSignUp={() => goToAuthFromGuestSheet("signup")}
       />
     </>
   );

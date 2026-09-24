@@ -55,6 +55,7 @@ import { useIsDemo } from "@/hooks/use-user-roles";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
+import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -228,6 +229,7 @@ function NewListingPage() {
   } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
+  const [guestPublishSheetOpen, setGuestPublishSheetOpen] = useState(false);
   const forwardAttemptPendingRef = useRef(false);
   const publishAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -1795,6 +1797,16 @@ function NewListingPage() {
     groups.length === 1 &&
     (groups[0].key === "description-keywords" || groups[0].key === "vehicle-facts");
   const nextGroups = pages[step]?.groups ?? [];
+  // Brukt av GuestPublishSheet: samme redirect-flyt som gate === "sign-in"
+  // brukte før arket erstattet det direkte navigasjonshoppet.
+  async function goToAuthFromGuestSheet(mode: "signin" | "signup") {
+    if (!(await flushLocalDraft())) return;
+    bypassNavigationBlockerRef.current = true;
+    void navigate({
+      to: "/auth",
+      search: { mode, returnTo: authResumeReturnTo(currentReturnTo()) },
+    });
+  }
   function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
     const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;
     const pageIndex = firstField
@@ -1838,12 +1850,7 @@ function NewListingPage() {
       // mutation.mutate() directly, so a guest reaching that dialog would hit
       // the server's auth error instead of the sign-in handoff.
       if (gate === "sign-in") {
-        if (!(await flushLocalDraft())) return;
-        bypassNavigationBlockerRef.current = true;
-        void navigate({
-          to: "/auth",
-          search: { mode: "signin", returnTo: authResumeReturnTo(currentReturnTo()) },
-        });
+        setGuestPublishSheetOpen(true);
         return;
       }
       if (gate === "confirm-without-preview") {
@@ -2365,6 +2372,13 @@ function NewListingPage() {
           isSavingDraft={isSavingDraft}
         />
       )}
+
+      <GuestPublishSheet
+        open={guestPublishSheetOpen}
+        onOpenChange={setGuestPublishSheetOpen}
+        onSignIn={() => void goToAuthFromGuestSheet("signin")}
+        onSignUp={() => void goToAuthFromGuestSheet("signup")}
+      />
 
       {publishedId && (
         <PublishedListingDialog

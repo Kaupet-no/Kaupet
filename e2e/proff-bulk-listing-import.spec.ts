@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,11 +12,27 @@ const { users } = JSON.parse(
   ),
 ) as { users: Record<string, { email: string; password: string }> };
 
-const validCsv = [
-  "external_id;category;title;description;price;condition;can_ship",
-  "bulk-1;e2e-test-listing;Bulk annonse én;Dette er en gyldig beskrivelse fra masseimport.;1200;good;nei",
-  "bulk-2;e2e-test-listing;Bulk annonse to;Dette er en annen gyldig beskrivelse fra masseimport.;2400;good;nei",
-].join("\n");
+const CSV_HEADER = "external_id;category;title;description;price;condition;can_ship";
+
+/** external_id er en varig nøkkel per organisasjon (upsert), så hver kjøring —
+ * også Playwright-retries mot samme database — trenger egne ID-er for at en rad
+ * skal forhåndsvises som «Ny». */
+function uniqueRunId(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function validCsv(runId: string): string {
+  return [
+    CSV_HEADER,
+    `bulk-${runId}-1;e2e-test-listing;Bulk annonse én;Dette er en gyldig beskrivelse fra masseimport.;1200;good;nei`,
+    `bulk-${runId}-2;e2e-test-listing;Bulk annonse to;Dette er en annen gyldig beskrivelse fra masseimport.;2400;good;nei`,
+  ].join("\n");
+}
+
+/** Statuscellen i forhåndsvisningstabellen, med eksakt tekst. */
+function previewStatusCell(page: Page, status: string) {
+  return page.getByRole("cell", { name: status, exact: true });
+}
 
 function skipNonDesktop(projectName: string) {
   return projectName !== "desktop-web";
@@ -55,12 +72,12 @@ test.describe("Proff masseimport", () => {
     await page.locator("html[data-kaupet-hydrated='true']").waitFor();
     await page.getByRole("button", { name: "Importer annonser" }).click();
     const csvPath = testInfo.outputPath("bulk-import.csv");
-    writeFileSync(csvPath, validCsv);
+    writeFileSync(csvPath, validCsv(uniqueRunId()));
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await expect(page.getByText("2 gyldige · 0 ugyldige")).toBeVisible();
     // Dry-run-forhåndsvisningen kjører automatisk og markerer begge radene
     // som nye før noe er skrevet til databasen.
-    await expect(page.getByText("Ny").first()).toBeVisible();
+    await expect(previewStatusCell(page, "Ny").first()).toBeVisible();
     await page.getByRole("button", { name: "Start import" }).click();
     await expect(page.getByText(/Du er i ferd med å importere 2 rader/)).toBeVisible();
     await page.getByRole("button", { name: "Bekreft import" }).click();
@@ -88,8 +105,8 @@ test.describe("Proff masseimport", () => {
     // Egen external_id-serie enn de andre testene i denne filen, slik at
     // testene ikke kolliderer når de kjører mot samme organisasjon.
     const repeatCsv = [
-      "external_id;category;title;description;price;condition;can_ship",
-      "bulk-repeat-1;e2e-test-listing;Bulk gjentatt annonse;Dette er en gyldig beskrivelse fra masseimport.;1500;good;nei",
+      CSV_HEADER,
+      `bulk-repeat-${uniqueRunId()};e2e-test-listing;Bulk gjentatt annonse;Dette er en gyldig beskrivelse fra masseimport.;1500;good;nei`,
     ].join("\n");
     writeFileSync(csvPath, repeatCsv);
 
@@ -97,7 +114,7 @@ test.describe("Proff masseimport", () => {
     await page.getByRole("button", { name: "Importer annonser" }).click();
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await expect(page.getByText("1 gyldige · 0 ugyldige")).toBeVisible();
-    await expect(page.getByText("Ny")).toBeVisible();
+    await expect(previewStatusCell(page, "Ny")).toBeVisible();
     await page.getByRole("button", { name: "Start import" }).click();
     await page.getByRole("button", { name: "Bekreft import" }).click();
     await expect(page.locator("section").filter({ hasText: "Import ferdig" })).toContainText(
@@ -109,7 +126,7 @@ test.describe("Proff masseimport", () => {
     await page.getByRole("button", { name: "Importer en ny fil" }).click();
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await expect(page.getByText("1 gyldige · 0 ugyldige")).toBeVisible();
-    await expect(page.getByText("Uendret")).toBeVisible();
+    await expect(previewStatusCell(page, "Uendret")).toBeVisible();
     await page.getByRole("button", { name: "Start import" }).click();
     await page.getByRole("button", { name: "Bekreft import" }).click();
     const secondResult = page.locator("section").filter({ hasText: "Import ferdig" });
@@ -120,7 +137,7 @@ test.describe("Proff masseimport", () => {
     await page.getByRole("button", { name: "Importer en ny fil" }).click();
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await page.getByRole("radio", { name: /Kun nye annonser/ }).click();
-    await expect(page.getByText("Finnes allerede")).toBeVisible();
+    await expect(previewStatusCell(page, "Finnes allerede")).toBeVisible();
   });
 
   test("deaktiverer oppretting når én rad er ugyldig", async ({ page }, testInfo) => {
@@ -137,7 +154,7 @@ test.describe("Proff masseimport", () => {
     const csvPath = testInfo.outputPath("bulk-import-invalid.csv");
     writeFileSync(
       csvPath,
-      `${validCsv.split("\n").slice(0, 1).join("\n")}\nbulk-invalid;e2e-test-listing;kort;Dette er en gyldig beskrivelse fra masseimport.;1200;good;nei`,
+      `${CSV_HEADER}\nbulk-invalid-${uniqueRunId()};e2e-test-listing;kort;Dette er en gyldig beskrivelse fra masseimport.;1200;good;nei`,
     );
     await page.getByLabel("Velg importfil").setInputFiles(csvPath);
     await expect(page.getByText("0 gyldige · 1 ugyldige")).toBeVisible();

@@ -145,7 +145,11 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
               className="h-16 w-16 bg-primary text-primary-foreground shadow-lg ring-4 ring-background"
               iconClassName="size-8"
             />
-          ) : user ? (
+          ) : (
+            // Åpner intensjon+tittel-velgeren for både innloggede og
+            // utloggede brukere — utkastet lagres lokalt, innlogging skjer
+            // først ved publisering (samme mønster som ny-annonse.tsx/
+            // ny-ok-annonse.tsx sin gjestedraft).
             <button
               type="button"
               aria-label={isOnNewAdPage ? "Avbryt" : "Ny annonse"}
@@ -165,16 +169,6 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
                 <Plus key="plus" className="size-8 animate-[fab-icon-in-reverse_0.18s_ease-out]" />
               )}
             </button>
-          ) : (
-            <Link
-              to="/auth"
-              search={{ mode: "signup" as const }}
-              aria-label="Ny annonse"
-              onClick={() => void hapticImpact("light")}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
-            >
-              <Plus className="size-8" />
-            </Link>
           )}
           <span className="native-nav-label text-muted-foreground">
             {isOnNewAdPage ? "Avbryt" : "Ny annonse"}

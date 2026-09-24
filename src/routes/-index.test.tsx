@@ -98,14 +98,14 @@ describe("LandingPage (native-skallet)", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
-  it("åpner ikke typevelgeren for utlogget bruker selv med ?opprett", () => {
+  it("åpner typevelgeren når ?opprett er satt for utlogget bruker også", () => {
     mocks.search = { opprett: true };
     mocks.user = null;
 
     render(<LandingPage />);
 
-    expect(screen.queryByRole("heading", { name: "Hva vil du selge?" })).toBeNull();
-    // Søkeparameteren ryddes uansett innloggingsstatus.
+    // Gjestedraft (2026-09-06): utloggede får samme velger, ikke /auth.
+    expect(screen.getByRole("heading", { name: "Hva vil du selge?" })).toBeTruthy();
     expect(mocks.navigate).toHaveBeenCalledWith({ to: "/", search: {}, replace: true });
   });
 });

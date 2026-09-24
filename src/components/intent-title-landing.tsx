@@ -121,7 +121,7 @@ export function IntentTitleLanding({
                 titleInputRef.current?.focus();
               }}
               className={cn(
-                "native-touch-target group relative flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:min-h-32 sm:flex-col sm:items-stretch sm:justify-between sm:gap-0 sm:rounded-2xl sm:p-4",
+                "native-touch-target group relative flex min-h-14 items-center gap-3 rounded-xl border py-3 pl-3 pr-9 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:min-h-32 sm:flex-col sm:items-stretch sm:justify-between sm:gap-0 sm:rounded-2xl sm:p-4",
                 selected
                   ? "border-primary bg-primary/10 shadow-sm"
                   : "border-border bg-card hover:shadow-sm",
@@ -136,9 +136,13 @@ export function IntentTitleLanding({
                 >
                   <Icon className="size-5" aria-hidden="true" />
                 </span>
+                {/* Absolutt på mobil (høyre kant av kortet, ift. den relative
+                    knappen) — ellers havnet den i klem mot ikonboksen i den
+                    smale raden. Statisk igjen fra sm: og oppover, spredt fra
+                    ikonet med justify-between på den fulle bredden. */}
                 <span
                   className={cn(
-                    "flex size-6 items-center justify-center rounded-full border text-transparent transition-[background-color,border-color,color] duration-150",
+                    "absolute right-3 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border text-transparent transition-[background-color,border-color,color] duration-150 sm:static sm:translate-y-0",
                     selected ? "border-primary bg-primary text-primary-foreground" : "border-input",
                   )}
                   aria-hidden="true"

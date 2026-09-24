@@ -183,3 +183,23 @@ samtykke før den tas i bruk.
 | `kaupet-pending-auth-intent`                                                                  | `sessionStorage`                    | Fullføre en handling (f.eks. favoritt) etter innlogging | Nei                                                                   |
 | `kaupet:lastAnnonserSearch`                                                                   | `sessionStorage`                    | Gå tilbake til forrige søkeresultat                     | Nei, slettes når fanen lukkes                                         |
 | Bildeutkast                                                                                   | IndexedDB (`kaupet-listing-drafts`) | Mellomlagre bilder under annonseregistrering            | Nei                                                                   |
+
+## 12. Proff-organisasjoners API-nøkler og REST-API
+
+Se `docs/PROFF-API.md` (kundevendt) og `docs/ARCHITECTURE.md` § 3 for
+systemgrensen. `/api/v1/…` betjener kun Proff-organisasjonens EGNE annonser
+og lokasjoner (samme tilgangssjekker som Excel-importen), og mottar ingen
+personopplysninger om sluttbrukere (kjøpere) — kun organisasjonens egne
+ansatte (den utøvende brukeren nøkkelen er knyttet til) og annonseinnhold.
+
+| Data                                                                                                                      | Formål                                                            | Grunnlag             | Lagring             | Slettefrist                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `organization_api_keys` (navn, `key_prefix`, `created_by`, `acting_user_id`, `default_location_id`, scopes, tidsstempler) | Autentisere maskinelle kall og knytte dem til en ansvarlig ansatt | Avtale               | Supabase Postgres   | Til nøkkelen tilbakekalles/utløper og organisasjonen (eller kontoen til `created_by`/`acting_user_id`) slettes; ingen egen sletterutine utover det i dag — **kjent gap, se Vedlegg A** |
+| `key_hash` (sha-256 av selve API-nøkkelen)                                                                                | Slå opp/validere nøkkelen ved hvert kall, uten å lagre klartekst  | Avtale               | Supabase Postgres   | Samme som raden over. Klartekstnøkkelen vises kun én gang ved opprettelse og lagres aldri                                                                                              |
+| `endpoint_rate_limits` (SHA-256-hash av `key_id`+kalltype)                                                                | Håndheve lese-/skrive-/batch-rategrensene per nøkkel              | Berettiget interesse | Supabase Postgres   | Rullerende vindu (time); rader for utløpte vinduer ryddes ikke eksplisitt i dag — lavt volum, ingen gjenkjennbar personopplysning i hash-nøkkelen alene                                |
+| E-postvarsel til organisasjonens superbrukere 14/3 dager før en nøkkel utløper                                            | Unngå at en integrasjon stopper uventet                           | Berettiget interesse | Resend (se § 8/§ 9) | Styres av Resends driftslagring, se § 8                                                                                                                                                |
+
+Selve annonsedataene som sendes inn via API-et (tittel, pris, bilder osv.)
+regnes ikke som personopplysninger i seg selv og dekkes for øvrig av § 2
+(annonser) og § 2.1 (bildeopprydning) på samme måte som annonser opprettet i
+veiviseren eller via Excel-import.

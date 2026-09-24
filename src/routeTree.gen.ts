@@ -54,11 +54,21 @@ import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
+import { Route as ApiV1LocationsRouteImport } from './routes/api/v1/locations'
+import { Route as ApiV1OpenapiDotjsonRouteImport } from './routes/api/v1/openapi[.]json'
 import { Route as ApiPublicApiKeysExpiryNotifyRouteImport } from './routes/api/public/api-keys/expiry-notify'
 import { Route as ApiPublicImagesProcessRouteImport } from './routes/api/public/images/process'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicR2CleanupRouteImport } from './routes/api/public/r2/cleanup'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
+import { Route as ApiV1CategoriesIndexRouteImport } from './routes/api/v1/categories/index'
+import { Route as ApiV1ListingsIndexRouteImport } from './routes/api/v1/listings/index'
+import { Route as ApiV1ListingsBatchRouteImport } from './routes/api/v1/listings/batch'
+import { Route as ApiV1ListingsRenewRouteImport } from './routes/api/v1/listings/renew'
+import { Route as ApiV1CategoriesIdFieldsRouteImport } from './routes/api/v1/categories/$id/fields'
+import { Route as ApiV1ListingsExternalRefIndexRouteImport } from './routes/api/v1/listings/$externalRef/index'
+import { Route as ApiV1ListingsExternalRefImagesRouteImport } from './routes/api/v1/listings/$externalRef/images'
+import { Route as ApiV1ListingsExternalRefStatusRouteImport } from './routes/api/v1/listings/$externalRef/status'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -301,6 +311,16 @@ const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
   path: '/api/public/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1LocationsRoute = ApiV1LocationsRouteImport.update({
+  id: '/api/v1/locations',
+  path: '/api/v1/locations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1OpenapiDotjsonRoute = ApiV1OpenapiDotjsonRouteImport.update({
+  id: '/api/v1/openapi.json',
+  path: '/api/v1/openapi.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicApiKeysExpiryNotifyRoute =
   ApiPublicApiKeysExpiryNotifyRouteImport.update({
     id: '/api/public/api-keys/expiry-notify',
@@ -327,6 +347,49 @@ const ApiPublicVippsWebhookRoute = ApiPublicVippsWebhookRouteImport.update({
   path: '/api/public/vipps/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1CategoriesIndexRoute = ApiV1CategoriesIndexRouteImport.update({
+  id: '/api/v1/categories/',
+  path: '/api/v1/categories/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1ListingsIndexRoute = ApiV1ListingsIndexRouteImport.update({
+  id: '/api/v1/listings/',
+  path: '/api/v1/listings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1ListingsBatchRoute = ApiV1ListingsBatchRouteImport.update({
+  id: '/api/v1/listings/batch',
+  path: '/api/v1/listings/batch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1ListingsRenewRoute = ApiV1ListingsRenewRouteImport.update({
+  id: '/api/v1/listings/renew',
+  path: '/api/v1/listings/renew',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1CategoriesIdFieldsRoute = ApiV1CategoriesIdFieldsRouteImport.update({
+  id: '/api/v1/categories/$id/fields',
+  path: '/api/v1/categories/$id/fields',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1ListingsExternalRefIndexRoute =
+  ApiV1ListingsExternalRefIndexRouteImport.update({
+    id: '/api/v1/listings/$externalRef/',
+    path: '/api/v1/listings/$externalRef/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiV1ListingsExternalRefImagesRoute =
+  ApiV1ListingsExternalRefImagesRouteImport.update({
+    id: '/api/v1/listings/$externalRef/images',
+    path: '/api/v1/listings/$externalRef/images',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiV1ListingsExternalRefStatusRoute =
+  ApiV1ListingsExternalRefStatusRouteImport.update({
+    id: '/api/v1/listings/$externalRef/status',
+    path: '/api/v1/listings/$externalRef/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -369,6 +432,8 @@ export interface FileRoutesByFullPath {
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
+  '/api/v1/locations': typeof ApiV1LocationsRoute
+  '/api/v1/openapi.json': typeof ApiV1OpenapiDotjsonRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -378,6 +443,14 @@ export interface FileRoutesByFullPath {
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
+  '/api/v1/listings/batch': typeof ApiV1ListingsBatchRoute
+  '/api/v1/listings/renew': typeof ApiV1ListingsRenewRoute
+  '/api/v1/categories/': typeof ApiV1CategoriesIndexRoute
+  '/api/v1/listings/': typeof ApiV1ListingsIndexRoute
+  '/api/v1/categories/$id/fields': typeof ApiV1CategoriesIdFieldsRoute
+  '/api/v1/listings/$externalRef/images': typeof ApiV1ListingsExternalRefImagesRoute
+  '/api/v1/listings/$externalRef/status': typeof ApiV1ListingsExternalRefStatusRoute
+  '/api/v1/listings/$externalRef/': typeof ApiV1ListingsExternalRefIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -418,6 +491,8 @@ export interface FileRoutesByTo {
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
+  '/api/v1/locations': typeof ApiV1LocationsRoute
+  '/api/v1/openapi.json': typeof ApiV1OpenapiDotjsonRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/bedrift': typeof AuthenticatedBedriftIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
@@ -427,6 +502,14 @@ export interface FileRoutesByTo {
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
+  '/api/v1/listings/batch': typeof ApiV1ListingsBatchRoute
+  '/api/v1/listings/renew': typeof ApiV1ListingsRenewRoute
+  '/api/v1/categories': typeof ApiV1CategoriesIndexRoute
+  '/api/v1/listings': typeof ApiV1ListingsIndexRoute
+  '/api/v1/categories/$id/fields': typeof ApiV1CategoriesIdFieldsRoute
+  '/api/v1/listings/$externalRef/images': typeof ApiV1ListingsExternalRefImagesRoute
+  '/api/v1/listings/$externalRef/status': typeof ApiV1ListingsExternalRefStatusRoute
+  '/api/v1/listings/$externalRef': typeof ApiV1ListingsExternalRefIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -471,6 +554,8 @@ export interface FileRoutesById {
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
+  '/api/v1/locations': typeof ApiV1LocationsRoute
+  '/api/v1/openapi.json': typeof ApiV1OpenapiDotjsonRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -480,6 +565,14 @@ export interface FileRoutesById {
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
+  '/api/v1/listings/batch': typeof ApiV1ListingsBatchRoute
+  '/api/v1/listings/renew': typeof ApiV1ListingsRenewRoute
+  '/api/v1/categories/': typeof ApiV1CategoriesIndexRoute
+  '/api/v1/listings/': typeof ApiV1ListingsIndexRoute
+  '/api/v1/categories/$id/fields': typeof ApiV1CategoriesIdFieldsRoute
+  '/api/v1/listings/$externalRef/images': typeof ApiV1ListingsExternalRefImagesRoute
+  '/api/v1/listings/$externalRef/status': typeof ApiV1ListingsExternalRefStatusRoute
+  '/api/v1/listings/$externalRef/': typeof ApiV1ListingsExternalRefIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -524,6 +617,8 @@ export interface FileRouteTypes {
     | '/kvittering/$promoId'
     | '/meldinger/$id'
     | '/api/public/csp-report'
+    | '/api/v1/locations'
+    | '/api/v1/openapi.json'
     | '/admin/'
     | '/bedrift/'
     | '/meldinger/'
@@ -533,6 +628,14 @@ export interface FileRouteTypes {
     | '/api/public/push/dispatch'
     | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
+    | '/api/v1/listings/batch'
+    | '/api/v1/listings/renew'
+    | '/api/v1/categories/'
+    | '/api/v1/listings/'
+    | '/api/v1/categories/$id/fields'
+    | '/api/v1/listings/$externalRef/images'
+    | '/api/v1/listings/$externalRef/status'
+    | '/api/v1/listings/$externalRef/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -573,6 +676,8 @@ export interface FileRouteTypes {
     | '/kvittering/$promoId'
     | '/meldinger/$id'
     | '/api/public/csp-report'
+    | '/api/v1/locations'
+    | '/api/v1/openapi.json'
     | '/admin'
     | '/bedrift'
     | '/meldinger'
@@ -582,6 +687,14 @@ export interface FileRouteTypes {
     | '/api/public/push/dispatch'
     | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
+    | '/api/v1/listings/batch'
+    | '/api/v1/listings/renew'
+    | '/api/v1/categories'
+    | '/api/v1/listings'
+    | '/api/v1/categories/$id/fields'
+    | '/api/v1/listings/$externalRef/images'
+    | '/api/v1/listings/$externalRef/status'
+    | '/api/v1/listings/$externalRef'
   id:
     | '__root__'
     | '/'
@@ -625,6 +738,8 @@ export interface FileRouteTypes {
     | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
     | '/api/public/csp-report'
+    | '/api/v1/locations'
+    | '/api/v1/openapi.json'
     | '/_authenticated/admin/'
     | '/_authenticated/bedrift/'
     | '/_authenticated/meldinger/'
@@ -634,6 +749,14 @@ export interface FileRouteTypes {
     | '/api/public/push/dispatch'
     | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
+    | '/api/v1/listings/batch'
+    | '/api/v1/listings/renew'
+    | '/api/v1/categories/'
+    | '/api/v1/listings/'
+    | '/api/v1/categories/$id/fields'
+    | '/api/v1/listings/$externalRef/images'
+    | '/api/v1/listings/$externalRef/status'
+    | '/api/v1/listings/$externalRef/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -658,11 +781,21 @@ export interface RootRouteChildren {
   BrukerIdRoute: typeof BrukerIdRoute
   OkIdRoute: typeof OkIdRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
+  ApiV1LocationsRoute: typeof ApiV1LocationsRoute
+  ApiV1OpenapiDotjsonRoute: typeof ApiV1OpenapiDotjsonRoute
   ApiPublicApiKeysExpiryNotifyRoute: typeof ApiPublicApiKeysExpiryNotifyRoute
   ApiPublicImagesProcessRoute: typeof ApiPublicImagesProcessRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicR2CleanupRoute: typeof ApiPublicR2CleanupRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
+  ApiV1ListingsBatchRoute: typeof ApiV1ListingsBatchRoute
+  ApiV1ListingsRenewRoute: typeof ApiV1ListingsRenewRoute
+  ApiV1CategoriesIndexRoute: typeof ApiV1CategoriesIndexRoute
+  ApiV1ListingsIndexRoute: typeof ApiV1ListingsIndexRoute
+  ApiV1CategoriesIdFieldsRoute: typeof ApiV1CategoriesIdFieldsRoute
+  ApiV1ListingsExternalRefImagesRoute: typeof ApiV1ListingsExternalRefImagesRoute
+  ApiV1ListingsExternalRefStatusRoute: typeof ApiV1ListingsExternalRefStatusRoute
+  ApiV1ListingsExternalRefIndexRoute: typeof ApiV1ListingsExternalRefIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -982,6 +1115,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCspReportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/locations': {
+      id: '/api/v1/locations'
+      path: '/api/v1/locations'
+      fullPath: '/api/v1/locations'
+      preLoaderRoute: typeof ApiV1LocationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/openapi.json': {
+      id: '/api/v1/openapi.json'
+      path: '/api/v1/openapi.json'
+      fullPath: '/api/v1/openapi.json'
+      preLoaderRoute: typeof ApiV1OpenapiDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/api-keys/expiry-notify': {
       id: '/api/public/api-keys/expiry-notify'
       path: '/api/public/api-keys/expiry-notify'
@@ -1015,6 +1162,62 @@ declare module '@tanstack/react-router' {
       path: '/api/public/vipps/webhook'
       fullPath: '/api/public/vipps/webhook'
       preLoaderRoute: typeof ApiPublicVippsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/categories/': {
+      id: '/api/v1/categories/'
+      path: '/api/v1/categories'
+      fullPath: '/api/v1/categories/'
+      preLoaderRoute: typeof ApiV1CategoriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/listings/': {
+      id: '/api/v1/listings/'
+      path: '/api/v1/listings'
+      fullPath: '/api/v1/listings/'
+      preLoaderRoute: typeof ApiV1ListingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/listings/batch': {
+      id: '/api/v1/listings/batch'
+      path: '/api/v1/listings/batch'
+      fullPath: '/api/v1/listings/batch'
+      preLoaderRoute: typeof ApiV1ListingsBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/listings/renew': {
+      id: '/api/v1/listings/renew'
+      path: '/api/v1/listings/renew'
+      fullPath: '/api/v1/listings/renew'
+      preLoaderRoute: typeof ApiV1ListingsRenewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/categories/$id/fields': {
+      id: '/api/v1/categories/$id/fields'
+      path: '/api/v1/categories/$id/fields'
+      fullPath: '/api/v1/categories/$id/fields'
+      preLoaderRoute: typeof ApiV1CategoriesIdFieldsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/listings/$externalRef/': {
+      id: '/api/v1/listings/$externalRef/'
+      path: '/api/v1/listings/$externalRef'
+      fullPath: '/api/v1/listings/$externalRef/'
+      preLoaderRoute: typeof ApiV1ListingsExternalRefIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/listings/$externalRef/images': {
+      id: '/api/v1/listings/$externalRef/images'
+      path: '/api/v1/listings/$externalRef/images'
+      fullPath: '/api/v1/listings/$externalRef/images'
+      preLoaderRoute: typeof ApiV1ListingsExternalRefImagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/listings/$externalRef/status': {
+      id: '/api/v1/listings/$externalRef/status'
+      path: '/api/v1/listings/$externalRef/status'
+      fullPath: '/api/v1/listings/$externalRef/status'
+      preLoaderRoute: typeof ApiV1ListingsExternalRefStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -1125,11 +1328,21 @@ const rootRouteChildren: RootRouteChildren = {
   BrukerIdRoute: BrukerIdRoute,
   OkIdRoute: OkIdRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
+  ApiV1LocationsRoute: ApiV1LocationsRoute,
+  ApiV1OpenapiDotjsonRoute: ApiV1OpenapiDotjsonRoute,
   ApiPublicApiKeysExpiryNotifyRoute: ApiPublicApiKeysExpiryNotifyRoute,
   ApiPublicImagesProcessRoute: ApiPublicImagesProcessRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicR2CleanupRoute: ApiPublicR2CleanupRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
+  ApiV1ListingsBatchRoute: ApiV1ListingsBatchRoute,
+  ApiV1ListingsRenewRoute: ApiV1ListingsRenewRoute,
+  ApiV1CategoriesIndexRoute: ApiV1CategoriesIndexRoute,
+  ApiV1ListingsIndexRoute: ApiV1ListingsIndexRoute,
+  ApiV1CategoriesIdFieldsRoute: ApiV1CategoriesIdFieldsRoute,
+  ApiV1ListingsExternalRefImagesRoute: ApiV1ListingsExternalRefImagesRoute,
+  ApiV1ListingsExternalRefStatusRoute: ApiV1ListingsExternalRefStatusRoute,
+  ApiV1ListingsExternalRefIndexRoute: ApiV1ListingsExternalRefIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

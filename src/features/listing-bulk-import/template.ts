@@ -101,8 +101,11 @@ function selectableCategories(subtree: BulkImportTemplateCategory[]): BulkImport
   return leaves.length > 0 ? leaves : subtree;
 }
 
-/** Felter som ikke skal ha egen kolonne: søkeområder og utstyrsgruppene. */
-function templateFiltersForCategory(
+/** Felter som ikke skal ha egen kolonne: søkeområder og utstyrsgruppene.
+ * Eksportert slik at `GET /api/v1/categories/{id}/fields`
+ * (`src/features/listing-api/listing-api.server.ts`) kan gjenbruke nøyaktig
+ * samme utvalg som «Kategorifelter»-arket, i stedet for å duplisere det. */
+export function templateFiltersForCategory(
   categoryId: string,
   filters: CategoryFilter[],
   categoriesById: Map<string, CategoryNode>,

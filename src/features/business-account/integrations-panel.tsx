@@ -438,6 +438,27 @@ export function IntegrationsPanel({
           </>
         }
       >
+        <p className="text-sm text-muted-foreground">
+          Se{" "}
+          <a
+            href="https://github.com/Kaupet-no/Kaupet/blob/main/docs/PROFF-API.md"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            API-dokumentasjonen
+          </a>{" "}
+          for autentisering, grenser og eksempler, eller{" "}
+          <a
+            href="/api/v1/openapi.json"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            last ned OpenAPI-spesifikasjonen
+          </a>
+          .
+        </p>
         {revokeMutation.error && (
           <Alert variant="destructive">
             <AlertDescription>

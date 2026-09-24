@@ -19,6 +19,15 @@ Kaupet består av:
 Native og web deler domene, ruter og hovedkomponenter. Plattformtilpasning
 skal ligge i tydelige presentasjonsgrenser, ikke i parallelle produktflyter.
 
+Utover disse, brukervendte klientene har Kaupet et **offentlig REST-API**
+(`/api/v1/…`, se `docs/PROFF-API.md`) for Proff-organisasjoner som vil
+opprette/vedlikeholde annonser maskinelt (lagersystem, DMS, nettbutikk).
+Det autentiseres med en organisasjonseid API-nøkkel (`Authorization: Bearer
+kpt_live_…`, `src/lib/api-keys.server.ts`) i stedet for en brukersesjon, men
+går gjennom akkurat den samme tjenestelogikken og de samme RPC-ene som
+Excel-bulkimporten (`src/features/listing-bulk-import/listing-sync.server.ts`)
+— se § 3 for grensen dette introduserer.
+
 Eksterne tredjepartstjenester (kalt kun server-side, se § 3):
 
 - Vipps/MobilePay for betaling (promoteringer).
@@ -69,6 +78,17 @@ minst to reelle konsumenter trenger samme kontrakt.
   `*.server.ts`-moduler, aldri fra klientkode. Nøkler/endepunkt-URL-er lagres
   i sops-secrets (`secrets/`) og som Cloudflare Worker-secrets, aldri i
   `VITE_*`-variabler eller committet i klartekst.
+- `/api/v1/…`-rutene (`src/routes/api/v1/…`) er en egen, uautentisert-mot-
+  brukersesjon inngangsport: de autentiserer med en hashet API-nøkkel
+  (`authenticateApiKey`, `src/lib/api-keys.server.ts`) i stedet for
+  `requireSupabaseAuth`, håndhever egne scope- og rategrenser
+  (`src/lib/api-handler.server.ts`, `src/lib/api-rate-limit.server.ts`) og
+  svarer i et fast JSON-feilformat (`src/lib/api-response.server.ts`) — aldri
+  HTML/SSR. Forretningslogikken (`src/features/listing-api/`) kaller de
+  samme aktør- og synk-funksjonene som Excel-importen
+  (`resolveOrganizationActor`/`actorFromApiKey`, `listing-sync.server.ts`),
+  slik at tilgangskontroll, kategorivalidering og rategrenser for nye
+  annonser/bilder aldri kan avvike mellom kanalene.
 
 ## 4. Domenegrenser for annonser
 

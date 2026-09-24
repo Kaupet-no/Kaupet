@@ -163,6 +163,74 @@ export async function resolveOrganizationActor(
   };
 }
 
+/**
+ * Samme aktørkontrakt som `resolveOrganizationActor`, men for REST-API-et/MCP
+ * (fase 4/5): organisasjonen, den utøvende brukeren og Proff-tilgangen er
+ * allerede bekreftet av `authenticateApiKey`/`resolve_organization_api_key`
+ * (se api-keys.server.ts) på autentiseringstidspunktet, så denne funksjonen
+ * gjør IKKE de kontrollene på nytt. Den slår derimot opp lokasjonen på nytt
+ * hver gang, siden `locationId` her kan avvike fra nøkkelens
+ * `default_location_id` (en forespørsel kan sende en annen aktiv lokasjon i
+ * organisasjonen) — og håndhever de samme medlemskaps-/lokasjonssjekkene som
+ * `resolveOrganizationActor`: `member`-rolle krever `can_create_listings`, og
+ * ikke-superbrukere må ha en eksplisitt tildeling til lokasjonen. */
+export async function actorFromApiKey(
+  supabaseAdmin: SupabaseClient<Database>,
+  params: {
+    organizationId: string;
+    actingUserId: string;
+    locationId: string;
+    source: SyncSource;
+  },
+): Promise<OrganizationActor> {
+  const { organizationId, actingUserId, locationId, source } = params;
+  const { data: membership, error: membershipError } = await supabaseAdmin
+    .from("organization_members")
+    .select("role, status, can_create_listings")
+    .eq("organization_id", organizationId)
+    .eq("user_id", actingUserId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership) {
+    throw new Error(
+      "Brukeren nøkkelen tilhører er ikke lenger et aktivt medlem av organisasjonen.",
+    );
+  }
+  if (membership.role === "member" && !membership.can_create_listings) {
+    throw new Error("Brukeren nøkkelen tilhører har ikke tilgang til å opprette annonser.");
+  }
+  const { data: location, error: locationError } = await supabaseAdmin
+    .from("organization_locations")
+    .select("postal_code, city, lat, lng, address_line")
+    .eq("id", locationId)
+    .eq("organization_id", organizationId)
+    .eq("active", true)
+    .maybeSingle();
+  if (locationError) throw locationError;
+  if (!location) throw new Error("Fant ingen aktiv lokasjon med denne IDen.");
+  if (membership.role !== "superuser") {
+    const { data: assignment, error: assignmentError } = await supabaseAdmin
+      .from("organization_location_members")
+      .select("location_id")
+      .eq("location_id", locationId)
+      .eq("user_id", actingUserId)
+      .maybeSingle();
+    if (assignmentError) throw assignmentError;
+    if (!assignment) {
+      throw new Error("Nøkkelens bruker har ikke tilgang til denne lokasjonen.");
+    }
+  }
+
+  return {
+    organizationId,
+    userId: actingUserId,
+    locationId,
+    source,
+    location: location as OrganizationListingLocation,
+  };
+}
+
 /** Kategorier, kategoritilgang, filtre og flows for aktørens organisasjon. */
 export async function loadSyncContext(
   supabaseAdmin: SupabaseClient<Database>,

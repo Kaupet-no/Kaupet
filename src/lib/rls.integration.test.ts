@@ -5774,6 +5774,9 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
         name: "Synlig selger",
         phone: "12345678",
         avatar_path: `${organizationId}/contact-test.webp`,
+        // Satt eksplisitt: i en bulk-insert med ulike nøkler fyller PostgREST
+        // manglende kolonner med NULL i stedet for kolonnens standardverdi.
+        show_in_listings: true,
         sort_order: 0,
       },
       {

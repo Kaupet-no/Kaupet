@@ -36,7 +36,6 @@ export type OrganizationActor = {
   organizationId: string;
   userId: string;
   locationId: string;
-  showVisitingAddress: boolean;
   source: SyncSource;
   location: OrganizationListingLocation;
 };
@@ -100,11 +99,10 @@ export async function resolveOrganizationActor(
   params: {
     userId: string;
     locationId: string;
-    showVisitingAddress: boolean;
     source: SyncSource;
   },
 ): Promise<OrganizationActor> {
-  const { userId, locationId, showVisitingAddress, source } = params;
+  const { userId, locationId, source } = params;
   const { data: membership, error: membershipError } = await supabaseAdmin
     .from("organization_members")
     .select("organization_id, role, status, can_create_listings, category_access")
@@ -149,7 +147,6 @@ export async function resolveOrganizationActor(
     organizationId: membership.organization_id,
     userId,
     locationId,
-    showVisitingAddress,
     source,
     location: location as OrganizationListingLocation,
   };
@@ -304,7 +301,6 @@ async function callUpsert(
       status: row.status ?? "",
     },
     _mode: mode,
-    _show_visiting_address: ctx.showVisitingAddress,
     _dry_run: dryRun,
   });
   if (error) throw error;

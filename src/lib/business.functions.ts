@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isValidOrganizationNumber, normalizeOrganizationNumber } from "@/lib/organization-number";
+import { normalizePhone } from "@/lib/phone";
 import { PROFF_TERMS, type ProffTerm } from "@/features/business-account/plans";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -544,7 +545,7 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
     const { data: locations, error: locationsError } = await supabaseAdmin
       .from("organization_locations")
       .select(
-        "id, organization_id, name, address_line, postal_code, city, lat, lng, is_default, active, created_at, updated_at, organization_location_members!organization_location_members_location_organization_fk(user_id, role, listing_access, listing_edit_scope, chat_access)",
+        "id, organization_id, name, address_line, postal_code, city, lat, lng, is_default, active, show_visiting_address, created_at, updated_at, organization_location_members!organization_location_members_location_organization_fk(user_id, role, listing_access, listing_edit_scope, chat_access), organization_location_contacts(id, name, phone, avatar_path, show_in_listings, sort_order)",
       )
       .eq("organization_id", organizationId)
       .eq("active", true)
@@ -572,6 +573,16 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
           lng: location.lng as number | null,
           is_default: location.is_default as boolean,
           active: location.active as boolean,
+          show_visiting_address: location.show_visiting_address as boolean,
+          contacts: [...(location.organization_location_contacts ?? [])]
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((contact) => ({
+              id: contact.id,
+              name: contact.name,
+              phone: contact.phone,
+              avatar_path: contact.avatar_path,
+              show_in_listings: contact.show_in_listings,
+            })),
           created_at: location.created_at as string,
           updated_at: location.updated_at as string,
           permissions:
@@ -787,6 +798,11 @@ export const updateOrganizationLocation = createServerFn({ method: "POST" })
   .validator((input: unknown) => locationInputSchema.extend({ locationId: uuid }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { geocodeStreetAddress } = await import("@/lib/geocode");
+    const visiting = await geocodeStreetAddress({
+      address_line: data.addressLine,
+      postal_code: data.postalCode,
+    });
     const { data: location, error } = await supabaseAdmin
       .from("organization_locations")
       .update({
@@ -794,6 +810,8 @@ export const updateOrganizationLocation = createServerFn({ method: "POST" })
         address_line: data.addressLine,
         postal_code: data.postalCode,
         city: data.city,
+        visiting_lat: visiting?.lat ?? null,
+        visiting_lng: visiting?.lng ?? null,
       })
       .eq("id", data.locationId)
       .eq("organization_id", organizationId)
@@ -805,6 +823,114 @@ export const updateOrganizationLocation = createServerFn({ method: "POST" })
       throw await toClientError("database", error);
     }
     return { location };
+  });
+
+const locationContactsSchema = z.object({
+  locationId: uuid,
+  showVisitingAddress: z.boolean(),
+  contacts: z
+    .array(
+      z.object({
+        id: uuid.optional(),
+        name: z.string().trim().min(1).max(120),
+        phone: z.string().transform((value, ctx) => {
+          const phone = normalizePhone(value);
+          if (!phone) {
+            ctx.addIssue({ code: "custom", message: "Ugyldig telefonnummer." });
+            return z.NEVER;
+          }
+          return phone;
+        }),
+        showInListings: z.boolean(),
+        avatarPath: z.string().max(500).nullable(),
+      }),
+    )
+    .max(20),
+});
+
+/** Erstatter lokasjonens kontaktliste og visningsvalg for besøksadresse.
+ * Profilbilder kan bare endres med aktiv Proff; uten Proff beholdes lagrede
+ * bilder urørt (de vises ikke, se `listing_business_contact`). */
+export const updateLocationContacts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => locationContactsSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { data: location, error: locationError } = await supabaseAdmin
+      .from("organization_locations")
+      .select("id, address_line, postal_code, visiting_lat")
+      .eq("id", data.locationId)
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .maybeSingle();
+    if (locationError) throw await toClientError("database", locationError);
+    if (!location) throw new Error(UNAUTHORIZED_MESSAGE);
+
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("organization_location_contacts")
+      .select("id, avatar_path")
+      .eq("location_id", data.locationId);
+    if (existingError) throw await toClientError("database", existingError);
+    const existingById = new Map((existing ?? []).map((row) => [row.id, row]));
+    const canUseAvatars = await hasEffectiveProffAccess(supabaseAdmin, organizationId);
+    const avatarPrefix = `${organizationId}/contact-`;
+
+    const rows = data.contacts.map((contact, index) => {
+      const previous = contact.id ? existingById.get(contact.id) : undefined;
+      let avatarPath = previous?.avatar_path ?? null;
+      if (canUseAvatars && contact.avatarPath !== avatarPath) {
+        if (contact.avatarPath && !contact.avatarPath.startsWith(avatarPrefix)) {
+          throw new Error("Ugyldig profilbilde.");
+        }
+        avatarPath = contact.avatarPath;
+      }
+      return {
+        id: previous ? previous.id : crypto.randomUUID(),
+        location_id: data.locationId,
+        organization_id: organizationId,
+        name: contact.name,
+        phone: contact.phone,
+        show_in_listings: contact.showInListings,
+        avatar_path: avatarPath,
+        sort_order: index,
+      };
+    });
+    const keptIds = new Set(rows.map((row) => row.id));
+    const removedIds = [...existingById.keys()].filter((id) => !keptIds.has(id));
+    if (removedIds.length > 0) {
+      const { error } = await supabaseAdmin
+        .from("organization_location_contacts")
+        .delete()
+        .in("id", removedIds);
+      if (error) throw await toClientError("database", error);
+    }
+    if (rows.length > 0) {
+      const { error } = await supabaseAdmin.from("organization_location_contacts").upsert(rows);
+      if (error) throw await toClientError("database", error);
+    }
+
+    let visiting: { lat: number; lng: number } | null = null;
+    if (
+      data.showVisitingAddress &&
+      location.visiting_lat == null &&
+      location.address_line &&
+      location.postal_code
+    ) {
+      const { geocodeStreetAddress } = await import("@/lib/geocode");
+      visiting = await geocodeStreetAddress({
+        address_line: location.address_line,
+        postal_code: location.postal_code,
+      });
+    }
+    const { error: updateError } = await supabaseAdmin
+      .from("organization_locations")
+      .update({
+        show_visiting_address: data.showVisitingAddress,
+        ...(visiting && { visiting_lat: visiting.lat, visiting_lng: visiting.lng }),
+      })
+      .eq("id", data.locationId);
+    if (updateError) throw await toClientError("database", updateError);
+    return { ok: true as const };
   });
 
 const locationMemberSchema = z.object({

@@ -28,7 +28,6 @@ function makeContext(): SyncContext {
     organizationId: "org-1",
     userId: "user-1",
     locationId: "loc-1",
-    showVisitingAddress: false,
     source: "api",
     location: { postal_code: "0150", city: "Oslo", lat: 59.91, lng: 10.75, address_line: null },
     categoryAccess: "all",

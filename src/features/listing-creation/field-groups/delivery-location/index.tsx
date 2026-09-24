@@ -5,7 +5,6 @@ import { Hash, Loader2, LocateFixed, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -337,15 +336,6 @@ export function LocationGroup(props: WizardSharedProps) {
             </div>
           </div>
         )}
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={props.watch("show_visiting_address") ?? false}
-            onCheckedChange={(checked) =>
-              props.setValue("show_visiting_address", checked === true, { shouldDirty: true })
-            }
-          />
-          Vis full besøksadresse på annonsen
-        </label>
       </section>
     );
   }

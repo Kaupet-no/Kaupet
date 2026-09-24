@@ -19,7 +19,6 @@ export const createListingsFromImport = createServerFn({ method: "POST" })
         importId: z.string().uuid(),
         rows: z.array(z.unknown()).min(1).max(MAX_IMPORT_ROWS),
         locationId: z.string().uuid(),
-        showVisitingAddress: z.boolean().default(false),
         mode: z.enum(["create", "upsert"]).default("create"),
         dryRun: z.boolean().default(false),
       })
@@ -32,7 +31,6 @@ export const createListingsFromImport = createServerFn({ method: "POST" })
     const actor = await resolveOrganizationActor(supabaseAdmin, {
       userId: context.userId,
       locationId: data.locationId,
-      showVisitingAddress: data.showVisitingAddress,
       source: "excel",
     });
     const syncContext = await loadSyncContext(supabaseAdmin, actor);

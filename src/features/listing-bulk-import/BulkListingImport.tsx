@@ -113,7 +113,6 @@ export function BulkListingImport({
   const { data: filters = [] } = useAllCategoryFilters();
   const [templateCategoryId, setTemplateCategoryId] = useState<string | null>(null);
   const [locationId, setLocationId] = useState(selectedLocationId ?? locations[0]?.id ?? "");
-  const [showVisitingAddress, setShowVisitingAddress] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null);
@@ -130,7 +129,6 @@ export function BulkListingImport({
       importId: string;
       rows: ParsedBulkImport["rows"];
       locationId: string;
-      showVisitingAddress: boolean;
       mode: ImportMode;
     }) => createListingsFromImport({ data: variables }),
     onSuccess: setResults,
@@ -142,7 +140,6 @@ export function BulkListingImport({
       importId: string;
       rows: ParsedBulkImport["rows"];
       locationId: string;
-      showVisitingAddress: boolean;
       mode: ImportMode;
     }) => createListingsFromImport({ data: { ...variables, dryRun: true } }),
     onSuccess: setPreview,
@@ -167,7 +164,6 @@ export function BulkListingImport({
       importId: usedImportId,
       rows,
       locationId,
-      showVisitingAddress,
       mode: nextMode,
     });
   };
@@ -385,26 +381,6 @@ export function BulkListingImport({
                   <p className="text-xs text-muted-foreground">
                     Lokasjon velges før import. Kolonnene postnummer og sted i filen brukes ikke.
                   </p>
-                </div>
-                <div
-                  role="group"
-                  aria-label="Vis besøksadresse"
-                  className="flex items-start gap-3 rounded-md border p-3 text-sm"
-                >
-                  <input
-                    id="bulk-show-address"
-                    type="checkbox"
-                    aria-label="Vis besøksadresse"
-                    className="mt-1 size-4 accent-primary"
-                    checked={showVisitingAddress}
-                    onChange={(event) => setShowVisitingAddress(event.target.checked)}
-                  />
-                  <span>
-                    <span className="font-medium">Vis besøksadresse</span>
-                    <span className="block text-muted-foreground">
-                      Publiser full gateadresse på annonsene.
-                    </span>
-                  </span>
                 </div>
               </div>
               <div className="space-y-3">
@@ -716,7 +692,6 @@ export function BulkListingImport({
                     importId,
                     rows: parsed.rows,
                     locationId,
-                    showVisitingAddress,
                     mode,
                   });
                 }

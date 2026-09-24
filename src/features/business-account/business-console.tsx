@@ -53,6 +53,7 @@ import type {
 import { BusinessListingsPanel } from "@/features/business-account/business-listings-panel";
 import { BusinessMessagesPanel } from "@/features/business-account/business-messages-panel";
 import { BusinessProfileForm } from "@/features/business-account/business-profile-form";
+import { LocationContactsPanel } from "@/features/business-account/location-contacts-panel";
 import { BusinessAdminPanel } from "@/features/business-account/business-admin-panel";
 import { MemberManagement } from "@/features/business-account/member-management";
 import {
@@ -356,8 +357,11 @@ export function BusinessConsole({
             <TabsContent value="meldinger" className="mt-0">
               <BusinessMessagesPanel organization={organization} locationId={selectedLocationId} />
             </TabsContent>
-            <TabsContent value="bedriftsprofil" className="mt-0">
+            <TabsContent value="bedriftsprofil" className="mt-0 space-y-6">
               <BusinessProfileForm organization={organization} />
+              {role === "superuser" && (
+                <LocationContactsPanel organization={organization} locations={locations} />
+              )}
             </TabsContent>
             <TabsContent value="administrer" className="mt-0">
               <BusinessAdminPanel locations={locations} billingProfile={billingProfile} />

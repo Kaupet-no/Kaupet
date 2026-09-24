@@ -163,3 +163,28 @@ export async function lookupPostalCode(postal: string): Promise<{
     return null;
   }
 }
+
+/**
+ * Eksakte koordinater for en norsk gateadresse via Kartverkets adresse-API
+ * (matrikkelen). Best-effort: null ved ukjent adresse eller nettverksfeil.
+ */
+export async function geocodeStreetAddress(input: {
+  address_line: string;
+  postal_code: string;
+}): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = new URL("https://ws.geonorge.no/adresser/v1/sok");
+    url.searchParams.set("sok", input.address_line.trim());
+    url.searchParams.set("postnummer", input.postal_code.trim());
+    url.searchParams.set("treffPerSide", "1");
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const data: { adresser?: Array<{ representasjonspunkt?: { lat?: number; lon?: number } }> } =
+      await res.json();
+    const point = data.adresser?.[0]?.representasjonspunkt;
+    if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return null;
+    return { lat: point!.lat!, lng: point!.lon! };
+  } catch {
+    return null;
+  }
+}

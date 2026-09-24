@@ -115,10 +115,12 @@ export async function deletePreviousAvatarImage(
 export async function uploadOrganizationLogo(opts: {
   organizationId: string;
   file: File;
+  kind?: "logo" | "contact";
 }): Promise<string> {
   const formData = new FormData();
   formData.append("organizationId", opts.organizationId);
   formData.append("file", opts.file);
+  if (opts.kind) formData.append("kind", opts.kind);
   const { path } = await uploadOrganizationLogoFn({ data: formData });
   return path;
 }

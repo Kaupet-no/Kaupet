@@ -69,7 +69,7 @@ function initialState(organization: BusinessOrganization): FormState {
   };
 }
 
-function PanelSection({
+export function PanelSection({
   title,
   description,
   children,
@@ -96,7 +96,7 @@ function PanelSection({
   );
 }
 
-function SaveState({ pending, saved }: { pending: boolean; saved: boolean }) {
+export function SaveState({ pending, saved }: { pending: boolean; saved: boolean }) {
   return (
     <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
       {pending ? (

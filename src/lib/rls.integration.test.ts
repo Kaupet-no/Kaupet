@@ -5752,6 +5752,87 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
       .eq("organization_id", organizationId);
     expect(serviceUpdate).toBeNull();
   });
+
+  it("eksponerer kun valgt kontaktinfo for aktive annonser via listing_business_contact", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { error: locationUpdate } = await admin
+      .from("organization_locations")
+      .update({
+        address_line: "Testgata 1",
+        postal_code: "0001",
+        city: "Oslo",
+        show_visiting_address: true,
+        visiting_lat: 59.9,
+        visiting_lng: 10.7,
+      })
+      .eq("id", locationId);
+    expect(locationUpdate).toBeNull();
+    const { error: contactsError } = await admin.from("organization_location_contacts").insert([
+      {
+        location_id: locationId,
+        organization_id: organizationId,
+        name: "Synlig selger",
+        phone: "12345678",
+        avatar_path: `${organizationId}/contact-test.webp`,
+        sort_order: 0,
+      },
+      {
+        location_id: locationId,
+        organization_id: organizationId,
+        name: "Skjult selger",
+        phone: "87654321",
+        show_in_listings: false,
+        sort_order: 1,
+      },
+    ]);
+    expect(contactsError).toBeNull();
+
+    const direct = await anon
+      .from("organization_location_contacts")
+      .select("id")
+      .eq("location_id", locationId);
+    expect(direct.error).not.toBeNull();
+
+    const { data, error } = await anon.rpc("listing_business_contact", { _listing_id: listingId });
+    expect(error).toBeNull();
+    const contact = data as {
+      visiting_address: { address_line: string; lat: number } | null;
+      contacts: { name: string; phone: string; avatar_path: string | null }[];
+    };
+    expect(contact.visiting_address).toMatchObject({ address_line: "Testgata 1", lat: 59.9 });
+    expect(contact.contacts).toEqual([
+      expect.objectContaining({
+        name: "Synlig selger",
+        phone: "12345678",
+        avatar_path: `${organizationId}/contact-test.webp`,
+      }),
+    ]);
+
+    // Uten Proff skjules profilbildet, og uten flagget skjules adressen.
+    await admin
+      .from("organizations")
+      .update({ proff_access_until: new Date(Date.now() - 1000).toISOString() })
+      .eq("id", organizationId);
+    await admin
+      .from("organization_locations")
+      .update({ show_visiting_address: false })
+      .eq("id", locationId);
+    const withoutProff = await anon.rpc("listing_business_contact", { _listing_id: listingId });
+    const reduced = withoutProff.data as typeof contact;
+    expect(reduced.visiting_address).toBeNull();
+    expect(reduced.contacts[0]?.avatar_path).toBeNull();
+
+    // Ikke-aktive annonser gir ingen kontaktinfo til anonyme.
+    await admin.from("listings").update({ status: "draft" }).eq("id", listingId);
+    const draft = await anon.rpc("listing_business_contact", { _listing_id: listingId });
+    expect(draft.data).toBeNull();
+
+    await admin.from("listings").update({ status: "active" }).eq("id", listingId);
+    await admin
+      .from("organizations")
+      .update({ proff_access_until: new Date(Date.now() + 86_400_000).toISOString() })
+      .eq("id", organizationId);
+  });
 });
 
 // Shared cleanup for every createTestCategory() call above, so each of the

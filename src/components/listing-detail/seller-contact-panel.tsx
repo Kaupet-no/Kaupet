@@ -1,4 +1,11 @@
-import { Building2, MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
+import {
+  Building2,
+  MessageCircle,
+  Phone,
+  Share2,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -6,6 +13,7 @@ import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 import { formatOrganizationNumber } from "@/lib/organization-number";
+import { formatPhone, phoneHref } from "@/lib/phone";
 
 export type SellerIdentity =
   | {
@@ -21,8 +29,51 @@ export type SellerIdentity =
       displayName: string;
       organizationNumber: string;
       visitingAddress?: string | null;
+      /** Telefonnumre bedriften har valgt å vise for annonsens lokasjon. */
+      contacts?: SellerContact[];
       createdAt: string;
     };
+
+export type SellerContact = {
+  id: string;
+  name: string;
+  phone: string;
+  /** Kun satt for bedrifter med aktiv Proff. */
+  avatarUrl: string | null;
+};
+
+function SellerContactList({ contacts }: { contacts: SellerContact[] }) {
+  return (
+    <ul className="mt-4 space-y-2" aria-label="Ring selger">
+      {contacts.map((contact) => (
+        <li key={contact.id} className="flex items-center gap-3">
+          {contact.avatarUrl ? (
+            <img
+              src={contact.avatarUrl}
+              alt=""
+              className="size-10 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+              <UserIcon className="size-5 text-muted-foreground" aria-hidden="true" />
+            </span>
+          )}
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="truncate font-medium">{contact.name}</p>
+            <a
+              href={phoneHref(contact.phone)}
+              className="inline-flex min-h-8 items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+              aria-label={`Ring ${contact.name} på ${formatPhone(contact.phone)}`}
+            >
+              <Phone className="size-3.5" aria-hidden="true" />
+              {formatPhone(contact.phone)}
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function SellerContactPanel({
   isLoggedIn,
@@ -135,6 +186,10 @@ export function SellerContactPanel({
           )}
         </div>
       </div>
+
+      {seller?.kind === "business" && !!seller.contacts?.length && (
+        <SellerContactList contacts={seller.contacts} />
+      )}
 
       {!isOwner && (
         <div className="mt-4 space-y-3">

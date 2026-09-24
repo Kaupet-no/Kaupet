@@ -166,6 +166,8 @@ export type ListingDetailViewProps = {
   postalCode: string | null;
   displayLat: number | null;
   displayLng: number | null;
+  /** Satt når kartpunktet er bedriftens eksakte besøksadresse. */
+  exactLocationLabel?: string | null;
   createdAt: string;
   updatedAt: string | null;
   publishedAt: string | null;
@@ -238,6 +240,7 @@ export function ListingDetailView({
   postalCode,
   displayLat,
   displayLng,
+  exactLocationLabel,
   createdAt,
   updatedAt,
   publishedAt,
@@ -443,6 +446,7 @@ export function ListingDetailView({
       postalCode={postalCode}
       displayLat={displayLat}
       displayLng={displayLng}
+      exactLocationLabel={exactLocationLabel}
       createdAt={createdAt}
       updatedAt={updatedAt}
       publishedAt={publishedAt}
@@ -521,6 +525,7 @@ function ListingDetailViewBody({
   postalCode,
   displayLat,
   displayLng,
+  exactLocationLabel,
   createdAt,
   updatedAt,
   publishedAt,
@@ -579,6 +584,8 @@ function ListingDetailViewBody({
   postalCode: string | null;
   displayLat: number | null;
   displayLng: number | null;
+  /** Satt når kartpunktet er bedriftens eksakte besøksadresse. */
+  exactLocationLabel?: string | null;
   createdAt: string;
   updatedAt: string | null;
   publishedAt: string | null;
@@ -1282,7 +1289,12 @@ function ListingDetailViewBody({
           >
             <ClientOnly fallback={<Skeleton className="h-full w-full rounded-none" />}>
               <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
-                <ListingDetailMap lat={displayLat} lng={displayLng} interactive={false} />
+                <ListingDetailMap
+                  lat={displayLat}
+                  lng={displayLng}
+                  interactive={false}
+                  exact={!!exactLocationLabel}
+                />
               </Suspense>
             </ClientOnly>
             <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
@@ -1291,8 +1303,9 @@ function ListingDetailViewBody({
             </span>
           </button>
           <p className="mt-2 text-xs text-muted-foreground">
-            Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det
-            markerte området.
+            {exactLocationLabel
+              ? `Besøksadresse: ${exactLocationLabel}`
+              : "Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det markerte området."}
           </p>
         </section>
       )}
@@ -1315,7 +1328,12 @@ function ListingDetailViewBody({
       <ClientOnly>
         {mapOverlayOpen && displayLat != null && displayLng != null && (
           <Suspense fallback={<LightboxLoadingFallback />}>
-            <MapOverlay lat={displayLat} lng={displayLng} onClose={closeMapOverlay} />
+            <MapOverlay
+              lat={displayLat}
+              lng={displayLng}
+              exactLocationLabel={exactLocationLabel}
+              onClose={closeMapOverlay}
+            />
           </Suspense>
         )}
       </ClientOnly>

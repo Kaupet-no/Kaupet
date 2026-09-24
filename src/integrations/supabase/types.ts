@@ -1447,6 +1447,53 @@ export type Database = {
           },
         ]
       }
+      organization_location_contacts: {
+        Row: {
+          avatar_path: string | null
+          created_at: string
+          id: string
+          location_id: string
+          name: string
+          organization_id: string
+          phone: string
+          show_in_listings: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          created_at?: string
+          id?: string
+          location_id: string
+          name: string
+          organization_id: string
+          phone: string
+          show_in_listings?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar_path?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string
+          name?: string
+          organization_id?: string
+          phone?: string
+          show_in_listings?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_contacts_location_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       organization_location_members: {
         Row: {
           chat_access: string
@@ -1563,7 +1610,10 @@ export type Database = {
           name: string
           organization_id: string
           postal_code: string | null
+          show_visiting_address: boolean
           updated_at: string
+          visiting_lat: number | null
+          visiting_lng: number | null
         }
         Insert: {
           active?: boolean
@@ -1577,7 +1627,10 @@ export type Database = {
           name: string
           organization_id: string
           postal_code?: string | null
+          show_visiting_address?: boolean
           updated_at?: string
+          visiting_lat?: number | null
+          visiting_lng?: number | null
         }
         Update: {
           active?: boolean
@@ -1591,7 +1644,10 @@ export type Database = {
           name?: string
           organization_id?: string
           postal_code?: string | null
+          show_visiting_address?: boolean
           updated_at?: string
+          visiting_lat?: number | null
+          visiting_lng?: number | null
         }
         Relationships: [
           {
@@ -3195,6 +3251,10 @@ export type Database = {
       is_user_banned: { Args: { _uid: string }; Returns: boolean }
       is_user_deletion_pending: { Args: { _user_id: string }; Returns: boolean }
       is_user_suspended: { Args: { _uid: string }; Returns: boolean }
+      listing_business_contact: {
+        Args: { _listing_id: string }
+        Returns: Json
+      }
       listing_filter_facet_counts: {
         Args: {
           p_active_attrs?: Json

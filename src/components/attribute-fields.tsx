@@ -111,7 +111,7 @@ export function AttributeFields({
   };
 
   return (
-    <div className="space-y-4 rounded-xl border border-border p-4">
+    <div className="space-y-4">
       {heading && <p className="text-sm font-medium">{heading}</p>}
       {filters.map((f) => {
         if (f.key === PART_FITMENT_SCOPE_KEY) {
@@ -253,6 +253,55 @@ function AttributeField({
   if (filter.type === "select") {
     const options = filter.options ?? [];
     const showRequiredMark = required && !filter.is_optional;
+    const canDeselect = !showRequiredMark;
+
+    if (options.length > 0 && options.length <= 6) {
+      return (
+        <div className="space-y-2">
+          <Label id={`${fieldId}-label`}>
+            {label}
+            {showRequiredMark && <span className="text-destructive"> *</span>}
+            {required && filter.is_optional && (
+              <span className="font-normal text-muted-foreground"> (valgfritt)</span>
+            )}
+          </Label>
+          <div
+            role="radiogroup"
+            aria-labelledby={`${fieldId}-label`}
+            aria-required={showRequiredMark || undefined}
+            aria-invalid={!!error}
+            aria-describedby={error ? errorId : undefined}
+            className="flex flex-wrap gap-2"
+          >
+            {options.map((o) => {
+              const isSelected = value === o.value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => onChange(isSelected && canDeselect ? undefined : o.value)}
+                  className={`native-touch-target min-h-12 rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground font-medium"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  {o.label_nb}
+                </button>
+              );
+            })}
+          </div>
+          {error && (
+            <p id={errorId} className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-2">
         <Label htmlFor={fieldId}>

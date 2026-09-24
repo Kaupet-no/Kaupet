@@ -1,11 +1,4 @@
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { CONDITIONS, VEHICLE_CONDITIONS_BY_SLUG } from "@/lib/constants";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
@@ -13,13 +6,10 @@ import type { WizardSharedProps, ListingFormShape } from "../types";
 import { RequiredMark } from "../required-mark";
 
 /**
- * Tilstand (condition): a dropdown rather than the previous vertical list of
- * radio-cards, to keep the (long, Beskrivelse-steget) page more compact.
- * Each option's full description is still shown for non-vehicle categories —
- * both inside the open dropdown (under each label) and, once a value is
- * picked, as helper text under the closed trigger — so collapsing the list
- * into a `<Select>` loses none of the descriptive text the radio-cards used
- * to show.
+ * Tilstand (condition): a vertical list of choice-rows (whole row clickable,
+ * radio indicator, hairline dividers — no card-in-card) rather than a
+ * dropdown. Each option's full description is shown inline for non-vehicle
+ * categories.
  *
  * For Bil og MC (`isVehicle`), the options are per-vehicle-type (e.g.
  * "Ny bil"/"Bruktbil"/"Utbedringer må påregnes"/"Reparasjonsobjekt/delebil"
@@ -40,41 +30,52 @@ export function Condition({
   const options = isVehicle
     ? (VEHICLE_CONDITIONS_BY_SLUG[leafSlug as VehicleLeafSlug] ?? VEHICLE_CONDITIONS_BY_SLUG.bil)
     : CONDITIONS;
-  const selected = options.find((c) => c.value === condition);
 
   return (
     <section className="space-y-2">
-      <Label htmlFor="condition-select">
+      <Label id="condition-label">
         Tilstand
         <RequiredMark />
       </Label>
-      <Select
-        value={condition ?? undefined}
-        onValueChange={(v) =>
-          setValue("condition", v as ListingFormShape["condition"], { shouldValidate: true })
-        }
+      <div
+        role="radiogroup"
+        aria-labelledby="condition-label"
+        aria-required="true"
+        className="divide-y divide-border rounded-md border border-border"
       >
-        <SelectTrigger id="condition-select" aria-label="Tilstand" aria-required="true">
-          <SelectValue placeholder="Velg tilstand">{selected?.label}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((c) => (
-            <SelectItem key={c.value} value={c.value}>
-              <span className="flex flex-col items-start py-0.5 pr-2">
+        {options.map((c) => {
+          const isSelected = condition === c.value;
+          return (
+            <button
+              key={c.value}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              onClick={() =>
+                setValue("condition", c.value as ListingFormShape["condition"], {
+                  shouldValidate: true,
+                })
+              }
+              className="native-touch-target flex min-h-14 w-full items-start gap-3 px-3 py-3 text-left first:rounded-t-md last:rounded-b-md hover:bg-muted/50"
+            >
+              <span
+                aria-hidden
+                className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                  isSelected ? "border-primary" : "border-border"
+                }`}
+              >
+                {isSelected && <span className="size-2 rounded-full bg-primary" />}
+              </span>
+              <span className="flex flex-col">
                 <span className="text-sm font-medium">{c.label}</span>
                 {"description" in c && (
-                  <span className="text-xs text-muted-foreground group-focus:text-accent-foreground/80">
-                    {c.description}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{c.description}</span>
                 )}
               </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {selected && "description" in selected && (
-        <p className="text-xs text-muted-foreground">{selected.description}</p>
-      )}
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }

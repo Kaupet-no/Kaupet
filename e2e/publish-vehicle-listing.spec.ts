@@ -69,8 +69,7 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
     .fill("Velholdt Volvo XC60 med komplett servicehistorikk og gode dekk.");
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-condition"), testInfo);
 
-  await page.getByRole("combobox", { name: "Tilstand" }).click();
-  await page.getByRole("option", { name: "Bruktbil" }).click();
+  await page.getByRole("radio", { name: "Bruktbil" }).click();
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).check();
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-price"), testInfo);
   await publishingStatusButton(page).waitFor();

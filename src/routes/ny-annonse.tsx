@@ -280,7 +280,7 @@ function NewListingPage() {
     control,
     watch,
     trigger,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, isDirty },
   } = useForm<ListingForm>({
     resolver: zodResolver(listingSchema),
     mode: "onTouched",
@@ -907,6 +907,7 @@ function NewListingPage() {
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
     discardDraft,
+    dismissDraftOffer,
   } = useDraftAutosave({
     title,
     subtitle,
@@ -933,6 +934,7 @@ function NewListingPage() {
   });
 
   function restoreDraft() {
+    setDraftDecisionPrompt(false);
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "draft_restored",
@@ -950,6 +952,32 @@ function NewListingPage() {
     });
   }
 
+  // Utkasttilbudet ("Lagret utkast: ... / Fortsett / Start ny") skal vises
+  // ÉN gang, ved start — ikke henge igjen på hvert steg. Så snart brukeren
+  // begynner å redigere (et felt blir "dirty") eller går videre til neste
+  // steg uten å ta et aktivt valg, forsvinner tilbudet for resten av
+  // økten. dismissDraftOffer lar det gamle utkastet ligge urørt (verken
+  // gjenopprettet eller slettet) — kun kobler fra den lagrede draftId-en,
+  // slik at autolagringen som fortsetter ikke overskriver det stille.
+  //
+  // Dette er kun trygt når det avviste utkastet allerede har en server-kopi
+  // (draftId) — da ligger dataene trygt hos Supabase uansett hva som skjer
+  // lokalt etterpå. Et utkast som KUN finnes i localStorage/IndexedDB ville
+  // blitt overskrevet stille av den nye annonsens autolagring (samme
+  // DRAFT_KEY/bildelager) hvis vi auto-avviste det samme veien — se
+  // draftDecisionRequired/goToNextPage, som i stedet tvinger et eksplisitt
+  // valg før brukeren kan forlate steg 1.
+  useEffect(() => {
+    if (!hasDraftData || !draftId) return;
+    if (isDirty || step > 1) dismissDraftOffer();
+  }, [hasDraftData, draftId, isDirty, step, dismissDraftOffer]);
+
+  // Utkast som bare finnes lokalt: brukeren må aktivt velge Fortsett/Start
+  // ny før hen forlater steg 1 — se blokkeringen i goToNextPage.
+  const draftDecisionRequired = !!hasDraftData && !draftId;
+  const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
+  const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     if (resume !== "auth-publish" || !user || !hasDraftData || authResumeHandledRef.current) {
       return;
@@ -965,6 +993,7 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, hasDraftData]);
   async function startNewListing() {
+    setDraftDecisionPrompt(false);
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "draft_started",
@@ -1078,6 +1107,16 @@ function NewListingPage() {
   }): Promise<ComposerNavigationResult> {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
+
+    // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
+    // skrive over stille — hold brukeren på steg 1 til hen har tatt et
+    // eksplisitt valg om det tilbudte utkastet, i stedet for å bare varsle
+    // med en toast.
+    if (isFirst && draftDecisionRequired) {
+      setDraftDecisionPrompt(true);
+      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
+      return "blocked";
+    }
 
     // "Slå opp"-knappen er fjernet — oppslaget kjøres fra selve Neste-knappen
     // når brukeren står på vehicle-registration-steget med et uslått-opp
@@ -1387,20 +1426,14 @@ function NewListingPage() {
     typeof hasDraftData?.title === "string" && hasDraftData.title.trim()
       ? hasDraftData.title.trim()
       : "Utkast";
-  const restorableDraftCategoryId =
-    typeof hasDraftData?.category_id === "string" ? hasDraftData.category_id : null;
-  const restorableDraftCategory = restorableDraftCategoryId
-    ? categoryBreadcrumb(restorableDraftCategoryId, categoriesById) || null
-    : null;
-  const restorableDraftSavedAt =
-    typeof hasDraftData?.saved_at === "number" ? new Date(hasDraftData.saved_at) : null;
-  const restorableDraftSavedAtLabel =
-    restorableDraftSavedAt && !Number.isNaN(restorableDraftSavedAt.getTime())
-      ? restorableDraftSavedAt.toLocaleString("nb-NO", {
-          dateStyle: "short",
-          timeStyle: "short",
-        })
-      : null;
+  // fromLanding-brukere kommer inn med en ny tittel fra velgeren
+  // (titleParam) — hvis den ikke matcher det lagrede utkastet, er dette et
+  // reelt valg mellom to annonser, ikke bare "fortsett der du slapp".
+  const draftTitleConflict =
+    fromLanding &&
+    !!titleParam?.trim() &&
+    !!hasDraftData &&
+    restorableDraftTitle.trim().toLowerCase() !== titleParam.trim().toLowerCase();
 
   // Derived label for the category picker button
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
@@ -1826,22 +1859,31 @@ function NewListingPage() {
           }
           onCancel={() => void navigate({ to: "/" })}
           notice={
-            hasDraftData ? (
-              <div className="mt-4 flex flex-col items-stretch gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm sm:flex-row sm:items-start">
+            hasDraftData && isFirst ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs sm:text-sm">
                 <div className="min-w-0 flex-1">
-                  <p>
-                    Lagret utkast: <strong>{restorableDraftTitle}</strong>
+                  <p className="truncate">
+                    {draftTitleConflict ? (
+                      <>
+                        Du har et ulagret utkast: <strong>«{restorableDraftTitle}»</strong>.
+                        Fortsett det i stedet?
+                      </>
+                    ) : (
+                      <>
+                        Lagret utkast: <strong>{restorableDraftTitle}</strong>
+                      </>
+                    )}
                   </p>
-                  {(restorableDraftCategory || restorableDraftSavedAtLabel) && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {restorableDraftCategory ? `Kategori: ${restorableDraftCategory}` : null}
-                      {restorableDraftCategory && restorableDraftSavedAtLabel ? " · " : null}
-                      {restorableDraftSavedAtLabel ? `Lagret ${restorableDraftSavedAtLabel}` : null}
+                  {draftDecisionPrompt && (
+                    <p role="alert" aria-live="assertive" className="mt-1 text-destructive">
+                      Utkastet finnes bare på denne enheten. Velg «Fortsett utkastet» eller «Start
+                      ny annonse» før du går videre, så det ikke går tapt.
                     </p>
                   )}
                 </div>
-                <div className="flex w-full shrink-0 flex-col justify-end gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+                <div className="flex shrink-0 gap-2">
                   <Button
+                    ref={continueDraftButtonRef}
                     type="button"
                     size="sm"
                     variant="secondary"

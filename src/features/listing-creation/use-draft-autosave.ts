@@ -550,6 +550,27 @@ export function useDraftAutosave(fields: DraftFields) {
     void clearDraftImages();
   }
 
+  /** Stops offering the recoverable draft without discarding or restoring
+   * it — the on-disk/server row is left untouched — but detaches the
+   * wizard's own draftId from it, so any autosave that runs from here on
+   * writes a *new* draft instead of silently overwriting the declined one
+   * with whatever the user types next (see "ikke overskriver..." tests). */
+  function dismissDraftOffer() {
+    draftRestorePending.current = false;
+    draftConflictRef.current = false;
+    draftIdRef.current = null;
+    draftUpdatedAtRef.current = null;
+    setDraftSaveConflict(false);
+    setDraftId(null);
+    setHasDraftData(null);
+    try {
+      localStorage.removeItem(DRAFT_ID_KEY);
+      localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
   async function discardDraft() {
     const id = draftIdRef.current ?? localStorage.getItem(DRAFT_ID_KEY);
     clearDraftStorage();
@@ -577,5 +598,6 @@ export function useDraftAutosave(fields: DraftFields) {
     restoreDraft,
     clearDraftStorage,
     discardDraft,
+    dismissDraftOffer,
   };
 }

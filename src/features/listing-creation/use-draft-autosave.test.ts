@@ -680,6 +680,67 @@ describe("useDraftAutosave", () => {
     expect(setImages).toHaveBeenCalledWith(restored);
   });
 
+  it("holder draftId null for et utkast som kun finnes lokalt (ingen DRAFT_ID_KEY), og lar DRAFT_KEY stå urørt til brukeren velger", async () => {
+    const localOnlyDraft = { title: "Vintage lenestol i eik", saved_at: Date.now() };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(localOnlyDraft));
+    // Ingen DRAFT_ID_KEY — utkastet har aldri blitt lagret til serveren.
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Brompton sykkel" }),
+    );
+    await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
+    vi.useFakeTimers();
+    // Signalet ny-annonse.tsx bruker for å avgjøre om auto-avvisning er trygt:
+    // uten server-id skal draftId være null, så ruten IKKE auto-avviser og
+    // heller ber brukeren ta et eksplisitt valg før hen går videre.
+    expect(result.current.draftId).toBeNull();
+
+    // 30s-intervallet forsøker en autolagring mens tilbudet fortsatt henger
+    // ubesvart (ruten har ikke kalt dismissDraftOffer) — skal fortsatt være
+    // blokkert, akkurat som for et utkast med server-id.
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}")).toMatchObject(localOnlyDraft);
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+  });
+
+  it("dismissDraftOffer leaves the old draft untouched but lets a new title autosave into a fresh row (ny tittel ≠ lagret utkast)", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Vintage lenestol i eik", saved_at: Date.now() }),
+    );
+    localStorage.setItem(DRAFT_ID_KEY, "old-draft-id");
+    saveDraftListingMock.mockResolvedValue({ id: "new-draft-id", kaupet_code: "ABC123" });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Brompton sykkel" }),
+    );
+
+    await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
+    // Without a decision, saving is still blocked — the mismatched title
+    // must not silently overwrite the offered draft.
+    expect(await act(() => result.current.saveDraftToSupabase())).toBeNull();
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
+
+    // The user ignores the offer and keeps typing the new listing — the
+    // route dismisses the offer instead of restoring or discarding.
+    act(() => result.current.dismissDraftOffer());
+
+    expect(result.current.hasDraftData).toBeNull();
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+
+    const id = await act(() => result.current.saveDraftToSupabase());
+    expect(id).toBe("new-draft-id");
+    // A fresh row is created — the old draft's id is never reused, so its
+    // server-side row is never overwritten by the new listing's content.
+    expect(saveDraftListingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ id: "old-draft-id" }),
+      }),
+    );
+  });
+
   it("persists attributes into the localStorage draft", () => {
     vi.useFakeTimers();
     renderHook(() =>

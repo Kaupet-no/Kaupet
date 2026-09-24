@@ -185,6 +185,45 @@ const SOLO_FIELD_GROUP_KEYS: Record<string, true> = {
   "vehicle-price": true,
 };
 
+/** The subset of `SOLO_FIELD_GROUP_KEYS` that is category-flow content
+ * rather than the always-present structural picking steps themselves
+ * (`category-select`/`category-confirm`) — i.e. a solo page a category's
+ * *stored* `field_groups` can opt into (currently only
+ * `vehicle-registration`; `vehicle-price` is runtime-injected alongside it,
+ * see withRuntimeFieldGroups, so checking for either is equivalent here). */
+const FLOW_DEFINING_SOLO_KEYS = new Set(
+  Object.keys(SOLO_FIELD_GROUP_KEYS).filter(
+    (key) => key !== "category-select" && key !== "category-confirm",
+  ),
+);
+
+/**
+ * Whether the AI category suggestion(s) offered on the landing-entry flow
+ * still need the dedicated category-confirm solo step, rather than the
+ * inline "Kaupet foreslår"-chip on category-attributes. True whenever any
+ * suggested category's effective flow (see effectiveFlowForCategory)
+ * contains a `FLOW_DEFINING_SOLO_KEYS` entry — a structural solo page that
+ * must know the resolved category before the rest of the flow can render
+ * (in practice `vehicle-registration`), same reasoning as
+ * withRuntimeFieldGroups' own category-confirm injection. This is a
+ * flow-shape check, not a category-type check (no vehicle/boat-specific
+ * logic here — see AGENTS.md on keeping the generic core vertical-agnostic):
+ * any category whose flow has no such page is safe to resolve later, inline
+ * on category-attributes, because its task-page structure never depends on
+ * which leaf ends up chosen. Pure so it's testable without mounting the
+ * wizard.
+ */
+export function suggestionNeedsCategoryConfirm(
+  suggestionCategoryIds: string[],
+  allFlows: CategoryFlowRow[],
+  categoriesById: Map<string, CategoryNode>,
+): boolean {
+  return suggestionCategoryIds.some((id) => {
+    const { fieldGroups } = effectiveFlowForCategory(id, allFlows, categoriesById);
+    return fieldGroups.some((key) => FLOW_DEFINING_SOLO_KEYS.has(key));
+  });
+}
+
 /**
  * Ordinære flyter: samme fire oppgavegrenser på web og native — vis tingen,
  * gjør den søkbar, avklar handelen, se over og publiser. Kategorivalg og

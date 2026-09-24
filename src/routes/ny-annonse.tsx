@@ -21,6 +21,7 @@ import {
   effectiveFlowForCategory,
   withRuntimeFieldGroups,
   resolveWizardPages,
+  suggestionNeedsCategoryConfirm,
 } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
 import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
@@ -407,6 +408,91 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
+  // Fanger opp kjøretøytitler `suggest_category_for_title` (RPC-en bak
+  // useListingTitleHints) bommer på: den matcher kun mot historiske
+  // annonser og kategorinavn, så en tittel med bare merke/modell/karosseri
+  // ("Volvo V70 stasjonsvogn") gir ingen treff siden ingen kategori heter
+  // "Volvo". Gjenbruker søkets eksisterende merke-/attributtmatching
+  // (search-category-match.ts) som allerede løser akkurat dette for
+  // søkefeltet på /annonser — se suggestVehicleCategoryForTitle. Debounces
+  // på samme 400 ms som RPC-en for å unngå å flimre et annet forslag mens
+  // brukeren fortsatt skriver.
+  //
+  // Hentet opp hit (foran baseFieldGroupKeys) fordi showCategoryConfirm
+  // under trenger å vite om AI-forslaget er kjøretøy/båt før resten av
+  // flyten regnes ut — se suggestionNeedsCategoryConfirm.
+  const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
+  const { data: vehicleBrands } = useAllVehicleBrands();
+  // Samme react-query-cache-oppføring som useVehicleLookupFlow (kalt lenger
+  // ned på denne siden) allerede henter via useAllVehicleModels — ingen
+  // ekstra nettverkskall her.
+  const { data: vehicleModels } = useAllVehicleModels();
+  const clientCategoryHint = useMemo(
+    () =>
+      debouncedTitleForVehicleHint.length >= 5
+        ? suggestVehicleCategoryForTitle({
+            title: debouncedTitleForVehicleHint,
+            vehicleBrands: vehicleBrands ?? [],
+            vehicleModels: vehicleModels ?? [],
+            allFilters: allFilters ?? [],
+            categories: categories ?? [],
+            categoriesById,
+            bilOgMcCategoryId,
+          })
+        : null,
+    [
+      debouncedTitleForVehicleHint,
+      vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMcCategoryId,
+    ],
+  );
+
+  const {
+    categorySuggestions,
+    categorySuggestionLoading,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
+    title,
+    description,
+    categoryId,
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    priceNok: typeof priceNok === "number" ? priceNok : undefined,
+    isFree,
+    attributes,
+    setValue,
+    clientCategoryHint,
+  });
+
+  // category-confirm holdes bare for forslag som gir en annen flyt enn
+  // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
+  // avgjørelsen må stå fast før resten av sidene regnes ut, siden bl.a.
+  // vehicle-registration er en solo-side som forutsetter avklart kategori.
+  // For alle andre forslag vises kategorien i stedet som en endrebar chip
+  // øverst på "Om tingen" (category-attributes) — mens forslaget ennå ikke
+  // er lastet holdes steget midlertidig for å unngå å måtte bytte sidesett
+  // etter at brukeren allerede har bladd forbi det.
+  const suggestionCategoryIds = [
+    ...categorySuggestions.map((s) => s.category_id),
+    ...(clientCategoryHint ? [clientCategoryHint.category_id] : []),
+  ];
+  const showCategoryConfirm =
+    fromLanding &&
+    !categoryConfirmed &&
+    (categorySuggestionLoading ||
+      suggestionNeedsCategoryConfirm(suggestionCategoryIds, allFlows ?? [], categoriesById));
+
   const baseFieldGroupKeys = useMemo(
     () =>
       effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
@@ -466,7 +552,7 @@ function NewListingPage() {
   const isCarLeaf = categoriesById.get(categoryId)?.slug === "bil";
   const fieldGroupKeys = useMemo(() => {
     let keys = withRuntimeFieldGroups(baseFieldGroupKeys, {
-      showCategoryConfirm: fromLanding && !categoryConfirmed,
+      showCategoryConfirm,
     });
     if (behavior.requiresDeliveryMethod && !keys.includes("delivery")) {
       const insertAt = keys.indexOf("location");
@@ -482,8 +568,7 @@ function NewListingPage() {
     );
   }, [
     baseFieldGroupKeys,
-    fromLanding,
-    categoryConfirmed,
+    showCategoryConfirm,
     behavior.requiresDeliveryMethod,
     isVehicleFlow,
     isCarLeaf,
@@ -1039,74 +1124,25 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Fanger opp kjøretøytitler `suggest_category_for_title` (RPC-en bak
-  // useListingTitleHints) bommer på: den matcher kun mot historiske
-  // annonser og kategorinavn, så en tittel med bare merke/modell/karosseri
-  // ("Volvo V70 stasjonsvogn") gir ingen treff siden ingen kategori heter
-  // "Volvo". Gjenbruker søkets eksisterende merke-/attributtmatching
-  // (search-category-match.ts) som allerede løser akkurat dette for
-  // søkefeltet på /annonser — se suggestVehicleCategoryForTitle. Debounces
-  // på samme 400 ms som RPC-en for å unngå å flimre et annet forslag mens
-  // brukeren fortsatt skriver.
-  const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
-  const { data: vehicleBrands } = useAllVehicleBrands();
-  // Samme react-query-cache-oppføring som useVehicleLookupFlow (kalt lenger
-  // ned på denne siden) allerede henter via useAllVehicleModels — ingen
-  // ekstra nettverkskall her.
-  const { data: vehicleModels } = useAllVehicleModels();
-  const clientCategoryHint = useMemo(
-    () =>
-      debouncedTitleForVehicleHint.length >= 5
-        ? suggestVehicleCategoryForTitle({
-            title: debouncedTitleForVehicleHint,
-            vehicleBrands: vehicleBrands ?? [],
-            vehicleModels: vehicleModels ?? [],
-            allFilters: allFilters ?? [],
-            categories: categories ?? [],
-            categoriesById,
-            bilOgMcCategoryId,
-          })
-        : null,
-    [
-      debouncedTitleForVehicleHint,
-      vehicleBrands,
-      vehicleModels,
-      allFilters,
-      categories,
-      categoriesById,
-      bilOgMcCategoryId,
-    ],
-  );
-
-  const {
-    categorySuggestions,
-    categorySuggestionLoading,
-    setSuggestionDismissed,
-    applyCategorySuggestion,
-    similarListings,
-    wtbMatch,
-    keywordSuggestions,
-    keywordsFetching,
-    appendTagToDescription,
-  } = useListingTitleHints({
-    title,
-    description,
-    categoryId,
-    categoryTouchedManually,
-    setSelectedParentId,
-    setCategoryTouchedManually,
-    priceNok: typeof priceNok === "number" ? priceNok : undefined,
-    isFree,
-    attributes,
-    setValue,
-    clientCategoryHint,
-  });
-
   async function goToNextPage(options?: {
     skipImageCheck?: boolean;
   }): Promise<ComposerNavigationResult> {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
+
+    // Kategorien regnes som valgt idet brukeren går videre fra "Om tingen"
+    // uten å ha trykket forslagschipen eksplisitt — chippen er en tydelig
+    // handling (UI-guiden), ikke en skjult overskriving, men å måtte trykke
+    // "Riktig" før "Neste" i tillegg ville vært dobbeltarbeid når forslaget
+    // uansett er det eneste feltet peker mot.
+    if (
+      groups.some((g) => g.key === "category-attributes") &&
+      !categoryId &&
+      categorySuggestions.length > 0 &&
+      !categoryTouchedManually
+    ) {
+      applySuggestedCategory(categorySuggestions[0].category_id);
+    }
 
     // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
     // skrive over stille — hold brukeren på steg 1 til hen har tatt et
@@ -1507,7 +1543,11 @@ function NewListingPage() {
     if (via !== "wizard") return;
     if (currentPage?.groups?.some((g) => g.key === "category-select")) {
       goToNextPage();
-    } else if (currentPage?.groups?.some((g) => g.key === "category-confirm")) {
+    } else if (
+      currentPage?.groups?.some(
+        (g) => g.key === "category-confirm" || g.key === "category-attributes",
+      )
+    ) {
       setCategoryConfirmed(true);
     } else if (
       currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
@@ -1569,7 +1609,11 @@ function NewListingPage() {
     applyCategorySuggestion(id);
     if (currentPage?.groups?.some((group) => group.key === "category-select")) {
       goToNextPage();
-    } else if (currentPage?.groups?.some((group) => group.key === "category-confirm")) {
+    } else if (
+      currentPage?.groups?.some(
+        (group) => group.key === "category-confirm" || group.key === "category-attributes",
+      )
+    ) {
       setCategoryConfirmed(true);
     }
   };

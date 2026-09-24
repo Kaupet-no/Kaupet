@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { INTEGRATION_LIMITS, newListingsPerDayLimitMessage } from "@/lib/integration-limits";
+import {
+  INTEGRATION_LIMITS,
+  newImagesPerDayLimitMessage,
+  newListingsPerDayLimitMessage,
+} from "@/lib/integration-limits";
 import type { BulkImportRow } from "./import-schema";
 import { syncListings, type SyncContext } from "./listing-sync.server";
 
@@ -47,10 +51,12 @@ function makeContext(): SyncContext {
 function makeSupabaseAdmin({
   existingRefs = [] as string[],
   createdToday = 0,
+  imagesCreatedToday = 0,
   rpcImpl,
 }: {
   existingRefs?: string[];
   createdToday?: number;
+  imagesCreatedToday?: number;
   rpcImpl: (name: string, args: Record<string, unknown>) => unknown;
 }) {
   const from = vi.fn((table: string) => {
@@ -71,7 +77,9 @@ function makeSupabaseAdmin({
               }
             : table === "organization_listing_imports"
               ? { data: null, count: createdToday, error: null }
-              : { data: null, error: null },
+              : table === "listing_image_jobs"
+                ? { data: null, count: imagesCreatedToday, error: null }
+                : { data: null, error: null },
       ).then(resolve, reject);
     return chain;
   });
@@ -317,12 +325,15 @@ describe("syncListings", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("tar imot imageUrls uten å feile (steg 4 håndterer selve bildehentingen)", async () => {
-    const rpc = vi.fn();
+  it("legger bilder i kø (enqueue_listing_image_jobs, _replace=true) når raden har imageUrls", async () => {
+    const calls: { name: string; args: Record<string, unknown> }[] = [];
     const supabaseAdmin = makeSupabaseAdmin({
-      rpcImpl: (_name, args) => {
-        rpc(args);
-        return { data: { status: "created", listing_id: "listing-1" }, error: null };
+      rpcImpl: (name, args) => {
+        calls.push({ name, args });
+        if (name === "upsert_listing_from_external") {
+          return { data: { status: "created", listing_id: "listing-1" }, error: null };
+        }
+        return { data: 2, error: null };
       },
     });
     const results = await syncListings(supabaseAdmin, makeContext(), {
@@ -336,7 +347,71 @@ describe("syncListings", () => {
       mode: "create",
     });
     expect(results[0]).toMatchObject({ status: "created" });
-    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(results[0].warning).toBeUndefined();
+    const enqueueCall = calls.find((c) => c.name === "enqueue_listing_image_jobs");
+    expect(enqueueCall?.args).toEqual({
+      _organization_id: "org-1",
+      _listing_id: "listing-1",
+      _urls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
+      _replace: true,
+    });
+  });
+
+  it("legger IKKE bilder i kø når raden ikke sender imageUrls (kolonne mangler/tom rører ikke bildene)", async () => {
+    const calls: string[] = [];
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (name) => {
+        calls.push(name);
+        return { data: { status: "created", listing_id: "listing-1" }, error: null };
+      },
+    });
+    await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "no-images", imageUrls: [] })],
+      mode: "create",
+    });
+    expect(calls).toEqual(["upsert_listing_from_external"]);
+  });
+
+  it("legger ikke bilder i kø i dry-run", async () => {
+    const calls: string[] = [];
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (name) => {
+        calls.push(name);
+        return { data: { status: "created" }, error: null };
+      },
+    });
+    await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "with-images", imageUrls: ["https://example.com/a.jpg"] })],
+      mode: "create",
+      dryRun: true,
+    });
+    expect(calls).toEqual(["upsert_listing_from_external"]);
+    expect(supabaseAdmin.from).not.toHaveBeenCalledWith("listing_image_jobs");
+  });
+
+  it("håndhever døgngrensen for nye bilder: annonsen lagres, bildene hoppes over med en advarsel", async () => {
+    const calls: string[] = [];
+    const supabaseAdmin = makeSupabaseAdmin({
+      imagesCreatedToday: INTEGRATION_LIMITS.organization.newImagesPerDay - 1,
+      rpcImpl: (name) => {
+        calls.push(name);
+        return { data: { status: "created", listing_id: "listing-1" }, error: null };
+      },
+    });
+    const results = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [
+        makeRow({
+          externalId: "with-images",
+          imageUrls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
+        }),
+      ],
+      mode: "create",
+    });
+    expect(results[0]).toMatchObject({ status: "created", warning: newImagesPerDayLimitMessage() });
+    expect(calls).toEqual(["upsert_listing_from_external"]);
   });
 
   it("maskerer interne feil (kastet unntak) fra RPC-kallet", async () => {

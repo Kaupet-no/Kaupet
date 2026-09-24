@@ -15,7 +15,11 @@ import {
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
-import { INTEGRATION_LIMITS, newListingsPerDayLimitMessage } from "@/lib/integration-limits";
+import {
+  INTEGRATION_LIMITS,
+  newImagesPerDayLimitMessage,
+  newListingsPerDayLimitMessage,
+} from "@/lib/integration-limits";
 import { bulkImportRowSchema, normalizeBulkImportRow, type BulkImportRow } from "./import-schema";
 
 /** Innkommende kanal for en synk. `excel` er dagens filopplasting; `api` og
@@ -62,6 +66,13 @@ export type ListingSyncResult = {
   listingId?: string;
   kaupetCode?: string;
   error?: string;
+  /** Ikke-blokkerende advarsel: raden lyktes (annonsen ble lagret), men noe
+   * sekundært ble hoppet over — i dag kun døgngrensen for nye bilder
+   * (`INTEGRATION_LIMITS.organization.newImagesPerDay`). Skal ALDRI settes
+   * for feil vi selv eier (Cloudflare Images nede, R2-feil o.l.) — de vises
+   * ikke her i det hele tatt, siden bildejobben da bare blir stående og
+   * prøves på nytt (se listing-image-jobs.server.ts). */
+  warning?: string;
 };
 
 const BATCH_SIZE = 25;
@@ -269,11 +280,6 @@ async function callUpsert(
   dryRun: boolean,
 ): Promise<ListingSyncResult> {
   const category = resolveCategory(row.category, ctx.categories)!;
-  // Steg 4: her skal `row.imageUrls` (validert i import-schema.ts: kun
-  // https://, maks 2048 tegn, maks MAX_IMPORT_IMAGES per rad) legges i kø som
-  // bildejobber (`listing_image_jobs`) for annonsen RPC-en oppretter/
-  // oppdaterer under. I dag tas de bare imot her og går ingen vei videre —
-  // ingen bilder legges til `listing_images`.
   const { data, error } = await supabaseAdmin.rpc("upsert_listing_from_external", {
     _organization_id: ctx.organizationId,
     _user_id: ctx.userId,
@@ -378,17 +384,39 @@ export async function syncListings(
   }
 
   let remainingNewListings = Number.POSITIVE_INFINITY;
+  // Samme prinsipp for døgngrensen for nye bilder: tell jobber opprettet i
+  // dag for organisasjonen (UTC-døgn, se startOfUtcDayIso), og trekk fra
+  // konservativt (antall URL-er i raden, ikke det faktiske antallet NYE
+  // jobber `enqueue_listing_image_jobs` ender opp med å opprette) *før*
+  // RPC-kallet. Overskrider en rad kvoten, hopper vi over ENQUEUE for den
+  // raden — annonsen lagres uansett (se warning-feltet på ListingSyncResult).
+  let remainingNewImages = Number.POSITIVE_INFINITY;
   if (!dryRun) {
-    const { count, error } = await supabaseAdmin
-      .from("organization_listing_imports")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", ctx.organizationId)
-      .eq("status", "created")
-      .gte("created_at", startOfUtcDayIso());
-    if (error) throw error;
+    const [
+      { count: listingCount, error: listingCountError },
+      { count: imageCount, error: imageCountError },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("organization_listing_imports")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId)
+        .eq("status", "created")
+        .gte("created_at", startOfUtcDayIso()),
+      supabaseAdmin
+        .from("listing_image_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId)
+        .gte("created_at", startOfUtcDayIso()),
+    ]);
+    if (listingCountError) throw listingCountError;
+    if (imageCountError) throw imageCountError;
     remainingNewListings = Math.max(
       0,
-      INTEGRATION_LIMITS.organization.newListingsPerDay - (count ?? 0),
+      INTEGRATION_LIMITS.organization.newListingsPerDay - (listingCount ?? 0),
+    );
+    remainingNewImages = Math.max(
+      0,
+      INTEGRATION_LIMITS.organization.newImagesPerDay - (imageCount ?? 0),
     );
   }
 
@@ -424,8 +452,9 @@ export async function syncListings(
           }
           remainingNewListings -= 1;
         }
+        let result: ListingSyncResult;
         try {
-          return await callUpsert(
+          result = await callUpsert(
             supabaseAdmin,
             ctx,
             importId,
@@ -442,6 +471,48 @@ export async function syncListings(
             error: "Annonsen kunne ikke opprettes. Prøv igjen senere.",
           };
         }
+
+        // Bilder: kun rader som faktisk sender en URL-liste rører det
+        // lagrede bildesettet ("kolonne mangler/tom" = ikke rør bilder;
+        // "liste med URL-er" = erstatt settet, håndhevet av
+        // `enqueue_listing_image_jobs(_replace=true)`). Ingen dry-run
+        // (skriver ingenting), og kun for rader som faktisk lyktes.
+        if (
+          !dryRun &&
+          result.status !== "failed" &&
+          result.listingId &&
+          normalized.imageUrls.length > 0
+        ) {
+          if (remainingNewImages < normalized.imageUrls.length) {
+            result.warning = newImagesPerDayLimitMessage();
+          } else {
+            remainingNewImages -= normalized.imageUrls.length;
+            try {
+              const { error: enqueueError } = await supabaseAdmin.rpc(
+                "enqueue_listing_image_jobs",
+                {
+                  _organization_id: ctx.organizationId,
+                  _listing_id: result.listingId,
+                  _urls: normalized.imageUrls,
+                  _replace: true,
+                },
+              );
+              if (enqueueError) throw enqueueError;
+            } catch (cause) {
+              // Dette er en feil VI eier (kø-innsetting), ikke noe kunden
+              // kan rette — annonsen er allerede lagret. Ikke vis den som en
+              // radfeil eller -advarsel; logg for drift i stedet. Bildene
+              // mangler da helt for annonsen inntil neste synk sender dem
+              // igjen, en kjent begrensning (se rapportens usikkerhetsdel).
+              console.error("[listing-sync] kunne ikke legge bilder i kø", {
+                listingId: result.listingId,
+                cause: cause instanceof Error ? cause.message : String(cause),
+              });
+            }
+          }
+        }
+
+        return result;
       }),
     );
 

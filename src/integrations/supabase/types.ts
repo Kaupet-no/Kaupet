@@ -788,6 +788,75 @@ export type Database = {
           },
         ]
       }
+      listing_image_jobs: {
+        Row: {
+          attempts: number
+          content_hash: string | null
+          created_at: string
+          customer_error: string | null
+          id: string
+          internal_error: string | null
+          listing_id: string
+          next_attempt_at: string
+          organization_id: string
+          sort_order: number
+          source_url: string
+          status: string
+          storage_path: string | null
+          transformations: number
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          content_hash?: string | null
+          created_at?: string
+          customer_error?: string | null
+          id?: string
+          internal_error?: string | null
+          listing_id: string
+          next_attempt_at?: string
+          organization_id: string
+          sort_order?: number
+          source_url: string
+          status?: string
+          storage_path?: string | null
+          transformations?: number
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          content_hash?: string | null
+          created_at?: string
+          customer_error?: string | null
+          id?: string
+          internal_error?: string | null
+          listing_id?: string
+          next_attempt_at?: string
+          organization_id?: string
+          sort_order?: number
+          source_url?: string
+          status?: string
+          storage_path?: string | null
+          transformations?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_image_jobs_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_image_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_images: {
         Row: {
           caption: string | null
@@ -795,6 +864,7 @@ export type Database = {
           id: string
           listing_id: string
           sort_order: number
+          source_url: string | null
           storage_path: string
         }
         Insert: {
@@ -803,6 +873,7 @@ export type Database = {
           id?: string
           listing_id: string
           sort_order?: number
+          source_url?: string | null
           storage_path: string
         }
         Update: {
@@ -811,6 +882,7 @@ export type Database = {
           id?: string
           listing_id?: string
           sort_order?: number
+          source_url?: string | null
           storage_path?: string
         }
         Relationships: [
@@ -3127,6 +3199,26 @@ export type Database = {
         Args: { _bucket: string; _limit: number; _user_id: string; _window_seconds: number }
         Returns: boolean
       }
+      claim_listing_image_jobs: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          content_hash: string | null
+          created_at: string
+          customer_error: string | null
+          id: string
+          internal_error: string | null
+          listing_id: string
+          next_attempt_at: string
+          organization_id: string
+          sort_order: number
+          source_url: string
+          status: string
+          storage_path: string | null
+          transformations: number
+          updated_at: string
+        }[]
+      }
       compute_wtb_matches: {
         Args: {
           _attributes: Json
@@ -3215,6 +3307,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      enqueue_listing_image_jobs: {
+        Args: {
+          _listing_id: string
+          _organization_id: string
+          _replace?: boolean
+          _urls: string[]
+        }
+        Returns: number
       }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }

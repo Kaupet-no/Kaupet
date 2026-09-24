@@ -10,6 +10,8 @@ const limitMock = vi.fn();
 const eqMock = vi.fn();
 const selectMock = vi.fn();
 const fromMock = vi.fn();
+const imageJobsInMock = vi.fn();
+const imageJobsSelectMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: (...args: unknown[]) => fromMock(...args) },
@@ -23,6 +25,7 @@ function row(
     source: string;
     status: string;
     created_at: string;
+    listing_id: string | null;
   }>,
 ) {
   return {
@@ -30,6 +33,7 @@ function row(
     source: "excel",
     status: "created",
     created_at: "2026-09-24T10:00:00.000Z",
+    listing_id: null,
     ...overrides,
   };
 }
@@ -38,13 +42,25 @@ function mockRows(rows: ReturnType<typeof row>[]) {
   limitMock.mockResolvedValue({ data: rows, error: null });
 }
 
+function mockImageJobs(
+  rows: { listing_id: string; status: string; customer_error: string | null }[],
+) {
+  imageJobsInMock.mockResolvedValue({ data: rows, error: null });
+}
+
 beforeEach(() => {
   fromMock.mockReset();
   selectMock.mockReset();
   eqMock.mockReset();
   orderMock.mockReset();
   limitMock.mockReset();
-  fromMock.mockImplementation(() => ({ select: selectMock }));
+  imageJobsInMock.mockReset();
+  imageJobsSelectMock.mockReset();
+  imageJobsSelectMock.mockImplementation(() => ({ in: imageJobsInMock }));
+  mockImageJobs([]);
+  fromMock.mockImplementation((table: string) =>
+    table === "listing_image_jobs" ? { select: imageJobsSelectMock } : { select: selectMock },
+  );
   selectMock.mockImplementation(() => ({ eq: eqMock }));
   eqMock.mockImplementation(() => ({ order: orderMock }));
   orderMock.mockImplementation(() => ({ limit: limitMock }));
@@ -82,5 +98,26 @@ describe("ImportHistory", () => {
     limitMock.mockResolvedValue({ data: null, error: new Error("boom") });
     render(<ImportHistory organizationId="org-1" />, { wrapper });
     expect(await screen.findByText(/Importhistorikken kunne ikke lastes/)).toBeTruthy();
+  });
+
+  it("viser bildestatus (behandles/feilet, kun customer_error-tekster) per kjøring", async () => {
+    mockRows([
+      row({ listing_id: "listing-1" }),
+      row({ listing_id: "listing-2", status: "updated" }),
+    ]);
+    mockImageJobs([
+      { listing_id: "listing-1", status: "pending", customer_error: null },
+      { listing_id: "listing-1", status: "processing", customer_error: null },
+      {
+        listing_id: "listing-2",
+        status: "failed",
+        customer_error: "Bildet finnes ikke på adressen (HTTP 404).",
+      },
+    ]);
+    render(<ImportHistory organizationId="org-1" />, { wrapper });
+
+    expect(await screen.findByText(/Bilder behandles: 2/)).toBeTruthy();
+    expect(screen.getByText(/Bilder feilet: 1/)).toBeTruthy();
+    expect(screen.getByText("Bildet finnes ikke på adressen (HTTP 404).")).toBeTruthy();
   });
 });

@@ -54,6 +54,7 @@ import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
+import { Route as ApiPublicImagesProcessRouteImport } from './routes/api/public/images/process'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicR2CleanupRouteImport } from './routes/api/public/r2/cleanup'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
@@ -299,6 +300,11 @@ const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
   path: '/api/public/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicImagesProcessRoute = ApiPublicImagesProcessRouteImport.update({
+  id: '/api/public/images/process',
+  path: '/api/public/images/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
   id: '/api/public/push/dispatch',
   path: '/api/public/push/dispatch',
@@ -360,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
+  '/api/public/images/process': typeof ApiPublicImagesProcessRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
@@ -407,6 +414,7 @@ export interface FileRoutesByTo {
   '/bedrift': typeof AuthenticatedBedriftIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
+  '/api/public/images/process': typeof ApiPublicImagesProcessRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
@@ -458,6 +466,7 @@ export interface FileRoutesById {
   '/_authenticated/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
+  '/api/public/images/process': typeof ApiPublicImagesProcessRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/r2/cleanup': typeof ApiPublicR2CleanupRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
@@ -509,6 +518,7 @@ export interface FileRouteTypes {
     | '/bedrift/'
     | '/meldinger/'
     | '/mine-annonser/'
+    | '/api/public/images/process'
     | '/api/public/push/dispatch'
     | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
@@ -556,6 +566,7 @@ export interface FileRouteTypes {
     | '/bedrift'
     | '/meldinger'
     | '/mine-annonser'
+    | '/api/public/images/process'
     | '/api/public/push/dispatch'
     | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
@@ -606,6 +617,7 @@ export interface FileRouteTypes {
     | '/_authenticated/bedrift/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
+    | '/api/public/images/process'
     | '/api/public/push/dispatch'
     | '/api/public/r2/cleanup'
     | '/api/public/vipps/webhook'
@@ -633,6 +645,7 @@ export interface RootRouteChildren {
   BrukerIdRoute: typeof BrukerIdRoute
   OkIdRoute: typeof OkIdRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
+  ApiPublicImagesProcessRoute: typeof ApiPublicImagesProcessRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicR2CleanupRoute: typeof ApiPublicR2CleanupRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
@@ -955,6 +968,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCspReportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/images/process': {
+      id: '/api/public/images/process'
+      path: '/api/public/images/process'
+      fullPath: '/api/public/images/process'
+      preLoaderRoute: typeof ApiPublicImagesProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/push/dispatch': {
       id: '/api/public/push/dispatch'
       path: '/api/public/push/dispatch'
@@ -1084,6 +1104,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrukerIdRoute: BrukerIdRoute,
   OkIdRoute: OkIdRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
+  ApiPublicImagesProcessRoute: ApiPublicImagesProcessRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicR2CleanupRoute: ApiPublicR2CleanupRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,

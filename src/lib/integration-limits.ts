@@ -115,3 +115,14 @@ export function newListingsPerDayLimitMessage(): string {
     "er nådd. Eksisterende annonser kan fortsatt oppdateres; prøv igjen i morgen."
   );
 }
+
+/** Den norske kundevendte advarselsteksten når døgngrensen for nye bilder er
+ * nådd for en rad. Annonsen lagres uansett — kun bildene for denne raden
+ * hoppes over (se `warning`-feltet på `ListingSyncResult` i
+ * `listing-sync.server.ts`); ikke en feil. */
+export function newImagesPerDayLimitMessage(): string {
+  return (
+    `Dagens grense på ${formatLimit(INTEGRATION_LIMITS.organization.newImagesPerDay, "nye bilder")} ` +
+    "er nådd. Annonsen ble lagret uten disse bildene; de legges til ved neste synk."
+  );
+}

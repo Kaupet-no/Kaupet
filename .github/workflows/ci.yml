@@ -338,6 +338,13 @@ jobs:
           echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
           echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
           echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
+          # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
+          # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
+          if [ -n "${{ secrets.IMAGE_JOBS_SECRET }}" ]; then
+            echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no
+          else
+            echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -609,6 +616,13 @@ jobs:
           echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
           echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
           echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
+          # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
+          # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
+          if [ -n "${{ secrets.IMAGE_JOBS_SECRET }}" ]; then
+            echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no-staging
+          else
+            echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

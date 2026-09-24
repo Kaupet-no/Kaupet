@@ -15,6 +15,7 @@ type ImportHistoryRow = {
   source: string;
   status: string;
   created_at: string;
+  listing_id: string | null;
 };
 
 type ImportRunCounts = {
@@ -30,6 +31,22 @@ type ImportRun = {
   source: string;
   createdAt: string;
   counts: ImportRunCounts;
+  listingIds: string[];
+};
+
+/** Bildestatus for en importkjøring (steg 4: bilder serverside). Kun
+ * kundevendte tall og tekster — `internal_error` er verken hentet (RLS-
+ * kolonnegrant hindrer det uansett) eller vist noe sted. */
+type ImportRunImageStatus = {
+  /** `pending`/`processing` — jobben venter eller behandles, kan ende i
+   * begge de andre gruppene. Vises som "Behandles" siden en intern feil
+   * (vi eier) ALDRI skal vises som noe kunden må reagere på. */
+  processing: number;
+  /** `failed` MED `customer_error` — en feil kunden selv kan rette. */
+  failed: number;
+  /** De faktiske, norske `customer_error`-tekstene for feilede bilder i
+   * denne kjøringen (deduplisert), til bruk i en kort forklaring. */
+  failedMessages: string[];
 };
 
 const SOURCE_LABELS_NB: Record<string, string> = {
@@ -80,25 +97,85 @@ function groupIntoRuns(rows: ImportHistoryRow[]): ImportRun[] {
         source: row.source,
         createdAt: row.created_at,
         counts: emptyCounts(),
+        listingIds: [],
       };
       byImportId.set(row.import_id, run);
     }
     if ((run.counts as Record<string, number>)[row.status] !== undefined) {
       (run.counts as Record<string, number>)[row.status] += 1;
     }
+    if (row.listing_id) run.listingIds.push(row.listing_id);
   }
   return [...byImportId.values()];
 }
 
-async function fetchImportHistory(organizationId: string): Promise<ImportRun[]> {
+// Chunkstørrelse for `.in("listing_id", …)`-oppslaget under, av samme grunn
+// som REF_LOOKUP_CHUNK_SIZE i listing-sync.server.ts (kort URL).
+const LISTING_IDS_CHUNK_SIZE = 100;
+
+/** Henter bildestatus (steg 4) for et sett med annonse-id-er, gruppert per
+ * annonse. Egen spørring mot `listing_image_jobs` — RLS begrenser den til
+ * organisasjonens egne rader, og kolonne-grant-en (se migrasjonen) skjuler
+ * `internal_error` for klienten, akkurat som ønsket her. */
+async function fetchImageStatusByListingId(
+  listingIds: string[],
+): Promise<Map<string, { processing: number; failed: number; failedMessages: string[] }>> {
+  const result = new Map<
+    string,
+    { processing: number; failed: number; failedMessages: string[] }
+  >();
+  for (let offset = 0; offset < listingIds.length; offset += LISTING_IDS_CHUNK_SIZE) {
+    const chunk = listingIds.slice(offset, offset + LISTING_IDS_CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from("listing_image_jobs")
+      .select("listing_id, status, customer_error")
+      .in("listing_id", chunk);
+    if (error) throw error;
+    for (const job of data ?? []) {
+      const entry = result.get(job.listing_id) ?? { processing: 0, failed: 0, failedMessages: [] };
+      if (job.status === "pending" || job.status === "processing") {
+        entry.processing += 1;
+      } else if (job.status === "failed" && job.customer_error) {
+        entry.failed += 1;
+        if (!entry.failedMessages.includes(job.customer_error)) {
+          entry.failedMessages.push(job.customer_error);
+        }
+      }
+      result.set(job.listing_id, entry);
+    }
+  }
+  return result;
+}
+
+async function fetchImportHistory(
+  organizationId: string,
+): Promise<(ImportRun & { imageStatus: ImportRunImageStatus })[]> {
   const { data, error } = await supabase
     .from("organization_listing_imports")
-    .select("import_id, source, status, created_at")
+    .select("import_id, source, status, created_at, listing_id")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(HISTORY_ROW_WINDOW);
   if (error) throw error;
-  return groupIntoRuns((data ?? []) as ImportHistoryRow[]);
+  const runs = groupIntoRuns((data ?? []) as ImportHistoryRow[]);
+
+  const allListingIds = Array.from(new Set(runs.flatMap((run) => run.listingIds)));
+  const imageStatusByListingId =
+    allListingIds.length > 0 ? await fetchImageStatusByListingId(allListingIds) : new Map();
+
+  return runs.map((run) => {
+    const imageStatus: ImportRunImageStatus = { processing: 0, failed: 0, failedMessages: [] };
+    for (const listingId of run.listingIds) {
+      const entry = imageStatusByListingId.get(listingId);
+      if (!entry) continue;
+      imageStatus.processing += entry.processing;
+      imageStatus.failed += entry.failed;
+      for (const message of entry.failedMessages) {
+        if (!imageStatus.failedMessages.includes(message)) imageStatus.failedMessages.push(message);
+      }
+    }
+    return { ...run, imageStatus };
+  });
 }
 
 /**
@@ -162,6 +239,21 @@ export function ImportHistory({ organizationId }: { organizationId: string }) {
               .map((key) => `${STATUS_LABELS_NB[key]}: ${run.counts[key]}`)
               .join(" · ") || "Ingen endringer"}
           </p>
+          {(run.imageStatus.processing > 0 || run.imageStatus.failed > 0) && (
+            <p className="mt-1 text-muted-foreground">
+              {[
+                run.imageStatus.processing > 0
+                  ? `Bilder behandles: ${run.imageStatus.processing}`
+                  : null,
+                run.imageStatus.failed > 0 ? `Bilder feilet: ${run.imageStatus.failed}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              {run.imageStatus.failedMessages.length > 0 && (
+                <span className="block text-xs">{run.imageStatus.failedMessages.join(" ")}</span>
+              )}
+            </p>
+          )}
         </li>
       ))}
     </ul>

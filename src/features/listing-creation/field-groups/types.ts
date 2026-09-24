@@ -51,6 +51,10 @@ export type ComposerReviewGroup = {
 export type ComposerReviewEditOptions = {
   field?: string;
   groupKey?: string;
+  /** Anchor id (matches a `review-section-<reviewAnchor>` wrapper in
+   * review-publish/index.tsx) to scroll/focus back to when the edit returns
+   * to the "Se over"-steget — only meaningful for edits started from there. */
+  reviewAnchor?: string;
 };
 
 /*

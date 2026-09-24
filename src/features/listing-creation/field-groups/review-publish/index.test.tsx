@@ -76,13 +76,13 @@ describe("ReviewPublishGroup", () => {
     );
     const { rerender } = render(view(["Tittelen må være minst 5 tegn"]));
 
-    expect(screen.getByRole("heading", { name: "Publiseringsklar" })).toBeTruthy();
-    expect(screen.getByRole("alert").textContent).toContain("Tittelen må være minst 5 tegn");
-    expect(screen.getByRole("heading", { name: "Gjør annonsen bedre" })).toBeTruthy();
-    expect(screen.getByText("Legg til bilder")).toBeTruthy();
+    expect(screen.getByText("1 opplysning må fylles ut")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tittelen må være minst 5 tegn" })).toBeTruthy();
+    expect(screen.queryByText("Klar til publisering")).toBeNull();
 
     rerender(view([]));
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("Klar til publisering")).toBeTruthy();
+    expect(screen.getByText("Legg til bilder, så finner flere den")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Publiser" }));
 
     expect(onSubmit).toHaveBeenCalledOnce();

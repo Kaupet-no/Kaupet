@@ -52,27 +52,18 @@ export function composerPage(page: Page, pageKey: string) {
   return page.getByTestId(`composer-page-${pageKey}`);
 }
 
-export function publishingStatusButton(page: Page) {
-  return page.getByTestId("publishing-status-button");
+/** V3 annonsestyrke-indikator — erstatter den gamle "Publiseringsstatus"-
+ * boksen/dialogen. Vises i desktop-sidekolonnen gjennom hele flyten, og
+ * øverst på Se over-steget på mobil/native (se ny-annonse.tsx sin aside og
+ * ReviewPublishGroup). */
+export function listingStrengthIndicator(page: Page) {
+  return page.getByTestId("listing-strength");
 }
 
-export function missingInformationDialog(page: Page) {
-  return page.getByRole("dialog", { name: "Opplysninger som mangler" });
-}
-
-export async function openPublishingStatus(page: Page) {
-  await publishingStatusButton(page).click();
-  await expect(missingInformationDialog(page)).toBeVisible();
-}
-
+/** Klikker lenken for et manglende felt direkte i indikatoren — ingen egen
+ * dialog lenger, lenkene ligger inline under "X opplysninger må fylles ut". */
 export async function fixMissingInformation(page: Page, label: string) {
-  const dialog = missingInformationDialog(page);
-  await dialog
-    .locator("li")
-    .filter({ hasText: label })
-    .getByRole("button", { name: "Fiks dette" })
-    .click();
-  await expect(dialog).toBeHidden();
+  await listingStrengthIndicator(page).getByRole("button", { name: label }).click();
 }
 /**
  * Clicks `trigger` and waits for `expected` to appear. Retries the click a

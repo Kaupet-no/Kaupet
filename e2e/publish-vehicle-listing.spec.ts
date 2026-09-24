@@ -6,11 +6,9 @@ import {
   clickNextAndWaitFor,
   fixMissingInformation,
   goToNewListing,
+  listingStrengthIndicator,
   login,
-  missingInformationDialog,
-  openPublishingStatus,
   publishAndExpectSuccess,
-  publishingStatusButton,
   wizardStep,
 } from "./pages/listing-wizard";
 
@@ -72,9 +70,9 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await page.getByRole("radio", { name: "Bruktbil" }).click();
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).check();
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-price"), testInfo);
-  await publishingStatusButton(page).waitFor();
-  await openPublishingStatus(page);
-  await expect(missingInformationDialog(page).getByText("Pris", { exact: true })).toBeVisible();
+  const indicator = listingStrengthIndicator(page);
+  await indicator.waitFor();
+  await expect(indicator.getByRole("button", { name: "Pris", exact: true })).toBeVisible();
   await fixMissingInformation(page, "Pris");
   await expect(page.locator("#price_nok")).toBeFocused();
   await page.locator("#price_nok").fill("349000");
@@ -82,7 +80,7 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await clickNextAndWaitFor(page, wizardStep(page, "location"), testInfo);
 
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
-  await expect(page.getByText("Publiseringsklar")).toBeVisible();
+  await expect(page.getByText("Klar til publisering")).toBeVisible();
   // desktop-web is also the shared Proff superuser fixture (see
   // global-setup.ts) — LocationGroup shows the organization's own location
   // picker for it instead of a personal postal-code input, and auto-selects

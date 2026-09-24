@@ -13,11 +13,9 @@ import {
   fillDescriptionAndAdvance,
   fixMissingInformation,
   goToNewListing,
+  listingStrengthIndicator,
   login,
-  missingInformationDialog,
-  openPublishingStatus,
   publishAndExpectSuccess,
-  publishingStatusButton,
   wizardStep,
 } from "./pages/listing-wizard";
 
@@ -72,7 +70,7 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   // (see requiresDeliveryMethod in category-behavior.ts) and createListing
   // rejects can_ship: null server-side — but the wizard's own
   // "requiredToPublish" check for the delivery field group doesn't catch a
-  // missing selection, so skipping this silently reaches "Publiseringsklar"
+  // missing selection, so skipping this silently reaches "Klar til publisering"
   // and only fails once the publish click hits the server.
   await page.getByRole("radio", { name: /Må hentes/ }).click();
   await clickNextAndWaitFor(page, wizardStep(page, "review-publish"), testInfo);
@@ -83,27 +81,26 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
 test("viser manglende opplysninger med snarvei til feltet", async ({ page }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop-web",
-    "Publiseringsstatus ligger i desktop-sidepanelet",
+    "Annonsestyrke-indikatoren ligger i desktop-sidepanelet",
   );
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
   await login(page, credentials.email, credentials.password);
   await goToNewListing(page);
-  // Publiseringsstatus rendres bak `categoryId &&` (ui-gjennomgangen, W2):
-  // antallet manglende opplysninger avhenger av kategorien, så panelet finnes
-  // ikke før en kategori er valgt. Tittelen fylles derfor på photos-steget
-  // i stedet for via ?title=, slik at den ikke teller som en mangel her.
+  // Indikatoren rendres bak `categoryId &&` (ui-gjennomgangen, W2): antallet
+  // manglende opplysninger avhenger av kategorien, så den finnes ikke før en
+  // kategori er valgt. Tittelen fylles derfor på photos-steget i stedet for
+  // via ?title=, slik at den ikke teller som en mangel her.
   await chooseCategory(page, TEST_CATEGORY_NAME);
   await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E statusannonse");
-  await publishingStatusButton(page).waitFor();
+  const indicator = listingStrengthIndicator(page);
+  await indicator.waitFor();
 
-  await expect(publishingStatusButton(page)).toContainText(/opplysninger? mangler/);
-  await openPublishingStatus(page);
-  const dialog = missingInformationDialog(page);
-  await expect(dialog.getByText("Beskrivelse", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Pris", { exact: true })).toBeVisible();
+  await expect(indicator).toContainText(/opplysninger? må fylles ut/);
+  await expect(indicator.getByRole("button", { name: "Beskrivelse", exact: true })).toBeVisible();
+  await expect(indicator.getByRole("button", { name: "Pris", exact: true })).toBeVisible();
 
   await fixMissingInformation(page, "Beskrivelse");
   await expect(page.getByTestId("listing-description-textarea")).toBeFocused();

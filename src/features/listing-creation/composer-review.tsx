@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type {
   ComposerReviewClassification,
   ComposerReviewStatus,
@@ -20,6 +21,72 @@ const statusSections: {
     actionLabel: "Endre",
   },
 ];
+
+/**
+ * Compact annonsestyrke-indikator (V3): erstatter den gamle "Publiseringsstatus"-
+ * boksen og "Publiseringsklar"-overskriften med ett kompakt element — en prikk +
+ * tekst, med lenker rett til feltene når noe blokkerer. To nivåer, ikke tre:
+ * blokkerende (requiredToPublish) og valgfritt bedre (alt annet). Vises i
+ * sidekolonnen gjennom hele flyten på desktop, og øverst på Se over på mobil
+ * (se ReviewPublishGroup / ny-annonse.tsx sin aside).
+ */
+export function ListingStrengthIndicator({
+  required,
+  improvements,
+}: {
+  required: ComposerReviewStatus[];
+  improvements: ComposerReviewStatus[];
+}) {
+  const ready = required.length === 0;
+  const invitation = improvements[0];
+  return (
+    <section aria-labelledby="listing-strength-title" className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className={cn("size-2.5 shrink-0 rounded-full", ready ? "bg-primary" : "bg-destructive")}
+        />
+        <p
+          id="listing-strength-title"
+          role="status"
+          aria-live="polite"
+          className="text-sm font-semibold"
+        >
+          {ready
+            ? "Klar til publisering"
+            : `${required.length} ${required.length === 1 ? "opplysning" : "opplysninger"} må fylles ut`}
+        </p>
+      </div>
+      {!ready ? (
+        <ul className="space-y-1 pl-[1.125rem]">
+          {required.map((item) => (
+            <li key={item.key}>
+              <button
+                type="button"
+                onClick={item.onAction}
+                className="native-touch-target text-left text-sm text-destructive underline decoration-dotted underline-offset-4 hover:decoration-solid"
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        invitation && (
+          <button
+            type="button"
+            onClick={invitation.onAction}
+            className="native-touch-target block pl-[1.125rem] text-left text-sm text-brand-text underline decoration-dotted underline-offset-4 hover:decoration-solid"
+          >
+            {invitation.key === "photos"
+              ? "Legg til bilder, så finner flere den"
+              : invitation.label}
+          </button>
+        )
+      )}
+    </section>
+  );
+}
 
 export function ComposerReviewStatuses({ items }: { items: ComposerReviewStatus[] }) {
   return (

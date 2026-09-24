@@ -65,8 +65,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
@@ -75,6 +73,7 @@ import {
   PublishActions,
   ReviewPreview,
 } from "@/features/listing-creation/field-groups/review-publish";
+import { deriveComposerImprovements } from "@/features/listing-creation/field-groups/review-publish/derive-improvements";
 import type {
   ComposerReviewEditOptions,
   ComposerReviewStatus,
@@ -88,7 +87,7 @@ import { publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
-import { ComposerReviewStatuses } from "@/features/listing-creation/composer-review";
+import { ListingStrengthIndicator } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import { NoImageDialog } from "@/features/listing-creation/no-image-dialog";
@@ -191,13 +190,17 @@ function NewListingPage() {
   const returnToReviewRef = useRef(false);
   const reviewSectionLastStepRef = useRef<number | null>(null);
   const pendingReviewFocusRef = useRef<string | null>(null);
+  /** Set from `ComposerReviewEditOptions.reviewAnchor` when an edit is
+   * started from the Se over-steget (review-publish's `ListingReviewSection`
+   * wrappers) — consumed once we land back on review to scroll/focus that
+   * section, per the "return goes back to where you left" rule (UI-guiden). */
+  const returnFocusAnchorRef = useRef<string | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const authResumeHandledRef = useRef(false);
   const bypassNavigationBlockerRef = useRef(false);
   const noImagePromptShownRef = useRef(false);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
-  const [publishingStatusOpen, setPublishingStatusOpen] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
     field: string;
     message: string;
@@ -636,6 +639,22 @@ function NewListingPage() {
     return () => cancelAnimationFrame(frame);
   }, [pages.length, reviewJumpRequested, setStep]);
 
+  // Lander vi på Se over med et pending anker (satt av editReviewSection når
+  // redigeringen startet derfra), scroll/fokuser dit i stedet for toppen —
+  // ellers no-op (vanlig ankomst til review har ingen anker satt).
+  useEffect(() => {
+    if (step !== pages.length) return;
+    const anchor = returnFocusAnchorRef.current;
+    if (!anchor) return;
+    returnFocusAnchorRef.current = null;
+    const frame = requestAnimationFrame(() => {
+      const el = document.getElementById(`review-section-${anchor}`);
+      el?.focus();
+      el?.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [step, pages.length]);
+
   const currentStepKey = currentPage?.groups[0]?.key ?? "unknown";
   // Category selection (suggestion click or manual pick) auto-advances the
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
@@ -730,6 +749,7 @@ function NewListingPage() {
       return;
     }
     reviewSectionLastStepRef.current = target.last;
+    returnFocusAnchorRef.current = options?.reviewAnchor ?? null;
     setStep(target.first);
     if (target.first === step && options?.field) {
       requestAnimationFrame(() => {
@@ -836,7 +856,6 @@ function NewListingPage() {
       targetField: field,
       insertionOrder: insertionOrder++,
       onAction: () => {
-        setPublishingStatusOpen(false);
         editReviewSection(reviewSectionForGroup(groupKey), {
           field,
           groupKey,
@@ -945,11 +964,6 @@ function NewListingPage() {
     }
   }
   const sortedPublishingRequirements = sortComposerRequirements(pages, publishingRequirements);
-  const missingPublishingCount = sortedPublishingRequirements.length;
-  const publishingStatus =
-    missingPublishingCount > 0
-      ? `${missingPublishingCount} ${missingPublishingCount === 1 ? "opplysning mangler" : "opplysninger mangler"}`
-      : "Klar til publisering";
 
   const shouldBlockNav =
     publishedId === null &&
@@ -1743,6 +1757,11 @@ function NewListingPage() {
     ),
     publishingRequirements: sortedPublishingRequirements,
   };
+  // Samme avledning som mobilens ReviewPublishGroup bruker (V3) — regnet her
+  // også, siden sidekolonnens annonsestyrke-indikator vises gjennom hele
+  // flyten, ikke bare på Se over-steget der ReviewPublishGroup selv rendres.
+  // eslint-disable-next-line react-hooks/refs -- deriveComposerImprovements leser kun images/city/postalCode/groupKeys fra sharedProps, ingen ref
+  const desktopImprovements = deriveComposerImprovements(sharedProps);
 
   const groups = currentPage?.groups ?? [];
   // Native gives the description textarea a flex-fill layout so it grows to
@@ -2008,59 +2027,36 @@ function NewListingPage() {
           aside={
             !native ? (
               <>
-                {/* Antallet manglende opplysninger telles fra feltgruppene, og
-                    feltgruppene bestemmes av kategorien — før den er valgt ville
-                    tallet vært en gjetning som hopper så snart kategorien settes. */}
+                {/* Annonsestyrken telles fra feltgruppene, og feltgruppene
+                    bestemmes av kategorien — før den er valgt ville tallet
+                    vært en gjetning som hopper så snart kategorien settes.
+                    Vises gjennom hele flyten (V3), ikke bare på Se over. */}
                 {categoryId && (
-                  <section aria-labelledby="desktop-publishing-status-title" className="space-y-2">
-                    <h2 id="desktop-publishing-status-title" className="text-lg font-semibold">
-                      Publiseringsstatus
-                    </h2>
-                    {missingPublishingCount > 0 ? (
-                      <button
-                        type="button"
-                        data-testid="publishing-status-button"
-                        aria-haspopup="dialog"
-                        onClick={() => setPublishingStatusOpen(true)}
-                        className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left transition-[background-color,border-color] duration-150 hover:border-primary/70 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span
-                            role="status"
-                            aria-live="polite"
-                            className="block text-sm font-medium text-foreground"
-                          >
-                            {publishingStatus}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            Trykk for å se hva som mangler
-                          </span>
-                        </span>
-                        <ChevronRight
-                          className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
-                          aria-hidden
-                        />
-                      </button>
-                    ) : (
-                      <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                        {publishingStatus}
-                      </p>
-                    )}
-                  </section>
+                  <div data-testid="listing-strength">
+                    <ListingStrengthIndicator
+                      required={sortedPublishingRequirements}
+                      improvements={desktopImprovements}
+                    />
+                  </div>
                 )}
-                <ReviewPreview
-                  headingId="desktop-listing-preview-title"
-                  images={images}
-                  title={title}
-                  subtitle={subtitle}
-                  priceNok={priceNok}
-                  isFree={isFree}
-                  city={city}
-                  postalCode={postalCode}
-                  categorySlug={categorySlug}
-                  attributes={attributes}
-                  onPreview={openPreview}
-                />
+                {/* På Se over-steget selv er hovedkolonnen allerede annonsen
+                    (N1) — sidekolonnens forhåndsvisningskort ville bare
+                    duplisert den. */}
+                {currentStepKey !== "review-publish" && (
+                  <ReviewPreview
+                    headingId="desktop-listing-preview-title"
+                    images={images}
+                    title={title}
+                    subtitle={subtitle}
+                    priceNok={priceNok}
+                    isFree={isFree}
+                    city={city}
+                    postalCode={postalCode}
+                    categorySlug={categorySlug}
+                    attributes={attributes}
+                    onPreview={openPreview}
+                  />
+                )}
               </>
             ) : undefined
           }
@@ -2096,22 +2092,6 @@ function NewListingPage() {
           )}
         </ListingComposerShell>
       </form>
-
-      <ResponsiveOverlay open={publishingStatusOpen} onOpenChange={setPublishingStatusOpen}>
-        <ResponsiveOverlayContent
-          className="max-h-[85vh] overflow-y-auto sm:max-w-md"
-          expandable
-          onCloseAutoFocus={(event) => event.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle>Opplysninger som mangler</DialogTitle>
-            <DialogDescription>
-              Fyll ut disse opplysningene før annonsen kan publiseres.
-            </DialogDescription>
-          </DialogHeader>
-          <ComposerReviewStatuses items={sortedPublishingRequirements} />
-        </ResponsiveOverlayContent>
-      </ResponsiveOverlay>
 
       <AlertDialog open={previewNudgeOpen} onOpenChange={setPreviewNudgeOpen}>
         <AlertDialogContent>

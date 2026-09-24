@@ -70,8 +70,8 @@ import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import {
+  ListingPreviewCanvas,
   PublishActions,
-  ReviewPreview,
 } from "@/features/listing-creation/field-groups/review-publish";
 import { deriveComposerImprovements } from "@/features/listing-creation/field-groups/review-publish/derive-improvements";
 import type {
@@ -172,6 +172,25 @@ export const Route = createFileRoute("/ny-annonse")({
   component: NewListingPage,
   errorComponent: NewListingError,
 });
+
+/** Hvilke(t) anker i det levende lerretet (ListingPreviewCanvas) et steg sin
+ * feltgruppe hører til — brukes til å markere "Du redigerer" i sidekolonnen.
+ * vehicle-facts samler flere felt (tittel/km/beskrivelse) på ett steg, derfor
+ * flere ankre der. Steg uten oppføring her (kategorivalg, registreringsnr.
+ * osv.) får ingen markering — det er greit, lerretet viser uansett hele
+ * annonsen. */
+const CANVAS_ANCHORS_BY_GROUP_KEY: Record<string, string[]> = {
+  photos: ["photos"],
+  title: ["title"],
+  price: ["price"],
+  "vehicle-price": ["price"],
+  "category-attributes": ["facts"],
+  "boat-facts": ["facts"],
+  "vehicle-facts": ["title", "facts", "description"],
+  "description-keywords": ["description"],
+  location: ["location"],
+  delivery: ["location"],
+};
 
 function NewListingPage() {
   const navigate = useNavigate();
@@ -1761,6 +1780,11 @@ function NewListingPage() {
   const desktopImprovements = deriveComposerImprovements(sharedProps);
 
   const groups = currentPage?.groups ?? [];
+  // Delene av det levende lerretet som hører til steget brukeren står på nå
+  // (V2) — se CANVAS_ANCHORS_BY_GROUP_KEY.
+  const canvasActiveAnchors = Array.from(
+    new Set(groups.flatMap((g) => CANVAS_ANCHORS_BY_GROUP_KEY[g.key] ?? [])),
+  );
   // Native gives the description textarea a flex-fill layout so it grows to
   // fill the remaining page height instead of a fixed row count — needed on
   // any solo native page containing it: the generic description-keywords
@@ -2033,12 +2057,15 @@ function NewListingPage() {
           footer={composerFooter}
           firstStep={isFirst}
           aside={
-            !native ? (
+            // På Se over-steget selv er hovedkolonnen allerede annonsen (N1)
+            // — lerretet ville bare duplisert den, så sidekolonnen skjules
+            // helt der og hovedkolonnen får full bredde (V2). Annonsestyrken
+            // vises da inline øverst i ReviewPublishGroup i stedet.
+            !native && currentStepKey !== "review-publish" ? (
               <>
                 {/* Annonsestyrken telles fra feltgruppene, og feltgruppene
                     bestemmes av kategorien — før den er valgt ville tallet
-                    vært en gjetning som hopper så snart kategorien settes.
-                    Vises gjennom hele flyten (V3), ikke bare på Se over. */}
+                    vært en gjetning som hopper så snart kategorien settes. */}
                 {categoryId && (
                   <div data-testid="listing-strength">
                     <ListingStrengthIndicator
@@ -2047,24 +2074,15 @@ function NewListingPage() {
                     />
                   </div>
                 )}
-                {/* På Se over-steget selv er hovedkolonnen allerede annonsen
-                    (N1) — sidekolonnens forhåndsvisningskort ville bare
-                    duplisert den. */}
-                {currentStepKey !== "review-publish" && (
-                  <ReviewPreview
-                    headingId="desktop-listing-preview-title"
-                    images={images}
-                    title={title}
-                    subtitle={subtitle}
-                    priceNok={priceNok}
-                    isFree={isFree}
-                    city={city}
-                    postalCode={postalCode}
-                    categorySlug={categorySlug}
-                    attributes={attributes}
-                    onPreview={openPreview}
-                  />
-                )}
+                {/* Det levende lerretet (V2): samme kompakte kjøpervisning som
+                    Se over bruker, oppdatert mens brukeren skriver. Delen som
+                    hører til steget brukeren står på nå er markert. */}
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Slik ser kjøperen annonsen
+                  </p>
+                  <ListingPreviewCanvas {...sharedProps} activeAnchors={canvasActiveAnchors} />
+                </div>
               </>
             ) : undefined
           }

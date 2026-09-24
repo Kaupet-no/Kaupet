@@ -215,7 +215,7 @@ export function ListingComposerShell({
         data-composer-layout={showAside ? "split" : "single-column"}
         className={cn(
           showAside
-            ? "grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-start lg:gap-10 lg:mt-2"
+            ? "grid min-w-0 lg:grid-cols-[minmax(25rem,30rem)_minmax(0,1.1fr)] lg:items-start lg:gap-10 lg:mt-2"
             : "contents",
         )}
       >
@@ -284,7 +284,7 @@ export function ListingComposerShell({
           <aside
             aria-label="Oppsummering av annonsen"
             data-composer-aside="desktop"
-            className="hidden min-w-0 space-y-6 rounded-2xl border border-border bg-background p-5 lg:sticky lg:top-[calc(var(--site-header-h)+1.5rem)] lg:block"
+            className="hidden min-w-0 space-y-6 rounded-2xl border border-border bg-background p-5 lg:sticky lg:top-[calc(var(--site-header-h)+1.5rem)] lg:block lg:max-h-[calc(100dvh-var(--site-header-h)-3rem)] lg:overflow-y-auto"
           >
             {aside}
           </aside>

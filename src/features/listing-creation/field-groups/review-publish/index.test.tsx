@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
-import { PublishActions, ReviewPreview, ReviewPublishGroup } from ".";
+import { ListingPreviewCanvas, PublishActions, ReviewPublishGroup } from ".";
 
 const categoryFilters = vi.hoisted(() => ({
   current: [] as import("@/lib/category-filters").CategoryFilter[],
@@ -145,70 +145,48 @@ describe("PublishActions", () => {
   );
 });
 
-describe("ReviewPreview", () => {
-  it("viser en tilgjengelig tom forhåndsvisning uten å feile", () => {
+describe("ListingPreviewCanvas", () => {
+  const baseProps = {
+    native: false,
+    isVehicle: false,
+    behavior: { requiresDeliveryMethod: false },
+    categories: [],
+    categoryId: "",
+    images: [],
+    title: "Kort",
+    subtitle: undefined,
+    previewPrice: null,
+    city: undefined,
+    postalCode: undefined,
+    categoryLabel: "Møbler",
+    attributes: {},
+    mutationIsPending: false,
+    uploadProgress: null,
+    improvementGroupKeys: [],
+    publishingRequirementErrors: [],
+  } as unknown as WizardSharedProps;
+
+  it("markerer det aktive ankeret med «Du redigerer» og lar de andre stå umerket", () => {
     render(
-      <ReviewPreview
-        images={[]}
-        title=""
-        subtitle=""
-        priceNok={undefined}
-        isFree={false}
-        city=""
-        postalCode=""
-        categorySlug={null}
-        attributes={{}}
+      <ListingPreviewCanvas
+        {...baseProps}
+        onEditReviewSection={vi.fn()}
+        activeAnchors={["price"]}
       />,
     );
 
-    expect(screen.getByRole("region", { name: "Forhåndsvisning" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Forhåndsvisning" })).toBeTruthy();
-    expect(screen.getAllByText("Ingen bilde").length).toBeGreaterThan(0);
-    expect(screen.getByText("—")).toBeTruthy();
-    expect(screen.getByText("Pris ikke satt")).toBeTruthy();
-    expect(screen.getByRole("article").className).toContain("text-left");
-    expect(screen.queryByText("Pris ved henvendelse")).toBeNull();
+    expect(screen.getAllByText("Du redigerer")).toHaveLength(1);
   });
-  it("gjør hele forhåndsvisningskortet trykkbart med beskrivende navn", () => {
-    const onPreview = vi.fn();
-    render(
-      <ReviewPreview
-        images={[]}
-        title="Volvo V90"
-        subtitle=""
-        priceNok={250_000}
-        isFree={false}
-        city="Oslo"
-        postalCode=""
-        categorySlug="bil"
-        attributes={{}}
-        onPreview={onPreview}
-      />,
+
+  it("kaller onEditReviewSection med riktig anker når en del av lerretet klikkes", () => {
+    const onEditReviewSection = vi.fn();
+    render(<ListingPreviewCanvas {...baseProps} onEditReviewSection={onEditReviewSection} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Endre pris" }));
+
+    expect(onEditReviewSection).toHaveBeenCalledWith(
+      "details",
+      expect.objectContaining({ reviewAnchor: "price", field: "price_nok" }),
     );
-
-    const previewButton = screen.getByRole("button", {
-      name: "Trykk for å forhåndsvise annonsen",
-    });
-    fireEvent.click(previewButton);
-
-    expect(onPreview).toHaveBeenCalledOnce();
-    expect(screen.getByText("Trykk for å forhåndsvise annonsen")).toBeTruthy();
-  });
-  it("viser kjøretøyets pris inkludert omregistreringsavgift", () => {
-    render(
-      <ReviewPreview
-        images={[]}
-        title="Volvo V90"
-        subtitle=""
-        priceNok={250_000}
-        isFree={false}
-        city="Oslo"
-        postalCode=""
-        categorySlug="bil"
-        attributes={{ omregistreringsavgift_override_kr: 5_000 }}
-      />,
-    );
-
-    expect(screen.getByText("255 000 kr")).toBeTruthy();
   });
 });

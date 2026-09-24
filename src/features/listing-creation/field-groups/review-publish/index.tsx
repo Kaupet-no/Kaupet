@@ -2,7 +2,6 @@ import { type ReactNode, type RefObject } from "react";
 import { ImageIcon, Loader2, MapPin, Pencil } from "lucide-react";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -12,90 +11,6 @@ import { ListingStrengthIndicator } from "@/features/listing-creation/composer-r
 import type { WizardSharedProps, ComposerReviewStatus } from "../types";
 import { Vehicle360Group } from "../vehicle-360";
 import { deriveComposerImprovements } from "./derive-improvements";
-
-type ReviewPreviewProps = Pick<
-  WizardSharedProps,
-  | "images"
-  | "title"
-  | "subtitle"
-  | "priceNok"
-  | "isFree"
-  | "city"
-  | "postalCode"
-  | "categorySlug"
-  | "attributes"
-> & {
-  headingId?: string;
-  onPreview?: () => void;
-};
-
-/** Preview card using the same presentation as the public listing grid. */
-export function ReviewPreview({
-  images,
-  title,
-  subtitle,
-  priceNok,
-  isFree,
-  city,
-  categorySlug,
-  attributes,
-  headingId = "listing-preview-title",
-  onPreview,
-}: ReviewPreviewProps) {
-  const listing: ListingCardData = {
-    id: "preview",
-    kaupet_code: "",
-    title: title || "—",
-    subtitle: subtitle || null,
-    price_nok: typeof priceNok === "number" ? priceNok : null,
-    is_free: isFree ?? false,
-    city: city || null,
-    created_at: "",
-    cover_path: null,
-    mileage_km: typeof attributes?.mileage_km === "number" ? attributes.mileage_km : null,
-    engine_hours: typeof attributes?.engine_hours === "number" ? attributes.engine_hours : null,
-    category_slug: categorySlug,
-    attributes,
-  };
-  const card = (
-    <ListingCard
-      listing={listing}
-      preview
-      signedImageUrl={images[0]?.previewUrl ?? null}
-      missingPriceLabel="Pris ikke satt"
-    />
-  );
-
-  return (
-    <section aria-labelledby={headingId} className="space-y-2">
-      <h3 id={headingId} className="text-sm font-semibold">
-        Forhåndsvisning
-      </h3>
-      <p className="text-xs text-muted-foreground">
-        Dette er slik annonsen din vil se ut i søkelisten
-      </p>
-      {onPreview ? (
-        <button
-          type="button"
-          onClick={onPreview}
-          /* Navnet hentes fra den synlige teksten under kortet i stedet for en
-             egen aria-label — ellers leses den samme setningen to ganger. */
-          aria-labelledby={`${headingId}-action`}
-          className="block w-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:max-w-[220px]"
-        >
-          {card}
-        </button>
-      ) : (
-        <div className="sm:max-w-[220px]">{card}</div>
-      )}
-      {onPreview && (
-        <p id={`${headingId}-action`} className="text-xs text-muted-foreground">
-          Trykk for å forhåndsvise annonsen
-        </p>
-      )}
-    </section>
-  );
-}
 
 type UploadProgressProps = {
   mutationIsPending: boolean;
@@ -129,27 +44,35 @@ type PublishActionsProps = {
   isGuest?: boolean;
 };
 
-/** En seksjon i den lokale annonsevisningen på Se over-steget, med en
- * diskret Endre-knapp og et fokuserbart anker (`review-section-<anchor>`) —
- * ny-annonse.tsx scroller/fokuserer dit når brukeren kommer tilbake fra en
- * redigering herfra (se `returnFocusGroupKeyRef`). */
+/** En seksjon i den lokale annonsevisningen, med en diskret Endre-knapp og et
+ * fokuserbart anker (`review-section-<anchor>`) — ny-annonse.tsx scroller/
+ * fokuserer dit når brukeren kommer tilbake fra en redigering herfra (se
+ * `returnFocusGroupKeyRef`). `active` markerer delen som hører til steget
+ * brukeren står på nå — kun brukt av det levende lerretet i sidekolonnen
+ * (ny-annonse.tsx), aldri av Se over selv. */
 function ListingReviewSection({
   anchor,
   editLabel,
   onEdit,
+  active,
   children,
 }: {
   anchor: string;
   editLabel: string;
   onEdit: () => void;
+  active?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
       id={`review-section-${anchor}`}
       tabIndex={-1}
-      className="scroll-mt-24 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className={cn(
+        "scroll-mt-24 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        active && "border-2 border-dashed border-brand p-3",
+      )}
     >
+      {active && <p className="mb-1.5 text-xs font-medium text-brand-text">Du redigerer</p>}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">{children}</div>
         <Button
@@ -168,32 +91,24 @@ function ListingReviewSection({
   );
 }
 
+type ListingPreviewCanvasProps = WizardSharedProps & {
+  /** Ankrene til delen som hører til steget brukeren står på nå (f.eks.
+   * ["price"]) — markeres med stiplet ramme + "Du redigerer". Kun satt av
+   * det levende lerretet i sidekolonnen (ny-annonse.tsx); Se over selv
+   * bruker aldri denne. */
+  activeAnchors?: string[];
+};
+
 /**
- * Registry-facing wrapper: den lokale annonsevisningen (N1) + annonsestyrke-
- * indikatoren (V3, kun mobil — desktop har den i sidekolonnen gjennom hele
- * flyten, se ny-annonse.tsx) + UploadProgress. `PublishActions` er
- * deliberately excluded — it renders inline in the wizard's footer bar next
- * to "Tilbake" (not stacked above it), same as today, so ny-annonse.tsx
- * renders it explicitly on the last page instead of via this wrapper.
- *
- * Gjenbruker ikke ListingDetailView/PreviewDraftView direkte: den komponenten
- * er bygget for publiserte bilder (storage_path + imgUrls) og drar med seg
- * router/kart/redigeringskontekst den ikke trenger her, mens utkastets bilder
- * fortsatt er lokale blob-er (PendingImage). "Se full forhåndsvisning"-lenken
- * under åpner den ekte visningen (samme overlay som før) for den som vil se
- * akkurat det kjøper ser.
+ * De seks delene av annonsen slik kjøperen ser den — bilder, tittel, pris,
+ * viktige egenskaper, beskrivelse, sted — hver med et fokuserbart anker og
+ * en diskret Endre-knapp som hopper til steget som eier delen. Delt mellom
+ * Se over-steget (`ReviewPublishGroup`, N1) og det levende lerretet i
+ * sidekolonnen på desktop (ny-annonse.tsx sin aside), slik at kjøpervisningen
+ * kun vedlikeholdes ett sted.
  */
-export function ReviewPublishGroup(props: WizardSharedProps) {
-  const improvements = deriveComposerImprovements(props);
-  const required = (
-    props.publishingRequirements && props.publishingRequirements.length > 0
-      ? props.publishingRequirements
-      : props.publishingRequirementErrors.map((label, index) => ({
-          key: `publishing-requirement-${index}`,
-          label,
-          classification: "requiredToPublish" as const,
-        }))
-  ) as ComposerReviewStatus[];
+export function ListingPreviewCanvas(props: ListingPreviewCanvasProps) {
+  const isActive = (anchor: string) => !!props.activeAnchors?.includes(anchor);
 
   const priceGroupKey = props.improvementGroupKeys.includes("vehicle-price")
     ? "vehicle-price"
@@ -243,103 +158,137 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
   const factChips = [conditionLabel, mileageLabel, deliveryLabel].filter((v): v is string => !!v);
 
   return (
-    <>
-      {/* Desktop har indikatoren i sidekolonnen gjennom hele flyten (se
-          ny-annonse.tsx sin aside) — her repeteres den bare der det ikke
-          finnes noen sidekolonne: native og mobilnett. */}
-      <div className={props.native ? undefined : "lg:hidden"}>
-        <ListingStrengthIndicator required={required} improvements={improvements} />
-      </div>
-
-      <div className="space-y-6">
-        <ListingReviewSection
-          anchor="photos"
-          editLabel="Endre bilder"
-          onEdit={() => editSection("photos", "content", "photos")}
-        >
-          {props.images.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {props.images.slice(0, 6).map((img, index) => (
-                <img
-                  key={img.id}
-                  src={img.previewUrl}
-                  alt=""
-                  className={cn(
-                    "shrink-0 rounded-lg object-cover",
-                    index === 0 ? "h-40 w-40 sm:h-48 sm:w-48" : "h-24 w-24",
-                  )}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-10 text-center">
-              <ImageIcon className="size-6 text-muted-foreground" aria-hidden />
-              <p className="text-sm text-muted-foreground">Ingen bilder ennå</p>
-            </div>
-          )}
-        </ListingReviewSection>
-
-        <ListingReviewSection
-          anchor="title"
-          editLabel="Endre tittel"
-          onEdit={() => editSection("title", "content", "title", "title")}
-        >
-          <h2 className="font-display text-2xl leading-tight tracking-tight">
-            {props.title || "Uten tittel ennå"}
-          </h2>
-        </ListingReviewSection>
-
-        <ListingReviewSection
-          anchor="price"
-          editLabel="Endre pris"
-          onEdit={() => editSection(priceGroupKey, "details", "price", "price_nok")}
-        >
-          <p className="font-display text-2xl font-semibold text-primary">{priceLabel}</p>
-        </ListingReviewSection>
-
-        {factChips.length > 0 && (
-          <ListingReviewSection
-            anchor="facts"
-            editLabel="Endre detaljer"
-            onEdit={() => editSection(factsGroupKey, "details", "facts")}
-          >
-            <ul className="flex flex-wrap gap-2">
-              {factChips.map((chip) => (
-                <li
-                  key={chip}
-                  className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground"
-                >
-                  {chip}
-                </li>
-              ))}
-            </ul>
-          </ListingReviewSection>
+    <div className="space-y-6">
+      <ListingReviewSection
+        anchor="photos"
+        editLabel="Endre bilder"
+        active={isActive("photos")}
+        onEdit={() => editSection("photos", "content", "photos")}
+      >
+        {props.images.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {props.images.slice(0, 6).map((img, index) => (
+              <img
+                key={img.id}
+                src={img.previewUrl}
+                alt=""
+                className={cn(
+                  "shrink-0 rounded-lg object-cover",
+                  index === 0 ? "h-40 w-40 sm:h-48 sm:w-48" : "h-24 w-24",
+                )}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-10 text-center">
+            <ImageIcon className="size-6 text-muted-foreground" aria-hidden />
+            <p className="text-sm text-muted-foreground">Ingen bilder ennå</p>
+          </div>
         )}
+      </ListingReviewSection>
 
-        <ListingReviewSection
-          anchor="description"
-          editLabel="Endre beskrivelse"
-          onEdit={() =>
-            editSection("description-keywords", "details", "description", "description")
-          }
-        >
-          <h3 className="text-sm font-semibold text-muted-foreground">Beskrivelse</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-            {props.description || "Ingen beskrivelse ennå"}
-          </p>
-        </ListingReviewSection>
+      <ListingReviewSection
+        anchor="title"
+        editLabel="Endre tittel"
+        active={isActive("title")}
+        onEdit={() => editSection("title", "content", "title", "title")}
+      >
+        <h2 className="font-display text-2xl leading-tight tracking-tight">
+          {props.title || "Uten tittel ennå"}
+        </h2>
+      </ListingReviewSection>
 
+      <ListingReviewSection
+        anchor="price"
+        editLabel="Endre pris"
+        active={isActive("price")}
+        onEdit={() => editSection(priceGroupKey, "details", "price", "price_nok")}
+      >
+        <p className="font-display text-2xl font-semibold text-primary">{priceLabel}</p>
+      </ListingReviewSection>
+
+      {factChips.length > 0 && (
         <ListingReviewSection
-          anchor="location"
-          editLabel="Endre sted"
-          onEdit={() => editSection("location", "location", "location", "postal_code")}
+          anchor="facts"
+          editLabel="Endre detaljer"
+          active={isActive("facts")}
+          onEdit={() => editSection(factsGroupKey, "details", "facts")}
         >
-          <p className="flex items-center gap-1.5 text-sm text-foreground">
-            <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            {props.city || props.postalCode || "Ikke oppgitt"}
-          </p>
+          <ul className="flex flex-wrap gap-2">
+            {factChips.map((chip) => (
+              <li
+                key={chip}
+                className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground"
+              >
+                {chip}
+              </li>
+            ))}
+          </ul>
         </ListingReviewSection>
-      </div>
+      )}
+
+      <ListingReviewSection
+        anchor="description"
+        editLabel="Endre beskrivelse"
+        active={isActive("description")}
+        onEdit={() => editSection("description-keywords", "details", "description", "description")}
+      >
+        <h3 className="text-sm font-semibold text-muted-foreground">Beskrivelse</h3>
+        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+          {props.description || "Ingen beskrivelse ennå"}
+        </p>
+      </ListingReviewSection>
+
+      <ListingReviewSection
+        anchor="location"
+        editLabel="Endre sted"
+        active={isActive("location")}
+        onEdit={() => editSection("location", "location", "location", "postal_code")}
+      >
+        <p className="flex items-center gap-1.5 text-sm text-foreground">
+          <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          {props.city || props.postalCode || "Ikke oppgitt"}
+        </p>
+      </ListingReviewSection>
+    </div>
+  );
+}
+
+/**
+ * Registry-facing wrapper: den lokale annonsevisningen (N1, via
+ * `ListingPreviewCanvas`) + annonsestyrke-indikatoren (V3) + UploadProgress.
+ * `PublishActions` er deliberately excluded — it renders inline in the
+ * wizard's footer bar next to "Tilbake" (not stacked above it), same as
+ * today, so ny-annonse.tsx renders it explicitly on the last page instead of
+ * via this wrapper.
+ *
+ * Gjenbruker ikke ListingDetailView/PreviewDraftView direkte: den komponenten
+ * er bygget for publiserte bilder (storage_path + imgUrls) og drar med seg
+ * router/kart/redigeringskontekst den ikke trenger her, mens utkastets bilder
+ * fortsatt er lokale blob-er (PendingImage). "Se full forhåndsvisning"-lenken
+ * under åpner den ekte visningen (samme overlay som før) for den som vil se
+ * akkurat det kjøper ser.
+ */
+export function ReviewPublishGroup(props: WizardSharedProps) {
+  const improvements = deriveComposerImprovements(props);
+  const required = (
+    props.publishingRequirements && props.publishingRequirements.length > 0
+      ? props.publishingRequirements
+      : props.publishingRequirementErrors.map((label, index) => ({
+          key: `publishing-requirement-${index}`,
+          label,
+          classification: "requiredToPublish" as const,
+        }))
+  ) as ComposerReviewStatus[];
+
+  return (
+    <>
+      {/* På desktop er Se over allerede full bredde (lerretet i sidekolonnen
+          skjules på dette steget, se ny-annonse.tsx), så indikatoren vises
+          her uansett plattform — ikke bare på native/mobilnett som før. */}
+      <ListingStrengthIndicator required={required} improvements={improvements} />
+
+      <ListingPreviewCanvas {...props} />
 
       {props.onPreview && (
         <Button

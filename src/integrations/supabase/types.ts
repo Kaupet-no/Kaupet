@@ -1094,6 +1094,7 @@ export type Database = {
           display_lng: number | null
           draft_expiry_notified_at: string | null
           expires_at: string | null
+          external_ref: string | null
           hidden_from_home: boolean
           id: string
           is_free: boolean
@@ -1132,6 +1133,7 @@ export type Database = {
           display_lng?: number | null
           draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          external_ref?: string | null
           hidden_from_home?: boolean
           id?: string
           is_free?: boolean
@@ -1170,6 +1172,7 @@ export type Database = {
           display_lng?: number | null
           draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          external_ref?: string | null
           hidden_from_home?: boolean
           id?: string
           is_free?: boolean
@@ -1355,6 +1358,7 @@ export type Database = {
           import_id: string
           listing_id: string | null
           organization_id: string
+          source: string
           status: string
           updated_at: string
           user_id: string
@@ -1367,6 +1371,7 @@ export type Database = {
           import_id: string
           listing_id?: string | null
           organization_id: string
+          source?: string
           status: string
           updated_at?: string
           user_id: string
@@ -1379,6 +1384,7 @@ export type Database = {
           import_id?: string
           listing_id?: string | null
           organization_id?: string
+          source?: string
           status?: string
           updated_at?: string
           user_id?: string
@@ -3352,6 +3358,16 @@ export type Database = {
         Args: { _organization_id: string; _user_id: string }
         Returns: undefined
       }
+      renew_listings_by_external_ref: {
+        Args: {
+          _external_refs: string[]
+          _import_id: string
+          _organization_id: string
+          _source: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
       purge_endpoint_rate_limits: { Args: never; Returns: undefined }
       send_message_rate_limited: {
@@ -3427,6 +3443,10 @@ export type Database = {
           total_count: number
         }[]
       }
+      set_listing_status_by_external_ref: {
+        Args: { _external_ref: string; _organization_id: string; _status: string; _user_id: string }
+        Returns: Json
+      }
       set_organization_location_member_permissions: {
         Args: {
           _chat_access: string
@@ -3499,6 +3519,21 @@ export type Database = {
       sync_organization_entitlements: {
         Args: { _organization_id: string }
         Returns: undefined
+      }
+      upsert_listing_from_external: {
+        Args: {
+          _dry_run?: boolean
+          _external_ref: string
+          _import_id: string
+          _listing: Json
+          _location_id: string
+          _mode: string
+          _organization_id: string
+          _show_visiting_address?: boolean
+          _source: string
+          _user_id: string
+        }
+        Returns: Json
       }
       user_review_summary: {
         Args: { _user_id: string }

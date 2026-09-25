@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { ChevronDown, Sparkles } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
@@ -6,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/image-uploader";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
-import { PhotoSuggestionConsentDialog } from "@/features/listing-creation/photo-suggestion-consent-dialog";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
@@ -130,10 +130,7 @@ export function PhotosGroup({
   title,
   photoSuggestionEnabled,
   photoSuggestionStatus,
-  photoConsentOpen,
-  openPhotoConsent,
-  closePhotoConsent,
-  confirmPhotoConsent,
+  analyzePhotos,
   photoTitleSuggestion,
   dismissPhotoTitleSuggestion,
 }: Pick<
@@ -146,10 +143,7 @@ export function PhotosGroup({
   | "title"
   | "photoSuggestionEnabled"
   | "photoSuggestionStatus"
-  | "photoConsentOpen"
-  | "openPhotoConsent"
-  | "closePhotoConsent"
-  | "confirmPhotoConsent"
+  | "analyzePhotos"
   | "photoTitleSuggestion"
   | "dismissPhotoTitleSuggestion"
 >) {
@@ -183,7 +177,7 @@ export function PhotosGroup({
               variant="outline"
               data-testid="photo-suggestion-button"
               className="native-touch-target h-12 w-full gap-2 rounded-xl border-brand/40 text-brand-text hover:text-brand-text"
-              onClick={openPhotoConsent}
+              onClick={analyzePhotos}
               disabled={images.length === 0 || photoSuggestionStatus === "analyzing"}
               aria-describedby="photo-suggestion-help"
             >
@@ -192,8 +186,16 @@ export function PhotosGroup({
             </Button>
             <p id="photo-suggestion-help" className="text-xs text-muted-foreground">
               {images.length === 0 ? "Legg til minst ett bilde først. " : ""}
-              Vi bruker KI til å analysere bildene og foreslå tittel og kategori. Du ser hva som
-              sendes før noe skjer.
+              Denne funksjonen benytter KI for å analysere bildene. Les mer om hvordan bildene
+              behandles i{" "}
+              <Link
+                to="/personvern"
+                hash="bildeforslag"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                personvernerklæringen
+              </Link>
+              .
             </p>
           </div>
           {photoSuggestionStatus === "analyzing" && (
@@ -203,7 +205,7 @@ export function PhotosGroup({
           )}
           {photoSuggestionStatus === "unavailable" && (
             <p className="text-sm text-muted-foreground">
-              Fikk ikke til å analysere bildene nå. Du kan fylle ut selv.
+              Vi fikk dessverre ikke til å analysere bildene nå. Du må fylle ut selv.
             </p>
           )}
           {photoTitleSuggestion && (
@@ -225,11 +227,6 @@ export function PhotosGroup({
               </Button>
             </div>
           )}
-          <PhotoSuggestionConsentDialog
-            open={photoConsentOpen}
-            onOpenChange={(open) => (open ? openPhotoConsent() : closePhotoConsent())}
-            onConfirm={confirmPhotoConsent}
-          />
         </>
       )}
     </section>

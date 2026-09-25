@@ -1,10 +1,13 @@
 import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { isNotFound, isRedirect } from "@tanstack/react-router";
+import { getRequest, setResponseHeader, setResponseStatus } from "@tanstack/react-start/server";
+import { ZodError } from "zod";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requestBodyExceedsLimit } from "@/lib/request-size.server";
 import { buildSecurityHeaders } from "@/lib/security-headers";
+import { ClientError, isAlreadyLogged } from "@/lib/to-client-error";
 
 const cspNonceMiddleware = createMiddleware().server(async ({ next }) => {
   const nonce = crypto.randomUUID().replaceAll("-", "");
@@ -39,6 +42,40 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     });
   }
 });
+
+// Bare felt som ikke bærer brukerdata havner i Workers-loggen (personvern.tsx,
+// «Feilsøkingslogger»): ZodError-meldinger kan gjengi innsendte verdier, og
+// hele feilobjekter kan ha f.eks. Supabase-`details` med radinnhold.
+function describeError(error: unknown) {
+  if (error instanceof ZodError) return error.issues.map((i) => `${i.path.join(".")}: ${i.code}`);
+  if (error instanceof ClientError) return error.message;
+  const { name, message, code, stack } = (error ?? {}) as Record<string, unknown>;
+  return { name, message, code, stack };
+}
+
+// TanStack Start fanger kast fra serverfunksjoner i middleware-kjeden og
+// serialiserer dem som et vanlig 200-svar — `console.error("Server Fn Error!")`
+// i server-functions-handler nås aldri. Uten denne middlewaren havner feilen
+// bare i Response-bodyen, aldri i Workers-loggen/wrangler tail.
+const serverFnErrorLogMiddleware = createMiddleware({ type: "function" }).server(
+  async ({ next, serverFnMeta }) => {
+    try {
+      return await next();
+    } catch (error) {
+      if (!isRedirect(error) && !isNotFound(error)) {
+        const status =
+          error instanceof ClientError ? error.status : error instanceof ZodError ? 400 : 500;
+        const label = `[serverFn] ${serverFnMeta.name} (${serverFnMeta.filename}) ${status}`;
+        if (status < 500) console.warn(label, describeError(error));
+        else if (!isAlreadyLogged(error)) console.error(label, describeError(error));
+        // Bare for RPC-kall fra nettleseren: in-process-kall under SSR deler
+        // sidens respons, og en loader som håndterer feilen skal ikke gi 500.
+        if (getRequest()?.headers.get("x-tsr-serverFn") === "true") setResponseStatus(status);
+      }
+      throw error;
+    }
+  },
+);
 
 // In-memory cache to avoid hitting the DB on every request.
 const ipCache = new Map<string, { banned: boolean; expires: number }>();
@@ -118,7 +155,7 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [serverFnErrorLogMiddleware, attachSupabaseAuth],
   requestMiddleware: [
     cspNonceMiddleware,
     errorMiddleware,

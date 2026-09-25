@@ -71,11 +71,6 @@ type Props = {
   /** Renders the same static card surface for pre-publish previews. */
   preview?: boolean;
   linkState?: Record<string, unknown>;
-  onOpen?: (position: number, resultCount: number) => void;
-  /** Kortets posisjon (1-basert) og totalt antall treff — sendes videre til
-   * onOpen ved klikk, se search_result_opened-sporingen i result-list. */
-  position?: number;
-  resultCount?: number;
   /** Pre-signed by a result-list batch. Undefined keeps the standalone-card
    * fallback; null means the batch found no usable image. */
   signedImageUrl?: string | null;
@@ -183,9 +178,6 @@ export const ListingCard = memo(function ListingCard({
   compact = false,
   preview = false,
   linkState,
-  onOpen,
-  position = 0,
-  resultCount = 0,
   signedImageUrl,
   missingPriceLabel,
   knownFavorite,
@@ -247,7 +239,6 @@ export const ListingCard = memo(function ListingCard({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
-          onClick={() => onOpen?.(position, resultCount)}
           className={`${linkClass} flex min-w-0 flex-1 gap-3 p-2`}
         >
           <div
@@ -311,7 +302,6 @@ export const ListingCard = memo(function ListingCard({
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
         state={linkState}
-        onClick={() => onOpen?.(position, resultCount)}
         className={linkClass}
         aria-label={`${listing.title}, ${priceLabel}`}
       >

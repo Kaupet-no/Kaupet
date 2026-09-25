@@ -22,7 +22,6 @@ import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
 import { passwordSchema } from "@/lib/auth-schemas";
 import { authConfirmationRedirect, postAuthDestination, safeReturnTo } from "@/lib/auth-return";
-import { trackProductEvent } from "@/lib/product-analytics";
 
 const TERMS_VERSION = "1.0";
 
@@ -189,7 +188,6 @@ function AuthPage() {
 
   const onSubmit = async (values: AuthForm) => {
     setLoading(true);
-    trackProductEvent("auth_started", { mode: isSignUp ? "signup" : "signin" });
     try {
       // Bot-sjekken kjører i bakgrunnen fra siden lastes, og er nesten alltid
       // ferdig før noen rekker å fylle ut skjemaet. Vi venter på token her i
@@ -213,7 +211,6 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        trackProductEvent("auth_completed", { mode: "signup" });
         if (data.session) {
           await finishAuth();
         } else {
@@ -226,7 +223,6 @@ function AuthPage() {
           options: { captchaToken: turnstileToken ?? undefined },
         });
         if (error) throw error;
-        trackProductEvent("auth_completed", { mode: "signin" });
         showSuccessToast("Velkommen tilbake!");
         await finishAuth();
       }

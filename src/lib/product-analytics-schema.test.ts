@@ -8,37 +8,27 @@ const baseEvent = {
 };
 
 describe("productEventSchema", () => {
-  it("godtar nye personverntrygge søkehendelser", () => {
+  it("godtar feilhendelsen for publisering", () => {
     expect(
       productEventSchema.parse({
         ...baseEvent,
-        eventName: "search_filter_applied",
-        properties: { filterKey: "price", resultCount: 12 },
+        eventName: "listing_publish_failed",
+        properties: { kind: "sell", step: "review" },
       }),
-    ).toMatchObject({ eventName: "search_filter_applied" });
+    ).toMatchObject({ eventName: "listing_publish_failed" });
   });
-  it("beholder kompatibilitet for eksisterende annonsehendelser", () => {
-    expect(
-      productEventSchema.parse({
-        ...baseEvent,
-        eventName: "listing_creation_step_completed",
-        properties: { kind: "sell", step: "photos", stepNumber: 2 },
-      }),
-    ).toMatchObject({ properties: { stepNumber: 2 } });
 
-    expect(
-      productEventSchema.parse({
-        ...baseEvent,
-        eventName: "listing_creation_started",
-      }),
-    ).toMatchObject({ properties: {} });
+  it("avviser atferdshendelser", () => {
+    for (const eventName of ["search_submitted", "listing_opened", "favorite_toggled"]) {
+      expect(() => productEventSchema.parse({ ...baseEvent, eventName })).toThrow();
+    }
   });
 
   it("avviser rå søketekst og lokasjon i properties", () => {
     expect(() =>
       productEventSchema.parse({
         ...baseEvent,
-        eventName: "search_submitted",
+        eventName: "listing_publish_failed",
         properties: { query: "hemmelig tekst" },
       }),
     ).toThrow();
@@ -46,7 +36,7 @@ describe("productEventSchema", () => {
     expect(() =>
       productEventSchema.parse({
         ...baseEvent,
-        eventName: "search_map_opened",
+        eventName: "listing_publish_failed",
         properties: { latitude: 59.9 },
       }),
     ).toThrow();

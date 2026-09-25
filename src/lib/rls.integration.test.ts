@@ -5311,7 +5311,7 @@ describe.skipIf(!canRun)("RLS: interne logger, køer og rate-limit-tabeller er s
     const { data: event, error: eventError } = await admin
       .from("product_events")
       .insert({
-        event_name: "search_opened",
+        event_name: "listing_publish_failed",
         platform: "web",
         path: "/rls-test",
         properties: {},
@@ -5394,7 +5394,7 @@ describe.skipIf(!canRun)("RLS: interne logger, køer og rate-limit-tabeller er s
         changed_at: new Date().toISOString(),
       }),
       client.from("product_events").insert({
-        event_name: "search_opened",
+        event_name: "listing_publish_failed",
         platform: "web",
         path: "/client",
         properties: {},

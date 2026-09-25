@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -158,10 +157,6 @@ export function SearchBar({
                 label: `Søk etter «${q.trim()}»`,
                 icon: <SearchIcon className="size-4 shrink-0 text-primary" aria-hidden="true" />,
                 onSelect: () => {
-                  trackProductEvent("search_suggestion_selected", {
-                    suggestionType: "query",
-                    position: 1,
-                  });
                   onSubmitQ();
                   setQFocused(false);
                 },
@@ -180,10 +175,6 @@ export function SearchBar({
                 label: categorySuggestion.label,
                 icon: <FolderOpen className="size-4 shrink-0 text-primary" aria-hidden="true" />,
                 onSelect: () => {
-                  trackProductEvent("search_suggestion_selected", {
-                    suggestionType: "category",
-                    position: 2,
-                  });
                   categorySuggestion.onSelect();
                   setQFocused(false);
                 },
@@ -196,17 +187,13 @@ export function SearchBar({
       ? [
           {
             label: "Filter",
-            items: filterSuggestions.map((suggestion, index) => ({
+            items: filterSuggestions.map((suggestion) => ({
               id: suggestion.id,
               label: suggestion.label,
               icon: (
                 <SlidersHorizontal className="size-4 shrink-0 text-primary" aria-hidden="true" />
               ),
               onSelect: () => {
-                trackProductEvent("search_suggestion_selected", {
-                  suggestionType: "filter",
-                  position: index + 3,
-                });
                 suggestion.onSelect();
                 setQFocused(false);
               },
@@ -218,7 +205,7 @@ export function SearchBar({
       ? [
           {
             label: "Annonser",
-            items: listingSuggestions.map((suggestion, index) => ({
+            items: listingSuggestions.map((suggestion) => ({
               id: suggestion.id,
               label: suggestion.title,
               icon: (
@@ -226,10 +213,6 @@ export function SearchBar({
               ),
               kaupetCode: suggestion.kaupet_code,
               onSelect: () => {
-                trackProductEvent("search_suggestion_selected", {
-                  suggestionType: "listing",
-                  position: index + 1,
-                });
                 setQFocused(false);
               },
             })),

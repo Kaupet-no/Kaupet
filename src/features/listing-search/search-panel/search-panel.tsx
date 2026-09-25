@@ -49,7 +49,6 @@ import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
 import { SearchSuggestionList, type SearchSuggestionGroup } from "../search-suggestion-list";
 import { buildActiveFilterItems } from "./active-filter-items";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
@@ -175,7 +174,7 @@ export function SearchPanel({
   const browserFilterLayout = !!results && formFactor === "desktop";
   const inputRef = useRef<HTMLInputElement>(null);
   const close = (reason: "cancel" | "apply" = "cancel") => {
-    if (reason === "cancel") handleOpenChange(false);
+    if (reason === "cancel") onOpenChange(false);
     else onOpenChange(false);
   };
   const dragGate = useSheetDragGate({
@@ -186,7 +185,7 @@ export function SearchPanel({
   });
 
   // Android-tilbake og iOS-kantsveip lukker panelet (fase 3).
-  useOverlayHistory(isWeb ? false : open, () => handleOpenChange(false));
+  useOverlayHistory(isWeb ? false : open, () => onOpenChange(false));
 
   useEffect(() => {
     if (!open) return;
@@ -363,20 +362,10 @@ export function SearchPanel({
     setSubmitting(false);
     close("apply");
   };
-  function handleOpenChange(next: boolean) {
-    if (!next && results && draftChanged) {
-      trackProductEvent("search_filter_cancelled", { changed: true, section });
-    }
-    onOpenChange(next);
-  }
 
   const submitText = async (value: string) => {
     const trimmed = value.trim();
     if (submitting) return;
-    trackProductEvent("search_submitted", {
-      source: "panel_text",
-      hasText: trimmed.length > 0,
-    });
     void hapticImpact("medium");
     saveSearchToHistory(trimmed);
 
@@ -408,10 +397,6 @@ export function SearchPanel({
   };
 
   const goToCategory = (cat: Category) => {
-    trackProductEvent("search_suggestion_selected", {
-      suggestionType: "category",
-      position: 1,
-    });
     void hapticImpact("medium");
     if (results) {
       setDraft((previous) => ({
@@ -692,17 +677,8 @@ export function SearchPanel({
                 return;
               }
               if (results) {
-                trackProductEvent("search_filter_applied", {
-                  section,
-                  filterCount: draftItems.length,
-                  resultCount: buttonResultCount ?? null,
-                });
                 // Desktoppanelet har allerede anvendt valgene; mobil committer utkastet.
                 if (!browserFilterLayout) results.onApply(draft);
-                trackProductEvent("search_submitted", {
-                  hasCategory: draft.value.categories.length > 0,
-                  filterCount: draftItems.length,
-                });
                 close("apply");
               } else {
                 void applyLaunchFilters();
@@ -736,7 +712,7 @@ export function SearchPanel({
   return (
     <>
       {isWeb ? (
-        <ResponsiveOverlay open={open} onOpenChange={handleOpenChange}>
+        <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
           <ResponsiveOverlayContent
             key={results ? "results" : "launch"}
             /* Mobilweb får skuffen dratt til fullhøyde, som i appen. */
@@ -766,7 +742,7 @@ export function SearchPanel({
       ) : (
         <Drawer.Root
           open={open}
-          onOpenChange={handleOpenChange}
+          onOpenChange={onOpenChange}
           snapPoints={dragGate.snapPoints}
           activeSnapPoint={snap}
           setActiveSnapPoint={dragGate.setGatedSnapPoint}
@@ -911,10 +887,6 @@ function QueryBrowseContent({
               ),
               kaupetCode: suggestion.kaupet_code,
               onSelect: () => {
-                trackProductEvent("search_suggestion_selected", {
-                  suggestionType: "listing",
-                  position: index + 1,
-                });
                 onPickListing(index + 1);
               },
             })),

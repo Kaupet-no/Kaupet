@@ -222,18 +222,6 @@ function NewWtbPage() {
 
   const step = steps[stepIndex];
 
-  useEffect(() => {
-    trackProductEvent("listing_creation_started", { kind: "want" });
-  }, []);
-  useEffect(() => {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "viewed",
-      step,
-      stepNumber: stepIndex + 1,
-    });
-  }, [step, stepIndex]);
-
   const { data: allCategories = [] } = useCategories();
   const { data: isDemo = false } = useIsDemo();
   const categories = useMemo(
@@ -380,17 +368,12 @@ function NewWtbPage() {
     },
     onSuccess: (id) => {
       clearAfterPublish();
-      trackProductEvent("listing_published", { kind: "want" });
       void import("@/lib/haptics").then((module) => module.hapticNotification("success"));
       setCreatedId(id);
       setPublished(true);
     },
     onError: (err) => {
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "want",
-        action: "publish_failed",
-        step,
-      });
+      trackProductEvent("listing_publish_failed", { kind: "want", step });
       void import("@/lib/haptics").then((module) => module.hapticNotification("error"));
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen."));
     },
@@ -398,12 +381,6 @@ function NewWtbPage() {
 
   function goNext() {
     setValidationError(null);
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "completed",
-      step,
-      stepNumber: stepIndex + 1,
-    });
     setStepIndex((i) =>
       composerForwardStep(
         Math.min(i + 1, steps.length - 1),
@@ -447,12 +424,6 @@ function NewWtbPage() {
     if (step === "category-confirm") return;
     returnToReviewRef.current = false;
     setValidationError(null);
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "back",
-      step,
-      stepNumber: stepIndex + 1,
-    });
     setStepIndex((i) => Math.max(i - 1, 0));
   }
   useComposerHistoryBack(stepIndex === 0, goBack);
@@ -499,11 +470,6 @@ function NewWtbPage() {
     setAttributes(restorableDraft.attributes);
     setCheckedKeys(restorableDraft.checked_keys);
     dismissRestore();
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "draft_restored",
-      step,
-    });
   }
 
   useEffect(() => {
@@ -512,11 +478,6 @@ function NewWtbPage() {
     }
     authResumeHandledRef.current = true;
     restoreDraft();
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "auth_resumed",
-      step,
-    });
     requestAnimationFrame(() => setStepIndex(steps.length - 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, restorableDraft]);
@@ -597,21 +558,10 @@ function NewWtbPage() {
                 setGuestPublishSheetOpen(true);
                 return;
               }
-              trackProductEvent("listing_creation_step_completed", {
-                kind: "want",
-                action: "publish_started",
-                step,
-              });
               publish(values);
             },
             (fields) => {
               handleInvalid(fields);
-              trackProductEvent("listing_creation_step_completed", {
-                kind: "want",
-                action: "validation_failed",
-                step,
-                reason: "publish_form",
-              });
             },
           )}
           disabled={isPending}

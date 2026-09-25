@@ -8,7 +8,6 @@ import { setBackOverride } from "@/lib/native-offline";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { usePushStatus } from "@/hooks/use-push-status";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { listSavedSearches } from "@/lib/saved-searches";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
@@ -168,7 +167,6 @@ export function OnboardingFlow({ onComplete }: Props) {
   const finish = () => {
     if (finishing) return;
     setFinishing(true);
-    trackProductEvent("onboarding_completed", { signedIn: !!user });
     finishTimer.current = window.setTimeout(onComplete, reduceMotion ? 500 : 1200);
   };
 

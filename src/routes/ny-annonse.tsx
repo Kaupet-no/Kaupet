@@ -84,11 +84,6 @@ import type {
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
 import { trackProductEvent } from "@/lib/product-analytics";
-import {
-  clearFlowTimer,
-  computeDurationMs,
-  getOrStartFlowTimer,
-} from "@/features/listing-creation/flow-timing";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
@@ -204,13 +199,6 @@ function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
-  useEffect(() => trackProductEvent("listing_creation_started", { kind: "sell" }), []);
-  // V6-måling: tidspunktet flyten startet (første montering i økten, se
-  // flow-timing.ts) og om brukeren har gjenopprettet et utkast — sendes som
-  // durationMs/hadDraftRestore på listing_published for å måle median tid
-  // til publisert og frafall.
-  const flowStartedAtRef = useRef<number>(getOrStartFlowTimer());
-  const hadDraftRestoreRef = useRef(false);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
@@ -703,14 +691,7 @@ function NewListingPage() {
   // so no separate Next/Back controls are needed or wanted here.
   const isCategoryConfirmPage =
     currentPage?.groups.length === 1 && currentPage.groups[0]?.key === "category-confirm";
-  useEffect(() => {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "viewed",
-      step: currentStepKey,
-      stepNumber: step,
-    });
-  }, [currentStepKey, step]);
+  useEffect(() => {}, [currentStepKey, step]);
 
   function goBack() {
     // Mirrors the hidden Tilbake/Forrige buttons on category-confirm — this
@@ -721,12 +702,6 @@ function NewListingPage() {
     returnToReviewRef.current = false;
     reviewSectionLastStepRef.current = null;
     pendingReviewFocusRef.current = null;
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "back",
-      step: currentStepKey,
-      stepNumber: step,
-    });
     goBackStep();
   }
   useComposerHistoryBack(isFirst || isCategoryConfirmPage, goBack);
@@ -750,12 +725,6 @@ function NewListingPage() {
     section: "category" | "content" | "details" | "location",
     options?: ComposerReviewEditOptions,
   ) => {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "review_fix",
-      reason: section,
-      step: currentStepKey,
-    });
     returnToReviewRef.current = true;
     pendingReviewFocusRef.current = options?.field ?? null;
     setValidationError(null);
@@ -1078,13 +1047,6 @@ function NewListingPage() {
 
   function restoreDraft() {
     setDraftDecisionPrompt(false);
-    hadDraftRestoreRef.current = true;
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "draft_restored",
-      reason: "existing",
-      step: currentStepKey,
-    });
     const savedStepKey = hasDraftData?.step_key;
     if (typeof savedStepKey === "string") pendingRestoreStepKeyRef.current = savedStepKey;
     void restoreDraftFields({
@@ -1128,22 +1090,11 @@ function NewListingPage() {
     }
     authResumeHandledRef.current = true;
     restoreDraft();
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "auth_resumed",
-      step: currentStepKey,
-    });
     setReviewJumpRequested(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, hasDraftData]);
   async function startNewListing() {
     setDraftDecisionPrompt(false);
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "draft_started",
-      reason: "new",
-      step: currentStepKey,
-    });
     setDraftDiscardConfirmOpen(false);
     await discardDraft();
   }
@@ -1249,12 +1200,6 @@ function NewListingPage() {
       )
         setAttributesTouched(true);
       setValidationError("Rett feltene som er markert før du fortsetter.");
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "validation_failed",
-        step: currentStepKey,
-        reason: "form",
-      });
       return "blocked";
     }
     const validateCtx = {
@@ -1282,33 +1227,15 @@ function NewListingPage() {
         if (native) continue;
         if (noImageConfirmPending) continue;
         setNoImageConfirmPending(true);
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_prompt",
-          step: currentStepKey,
-          reason: "image",
-        });
         return "blocked";
       }
       if (typeof result === "string") {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-          reason: group.key,
-        });
         if (group.key === "category-attributes" || group.key === "boat-facts")
           setAttributesTouched(true);
         setValidationError(result);
         return "blocked";
       }
       if (result && typeof result === "object") {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-          reason: group.key,
-        });
         if (
           group.key === "category-attributes" ||
           group.key === "boat-facts" ||
@@ -1321,12 +1248,6 @@ function NewListingPage() {
         return "blocked";
       }
     }
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "completed",
-      step: currentStepKey,
-      stepNumber: step,
-    });
     if (returnToReviewRef.current && step === reviewSectionLastStepRef.current) {
       setReviewJumpRequested(true);
       returnToReviewRef.current = false;
@@ -1450,16 +1371,6 @@ function NewListingPage() {
       // the form still populated — without this the next autosave tick would
       // INSERT the published listing back as a duplicate draft.
       clearDraftStorage({ stopAutosave: true });
-      trackProductEvent("listing_published", {
-        kind: "sell",
-        action: "success",
-        imageCount: images.length,
-        isVehicle,
-        durationMs: computeDurationMs(flowStartedAtRef.current),
-        entry: fromLanding ? "landing" : "direct",
-        hadDraftRestore: hadDraftRestoreRef.current,
-      });
-      clearFlowTimer();
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       setPublishedId(result.id);
       setPublishedCode(result.kaupet_code);
@@ -1467,11 +1378,7 @@ function NewListingPage() {
     },
     onError: (err: Error) => {
       publishAttemptPendingRef.current = false;
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "publish_failed",
-        step: currentStepKey,
-      });
+      trackProductEvent("listing_publish_failed", { kind: "sell", step: currentStepKey });
       setUploadProgress(null);
       // Tokenet er engangsbruk — hent et nytt så neste forsøk ikke henger.
       turnstileRef.current?.reset();
@@ -1872,11 +1779,6 @@ function NewListingPage() {
         native,
       });
       if (gate === "fill-required-attributes") {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-        });
         setAttributesTouched(true);
         pendingReviewFocusRef.current = missingFilters[0]?.key
           ? `attr-${missingFilters[0].key}`
@@ -1897,22 +1799,11 @@ function NewListingPage() {
         setPreviewNudgeOpen(true);
         return;
       }
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "publish_started",
-        step: currentStepKey,
-      });
       publishOnce(v);
     },
     // eslint-disable-next-line react-hooks/refs -- callback runs only on form submit
     (fields) => {
       handleInvalidSubmit(fields);
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "validation_failed",
-        step: currentStepKey,
-        reason: "publish_form",
-      });
     },
   );
   // Neste-knappen på bildesteget bytter til "Fortsett uten bilder" (samme
@@ -2189,11 +2080,6 @@ function NewListingPage() {
               onClick={() => {
                 setPreviewNudgeOpen(false);
                 if (pendingSubmitValuesRef.current) {
-                  trackProductEvent("listing_creation_step_completed", {
-                    kind: "sell",
-                    action: "publish_started",
-                    step: currentStepKey,
-                  });
                   publishOnce(pendingSubmitValuesRef.current);
                 }
               }}

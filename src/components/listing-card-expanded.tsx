@@ -16,11 +16,6 @@ import { signListingImageUrls } from "@/lib/storage";
 type Props = {
   listing: ListingCardData;
   linkState?: Record<string, unknown>;
-  onOpen?: (position: number, resultCount: number) => void;
-  /** Kortets posisjon (1-basert) og totalt antall treff — sendes videre til
-   * onOpen ved klikk, se search_result_opened-sporingen i result-list. */
-  position?: number;
-  resultCount?: number;
   coverImageUrl?: string | null;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
@@ -35,9 +30,6 @@ type Props = {
 export const ListingCardExpanded = memo(function ListingCardExpanded({
   listing,
   linkState,
-  onOpen,
-  position = 0,
-  resultCount = 0,
   coverImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -100,7 +92,6 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
-          onClick={() => onOpen?.(position, resultCount)}
           className="block pr-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <h3 className="text-lg font-medium leading-snug">{listing.title}</h3>
@@ -154,7 +145,6 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
-          onClick={() => onOpen?.(position, resultCount)}
           className="flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           {(isVehicleListing || isBoatListing) && (

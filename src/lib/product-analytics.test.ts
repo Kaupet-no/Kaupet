@@ -20,14 +20,14 @@ describe("product analytics", () => {
   });
 
   it("sender en tillatt hendelse uten klientidentifikator eller fritekst", async () => {
-    trackProductEvent("search_submitted", { resultCount: 4, hasCategory: true });
+    trackProductEvent("listing_publish_failed", { kind: "sell", step: "review" });
     await vi.waitFor(() => expect(logProductEvent).toHaveBeenCalledOnce());
     expect(logProductEvent).toHaveBeenCalledWith({
       data: {
-        eventName: "search_submitted",
+        eventName: "listing_publish_failed",
         platform: "web",
         path: "/",
-        properties: { resultCount: 4, hasCategory: true },
+        properties: { kind: "sell", step: "review" },
       },
     });
   });
@@ -37,6 +37,6 @@ describe("product analytics", () => {
       throw new TypeError("Illegal invocation");
     });
 
-    expect(() => trackProductEvent("onboarding_completed")).not.toThrow();
+    expect(() => trackProductEvent("listing_publish_failed")).not.toThrow();
   });
 });

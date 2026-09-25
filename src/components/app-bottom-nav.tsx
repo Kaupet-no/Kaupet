@@ -17,7 +17,6 @@ import { useQuery } from "@tanstack/react-query";
 import { MessagesButton } from "@/components/messages-button";
 import logoIcon from "@/assets/brand/icon-only-green-letter.png";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
-import { trackProductEvent } from "@/lib/product-analytics";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -117,7 +116,6 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
             type="button"
             onClick={() => {
               void hapticImpact("light");
-              trackProductEvent("search_opened", { source: "bottom_nav" });
               openPanel("query");
             }}
             className={`flex h-12 w-12 items-center justify-center rounded-full ${

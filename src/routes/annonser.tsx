@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { FolderOpen, Save, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
@@ -47,7 +47,6 @@ import { useIsNative } from "@/hooks/use-is-native";
 import { useIsDesktop } from "@/hooks/use-form-factor";
 import { NativePageHeader } from "@/components/native-page-header";
 import { hapticImpact } from "@/lib/haptics";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
@@ -110,7 +109,6 @@ function BrowsePage() {
   const { user } = useAuth();
   const [qDraft, setQDraft] = useState(search.q);
   const [mounted, setMounted] = useState(false);
-  const searchPageViewTracked = useRef(false);
   const isDesktop = useIsDesktop();
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const { open: searchPanelOpen, openPanel } = useSearchPanel();
@@ -251,12 +249,6 @@ function BrowsePage() {
   const { data: vehicleBrands } = useAllVehicleBrands();
   const submitQuery = () => {
     void hapticImpact("medium");
-    trackProductEvent("search_submitted", {
-      source: "search_bar",
-      hasText: qDraft.trim().length > 0,
-      hasCategory: effectiveCategories.length > 0,
-      filterCount: activeFilterCount,
-    });
     void submitSearch({
       applied: appliedSearch,
       query: qDraft,
@@ -443,17 +435,6 @@ function BrowsePage() {
     setActiveTab("listings");
   }, [search.q, search.category, search.categories]);
 
-  useEffect(() => {
-    if (!mounted || searchPageViewTracked.current) return;
-    searchPageViewTracked.current = true;
-    trackProductEvent("search_page_viewed", {
-      hasText: search.q.trim().length > 0,
-      hasCategory: effectiveCategories.length > 0,
-      filterCount: activeFilterCount,
-      source: "route",
-    });
-  }, [mounted, activeFilterCount, effectiveCategories.length, search.q]);
-
   /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
      trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.
      Mobilweb bruker den delte knappen, som kategorilandingssidene også
@@ -503,27 +484,12 @@ function BrowsePage() {
                   filterCount={ordinaryFilterCount}
                   searchRuleCount={hasExtraSearchRules ? 1 : 0}
                   onOpenQuery={() => {
-                    trackProductEvent("search_filter_opened", {
-                      section: "query",
-                      source: "summary",
-                      filterCount: activeFilterCount,
-                    });
                     openPanel("query");
                   }}
                   onOpenRules={() => {
-                    trackProductEvent("search_filter_opened", {
-                      section: "search",
-                      source: "summary",
-                      filterCount: activeFilterCount,
-                    });
                     openPanel("search");
                   }}
                   onOpenFilters={() => {
-                    trackProductEvent("search_filter_opened", {
-                      section: "categories",
-                      source: "summary",
-                      filterCount: activeFilterCount,
-                    });
                     openPanel("categories");
                   }}
                 />
@@ -548,11 +514,6 @@ function BrowsePage() {
                       isDesktop
                         ? undefined
                         : () => {
-                            trackProductEvent("search_filter_opened", {
-                              section: "search",
-                              source: "advanced_search",
-                              filterCount: activeFilterCount,
-                            });
                             openPanel("search", qDraft);
                           }
                     }
@@ -765,10 +726,6 @@ function BrowsePage() {
                 zeroResultExpansionPending={zeroResultExpansionPending}
                 zeroResultExpansions={zeroResultExpansions}
                 onApplyZeroResultExpansion={(expansion) => {
-                  trackProductEvent("search_zero_results_recovered", {
-                    source: "zero_result_recovery",
-                    resultCount: expansion.count,
-                  });
                   applyPanelDraft(expansion.applied);
                 }}
                 mapListings={mapListings}

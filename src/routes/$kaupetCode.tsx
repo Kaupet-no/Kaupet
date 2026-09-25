@@ -55,7 +55,6 @@ import { ListingDetailSkeleton } from "@/components/listing-detail-skeleton";
 import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 import { currentReturnTo } from "@/lib/auth-return";
 import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
 import { toListingCardData } from "@/lib/listing-card-data";
 import { publicImageUrl } from "@/lib/image-url";
@@ -651,7 +650,6 @@ function ListingDetailPage() {
     },
     onSuccess: (conversationId) => {
       if (conversationId) {
-        trackProductEvent("contact_started", { listingType: "sell" });
         navigate({ to: "/meldinger/$id", params: { id: conversationId } });
       }
     },
@@ -665,11 +663,6 @@ function ListingDetailPage() {
     replayedContact.current = true;
     contactMutation.mutate();
   }, [contactMutation, data, user]);
-
-  useEffect(() => {
-    if (!data) return;
-    trackProductEvent("listing_opened", { hasImages: (data.listing_images?.length ?? 0) > 0 });
-  }, [data]);
 
   const images = useMemo(
     () => (data?.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),

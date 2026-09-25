@@ -13,7 +13,6 @@ import {
 import type { Category } from "@/lib/categories";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 import { priceBoundsForMax } from "@/lib/filter-range-bounds";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { SearchFilterSections } from "./filter-sections";
 import type { SearchPanelResultsContext } from "./search-panel";
 
@@ -255,11 +254,6 @@ export function SearchFilterSidebar({
               size="sm"
               className="h-8 gap-1.5 px-2 text-muted-foreground"
               onClick={() => {
-                trackProductEvent("search_filter_applied", {
-                  section: "categories",
-                  filterCount: 0,
-                  resultCount: null,
-                });
                 onApply({
                   value: {
                     ...defaultAdvancedSearchValue(),

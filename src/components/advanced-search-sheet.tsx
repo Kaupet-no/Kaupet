@@ -30,7 +30,6 @@ import {
   resetAdvancedSearchValue,
 } from "@/lib/advanced-search-actions";
 import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -699,7 +698,6 @@ export function SaveSearchDialog({
     setSaving(true);
     try {
       await createSavedSearch(name.trim(), criteria, notify);
-      trackProductEvent("search_saved", { notify });
       showSuccessToast("Søk lagret");
       onSaved();
     } catch (e) {

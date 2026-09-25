@@ -1,7 +1,7 @@
 export type PendingAuthIntent =
   { type: "favorite"; listingId: string } | { type: "contact"; listingId: string };
 
-const STORAGE_KEY = "kaupet-pending-auth-intent";
+const STORAGE_KEY = "kaupet_pending_auth_intent";
 
 export function savePendingAuthIntent(intent: PendingAuthIntent): void {
   try {

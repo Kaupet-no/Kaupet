@@ -14,12 +14,12 @@ export function isNative(): boolean {
       if (params.has("forcenative")) {
         const value = params.get("forcenative");
         if (value === "0" || value === "false") {
-          window.sessionStorage.removeItem("kaupet.forceNative");
+          window.sessionStorage.removeItem("kaupet_force_native");
         } else {
-          window.sessionStorage.setItem("kaupet.forceNative", "true");
+          window.sessionStorage.setItem("kaupet_force_native", "true");
         }
       }
-      if (window.sessionStorage.getItem("kaupet.forceNative") === "true") return true;
+      if (window.sessionStorage.getItem("kaupet_force_native") === "true") return true;
     } catch {
       // Storage can be unavailable in restricted webviews; use Capacitor below.
     }

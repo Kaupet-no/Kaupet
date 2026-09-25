@@ -202,7 +202,9 @@ function PersonvernPage() {
                 systemstyrt fargetema. Forlater ikke enheten din.
               </li>
               <li>
-                <strong>kaupet_draft_ny_annonse</strong>, <strong>kaupet_draft_id</strong>,{" "}
+                <strong>kaupet_draft_sell_listing</strong>,{" "}
+                <strong>kaupet_draft_sell_listing_id</strong>,{" "}
+                <strong>kaupet_draft_sell_listing_updated_at</strong>,{" "}
                 <strong>kaupet_draft_want_listing</strong> og{" "}
                 <strong>kaupet_draft_want_listing_id</strong> — utkast til salgsannonse eller
                 «ønskes kjøpt»-annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du
@@ -216,14 +218,14 @@ function PersonvernPage() {
                 informasjonsmelding eller sett en veiledning, slik at den ikke vises på nytt.
               </li>
               <li>
-                <strong>kaupet-pending-auth-intent</strong> — husker en handling du forsøkte (f.eks.
+                <strong>kaupet_pending_auth_intent</strong> — husker en handling du forsøkte (f.eks.
                 å legge til favoritt) mens du ikke var innlogget, slik at handlingen fullføres
                 automatisk etter innlogging. Lagres i <code>sessionStorage</code> og slettes
                 automatisk når fanen lukkes eller handlingen er fullført.
               </li>
             </ul>
             <p className="border-t border-border px-4 py-3 text-muted-foreground">
-              I tillegg lagrer vi <strong>kaupet:lastAnnonserSearch</strong> i nettleserens{" "}
+              I tillegg lagrer vi <strong>kaupet_last_search</strong> i nettleserens{" "}
               <code>sessionStorage</code>, som — i motsetning til de andre nøklene over — slettes
               automatisk når du lukker fanen. Denne brukes til å ta deg tilbake til søkeresultatene
               dine etter å ha sett på en annonse. Bildeutkast til en påbegynt annonse mellomlagres

@@ -27,9 +27,9 @@ vi.mock("./draft-image-store", () => ({
   clearDraftImages: (...args: unknown[]) => clearDraftImagesMock(...args),
 }));
 
-const DRAFT_KEY = "kaupet_draft_ny_annonse";
-const DRAFT_ID_KEY = "kaupet_draft_id";
-const DRAFT_UPDATED_AT_KEY = "kaupet_draft_updated_at";
+const DRAFT_KEY = "kaupet_draft_sell_listing";
+const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id";
+const DRAFT_UPDATED_AT_KEY = "kaupet_draft_sell_listing_updated_at";
 
 const baseFields = {
   title: "",
@@ -80,6 +80,26 @@ describe("useDraftAutosave", () => {
       expect.objectContaining({ title: "Sykkel til salgs" }),
     );
     expect(result.current.draftId).toBe("draft-123");
+  });
+
+  it("flytter et utkast fra de gamle nøkkelnavnene", () => {
+    localStorage.setItem(
+      "kaupet_draft_ny_annonse",
+      JSON.stringify({ title: "Sykkel til salgs", saved_at: Date.now() }),
+    );
+    localStorage.setItem("kaupet_draft_id", "draft-123");
+    localStorage.setItem("kaupet_draft_updated_at", "2026-09-25T10:00:00Z");
+
+    const { result } = renderHook(() => useDraftAutosave(baseFields));
+
+    expect(result.current.hasDraftData).toEqual(
+      expect.objectContaining({ title: "Sykkel til salgs" }),
+    );
+    expect(result.current.draftId).toBe("draft-123");
+    expect(localStorage.getItem(DRAFT_UPDATED_AT_KEY)).toBe("2026-09-25T10:00:00Z");
+    expect(localStorage.getItem("kaupet_draft_ny_annonse")).toBeNull();
+    expect(localStorage.getItem("kaupet_draft_id")).toBeNull();
+    expect(localStorage.getItem("kaupet_draft_updated_at")).toBeNull();
   });
 
   it("discards a draft older than 7 days instead of surfacing it", () => {

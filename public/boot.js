@@ -22,7 +22,7 @@
   ) {
     try {
       var p = new URLSearchParams(window.location.search).get("forcenative");
-      if (p === null) native = sessionStorage.getItem("kaupet.forceNative") === "true";
+      if (p === null) native = sessionStorage.getItem("kaupet_force_native") === "true";
       else native = p !== "0" && p !== "false";
     } catch (e) {}
   }

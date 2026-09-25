@@ -10,9 +10,27 @@ import {
   saveDraftImages,
 } from "@/features/listing-creation/draft-image-store";
 
-const DRAFT_KEY = "kaupet_draft_ny_annonse";
-const DRAFT_ID_KEY = "kaupet_draft_id";
-const DRAFT_UPDATED_AT_KEY = "kaupet_draft_updated_at";
+const DRAFT_KEY = "kaupet_draft_sell_listing";
+const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id";
+const DRAFT_UPDATED_AT_KEY = "kaupet_draft_sell_listing_updated_at";
+
+// ponytail: engangsflytting fra de gamle nøkkelnavnene (oktober 2026). Lokale
+// utkast utløper etter 7 dager, så dette kan slettes når det har vært ute
+// en stund.
+const LEGACY_DRAFT_KEYS: [string, string][] = [
+  ["kaupet_draft_ny_annonse", DRAFT_KEY],
+  ["kaupet_draft_id", DRAFT_ID_KEY],
+  ["kaupet_draft_updated_at", DRAFT_UPDATED_AT_KEY],
+];
+
+function migrateLegacyDraftKeys() {
+  for (const [from, to] of LEGACY_DRAFT_KEYS) {
+    const value = localStorage.getItem(from);
+    if (value === null) continue;
+    if (localStorage.getItem(to) === null) localStorage.setItem(to, value);
+    localStorage.removeItem(from);
+  }
+}
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 type ListingCondition = "new" | "like_new" | "good" | "acceptable" | "for_parts";
@@ -132,6 +150,7 @@ export function useDraftAutosave(fields: DraftFields) {
   // Load draft from localStorage on mount
   useEffect(() => {
     try {
+      migrateLegacyDraftKeys();
       const savedId = localStorage.getItem(DRAFT_ID_KEY);
       draftUpdatedAtRef.current = localStorage.getItem(DRAFT_UPDATED_AT_KEY);
       if (savedId) {

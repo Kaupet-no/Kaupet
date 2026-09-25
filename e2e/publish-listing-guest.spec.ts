@@ -65,6 +65,6 @@ test("utlogget bruker sendes til innlogging med utkastet i behold", async ({ pag
   await expect(page).toHaveURL(/returnTo=[^&]*resume%3Dauth-publish/);
 
   // Utkastet må ha overlevd navigasjonen, ellers er gjenopptakelsen tom.
-  const draft = await page.evaluate(() => localStorage.getItem("kaupet_draft_ny_annonse"));
+  const draft = await page.evaluate(() => localStorage.getItem("kaupet_draft_sell_listing"));
   expect(draft).toContain("E2E gjesteannonse");
 });

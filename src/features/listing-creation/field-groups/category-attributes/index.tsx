@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 
 import {
   AttributeFields,
@@ -161,6 +161,7 @@ export function CategoryAttributes({
           type="button"
           onClick={() => setCategoryPickerOpen(true)}
           aria-label={`Kategori${categoryLabel ? `, ${categoryLabel}` : ""}`}
+          aria-haspopup="dialog"
           aria-required="true"
           aria-invalid={!!errors.category_id}
           aria-describedby={errors.category_id ? "category-error" : undefined}
@@ -172,8 +173,13 @@ export function CategoryAttributes({
                 : "border-border bg-card text-muted-foreground"
           } hover:border-primary/40`}
         >
-          <span>{categoryLabel ?? "Velg kategori..."}</span>
-          <ChevronDown className="size-4 text-muted-foreground" />
+          <span>{categoryLabel ?? "Velg kategori"}</span>
+          {/* Åpner et eget vindu (Dialog/Sheet), ikke en nedtrekksliste — derfor
+              ChevronRight/«Endre» og ikke ChevronDown. */}
+          <span className="flex items-center gap-1 text-muted-foreground">
+            {categoryLabel && <span className="text-primary">Endre</span>}
+            <ChevronRight className="size-4" aria-hidden />
+          </span>
         </button>
       )}
 

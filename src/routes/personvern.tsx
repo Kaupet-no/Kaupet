@@ -186,8 +186,12 @@ function PersonvernPage() {
               <li>
                 <strong>Innloggingssesjon</strong>: nødvendig for at du skal kunne være logget inn
                 mellom besøk. Lagres som en informasjonskapsel (<code>sb-…-auth-token</code>) av vår
-                autentiseringsleverandør, Supabase. Dette er den eneste informasjonskapselen vanlige
-                brukere får, og den brukes ikke til sporing.
+                autentiseringsleverandør, Supabase. Brukes ikke til sporing.
+              </li>
+              <li>
+                <strong>__cf_bm</strong>: settes av Cloudflare, som leverer bot-beskyttelse for
+                Kaupet.no, for å skille mennesker fra automatiserte roboter. Informasjonskapselen
+                gjelder bare Kaupet.no, slettes etter 30 minutter og brukes ikke til sporing.
               </li>
               <li>
                 <strong>kaupet_recent_searches_v1</strong>: de siste søkeordene dine, slik at du

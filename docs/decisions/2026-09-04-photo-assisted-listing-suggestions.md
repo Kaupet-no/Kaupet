@@ -26,12 +26,13 @@ Chat Completions-endepunkt som allerede brukes for eksplisitt tekstbasert
 KI-forslag — ingen ny leverandør, ingen SDK.
 
 - **Eksplisitt, per-handling samtykke.** Automatisk intern tittelstatistikk
-  er uendret og krever ikke samtykke. Fotoforslag krever at brukeren trykker
-  en synlig "Analyser valgte bilder med KI"-handling som på forhånd
-  forklarer at inntil tre komprimerte miniatyrer (og eventuell starttekst)
-  sendes til Mistral. Samtykket gjelder kun gjeldende `inputRevision`
-  (bilder/starttekst/kategori); endres disse, kreves en ny eksplisitt
-  handling.
+  er uendret og krever ikke samtykke. Fotoforslag krever at brukeren selv
+  trykker knappen «Fyll ut tittel og kategori for meg». Trykket er
+  samtykket: det finnes ingen egen bekreftelsesdialog (fjernet 2026-09-25,
+  se § 2c). Hjelpeteksten under knappen sier at bildene analyseres med KI og
+  lenker til `/personvern#bildeforslag`, som forklarer hva som sendes til
+  Mistral. Samtykket gjelder kun gjeldende `inputRevision`
+  (bilder/starttekst/kategori); endres disse, kreves et nytt trykk.
 - **Base64-miniatyrer, ikke originalbilder.** Input er `thumbFile` —
   JPEG/PNG/WebP, maks 150 KiB dekodet per bilde, maks 450 KiB totalt, maks
   tre bilder. Et inkompatibelt/for stort bilde hoppes over; er ingen bilder
@@ -88,9 +89,10 @@ reverseringspunktet funksjonen er designet rundt.
 
 ## 2c. Leveransestatus (per 2026-09-25)
 
-Klientinngangen er nå bygget: samtykkedialogen ("Analyser valgte bilder med
-KI"), nedskalering til maks 480 px (kategoriforslag) / 768 px
-(detaljforslag), maks 2/3 bilder per kall, og EXIF-/XMP-fjerning i både
+Klientinngangen er nå bygget: knappen «Fyll ut tittel og kategori for
+meg» (først med en egen samtykkedialog, som ble fjernet samme dag slik at
+trykket på knappen er samtykket, se § 2), nedskalering til maks 480 px
+(kategoriforslag) / 768 px (detaljforslag), maks 2/3 bilder per kall, og EXIF-/XMP-fjerning i både
 klient og server (`PHOTO_SUGGESTION_LIMITS` i
 `src/lib/photo-suggestion-images.ts`), koblet til `inputRevision` slik at et
 endret bilde-/tittel-/kategorigrunnlag krever nytt samtykke.

@@ -1,19 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  Check,
-  Gift,
-  Search,
-  ShieldCheck,
-  ShoppingBag,
-  type LucideIcon,
-} from "lucide-react";
-import { useRef, useState } from "react";
+import { Gift, Search, ShoppingBag, type LucideIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 import { cn } from "@/lib/utils";
 
 type Intent = "sell" | "buy" | "free";
@@ -39,171 +26,78 @@ const INTENT_OPTIONS: { value: Intent; label: string; description: string; icon:
   },
 ];
 
-const INTENT_HEADINGS: Record<Intent, string> = {
-  sell: "Hva vil du selge?",
-  buy: "Hva leter du etter?",
-  free: "Hva vil du gi bort?",
-};
-
-const INTENT_EXAMPLES: Record<Intent, string> = {
-  sell: "For eksempel: vintage lenestol i eik",
-  buy: "For eksempel: terrengsykkel til voksen",
-  free: "For eksempel: barneseng som gis bort",
-};
-
-/** Matches wtbSchema's title min (3) for "kjøpe", listingSchema's (5) for
- * "selge"/"gi bort" — a title shorter than this never triggers the
- * suggestCategoryForTitle fetch (see use-listing-title-hints.ts), so letting
- * it through here would silently skip straight to the manual category
- * picker with no suggestion ever attempted. */
-function minTitleLength(intent: Intent): number {
-  return intent === "buy" ? 3 : 5;
-}
-
+/**
+ * Første valg når en annonse opprettes: bare hva slags annonse. Et trykk
+ * starter veiviseren direkte — salg og gi bort begynner med bilder (se
+ * applyPhotosEntry i category-flows.ts), etterlysninger med vanlig flyt.
+ */
 export function IntentTitleLanding({
   onNavigate,
-  defaultIntent = "sell",
+  defaultIntent,
+}: {
+  onNavigate?: () => void;
+  /** Fremhever valget brukeren kom fra (f.eks. «Ny etterlysning»). */
+  defaultIntent?: Intent;
+}) {
+  return (
+    <div className="flex flex-col gap-6 pt-2 sm:gap-7 sm:pt-0">
+      <header className="text-left">
+        <h2 className="font-display text-4xl leading-[1.04] tracking-tight sm:text-5xl">
+          Hva vil du opprette?
+        </h2>
+      </header>
+      <IntentOptions onNavigate={onNavigate} defaultIntent={defaultIntent} />
+    </div>
+  );
+}
+
+/** De tre valgkortene alene — brukt i dialogen over og inline under
+ * «Opprett en annonse» på forsiden (animert av HeroReveal i index.tsx). */
+export function IntentOptions({
+  onNavigate,
+  defaultIntent,
 }: {
   onNavigate?: () => void;
   defaultIntent?: Intent;
 }) {
   const navigate = useNavigate();
-  const [intent, setIntent] = useState<Intent>(defaultIntent);
-  const [title, setTitle] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
 
-  function submit() {
-    const trimmed = title.trim();
-    if (trimmed.length < minTitleLength(intent)) {
-      setError(`Tittelen må være minst ${minTitleLength(intent)} tegn`);
-      return;
-    }
-    // Starts the category call before the wizard mounts so the result is ready
-    // when the user reaches the confirmation step.
-    prefetchCategorySuggestion(trimmed);
+  function start(intent: Intent) {
     if (intent === "buy") {
-      void navigate({ to: "/ny-ok-annonse", search: { title: trimmed } });
+      void navigate({ to: "/ny-ok-annonse" });
     } else {
-      void navigate({ to: "/ny-annonse", search: { type: intent, title: trimmed } });
+      void navigate({ to: "/ny-annonse", search: { type: intent, start: "bilder" } });
     }
     onNavigate?.();
   }
 
   return (
-    <form
-      className="flex flex-col gap-6 pt-2 sm:gap-7 sm:pt-0"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-    >
-      <header className="text-left">
-        <h2 className="font-display text-4xl leading-[1.04] tracking-tight sm:text-5xl">
-          {INTENT_HEADINGS[intent]}
-        </h2>
-      </header>
-
-      <div role="radiogroup" aria-label="Jeg ønsker å" className="grid gap-3 sm:grid-cols-3">
-        {INTENT_OPTIONS.map((opt) => {
-          const selected = intent === opt.value;
-          const Icon = opt.icon;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-label={opt.label}
-              aria-checked={selected}
-              onClick={() => {
-                setIntent(opt.value);
-                setError(null);
-                titleInputRef.current?.focus();
-              }}
-              className={cn(
-                "native-touch-target group relative flex min-h-14 items-center gap-3 rounded-xl border py-3 pl-3 pr-9 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:min-h-32 sm:flex-col sm:items-stretch sm:justify-between sm:gap-0 sm:rounded-2xl sm:p-4",
-                selected
-                  ? "border-primary bg-primary/10 shadow-sm"
-                  : "border-border bg-card hover:shadow-sm",
-              )}
-            >
-              <span className="flex shrink-0 items-start justify-between sm:w-full">
-                <span
-                  className={cn(
-                    "flex size-11 items-center justify-center rounded-xl transition-colors duration-150",
-                    selected ? "bg-primary text-primary-foreground" : "bg-secondary text-primary",
-                  )}
-                >
-                  <Icon className="size-5" aria-hidden="true" />
-                </span>
-                {/* Absolutt på mobil (høyre kant av kortet, ift. den relative
-                    knappen) — ellers havnet den i klem mot ikonboksen i den
-                    smale raden. Statisk igjen fra sm: og oppover, spredt fra
-                    ikonet med justify-between på den fulle bredden. */}
-                <span
-                  className={cn(
-                    "absolute right-3 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border text-transparent transition-[background-color,border-color,color] duration-150 sm:static sm:translate-y-0",
-                    selected ? "border-primary bg-primary text-primary-foreground" : "border-input",
-                  )}
-                  aria-hidden="true"
-                >
-                  <Check className="size-3.5" strokeWidth={3} />
-                </span>
+    <div className="grid gap-3 sm:grid-cols-3">
+      {INTENT_OPTIONS.map((opt) => {
+        const highlighted = defaultIntent === opt.value;
+        const Icon = opt.icon;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => start(opt.value)}
+            className={cn(
+              "native-touch-target group flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left transition-[background-color,border-color,box-shadow,translate] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none sm:min-h-32 sm:flex-col sm:items-stretch sm:justify-between sm:gap-0 sm:rounded-2xl sm:p-4",
+              highlighted ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-card",
+            )}
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary transition-colors duration-150 group-hover:bg-primary group-hover:text-primary-foreground">
+              <Icon className="size-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold sm:mt-4 sm:text-base">{opt.label}</span>
+              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                {opt.description}
               </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold sm:mt-4 sm:text-base">
-                  {opt.label}
-                </span>
-                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                  {opt.description}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-6 sm:grid-cols-[1.35fr_0.85fr] sm:items-end">
-        <div className="w-full space-y-2">
-          <Label htmlFor="listing-title" className="text-sm font-medium">
-            Tittel
-          </Label>
-          <Input
-            ref={titleInputRef}
-            id="listing-title"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              setError(null);
-            }}
-            className="h-14 rounded-xl px-4 text-base sm:text-lg"
-            aria-invalid={!!error}
-            aria-describedby={
-              error ? "listing-title-help listing-title-error" : "listing-title-help"
-            }
-          />
-          <p id="listing-title-help" className="text-sm text-muted-foreground">
-            {INTENT_EXAMPLES[intent]}
-            {/* Skjult på mobil for å spare skjermplass — eksempelteksten er det
-                viktigste der. */}
-            <span className="hidden sm:inline"> · Du kan endre dette senere</span>
-          </p>
-          {error && (
-            <p id="listing-title-error" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-        </div>
-        <Button type="submit" size="lg" className="h-14 w-full gap-2 rounded-xl">
-          Fortsett
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Button>
-      </div>
-
-      <p className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-        <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
-        Annonsen lagres som utkast mens du jobber.
-      </p>
-    </form>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

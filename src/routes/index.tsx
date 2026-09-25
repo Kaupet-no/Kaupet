@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, FolderOpen, Search } from "lucide-react";
+import { ArrowRight, FolderOpen, Hash, Search } from "lucide-react";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -12,8 +12,9 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { AppLanding } from "@/components/app-landing";
-import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
-import { NewListingDialog } from "@/components/new-listing-dialog";
+import { KaupetCodeForm } from "@/components/kaupet-code-dialog";
+import { cn } from "@/lib/utils";
+import { IntentOptions } from "@/components/intent-title-landing";
 import { CategorySuggestionDialog } from "@/components/category-suggestion-dialog";
 import { CategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
@@ -134,6 +135,18 @@ function WebLanding({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [qDraft, setQDraft] = useState("");
+  const [codeOpen, setCodeOpen] = useState(false);
+  // Bytte mellom de to hero-panelene skjer på stedet: det nye glir inn og
+  // erstatter det åpne, uten lukkeanimasjon først. Høyden hopper da direkte
+  // (heroSwitching slår av høydeovergangen) — bare innholdet animeres.
+  const [heroSwitching, setHeroSwitching] = useState(false);
+  const toggleHeroPanel = (panel: "create" | "code") => {
+    const isOpen = panel === "create" ? adPickerOpen : codeOpen;
+    const otherOpen = panel === "create" ? codeOpen : adPickerOpen;
+    setHeroSwitching(otherOpen);
+    onAdPickerOpenChange(panel === "create" && !isOpen);
+    setCodeOpen(panel === "code" && !isOpen);
+  };
 
   const { categories: ssrCategories } = Route.useLoaderData();
   const { categories, categoriesIsError, refetchCategories, allFilters } =
@@ -383,12 +396,70 @@ function WebLanding({
             </Button>
           </form>
 
-          <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Button size="lg" variant="outline" onClick={() => onAdPickerOpenChange(true)}>
-              Opprett en annonse
+          {/* «Opprett en annonse» og «Har du en Kaupet-kode?» åpner hvert sitt
+              panel som glir inn under knappen, i stedet for en dialog. Bare ett
+              er åpent om gangen. Panelene ligger i samme flex-rad med full
+              bredde: på mobil (knappene brytes) kommer hvert panel rett under
+              sin knapp via `order`, fra sm: under hele raden. Ingen row-gap
+              — et lukket panel skal ikke ta plass. Knappene har fast bredde
+              så raden ikke hopper når teksten bytter til «Avbryt». */}
+          <div className="mt-5 flex flex-wrap justify-center gap-x-3">
+            <Button
+              size="lg"
+              variant="outline"
+              className="order-1 min-w-52"
+              aria-expanded={adPickerOpen}
+              aria-controls="hero-intent-options"
+              onClick={() => toggleHeroPanel("create")}
+            >
+              {adPickerOpen ? "Avbryt" : "Opprett en annonse"}
             </Button>
-            <NewListingDialog open={adPickerOpen} onOpenChange={onAdPickerOpenChange} />
-            <KaupetCodeDialog />
+            <HeroReveal
+              id="hero-intent-options"
+              open={adPickerOpen}
+              animateHeight={!heroSwitching}
+              className="order-2 max-w-3xl sm:order-3"
+            >
+              <IntentOptions />
+            </HeroReveal>
+            <Button
+              size="lg"
+              variant="outline"
+              className="order-3 mt-3 min-w-64 gap-2 sm:order-2 sm:mt-0"
+              aria-expanded={codeOpen}
+              aria-controls="hero-kaupet-code"
+              onClick={() => toggleHeroPanel("code")}
+            >
+              {codeOpen ? (
+                "Avbryt"
+              ) : (
+                <>
+                  <Hash className="size-4" aria-hidden="true" />
+                  Har du en Kaupet-kode?
+                </>
+              )}
+            </Button>
+            <HeroReveal
+              id="hero-kaupet-code"
+              open={codeOpen}
+              animateHeight={!heroSwitching}
+              className="order-4 max-w-md"
+            >
+              <div className="rounded-2xl border border-border bg-card p-4 text-left">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+                    <Hash className="size-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold sm:text-base">Åpne annonse med kode</p>
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      Skriv inn de 8 sifrene for å hoppe rett til annonsen.
+                    </p>
+                  </div>
+                </div>
+                <KaupetCodeForm autoFocus={codeOpen} onDone={() => setCodeOpen(false)} />
+              </div>
+            </HeroReveal>
           </div>
         </div>
       </section>
@@ -732,6 +803,55 @@ function WebLanding({
           <OpenSourceCtaSection />
         </>
       )}
+    </div>
+  );
+}
+
+/** Panel som glir ned under en hero-knapp — én felles animasjon for begge
+ * panelene: grid-rows 0fr→1fr animerer høyden uten å måle den, mens
+ * innholdet glir opp og tones inn. `inert` holder skjult innhold utenfor
+ * tab-rekkefølgen. */
+function HeroReveal({
+  id,
+  open,
+  animateHeight,
+  className,
+  children,
+}: {
+  id: string;
+  open: boolean;
+  /** false ved bytte mellom panelene: høyden settes direkte, så det nye
+   * innholdet erstatter det gamle i stedet for å vente på en lukking. */
+  animateHeight: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      id={id}
+      inert={!open}
+      className={cn(
+        "grid w-full basis-full",
+        animateHeight &&
+          "transition-[grid-template-rows,margin-top] duration-300 ease-out motion-reduce:transition-none",
+        open ? "mt-4 grid-rows-[1fr]" : "mt-0 grid-rows-[0fr]",
+        className,
+      )}
+    >
+      <div className="min-h-0 overflow-hidden">
+        {/* Luft til hover-løft og fokusring, innenfor klippingen. */}
+        <div
+          className={cn(
+            "p-1 transition-[translate,opacity] duration-300 ease-out motion-reduce:transition-none",
+            // Utgående innhold ved bytte forsvinner med én gang — ellers
+            // tones det ut oppå det innkommende i den samme raden.
+            !animateHeight && !open && "transition-none",
+            !open && "-translate-y-2 opacity-0",
+          )}
+        >
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

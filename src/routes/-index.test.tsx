@@ -51,7 +51,10 @@ vi.mock("@/components/animated-search-placeholder", () => ({
   AnimatedSearchPlaceholder: () => null,
 }));
 vi.mock("@/components/app-hero-logo", () => ({ AppHeroLogo: () => null }));
-vi.mock("@/components/kaupet-code-dialog", () => ({ KaupetCodeDialog: () => null }));
+vi.mock("@/components/kaupet-code-dialog", () => ({
+  KaupetCodeDialog: () => null,
+  KaupetCodeForm: () => null,
+}));
 vi.mock("@/lib/category-suggestion.functions", () => ({
   prefetchCategorySuggestion: vi.fn(),
 }));
@@ -84,8 +87,8 @@ describe("LandingPage (native-skallet)", () => {
 
     render(<LandingPage />);
 
-    expect(screen.getByRole("heading", { name: "Hva vil du selge?" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Jeg vil selge" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Hva vil du opprette?" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Jeg vil selge/ })).toBeTruthy();
     expect(mocks.navigate).toHaveBeenCalledWith({ to: "/", search: {}, replace: true });
   });
 
@@ -94,7 +97,7 @@ describe("LandingPage (native-skallet)", () => {
 
     render(<LandingPage />);
 
-    expect(screen.queryByRole("heading", { name: "Hva vil du selge?" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Hva vil du opprette?" })).toBeNull();
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
@@ -105,7 +108,7 @@ describe("LandingPage (native-skallet)", () => {
     render(<LandingPage />);
 
     // Gjestedraft (2026-09-06): utloggede får samme velger, ikke /auth.
-    expect(screen.getByRole("heading", { name: "Hva vil du selge?" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Hva vil du opprette?" })).toBeTruthy();
     expect(mocks.navigate).toHaveBeenCalledWith({ to: "/", search: {}, replace: true });
   });
 });

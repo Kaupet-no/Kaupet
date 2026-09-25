@@ -5,116 +5,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IntentTitleLanding } from "./intent-title-landing";
 
-const mocks = vi.hoisted(() => ({
-  navigate: vi.fn(),
-  prefetchCategorySuggestion: vi.fn(),
-}));
+const mocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => mocks.navigate }));
-vi.mock("@/lib/category-suggestion.functions", () => ({
-  prefetchCategorySuggestion: mocks.prefetchCategorySuggestion,
-}));
 
 afterEach(cleanup);
 
 beforeEach(() => {
   mocks.navigate.mockReset();
-  mocks.prefetchCategorySuggestion.mockReset();
 });
 
 describe("IntentTitleLanding", () => {
-  it("viser tre eksplisitte valg for annonseintensjon som radioknapper", () => {
+  it("viser bare overskriften og de tre valgene", () => {
     render(<IntentTitleLanding />);
 
-    const group = screen.getByRole("radiogroup", { name: "Jeg ønsker å" });
-    expect(screen.getByRole("heading", { name: "Hva vil du selge?" })).toBeTruthy();
-    const sell = screen.getByRole("radio", { name: "Jeg vil selge" });
-    const buy = screen.getByRole("radio", { name: "Jeg leter etter" });
-    const free = screen.getByRole("radio", { name: "Jeg vil gi bort" });
-    expect(group.contains(sell)).toBe(true);
-    expect(group.contains(buy)).toBe(true);
-    expect(group.contains(free)).toBe(true);
-    expect(sell.getAttribute("aria-checked")).toBe("true");
-    expect(buy.getAttribute("aria-checked")).toBe("false");
-  });
-
-  it("bytter intensjon, flytter fokus og navigerer med trimmet tittel", () => {
-    render(<IntentTitleLanding />);
-
-    fireEvent.click(screen.getByRole("radio", { name: "Jeg leter etter" }));
+    expect(screen.getByRole("heading", { name: "Hva vil du opprette?" })).toBeTruthy();
     expect(
-      screen.getByRole("radio", { name: "Jeg leter etter" }).getAttribute("aria-checked"),
-    ).toBe("true");
-    expect(screen.getByRole("heading", { name: "Hva leter du etter?" })).toBeTruthy();
-    const input = screen.getByRole("textbox", { name: "Tittel" });
-    expect(document.activeElement).toBe(input);
-
-    fireEvent.change(input, { target: { value: "  sykkel  " } });
-    fireEvent.submit(input.closest("form")!);
-
-    expect(mocks.navigate).toHaveBeenCalledWith({
-      to: "/ny-ok-annonse",
-      search: { title: "sykkel" },
-    });
+      screen.getAllByRole("button").map((b) => b.querySelector("span.font-semibold")?.textContent),
+    ).toEqual(["Jeg vil selge", "Jeg leter etter", "Jeg vil gi bort"]);
+    expect(screen.queryByRole("textbox")).toBeNull();
   });
 
-  it("har en synlig tittel-etikett og hjelpetekst med eksempel", () => {
-    render(<IntentTitleLanding />);
+  it.each([
+    ["Jeg vil selge", { to: "/ny-annonse", search: { type: "sell", start: "bilder" } }],
+    ["Jeg vil gi bort", { to: "/ny-annonse", search: { type: "free", start: "bilder" } }],
+    ["Jeg leter etter", { to: "/ny-ok-annonse" }],
+  ])("«%s» starter annonseflyten direkte", (label, target) => {
+    const onNavigate = vi.fn();
+    render(<IntentTitleLanding onNavigate={onNavigate} />);
 
-    const input = screen.getByRole("textbox", { name: "Tittel" });
-    expect(screen.getByText("Tittel")).toBeTruthy();
-    expect(screen.getByText("For eksempel: vintage lenestol i eik")).toBeTruthy();
-    expect(input.getAttribute("id")).toBe("listing-title");
-  });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(label) }));
 
-  it("beholder fem-tegnsgrensen for selge og starter ikke navigering ved kort tittel", () => {
-    render(<IntentTitleLanding />);
-
-    const input = screen.getByRole("textbox", { name: "Tittel" });
-    fireEvent.change(input, { target: { value: "abcd" } });
-    fireEvent.submit(input.closest("form")!);
-
-    expect(screen.getByText("Tittelen må være minst 5 tegn")).toBeTruthy();
-    expect(mocks.prefetchCategorySuggestion).not.toHaveBeenCalled();
-    expect(mocks.navigate).not.toHaveBeenCalled();
-  });
-
-  it("beholder kjøpe-intent med tre-tegnsgrense og tekstbasert kategoriforslag", () => {
-    render(<IntentTitleLanding defaultIntent="buy" />);
-
-    const input = screen.getByRole("textbox", { name: "Tittel" });
-    fireEvent.change(input, { target: { value: "ab" } });
-    fireEvent.submit(input.closest("form")!);
-
-    expect(screen.getByText("Tittelen må være minst 3 tegn")).toBeTruthy();
-    expect(mocks.prefetchCategorySuggestion).not.toHaveBeenCalled();
-    expect(mocks.navigate).not.toHaveBeenCalled();
-
-    fireEvent.change(input, { target: { value: "sykkel" } });
-    fireEvent.submit(input.closest("form")!);
-
-    expect(mocks.prefetchCategorySuggestion).toHaveBeenCalledWith("sykkel");
-    expect(mocks.navigate).toHaveBeenCalledWith({
-      to: "/ny-ok-annonse",
-      search: { title: "sykkel" },
-    });
-  });
-
-  it("beholder gi bort-intent med fem-tegnsgrense", () => {
-    render(<IntentTitleLanding defaultIntent="free" />);
-
-    const input = screen.getByRole("textbox", { name: "Tittel" });
-    fireEvent.change(input, { target: { value: "stol" } });
-    fireEvent.submit(input.closest("form")!);
-
-    expect(screen.getByText("Tittelen må være minst 5 tegn")).toBeTruthy();
-    fireEvent.change(input, { target: { value: "stolpe" } });
-    fireEvent.submit(input.closest("form")!);
-
-    expect(mocks.prefetchCategorySuggestion).toHaveBeenCalledWith("stolpe");
-    expect(mocks.navigate).toHaveBeenCalledWith({
-      to: "/ny-annonse",
-      search: { type: "free", title: "stolpe" },
-    });
+    expect(mocks.navigate).toHaveBeenCalledWith(target);
+    expect(onNavigate).toHaveBeenCalled();
   });
 });

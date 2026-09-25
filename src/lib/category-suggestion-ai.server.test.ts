@@ -228,4 +228,72 @@ describe("suggestListingFromPhotosAi", () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("drops an image that still contains EXIF metadata instead of forwarding it", async () => {
+    // Minimal JPEG bytes with an APP1 "Exif\0\0" segment — defense in depth in
+    // case a client somehow sends metadata despite re-encoding client-side.
+    const exifBytes = [
+      0xff,
+      0xd8,
+      0xff,
+      0xe1,
+      0x00,
+      0x08,
+      ...Array.from("Exif", (c) => c.charCodeAt(0)),
+      0x00,
+      0x00,
+      0xff,
+      0xd9,
+    ];
+    const exifBase64 = Buffer.from(exifBytes).toString("base64");
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: '{"categories":["bil"]}' } }] }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await suggestListingFromPhotosAi({
+      operation: "identify",
+      images: [
+        { mime: "image/jpeg", dataUrl: `data:image/jpeg;base64,${exifBase64}` },
+        { mime: "image/jpeg", dataUrl: "data:image/jpeg;base64,AAAA" },
+      ],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: "pending", categories: expect.any(Array) }),
+    );
+    const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(request.body as string);
+    // Only the non-EXIF image should have been forwarded (1 text + 1 image).
+    expect(body.messages[0].content).toHaveLength(2);
+    expect(body.messages[0].content[1]).toEqual({
+      type: "image_url",
+      image_url: { url: "data:image/jpeg;base64,AAAA" },
+    });
+  });
+
+  it("caps images at the per-operation limit even when the schema allows more", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: '{"categories":["bil"]}' } }] }),
+        { status: 200 },
+      ),
+    );
+
+    await suggestListingFromPhotosAi({
+      operation: "identify", // max 2, even though the schema allows up to 3
+      images: [
+        { mime: "image/jpeg", dataUrl: "data:image/jpeg;base64,AAAA" },
+        { mime: "image/jpeg", dataUrl: "data:image/jpeg;base64,AAAB" },
+        { mime: "image/jpeg", dataUrl: "data:image/jpeg;base64,AAAC" },
+      ],
+    });
+
+    const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(request.body as string);
+    // 1 text part + at most 2 image parts.
+    expect(body.messages[0].content).toHaveLength(3);
+  });
 });

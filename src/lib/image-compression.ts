@@ -1,8 +1,8 @@
-// Klientside-komprimering av bilder før opplasting til Supabase Storage.
-// Sparer både lagringsplass og brukernes opplastingsbåndbredde. Biblioteket
-// håndterer EXIF-rotasjon (viktig for mobilbilder), nedskalering og kjører i en
-// web worker slik at UI ikke blokkeres. Utdata er alltid WebP — formatet er
-// allerede tillatt i begge bucketene (se ALLOWED_MIME i storage.ts).
+// Klientside-komprimering av bilder før opplasting. Sparer både lagringsplass
+// og brukernes opplastingsbåndbredde. Biblioteket håndterer EXIF-rotasjon
+// (viktig for mobilbilder), nedskalering og kjører i en web worker slik at UI
+// ikke blokkeres. Utdata er WebP for opplasting og JPEG for KI-miniatyrer (se
+// presetene i image-presets.ts).
 
 import imageCompression from "browser-image-compression";
 
@@ -10,32 +10,37 @@ import { PRESETS } from "@/lib/image-presets";
 export type { CompressPreset } from "@/lib/image-presets";
 import type { CompressPreset } from "@/lib/image-presets";
 
-function toWebpName(name: string): string {
+function toPresetFileName(name: string, fileType: string): string {
   const dot = name.lastIndexOf(".");
   const base = dot > 0 ? name.slice(0, dot) : name;
-  return `${base}.webp`;
+  const ext = fileType === "image/jpeg" ? "jpg" : "webp";
+  return `${base}.${ext}`;
 }
 
 /**
- * Komprimer og nedskaler et bilde til WebP. Fail-safe: hvis komprimeringen
- * feiler, eller resultatet blir større enn originalen, returneres originalfilen
- * uendret — opplasting skal aldri brytes av komprimeringssteget.
+ * Komprimer og nedskaler et bilde til presetets format. Fail-safe: hvis
+ * komprimeringen feiler, eller resultatet blir større enn originalen, returneres
+ * originalfilen uendret — opplasting skal aldri brytes av komprimeringssteget.
+ * Unntak: presets med `alwaysUseCompressed` (KI-miniatyrer) bruker alltid den
+ * re-enkodede filen. `preserveExif` sendes alltid eksplisitt som `false`.
  */
 export async function compressImage(file: File, preset: CompressPreset): Promise<File> {
   const cfg = PRESETS[preset];
+  const fileType = cfg.fileType ?? "image/webp";
   let result = file;
   try {
     const compressed = await imageCompression(file, {
       maxWidthOrHeight: cfg.maxWidthOrHeight,
       maxSizeMB: cfg.maxSizeMB,
       initialQuality: cfg.initialQuality,
-      fileType: "image/webp",
+      fileType,
+      preserveExif: false,
       useWebWorker: true,
     });
     // Behold den minste av original og komprimert.
-    if (compressed.size < file.size) {
-      result = new File([compressed], toWebpName(file.name), {
-        type: "image/webp",
+    if (cfg.alwaysUseCompressed || compressed.size < file.size) {
+      result = new File([compressed], toPresetFileName(file.name, fileType), {
+        type: fileType,
         lastModified: Date.now(),
       });
     }

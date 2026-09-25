@@ -5,6 +5,7 @@ import {
   type CategoryNode,
 } from "@/lib/category-filters";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { containsImageMetadata } from "@/lib/image-metadata";
 import { z } from "zod";
 
 const inputSchema = z.object({ title: z.string().min(3).max(200) });
@@ -193,6 +194,10 @@ ${examplesBlock}Annonsetittel: "${truncatedTitle}"`;
 
 const PHOTO_MAX_BYTES = 150 * 1024;
 const PHOTO_MAX_TOTAL_BYTES = 450 * 1024;
+const PHOTO_MAX_IMAGES: Record<"identify" | "attributes", number> = {
+  identify: 2,
+  attributes: 3,
+};
 const PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const PHOTO_CATEGORY_CACHE_TTL_MS = 60_000;
 const PHOTO_UNAVAILABLE = {
@@ -235,20 +240,30 @@ async function loadPhotoCategories(): Promise<CategoryRow[] | null> {
   return photoCategoryLoad;
 }
 
-function boundedPhotoImages(images: PhotoSuggestionInput["images"]) {
+function boundedPhotoImages(
+  images: PhotoSuggestionInput["images"],
+  operation: "identify" | "attributes",
+) {
   let totalBytes = 0;
   const valid: PhotoSuggestionInput["images"] = [];
-  for (const image of images) {
+  for (const image of images.slice(0, PHOTO_MAX_IMAGES[operation])) {
     const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/u.exec(
       image.dataUrl,
     );
     if (!match || match[1] !== image.mime || match[2].length % 4 !== 0) continue;
     try {
-      const bytes = atob(match[2]).length;
-      if (bytes === 0 || bytes > PHOTO_MAX_BYTES || totalBytes + bytes > PHOTO_MAX_TOTAL_BYTES) {
+      const binary = atob(match[2]);
+      const size = binary.length;
+      if (size === 0 || size > PHOTO_MAX_BYTES || totalBytes + size > PHOTO_MAX_TOTAL_BYTES) {
         continue;
       }
-      totalBytes += bytes;
+      // Defense in depth: the client re-encodes and strips metadata before
+      // sending, but never trust that alone — reject any image that still
+      // carries EXIF/XMP bytes instead of forwarding it to Mistral.
+      const bytes = new Uint8Array(size);
+      for (let i = 0; i < size; i += 1) bytes[i] = binary.charCodeAt(i);
+      if (containsImageMetadata(bytes)) continue;
+      totalBytes += size;
       valid.push(image);
     } catch {
       // Invalid base64 is a manual-fallback case, not a provider error.
@@ -349,7 +364,7 @@ export async function suggestListingFromPhotosAi(input: unknown) {
   if (!parsed.success || process.env.MISTRAL_PHOTO_SUGGESTIONS_ENABLED !== "true") {
     return PHOTO_UNAVAILABLE;
   }
-  const images = boundedPhotoImages(parsed.data.images);
+  const images = boundedPhotoImages(parsed.data.images, parsed.data.operation);
   if (images.length === 0) return PHOTO_UNAVAILABLE;
 
   const categoryRows = await loadPhotoCategories();

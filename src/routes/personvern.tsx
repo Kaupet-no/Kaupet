@@ -341,8 +341,8 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Forslag fra bildene dine (KI)</h2>
           <p className="mt-3">
             Når du lager en salgsannonse, kan du be Kaupet foreslå kategori og detaljer ut fra
-            bildene dine. Dette er helt frivillig, og ingenting sendes før du selv trykker «Foreslå
-            kategori og detaljer fra bildene» og godtar i vinduet som forklarer hva som skjer.
+            bildene dine. Dette er helt frivillig, og ingenting sendes før du selv trykker «Fyll ut
+            tittel og kategori for meg».
           </p>
           <h3 className="mt-5 font-semibold">Dette sendes</h3>
           <ul className="mt-2 list-disc space-y-1 pl-5">

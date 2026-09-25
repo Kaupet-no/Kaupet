@@ -51,7 +51,6 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
   const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   const revision = `${images.map((image) => image.id).join(",")}|${title.trim()}`;
-  const [consentOpen, setConsentOpen] = useState(false);
   const [consentedRevision, setConsentedRevision] = useState<string | null>(null);
   const [status, setStatus] = useState<PhotoSuggestionStatus>("idle");
   const [categorySuggestions, setCategorySuggestions] = useState<PhotoCategorySuggestion[]>([]);
@@ -73,8 +72,9 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     setTitleSuggestion(null);
   }
 
-  async function confirmConsent() {
-    setConsentOpen(false);
+  // Trykket på knappen er samtykket: hjelpeteksten under den forklarer KI-
+  // bruken og lenker til personvernerklæringen.
+  async function analyzePhotos() {
     setConsentedRevision(revision);
     setStatus("analyzing");
     try {
@@ -148,10 +148,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     turnstileEnabled,
     turnstileRef,
     status,
-    consentOpen,
-    openConsent: () => setConsentOpen(true),
-    closeConsent: () => setConsentOpen(false),
-    confirmConsent,
+    analyzePhotos,
     categorySuggestions,
     titleSuggestion,
     dismissTitleSuggestion: () => setTitleSuggestion(null),

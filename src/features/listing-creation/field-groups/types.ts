@@ -244,10 +244,7 @@ export type WizardSharedProps = {
   // attributes steps — see use-photo-suggestion.ts.
   photoSuggestionEnabled: boolean;
   photoSuggestionStatus: "idle" | "analyzing" | "ok" | "unavailable";
-  photoConsentOpen: boolean;
-  openPhotoConsent: () => void;
-  closePhotoConsent: () => void;
-  confirmPhotoConsent: () => void;
+  analyzePhotos: () => void;
   /** 0-2 candidates from the photo `identify` call, same shape as
    * `categorySuggestions` — merged into the category-attributes chip ahead
    * of the title-based suggestions when present. */

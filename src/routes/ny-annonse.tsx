@@ -1735,10 +1735,7 @@ function NewListingPage() {
 
     photoSuggestionEnabled: photoSuggestion.enabled,
     photoSuggestionStatus: photoSuggestion.status,
-    photoConsentOpen: photoSuggestion.consentOpen,
-    openPhotoConsent: photoSuggestion.openConsent,
-    closePhotoConsent: photoSuggestion.closeConsent,
-    confirmPhotoConsent: photoSuggestion.confirmConsent,
+    analyzePhotos: photoSuggestion.analyzePhotos,
     photoCategorySuggestions: photoSuggestion.categorySuggestions,
     photoTitleSuggestion: photoSuggestion.titleSuggestion,
     dismissPhotoTitleSuggestion: photoSuggestion.dismissTitleSuggestion,

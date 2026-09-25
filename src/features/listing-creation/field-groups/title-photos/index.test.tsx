@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PHOTO_SUGGESTION_LIMITS } from "@/lib/photo-suggestion-images";
 import type { WizardSharedProps } from "../types";
 import { PhotosGroup, TitleGroup } from ".";
 
@@ -13,20 +12,6 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 afterEach(cleanup);
-
-/** jsdom har ingen matchMedia — ResponsiveOverlay (useFormFactor) trenger den. */
-function setViewportWidth(width: number) {
-  window.matchMedia = ((query: string) => {
-    const min = Number(/min-width:\s*(\d+)px/u.exec(query)?.[1] ?? 0);
-    return {
-      matches: width >= min,
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    } as unknown as MediaQueryList;
-  }) as typeof window.matchMedia;
-}
-setViewportWidth(1440);
 
 const image = {
   id: "1",
@@ -40,10 +25,7 @@ const noopPhotoSuggestionProps = {
   title: "",
   photoSuggestionEnabled: false,
   photoSuggestionStatus: "idle" as const,
-  photoConsentOpen: false,
-  openPhotoConsent: vi.fn(),
-  closePhotoConsent: vi.fn(),
-  confirmPhotoConsent: vi.fn(),
+  analyzePhotos: vi.fn(),
   photoTitleSuggestion: null,
   dismissPhotoTitleSuggestion: vi.fn(),
 };
@@ -162,9 +144,8 @@ describe("TitleGroup", () => {
     expect(screen.getByTestId("listing-title-input")).toBeTruthy();
   });
 
-  it("åpner samtykke ved trykk, uten å kalle confirmPhotoConsent selv", () => {
-    const openPhotoConsent = vi.fn();
-    const confirmPhotoConsent = vi.fn();
+  it("starter analysen ved trykk og lenker til personvernerklæringen", () => {
+    const analyzePhotos = vi.fn();
     render(
       <PhotosGroup
         images={[image]}
@@ -173,47 +154,11 @@ describe("TitleGroup", () => {
         noImageConfirmPending={false}
         {...noopPhotoSuggestionProps}
         photoSuggestionEnabled
-        openPhotoConsent={openPhotoConsent}
-        confirmPhotoConsent={confirmPhotoConsent}
+        analyzePhotos={analyzePhotos}
       />,
     );
+    expect(screen.getByText("personvernerklæringen")).toBeTruthy();
     fireEvent.click(screen.getByTestId("photo-suggestion-button"));
-    expect(openPhotoConsent).toHaveBeenCalledTimes(1);
-    expect(confirmPhotoConsent).not.toHaveBeenCalled();
-  });
-
-  it("samtykkedialogen viser 30 dager, EXIF og tallene fra PHOTO_SUGGESTION_LIMITS", () => {
-    const confirmPhotoConsent = vi.fn();
-    render(
-      <PhotosGroup
-        images={[image]}
-        setImages={vi.fn()}
-        uploadProgress={null}
-        noImageConfirmPending={false}
-        {...noopPhotoSuggestionProps}
-        photoSuggestionEnabled
-        photoConsentOpen
-        confirmPhotoConsent={confirmPhotoConsent}
-      />,
-    );
-    expect(screen.getByText("Analysere bildene med KI?")).toBeTruthy();
-    expect(screen.getByText(/30 dager/)).toBeTruthy();
-    expect(screen.getByText(/EXIF/)).toBeTruthy();
-    expect(
-      screen.getByText(
-        new RegExp(`opptil ${PHOTO_SUGGESTION_LIMITS.identify.maxImages} nedskalerte kopier`),
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(new RegExp(`maks ${PHOTO_SUGGESTION_LIMITS.identify.maxDimension} piksler`)),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(new RegExp(`opptil ${PHOTO_SUGGESTION_LIMITS.attributes.maxImages} kopier`)),
-    ).toBeTruthy();
-
-    // Intet kall skal skje før "Analyser bildene" trykkes.
-    expect(confirmPhotoConsent).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Analyser bildene" }));
-    expect(confirmPhotoConsent).toHaveBeenCalledTimes(1);
+    expect(analyzePhotos).toHaveBeenCalledTimes(1);
   });
 });

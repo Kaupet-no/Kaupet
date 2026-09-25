@@ -334,7 +334,7 @@ export function ImageUploader({
 
       {images.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          Tips: Ta ett bilde av hele tingen i dagslys, og et nærbilde av eventuelle skader.
+          Tips: Ta minst ett bilde av hele tingen i dagslys, og et nærbilde av eventuelle skader.
         </p>
       )}
 

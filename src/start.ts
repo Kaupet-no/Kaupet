@@ -1,5 +1,6 @@
 import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { isNotFound, isRedirect } from "@tanstack/react-router";
+import { getRequest, setResponseHeader, setResponseStatus } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
@@ -39,6 +40,26 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     });
   }
 });
+
+// TanStack Start fanger kast fra serverfunksjoner i middleware-kjeden og
+// serialiserer dem som et vanlig 200-svar — `console.error("Server Fn Error!")`
+// i server-functions-handler nås aldri. Uten denne middlewaren havner feilen
+// bare i Response-bodyen, aldri i Workers-loggen/wrangler tail.
+const serverFnErrorLogMiddleware = createMiddleware({ type: "function" }).server(
+  async ({ next, serverFnMeta }) => {
+    try {
+      return await next();
+    } catch (error) {
+      if (!isRedirect(error) && !isNotFound(error)) {
+        console.error(`[serverFn] ${serverFnMeta.name} (${serverFnMeta.filename})`, error);
+        // Bare for RPC-kall fra nettleseren: in-process-kall under SSR deler
+        // sidens respons, og en loader som håndterer feilen skal ikke gi 500.
+        if (getRequest()?.headers.get("x-tsr-serverFn") === "true") setResponseStatus(500);
+      }
+      throw error;
+    }
+  },
+);
 
 // In-memory cache to avoid hitting the DB on every request.
 const ipCache = new Map<string, { banned: boolean; expires: number }>();
@@ -118,7 +139,7 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [serverFnErrorLogMiddleware, attachSupabaseAuth],
   requestMiddleware: [
     cspNonceMiddleware,
     errorMiddleware,

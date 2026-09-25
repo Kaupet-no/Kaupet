@@ -150,7 +150,9 @@ export function ListingComposerShell({
             <span className="font-display text-lg text-brand">.</span>
             <span className="font-display text-sm text-muted-foreground">no</span>
           </span>
-          <span className="truncate text-sm text-muted-foreground">Ny annonse</span>
+          <span className="hidden truncate text-sm text-muted-foreground sm:inline">
+            Ny annonse
+          </span>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {status}
             <Button

@@ -95,9 +95,9 @@ Layouten er responsiv og er tilpasset både tablet og mobiltelefoner av varieren
 
 Se [README-CAPACITOR.md](README-CAPACITOR.md) for hvordan du bygger en tilsvarende app selv.
 
-## Slik kjører du Kaupet lokalt på din egen PC
+## Kjør Kaupet lokalt
 
-Du trenger [Bun](https://bun.sh) installert.
+Raskeste vei med Bun:
 
 ```bash
 git clone https://github.com/Kaupet-no/kaupet.git
@@ -106,87 +106,21 @@ bun install
 bun dev
 ```
 
-Appen kjører deretter på `http://localhost:8080`.
-
-### Miljøvariabler og lokal backend (Docker)
-
-Backenden (database, auth, filer) leveres av Supabase. Du trenger derimot ikke tilgang til Kaupet sitt Supabase-miljø for å komme i gang. Det enkleste er å kjøre Supabase lokalt i Docker.
-
-Krever [Docker](https://www.docker.com) og [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started):
-
-```bash
-bunx supabase start   # starter hele Supabase-stacken lokalt (Postgres, Auth, Storage, Studio m.m.)
-bun run env:local     # genererer .env med lokale Supabase-nøkler + tomme placeholders for resten
-bun dev
-```
-
-`supabase start` drar opp en komplett, isolert Docker Compose-stack og kjører migrasjonene i [supabase/migrations](supabase/migrations) automatisk. Nøklene som settes i `.env` er Supabase sine offentlig kjente lokale dev-defaults. Funksjonalitet som er avhengig av tredjeparter (kjøretøyoppslag, AI-kategoriforslag, Vipps, Resend, push-varsler) vil ikke virke før du eventuelt fyller inn egne nøkler manuelt i `.env`.
-
-Stopp stacken med `bunx supabase stop` når du er ferdig. Supabase Studio (lokalt admin-UI) er tilgjengelig på `http://localhost:54323`.
-
-#### Oppdater lokal dev-kopi fra staging
-
-For å få staging-kategorier og annonser inn i den lokale databasen, kjør:
-
-```bash
-bunx supabase start
-bun run env:local
-bun run db:refresh-local -- --replace
-```
-
-Importen leser staging-hemmelighetene fra `.env.staging.local`, kopierer
-kategorier, filtre, flows, kjøretøydata, annonser, popularitetstall og
-annonsebilder, og legger alle annonser under en syntetisk lokal dev-bruker.
-Kladder og utløpte staging-annonser normaliseres til aktive lokale annonser.
-Eksisterende lokale katalogdata, annonser og `listing-images` erstattes.
-Staging-brukere, meldinger, favoritter, adresser og andre private relasjoner
-kopieres ikke.
-Annonsetitler, beskrivelser og lokasjonsfelter kopieres uendret; bruk bare
-lokal maskin med tilgangskontroll og slett kopien når den ikke trengs.
-
-Kommandoen krever `--replace` med vilje, fordi den sletter lokale dev-data.
-
-#### Alternativ: kjør mot Kaupet sitt staging-Supabase
-
-For å kjøre appen lokalt mot staging-prosjektet, dekrypter staging-hemmelighetene
-og legg dem i den lokale `.env`-filen:
-
-```bash
-bun run env:staging
-bun dev
-```
-
-Dette bruker delt staging-data. Ikke kjør destruktive eller produksjonslignende
-administrative operasjoner lokalt. Bytt tilbake til isolert lokal Supabase med:
-
-```bash
-bunx supabase start
-bun run env:local
-```
-
-#### Alternativ: kjør mot et annet eksternt Supabase-prosjekt
-
-Har du tilgang til et eget Supabase-prosjekt, kan du i stedet kopiere
-`.env.example` til `.env` og fylle inn verdiene direkte:
-
-```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_PUBLISHABLE_KEY=...
-VITE_SUPABASE_PROJECT_ID=...
-```
+Appen kjører på `http://localhost:8080`. For fullstendig lokalt oppsett — Supabase i Docker, import av staging-data og kjøring mot eksterne Supabase-prosjekter — se [README-LOKALT.md](README-LOKALT.md).
 
 ## Teknologi som benyttes
 
 - [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 8
 - [Tailwind CSS v4](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com) komponenter
-- [Supabase](https://supabase.com) — database, auth, realtime og RLS
+- [Supabase](https://supabase.com) for database, auth, realtime og RLS
 - [Cloudflare Workers](https://www.cloudflare.com/products/workers/) for hosting
-- [Cloudflare R2](https://www.cloudflare.com/products/r2/) for bildelagring
+- [Cloudflare R2](https://www.cloudflare.com/products/r2/) for lagring av filer
 - [Capacitor](https://capacitorjs.com) for native iOS og Android-app — se [README-CAPACITOR.md](README-CAPACITOR.md) for oppsett av native build
 - [Statens vegvesen (Datautlevering)](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) for kjøretøyoppslag
-- [Mistral Small 4](https://mistral.ai) for AI-basert kategoriforslag, som fallback når vote-basert forslag mangler treffsikker historikk
-- [Vipps/MobilePay](https://vipps.no) for betaling av promoteringer, og [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) for bot-beskyttelse
+- [Mistral Small 4](https://mistral.ai) for KI-basert kategoriforslag ved annonseopprettelse
+- [Vipps/MobilePay](https://vipps.no) for betaling av promoteringer
+- [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) for bot-beskyttelse
 
 Alle kall mot tredjeparter skjer server-side. Arkitekturen er beskrevet i [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

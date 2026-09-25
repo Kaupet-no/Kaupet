@@ -124,6 +124,7 @@ async function clearListingStorage(local) {
 }
 
 async function ensureLocalOwner(local) {
+  const password = `local-${crypto.randomUUID()}-not-for-production`;
   const users = await unwrap(
     local.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     "Les lokale brukere",
@@ -133,20 +134,25 @@ async function ensureLocalOwner(local) {
     const created = await unwrap(
       local.auth.admin.createUser({
         email: LOCAL_ONLY_EMAIL,
-        password: `local-${crypto.randomUUID()}-not-for-production`,
+        password,
         email_confirm: true,
         user_metadata: { display_name: "Dev-selger" },
       }),
       "Opprett lokal dev-bruker",
     );
     user = created.user;
+  } else {
+    await unwrap(
+      local.auth.admin.updateUserById(user.id, { password }),
+      "Oppdater lokal dev-bruker",
+    );
   }
   if (!user) throw new Error("Kunne ikke opprette eller finne lokal dev-bruker");
 
   await upsertInBatches(local, "profiles", [
     { id: user.id, display_name: "Dev-selger", avatar_url: null, deleted_at: null },
   ]);
-  return user.id;
+  return { id: user.id, password };
 }
 
 function categoriesInParentOrder(rows) {
@@ -213,7 +219,7 @@ function contentType(path) {
 }
 
 async function copyListingImages(source, local, rows) {
-  const copiedPaths = new Set();
+  const copied = [];
   for (const row of rows) {
     const { data: file, error: downloadError } = await source.storage
       .from("listing-images")
@@ -222,16 +228,17 @@ async function copyListingImages(source, local, rows) {
       console.warn(`  Hopper over manglende bilde: ${row.storage_path}`);
       continue;
     }
+    const localPath = `${row.listing_id}/${row.id}.${row.storage_path.split(".").pop()}`;
     await unwrap(
-      local.storage.from("listing-images").upload(row.storage_path, file, {
-        contentType: contentType(row.storage_path),
+      local.storage.from("listing-images").upload(localPath, file, {
+        contentType: contentType(localPath),
         upsert: true,
       }),
-      `Skriv bilde ${row.storage_path}`,
+      `Skriv bilde ${localPath}`,
     );
-    copiedPaths.add(row.storage_path);
+    copied.push({ ...row, storage_path: localPath });
   }
-  return rows.filter((row) => copiedPaths.has(row.storage_path));
+  return copied;
 }
 
 async function main() {
@@ -293,11 +300,27 @@ async function main() {
   await upsertInBatches(local, "categories", categoriesInParentOrder(categories));
   await upsertInBatches(local, "category_filters", filters);
   await upsertInBatches(local, "category_flows", flows);
-  // category_filters generates its own synonyms; only import hand-curated rows.
+  // category_filters generates its own synonyms. Reuse their IDs when a
+  // hand-curated row has the same filter, option and phrase.
+  const generated = await readAll(local, "filter_synonyms");
+  const generatedIds = new Map(
+    generated.map((row) => [
+      JSON.stringify([row.category_filter_id, row.option_value, row.phrase]),
+      row.id,
+    ]),
+  );
   await upsertInBatches(
     local,
     "filter_synonyms",
-    synonyms.filter((row) => !row.is_generated),
+    synonyms
+      .filter((row) => !row.is_generated)
+      .map((row) => ({
+        ...row,
+        id:
+          generatedIds.get(
+            JSON.stringify([row.category_filter_id, row.option_value, row.phrase]),
+          ) ?? row.id,
+      })),
   );
   await upsertInBatches(
     local,
@@ -316,15 +339,24 @@ async function main() {
   );
   await upsertInBatches(local, "site_settings", settings);
 
-  const ownerId = await ensureLocalOwner(local);
-  const localListings = listings.map((row) => listingForLocal(row, ownerId));
+  const owner = await ensureLocalOwner(local);
+  const localListings = listings.map((row) => listingForLocal(row, owner.id));
   console.log("Skriver annonser som aktive lokale dev-annonser …");
   await upsertInBatches(local, "listings", localListings);
   await upsertInBatches(local, "listing_view_totals", viewTotals, "listing_id");
 
   console.log("Kopierer annonsebilder …");
   const localImages = await copyListingImages(source, local, images);
-  await upsertInBatches(local, "listing_images", localImages);
+  const localOwner = createClient(
+    localUrl,
+    required(localEnv, "SUPABASE_PUBLISHABLE_KEY", LOCAL_ENV_FILE),
+    options,
+  );
+  await unwrap(
+    localOwner.auth.signInWithPassword({ email: LOCAL_ONLY_EMAIL, password: owner.password }),
+    "Logg inn lokal dev-bruker",
+  );
+  await upsertInBatches(localOwner, "listing_images", localImages);
 
   console.log(
     `Ferdig: ${categories.length} kategorier, ${localListings.length} aktive annonser og ${localImages.length} annonsebilder lokalt.`,

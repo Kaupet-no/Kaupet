@@ -200,6 +200,11 @@ const PHOTO_MAX_IMAGES: Record<"identify" | "attributes", number> = {
 };
 const PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const PHOTO_CATEGORY_CACHE_TTL_MS = 60_000;
+// Not Small 4: mistral-small-2603 misreads even clear photos (drum -> "bowl of
+// bananas"). Ministral 14B identifies them as well as Medium 3.5 at about an
+// eighth of the price. Measured with scripts/eval-photo-identify.ts — see the
+// decision doc § 2d. Ministral rejects `reasoning_effort`, so it is not sent.
+const PHOTO_MODEL = "ministral-14b-2512";
 const PHOTO_UNAVAILABLE = {
   status: "unavailable" as const,
   source: "photo-ai" as const,
@@ -413,7 +418,7 @@ export async function suggestListingFromPhotosAi(input: unknown) {
   const prompt =
     parsed.data.operation === "identify"
       ? `Finn én eller to sannsynlige bladkategorier for bildene på en norsk markedsplass.
-Velg bare sluger fra kandidatlisten. Foreslå også en kort tittel hvis bildet viser én tydelig gjenstand.
+Velg bare sluger fra kandidatlisten. Hvis bildet viser én tydelig gjenstand, foreslå en kort tittel som bare navngir gjenstanden (og merke/modell hvis det står synlig). Ikke beskriv tilstand, alder, pris eller bruk.
 Ikke ta med personopplysninger, adresse, registreringsnummer eller kontaktinformasjon.
 Kandidater: ${candidateBlock}`
       : `Finn bare tydelige, synlige verdier for tillatte kategorifelt i bildene.
@@ -478,10 +483,9 @@ Tillatte felt: ${filters
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "mistral-small-2603",
+        model: PHOTO_MODEL,
         messages: [{ role: "user", content }],
         max_tokens: 256,
-        reasoning_effort: "none",
         temperature: 0,
         response_format: {
           type: "json_schema",

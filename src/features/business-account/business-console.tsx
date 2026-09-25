@@ -477,7 +477,7 @@ function Overview({
           value={planName}
           detail={
             organization.selected_plan === "proff_basis"
-              ? "Gratis – alltid"
+              ? "Alltid gratis"
               : effectiveProff
                 ? "Proff er aktiv"
                 : "Proff er ikke aktiv"

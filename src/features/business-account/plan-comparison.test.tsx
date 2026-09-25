@@ -113,7 +113,7 @@ describe("business plan comparison", () => {
     expect(screen.queryByText("Start enkelt", { exact: true })).toBeNull();
     expect(screen.getAllByText("Proff", { exact: true }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Basis", { exact: true }).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Gratis – alltid").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Alltid gratis").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1.?490 kr per måned eks\. mva/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
     expect(

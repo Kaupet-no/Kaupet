@@ -49,7 +49,13 @@ BEGIN
   -- En tom lokal/CI-database får referansedata først fra seed.sql, etter at
   -- migrasjonene er kjørt (se scripts/refresh-local-from-staging.mjs og
   -- mønsteret i 20260917110000_optional_boat_and_electronics_filters.sql).
-  IF v_root_count = 0 THEN
+  -- bildeler-og-tilbehor opprettes av 20260826200000_parts_fitment.sql selv
+  -- i en tom database, så bootstrap kjennes igjen på at seed-røttene
+  -- bil-og-mc og bat mangler.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.categories
+    WHERE parent_id IS NULL AND slug IN ('bil-og-mc', 'bat')
+  ) THEN
     RAISE NOTICE 'R6: rotkategoriene finnes ikke ennå — hopper over i tom bootstrap-database';
     RETURN;
   END IF;

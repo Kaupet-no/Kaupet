@@ -206,6 +206,11 @@ const PHOTO_UNAVAILABLE = {
   categories: [],
   attributes: [],
 };
+/** Every silent fallback logs why, so `wrangler tail` shows which gate fired. */
+function photoUnavailable(reason: string, detail?: unknown) {
+  console.warn("[photo-ai] unavailable:", reason, ...(detail === undefined ? [] : [detail]));
+  return PHOTO_UNAVAILABLE;
+}
 type PhotoSuggestionInput = {
   operation: "identify" | "attributes";
   title?: string;
@@ -362,23 +367,23 @@ export async function suggestListingFromPhotosAi(input: unknown) {
     .strict()
     .safeParse(input);
   if (!parsed.success || process.env.MISTRAL_PHOTO_SUGGESTIONS_ENABLED !== "true") {
-    return PHOTO_UNAVAILABLE;
+    return photoUnavailable(parsed.success ? "disabled" : "invalid input");
   }
   const images = boundedPhotoImages(parsed.data.images, parsed.data.operation);
-  if (images.length === 0) return PHOTO_UNAVAILABLE;
+  if (images.length === 0) return photoUnavailable("no valid images");
 
   const categoryRows = await loadPhotoCategories();
-  if (!categoryRows) return PHOTO_UNAVAILABLE;
+  if (!categoryRows) return photoUnavailable("categories load failed");
   const parentIds = new Set(
     categoryRows.flatMap((category) => (category.parent_id ? [category.parent_id] : [])),
   );
   const leafCategories = categoryRows.filter((category) => !parentIds.has(category.id));
-  if (leafCategories.length === 0) return PHOTO_UNAVAILABLE;
+  if (leafCategories.length === 0) return photoUnavailable("no leaf categories");
 
   let filters: CategoryFilter[] = [];
   if (parsed.data.operation === "attributes") {
     const category = categoryRows.find((candidate) => candidate.slug === parsed.data.categorySlug);
-    if (!category) return PHOTO_UNAVAILABLE;
+    if (!category) return photoUnavailable("unknown category slug");
     const categoryById = new Map<string, CategoryNode>(
       categoryRows.map((candidate) => [candidate.id, candidate]),
     );
@@ -394,7 +399,7 @@ export async function suggestListingFromPhotosAi(input: unknown) {
         "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
       )
       .in("category_id", [...categoryIds]);
-    if (filterError || !filterRows) return PHOTO_UNAVAILABLE;
+    if (filterError || !filterRows) return photoUnavailable("filters load failed");
     filters = effectiveFiltersForCategory(
       category.id,
       filterRows.map((row) => normalizeFilter(row)),
@@ -463,7 +468,7 @@ Tillatte felt: ${filters
           required: ["attributes"],
           additionalProperties: false,
         };
-  if (!process.env.MISTRAL_API_KEY) return PHOTO_UNAVAILABLE;
+  if (!process.env.MISTRAL_API_KEY) return photoUnavailable("MISTRAL_API_KEY missing");
 
   try {
     const response = await fetch("https://api.eu.mistral.ai/v1/chat/completions", {
@@ -492,12 +497,17 @@ Tillatte felt: ${filters
       }),
       signal: AbortSignal.timeout(5_000),
     });
-    if (!response.ok) return PHOTO_UNAVAILABLE;
+    if (!response.ok) {
+      return photoUnavailable(
+        `Mistral HTTP ${response.status}`,
+        (await response.text().catch(() => "")).slice(0, 300),
+      );
+    }
     const result = (await response.json()) as {
       choices?: Array<{ message?: { content?: string | null } }>;
     };
     const generated = result.choices?.[0]?.message?.content;
-    if (!generated) return PHOTO_UNAVAILABLE;
+    if (!generated) return photoUnavailable("empty Mistral response");
     if (parsed.data.operation === "identify") {
       const output = z
         .object({
@@ -514,7 +524,7 @@ Tillatte felt: ${filters
             categories: suggestions,
             ...(output.title ? { title: output.title } : {}),
           }
-        : PHOTO_UNAVAILABLE;
+        : photoUnavailable("no known category in Mistral response", output.categories);
     }
     const output = z
       .object({
@@ -534,8 +544,11 @@ Tillatte felt: ${filters
     );
     return attributes.length > 0
       ? { status: "pending" as const, source: "photo-ai" as const, attributes }
-      : PHOTO_UNAVAILABLE;
-  } catch {
-    return PHOTO_UNAVAILABLE;
+      : photoUnavailable("no allowed attributes in Mistral response");
+  } catch (error) {
+    return photoUnavailable(
+      "Mistral request threw",
+      error instanceof Error ? error.name + ": " + error.message : error,
+    );
   }
 }

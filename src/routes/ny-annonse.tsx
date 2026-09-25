@@ -71,10 +71,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
-import {
-  ListingPreviewCanvas,
-  PublishActions,
-} from "@/features/listing-creation/field-groups/review-publish";
+import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import { deriveComposerImprovements } from "@/features/listing-creation/field-groups/review-publish/derive-improvements";
 import type {
   ComposerReviewEditOptions,
@@ -82,7 +79,11 @@ import type {
   WizardSharedProps,
 } from "@/features/listing-creation/field-groups/types";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
-import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
+import {
+  EditableListingReview,
+  PhoneListingPreview,
+} from "@/features/listing-creation/preview-draft-view";
+import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { publishGate } from "@/features/listing-creation/publish-gate";
@@ -176,23 +177,21 @@ export const Route = createFileRoute("/ny-annonse")({
   errorComponent: NewListingError,
 });
 
-/** Hvilke(t) anker i det levende lerretet (ListingPreviewCanvas) et steg sin
- * feltgruppe hører til — brukes til å markere "Du redigerer" i sidekolonnen.
- * vehicle-facts samler flere felt (tittel/km/beskrivelse) på ett steg, derfor
- * flere ankre der. Steg uten oppføring her (kategorivalg, registreringsnr.
- * osv.) får ingen markering — det er greit, lerretet viser uansett hele
- * annonsen. */
-const CANVAS_ANCHORS_BY_GROUP_KEY: Record<string, string[]> = {
-  photos: ["photos"],
-  title: ["title"],
-  price: ["price"],
-  "vehicle-price": ["price"],
-  "category-attributes": ["facts"],
-  "boat-facts": ["facts"],
-  "vehicle-facts": ["title", "facts", "description"],
-  "description-keywords": ["description"],
-  location: ["location"],
-  delivery: ["location"],
+/** Hvilken del av annonsesiden (`data-preview-section` i ListingDetailView)
+ * en feltgruppe redigerer — telefonrammen ved siden av skjemaet scroller til
+ * delen for stegets første gruppe som har en, når steget byttes. Steg uten
+ * noen (kategorivalg, registreringsnr. osv.) lar rammen stå der den er. */
+const PREVIEW_SECTION_BY_GROUP_KEY: Record<string, string> = {
+  photos: "photos",
+  title: "title",
+  price: "price",
+  "vehicle-price": "price",
+  "category-attributes": "facts",
+  "boat-facts": "facts",
+  "vehicle-facts": "facts",
+  "description-keywords": "description",
+  location: "location",
+  delivery: "location",
 };
 
 function NewListingPage() {
@@ -206,13 +205,12 @@ function NewListingPage() {
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
-  const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const returnToReviewRef = useRef(false);
   const reviewSectionLastStepRef = useRef<number | null>(null);
   const pendingReviewFocusRef = useRef<string | null>(null);
   /** Set from `ComposerReviewEditOptions.reviewAnchor` when an edit is
-   * started from the Se over-steget (review-publish's `ListingReviewSection`
-   * wrappers) — consumed once we land back on review to scroll/focus that
+   * started from the Se over-steget (a `data-preview-section` on the listing
+   * page there) — consumed once we land back on review to scroll to that
    * section, per the "return goes back to where you left" rule (UI-guiden). */
   const returnFocusAnchorRef = useRef<string | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
@@ -236,10 +234,6 @@ function NewListingPage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftDiscardConfirmOpen, setDraftDiscardConfirmOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [hasPreviewed, setHasPreviewed] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewDraft, setPreviewDraft] = useState<PreviewDraft | null>(null);
-  const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
   const [pendingCategoryChange, setPendingCategoryChange] = useState<{
@@ -678,9 +672,9 @@ function NewListingPage() {
     if (!anchor) return;
     returnFocusAnchorRef.current = null;
     const frame = requestAnimationFrame(() => {
-      const el = document.getElementById(`review-section-${anchor}`);
-      el?.focus();
-      el?.scrollIntoView({ block: "center" });
+      document
+        .querySelector(`[data-testid="listing-review"] [data-preview-section="${anchor}"]`)
+        ?.scrollIntoView({ block: "center" });
     });
     return () => cancelAnimationFrame(frame);
   }, [step, pages.length]);
@@ -1438,9 +1432,9 @@ function NewListingPage() {
   // Derived label for the category picker button
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
-  function openPreview() {
+  function buildPreviewDraft(): PreviewDraft {
     const categoryNode = categoryId ? categoriesById.get(categoryId) : undefined;
-    setPreviewDraft({
+    return {
       title,
       subtitle: subtitle || null,
       description,
@@ -1467,11 +1461,66 @@ function NewListingPage() {
       })),
       imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
       attributes,
-    });
-    setHasPreviewed(true);
-    setPreviewNudgeOpen(false);
-    setPreviewOpen(true);
+    };
   }
+
+  /** Se over-steget redigerer annonsesiden direkte (eierens redigeringsmodus
+   * i ListingDetailView) — her lagres hver endring i utkastet i stedet for i
+   * databasen. Bilder, kategori, registreringsnummer og sted hopper tilbake
+   * til sine steg: utkastets bilder er lokale, og de andre har egne flyter. */
+  const draftEditContext: ListingEditContextValue = {
+    editMode: true,
+    listingId: "draft",
+    behavior,
+    fieldStatus: {},
+    saveField: async (patch) => {
+      const opts = { shouldDirty: true, shouldValidate: true };
+      switch (patch.group) {
+        case "title":
+          setValue("title", patch.title, opts);
+          break;
+        case "subtitle":
+          setValue("subtitle", patch.subtitle ?? "", opts);
+          break;
+        case "description":
+          setValue("description", patch.description, opts);
+          break;
+        case "condition":
+          setValue("condition", patch.condition as ListingForm["condition"], opts);
+          break;
+        case "price":
+          setValue("is_free", patch.is_free, opts);
+          setValue("price_nok", patch.price_nok ?? "", opts);
+          break;
+        case "delivery":
+          setValue(
+            "can_ship",
+            patch.can_ship == null ? null : patch.can_ship ? "ship" : "pickup",
+            opts,
+          );
+          break;
+        case "vehicle-condition":
+          setValue("known_issues", patch.known_issues ?? "", opts);
+          setValue("no_known_issues", patch.no_known_issues, opts);
+          setValue("maintenance_history", patch.maintenance_history ?? "", opts);
+          break;
+        case "attributes":
+          setAttributes(patch.attributes as AttributeMap);
+          break;
+        // "location" og "category" når aldri hit: openLocationEditor og
+        // openCategoryModal under hopper til stegene i stedet.
+      }
+    },
+    openVehicleLookupModal: () =>
+      editReviewSection("content", { groupKey: "vehicle-registration", reviewAnchor: "title" }),
+    openCategoryModal: () => editReviewSection("category"),
+    openLocationEditor: () =>
+      editReviewSection("location", {
+        groupKey: "location",
+        field: "postal_code",
+        reviewAnchor: "location",
+      }),
+  };
 
   // Redirect to home if no type selected and no draft — entry should go through the picker dialog.
   // `draftChecked` gates this: the draft is read from localStorage in an
@@ -1702,7 +1751,16 @@ function NewListingPage() {
     turnstileEnabled,
     turnstileRef,
     onCancel: () => navigate({ to: "/" }),
-    onPreview: openPreview,
+    reviewListing: (
+      <EditableListingReview
+        draft={buildPreviewDraft()}
+        editContext={draftEditContext}
+        native={native}
+        onEditImages={() =>
+          editReviewSection("content", { groupKey: "photos", reviewAnchor: "photos" })
+        }
+      />
+    ),
     onEditReviewSection: editReviewSection,
     improvementGroupKeys: fieldGroupsForKeys([
       ...fieldGroupKeys,
@@ -1722,17 +1780,12 @@ function NewListingPage() {
     publishingRequirements: sortedPublishingRequirements,
   };
   // Samme avledning som mobilens ReviewPublishGroup bruker (V3) — regnet her
-  // også, siden sidekolonnens annonsestyrke-indikator vises gjennom hele
-  // flyten, ikke bare på Se over-steget der ReviewPublishGroup selv rendres.
+  // også, siden annonsestyrken i stegraden vises gjennom hele flyten, ikke
+  // bare på Se over-steget der ReviewPublishGroup selv rendres.
   // eslint-disable-next-line react-hooks/refs -- deriveComposerImprovements leser kun images/city/postalCode/groupKeys fra sharedProps, ingen ref
   const desktopImprovements = deriveComposerImprovements(sharedProps);
 
   const groups = currentPage?.groups ?? [];
-  // Delene av det levende lerretet som hører til steget brukeren står på nå
-  // (V2) — se CANVAS_ANCHORS_BY_GROUP_KEY.
-  const canvasActiveAnchors = Array.from(
-    new Set(groups.flatMap((g) => CANVAS_ANCHORS_BY_GROUP_KEY[g.key] ?? [])),
-  );
   // Native gives the description textarea a flex-fill layout so it grows to
   // fill the remaining page height instead of a fixed row count — needed on
   // any solo native page containing it: the generic description-keywords
@@ -1775,8 +1828,6 @@ function NewListingPage() {
       const gate = publishGate({
         hasMissingAttributes: missingFilters.length > 0,
         authenticated: !!user,
-        hasPreviewed,
-        native,
       });
       if (gate === "fill-required-attributes") {
         setAttributesTouched(true);
@@ -1787,16 +1838,8 @@ function NewListingPage() {
         setValidationError("Fyll inn alle obligatoriske egenskaper før du publiserer.");
         return;
       }
-      // Auth is checked before the preview nudge: "Publiser likevel" calls
-      // mutation.mutate() directly, so a guest reaching that dialog would hit
-      // the server's auth error instead of the sign-in handoff.
       if (gate === "sign-in") {
         setGuestPublishSheetOpen(true);
-        return;
-      }
-      if (gate === "confirm-without-preview") {
-        pendingSubmitValuesRef.current = v;
-        setPreviewNudgeOpen(true);
         return;
       }
       publishOnce(v);
@@ -2003,34 +2046,26 @@ function NewListingPage() {
           validationAttempt={validationAttempt}
           footer={composerFooter}
           firstStep={isFirst}
-          aside={
-            // På Se over-steget selv er hovedkolonnen allerede annonsen (N1)
-            // — lerretet ville bare duplisert den, så sidekolonnen skjules
-            // helt der og hovedkolonnen får full bredde (V2). Annonsestyrken
-            // vises da inline øverst i ReviewPublishGroup i stedet.
+          // På Se over-steget er hovedkolonnen allerede annonsen (N1), og
+          // annonsestyrken vises inline øverst i ReviewPublishGroup — der
+          // trengs verken «Forhåndsvis» eller styrken i stegraden.
+          preview={
             !native && currentStepKey !== "review-publish" ? (
-              <>
-                {/* Annonsestyrken telles fra feltgruppene, og feltgruppene
-                    bestemmes av kategorien — før den er valgt ville tallet
-                    vært en gjetning som hopper så snart kategorien settes. */}
-                {categoryId && (
-                  <div data-testid="listing-strength">
-                    <ListingStrengthIndicator
-                      required={sortedPublishingRequirements}
-                      improvements={desktopImprovements}
-                    />
-                  </div>
-                )}
-                {/* Det levende lerretet (V2): samme kompakte kjøpervisning som
-                    Se over bruker, oppdatert mens brukeren skriver. Delen som
-                    hører til steget brukeren står på nå er markert. */}
-                <div className="space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Slik ser kjøperen annonsen
-                  </p>
-                  <ListingPreviewCanvas {...sharedProps} activeAnchors={canvasActiveAnchors} />
-                </div>
-              </>
+              <PhoneListingPreview draft={buildPreviewDraft()} />
+            ) : undefined
+          }
+          previewSection={groups.map((g) => PREVIEW_SECTION_BY_GROUP_KEY[g.key]).find(Boolean)}
+          // Antallet mangler avhenger av kategorien — før den er valgt ville
+          // tallet vært en gjetning som hopper så snart kategorien settes.
+          strength={
+            !native && currentStepKey !== "review-publish" && categoryId ? (
+              <div data-testid="listing-strength">
+                <ListingStrengthIndicator
+                  inline
+                  required={sortedPublishingRequirements}
+                  improvements={desktopImprovements}
+                />
+              </div>
             ) : undefined
           }
         >
@@ -2065,32 +2100,6 @@ function NewListingPage() {
           )}
         </ListingComposerShell>
       </form>
-
-      <AlertDialog open={previewNudgeOpen} onOpenChange={setPreviewNudgeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Annonsen er ikke forhåndsvist ennå</AlertDialogTitle>
-            <AlertDialogDescription>
-              Gå tilbake til gjennomgangen for å se forhåndsvisningen, eller publiser direkte.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              data-testid="publish-anyway-button"
-              onClick={() => {
-                setPreviewNudgeOpen(false);
-                if (pendingSubmitValuesRef.current) {
-                  publishOnce(pendingSubmitValuesRef.current);
-                }
-              }}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            >
-              Publiser likevel
-            </AlertDialogAction>
-            <AlertDialogCancel>Tilbake</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Category picker bottom sheet */}
       <CategoryPicker
@@ -2248,65 +2257,28 @@ function NewListingPage() {
         </ClientOnly>
       )}
 
-      {previewOpen && previewDraft && (
-        <PreviewDraftView draft={previewDraft} onClose={() => setPreviewOpen(false)} />
-      )}
-
-      {previewOpen ? (
-        <AlertDialog
-          open={blocker.status === "blocked"}
-          onOpenChange={(open) => {
-            if (!open) blocker.reset?.();
-          }}
-        >
-          <AlertDialogContent onClickOutside={() => blocker.reset?.()}>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Annonsen er ikke publisert ennå</AlertDialogTitle>
-              <AlertDialogDescription>Er du sikker på at du vil avslutte?</AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
-              <AlertDialogAction
-                className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
-                onClick={() => {
-                  setPreviewOpen(false);
-                  blocker.proceed?.();
-                }}
-              >
-                Avslutt uten å publisere
-              </AlertDialogAction>
-              <AlertDialogCancel
-                className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
-                onClick={() => blocker.reset?.()}
-              >
-                Fortsett forhåndsvisning
-              </AlertDialogCancel>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
-      ) : (
-        <DiscardListingDialog
-          open={blocker.status === "blocked"}
-          onReset={() => blocker.reset?.()}
-          onDiscard={async () => {
-            await discardDraft();
-            blocker.proceed?.();
-          }}
-          onSaveDraft={async () => {
-            if (!user) {
-              if (!(await flushLocalDraft())) return false;
-              blocker.proceed?.();
-              return true;
-            }
-            setIsSavingDraft(true);
-            const id = await saveDraftToSupabase();
-            setIsSavingDraft(false);
-            if (!id) return false;
+      <DiscardListingDialog
+        open={blocker.status === "blocked"}
+        onReset={() => blocker.reset?.()}
+        onDiscard={async () => {
+          await discardDraft();
+          blocker.proceed?.();
+        }}
+        onSaveDraft={async () => {
+          if (!user) {
+            if (!(await flushLocalDraft())) return false;
             blocker.proceed?.();
             return true;
-          }}
-          isSavingDraft={isSavingDraft}
-        />
-      )}
+          }
+          setIsSavingDraft(true);
+          const id = await saveDraftToSupabase();
+          setIsSavingDraft(false);
+          if (!id) return false;
+          blocker.proceed?.();
+          return true;
+        }}
+        isSavingDraft={isSavingDraft}
+      />
 
       <GuestPublishSheet
         open={guestPublishSheetOpen}

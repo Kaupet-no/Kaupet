@@ -51,14 +51,12 @@ test("utlogget bruker sendes til innlogging med utkastet i behold", async ({ pag
   const publishButton = page.getByTestId("publish-listing-button");
   await expect(publishButton).toHaveText(/Logg inn og publiser/);
 
-  // Ingen forhåndsvisning er åpnet. Auth-sjekken må komme før
-  // "Publiser likevel"-dialogen, ellers treffer gjesten publiseringskallet
-  // og får "Du må være logget inn." i stedet for innloggingsarket.
+  // Auth-sjekken må komme før publiseringskallet, ellers får gjesten
+  // "Du må være logget inn." i stedet for innloggingsarket.
   await publishButton.click();
   await expect(
     page.getByRole("heading", { name: "Nesten ute! Logg inn for å publisere" }),
   ).toBeVisible();
-  await expect(page.getByTestId("publish-anyway-button")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL(/\/auth\?/, { timeout: 10_000 });

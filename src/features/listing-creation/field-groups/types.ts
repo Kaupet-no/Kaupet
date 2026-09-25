@@ -1,4 +1,4 @@
-﻿import type { RefObject } from "react";
+﻿import type { ReactNode, RefObject } from "react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import type {
   UseFormRegister,
@@ -276,10 +276,12 @@ export type WizardSharedProps = {
   fetchMyLocation: () => void | Promise<void>;
   setFullscreenMapOpen: (open: boolean) => void;
   markerMovedRef: { current: boolean };
-  onPreview: () => void;
   lastEditedRef: { current: "postal_code" | "city" | "map" | null };
 
   // review/publish
+  /** Annonsesiden i redigeringsmodus for Se over-steget — bygget i
+   * ny-annonse.tsx, som eier utkastet og hvor endringene lagres. */
+  reviewListing?: ReactNode;
   previewPrice: string | null;
   mutationIsPending: boolean;
   turnstileEnabled: boolean;

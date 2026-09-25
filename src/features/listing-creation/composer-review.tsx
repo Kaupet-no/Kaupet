@@ -26,21 +26,26 @@ const statusSections: {
  * Compact annonsestyrke-indikator (V3): erstatter den gamle "Publiseringsstatus"-
  * boksen og "Publiseringsklar"-overskriften med ett kompakt element — en prikk +
  * tekst, med lenker rett til feltene når noe blokkerer. To nivåer, ikke tre:
- * blokkerende (requiredToPublish) og valgfritt bedre (alt annet). Vises i
- * sidekolonnen gjennom hele flyten på desktop, og øverst på Se over på mobil
- * (se ReviewPublishGroup / ny-annonse.tsx sin aside).
+ * blokkerende (requiredToPublish) og valgfritt bedre (alt annet). Vises på
+ * én linje (`inline`) i stegraden gjennom hele flyten på desktop, og øverst på
+ * Se over (se ReviewPublishGroup / ny-annonse.tsx sin `strength`).
  */
 export function ListingStrengthIndicator({
   required,
   improvements,
+  inline,
 }: {
   required: ComposerReviewStatus[];
   improvements: ComposerReviewStatus[];
+  inline?: boolean;
 }) {
   const ready = required.length === 0;
   const invitation = improvements[0];
   return (
-    <section aria-labelledby="listing-strength-title" className="space-y-2">
+    <section
+      aria-labelledby="listing-strength-title"
+      className={inline ? "flex flex-wrap items-center gap-x-4 gap-y-1" : "space-y-2"}
+    >
       <div className="flex items-center gap-2">
         <span
           aria-hidden
@@ -58,7 +63,7 @@ export function ListingStrengthIndicator({
         </p>
       </div>
       {!ready ? (
-        <ul className="space-y-1 pl-[1.125rem]">
+        <ul className={inline ? "flex flex-wrap gap-x-3" : "space-y-1 pl-[1.125rem]"}>
           {required.map((item) => (
             <li key={item.key}>
               <button
@@ -76,7 +81,10 @@ export function ListingStrengthIndicator({
           <button
             type="button"
             onClick={invitation.onAction}
-            className="native-touch-target block pl-[1.125rem] text-left text-sm text-brand-text underline decoration-dotted underline-offset-4 hover:decoration-solid"
+            className={cn(
+              "native-touch-target text-left text-sm text-brand-text underline decoration-dotted underline-offset-4 hover:decoration-solid",
+              !inline && "block pl-[1.125rem]",
+            )}
           >
             {invitation.key === "photos"
               ? "Legg til bilder, så finner flere den"

@@ -162,8 +162,8 @@ export async function fillDescriptionAndAdvance(
  * delivery/location on this page; generic listings arrive here from their
  * separate "Pris og henting" page.
  *
- * Publishing without having opened the preview first prompts a "want to
- * preview before publishing?" dialog rather than publishing immediately.
+ * Se over-steget er selve forhåndsvisningen, så «Publiser» publiserer
+ * direkte — det finnes ingen «Publiser likevel»-dialog lenger.
  * Asserts on the PublishedListingDialog's persistent title, not the
  * success toast — the toast auto-dismisses after a few seconds and was
  * the source of an intermittent CI flake (the toast could already be gone
@@ -176,18 +176,20 @@ export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
   // skjer etter klikket, og Turnstiles utfordringsiframe fortsatt kan være
   // nettverkstreg i CI.
   testInfo.setTimeout(testInfo.timeout + 20_000);
-  await expect(page.getByTestId("publish-listing-button")).toBeEnabled({ timeout: 20_000 });
+  const publishButton = page.getByTestId("publish-listing-button");
+  await expect(publishButton).toBeEnabled({ timeout: 20_000 });
+  // Feilgjetting: en rask dobbeltklikk skal fortsatt starte nøyaktig én
+  // publisering og ikke konkurrere om Turnstile-tokenet.
+  await publishButton.dblclick();
+  // Samme vern mot klikk som ikke registreres som før; knappen er deaktivert
+  // mens publiseringen pågår, så et nytt forsøk kan ikke starte en til.
   await clickAndWaitFor(
     page,
-    page.getByTestId("publish-listing-button"),
-    page.getByTestId("publish-anyway-button"),
+    publishButton,
+    page.getByRole("heading", { name: "Lappen henger ute" }),
     testInfo,
     "no-progress-after-publish-click",
   );
-  // Feilgjetting: en rask dobbeltklikk skal fortsatt starte nøyaktig én
-  // publisering og ikke konkurrere om Turnstile-tokenet.
-  await page.getByTestId("publish-anyway-button").dblclick();
-  await page.getByRole("heading", { name: "Lappen henger ute" }).waitFor({ timeout: 20_000 });
 }
 
 /**

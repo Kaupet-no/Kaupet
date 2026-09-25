@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
-import { ListingPreviewCanvas, PublishActions, ReviewPublishGroup } from ".";
+import { PublishActions, ReviewPublishGroup } from ".";
 
 const categoryFilters = vi.hoisted(() => ({
   current: [] as import("@/lib/category-filters").CategoryFilter[],
@@ -88,6 +88,26 @@ describe("ReviewPublishGroup", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
+  it("viser annonsesiden fra ny-annonse.tsx som selve Se over-visningen", () => {
+    render(
+      <ReviewPublishGroup
+        {...({
+          native: false,
+          isVehicle: false,
+          attributes: {},
+          mutationIsPending: false,
+          uploadProgress: null,
+          improvementGroupKeys: [],
+          publishingRequirementErrors: [],
+          reviewListing: <p>Annonsesiden</p>,
+        } as unknown as WizardSharedProps)}
+      />,
+    );
+
+    expect(screen.getByText("Annonsesiden")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Se full forhåndsvisning" })).toBeNull();
+  });
+
   it("åpner 360° som valgfri forbedring fra kjøretøyets review", async () => {
     render(
       <ReviewPublishGroup
@@ -110,7 +130,6 @@ describe("ReviewPublishGroup", () => {
           draftId: "draft-1",
           ensureDraftId: vi.fn(),
           onEditReviewSection: vi.fn(),
-          onPreview: vi.fn(),
           improvementGroupKeys: ["photos", "vehicle-price", "location", "vehicle-360"],
           publishingRequirementErrors: [],
         } as unknown as WizardSharedProps)}
@@ -143,50 +162,4 @@ describe("PublishActions", () => {
       });
     },
   );
-});
-
-describe("ListingPreviewCanvas", () => {
-  const baseProps = {
-    native: false,
-    isVehicle: false,
-    behavior: { requiresDeliveryMethod: false },
-    categories: [],
-    categoryId: "",
-    images: [],
-    title: "Kort",
-    subtitle: undefined,
-    previewPrice: null,
-    city: undefined,
-    postalCode: undefined,
-    categoryLabel: "Møbler",
-    attributes: {},
-    mutationIsPending: false,
-    uploadProgress: null,
-    improvementGroupKeys: [],
-    publishingRequirementErrors: [],
-  } as unknown as WizardSharedProps;
-
-  it("markerer det aktive ankeret med «Du redigerer» og lar de andre stå umerket", () => {
-    render(
-      <ListingPreviewCanvas
-        {...baseProps}
-        onEditReviewSection={vi.fn()}
-        activeAnchors={["price"]}
-      />,
-    );
-
-    expect(screen.getAllByText("Du redigerer")).toHaveLength(1);
-  });
-
-  it("kaller onEditReviewSection med riktig anker når en del av lerretet klikkes", () => {
-    const onEditReviewSection = vi.fn();
-    render(<ListingPreviewCanvas {...baseProps} onEditReviewSection={onEditReviewSection} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Endre pris" }));
-
-    expect(onEditReviewSection).toHaveBeenCalledWith(
-      "details",
-      expect.objectContaining({ reviewAnchor: "price", field: "price_nok" }),
-    );
-  });
 });

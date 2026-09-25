@@ -24,12 +24,16 @@ function renderShell({
   firstStep = false,
   footer = "Fortsett",
   native = true,
-  aside = null,
+  preview = null,
+  previewSection,
+  strength = null,
 }: {
   firstStep?: boolean;
   footer?: string;
   native?: boolean;
-  aside?: ReactNode;
+  preview?: ReactNode;
+  previewSection?: string;
+  strength?: ReactNode;
 } = {}) {
   const onBack = vi.fn();
   const onCancel = vi.fn();
@@ -43,7 +47,9 @@ function renderShell({
       onCancel={onCancel}
       footer={<button type="button">{footer}</button>}
       firstStep={firstStep}
-      aside={aside}
+      preview={preview}
+      previewSection={previewSection}
+      strength={strength}
     >
       Innhold
     </ListingComposerShell>,
@@ -153,28 +159,57 @@ describe("ListingComposerShell", () => {
     expect(footer?.classList.contains("bottom-0")).toBe(true);
     expect(footer?.classList.contains("lg:static")).toBe(true);
   });
-  it("viser desktop-aside i split layout og holder smale flater uten horisontal scroll", () => {
+  it("åpner forhåndsvisningen fra stegraden i et eget panel og gir fokus tilbake ved lukking", async () => {
     const { container } = renderShell({
       native: false,
-      aside: <div>Forhåndsvisning</div>,
+      preview: <div>Kjøpervisning</div>,
+      strength: <div>2 opplysninger må fylles ut</div>,
     });
-    const aside = container.querySelector('[data-composer-aside="desktop"]');
-    const layout = container.querySelector('[data-composer-layout="split"]');
-    expect(layout?.classList.contains("min-w-0")).toBe(true);
-    expect(aside?.classList.contains("hidden")).toBe(true);
-    expect(aside?.classList.contains("lg:block")).toBe(true);
-    expect(aside?.classList.contains("lg:sticky")).toBe(true);
-    expect(
-      container.querySelector('[data-composer-footer="web"]')?.classList.contains("lg:static"),
-    ).toBe(true);
+    const toolbar = container.querySelector('[data-composer-toolbar="desktop"]');
+    const trigger = screen.getByRole("button", { name: "Forhåndsvis" });
+    expect(toolbar?.contains(trigger)).toBe(true);
+    expect(toolbar?.textContent).toContain("2 opplysninger må fylles ut");
+    expect(toolbar?.classList.contains("lg:flex")).toBe(true);
+    expect(trigger.classList.contains("dock:hidden")).toBe(true);
+
+    fireEvent.click(trigger);
+    const panel = await screen.findByRole("dialog", { name: "Slik ser kjøperen annonsen" });
+    expect(panel.textContent).toContain("Kjøpervisning");
+
+    fireEvent.keyDown(panel, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(trigger);
   });
 
-  it("utelater desktop-aside i native og beholder én kolonne", () => {
+  it("viser forhåndsvisningen fast i telefonrammen og scroller rammen til delen steget redigerer", () => {
+    const scrollTo = vi.fn();
+    const original = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = scrollTo;
+    try {
+      const { container } = renderShell({
+        native: false,
+        preview: <p data-preview-section="price">1 800 kr</p>,
+        previewSection: "price",
+      });
+      const layout = container.querySelector('[data-composer-layout="preview-dock"]');
+      const dock = container.querySelector("[data-composer-preview-dock]");
+      expect(layout?.contains(dock)).toBe(true);
+      expect(dock?.classList.contains("dock:block")).toBe(true);
+      expect(dock?.querySelector("[inert]")?.textContent).toBe("1 800 kr");
+      expect(scrollTo).toHaveBeenCalledOnce();
+    } finally {
+      HTMLElement.prototype.scrollTo = original;
+    }
+  });
+
+  it("utelater forhåndsvisning og annonsestyrke i native og beholder én kolonne", () => {
     const { container } = renderShell({
       native: true,
-      aside: <div>Forhåndsvisning</div>,
+      preview: <div>Kjøpervisning</div>,
+      strength: <div>Klar til publisering</div>,
     });
-    expect(container.querySelector('[data-composer-aside="desktop"]')).toBeNull();
+    expect(container.querySelector('[data-composer-toolbar="desktop"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: "Forhåndsvis" })).toBeNull();
     expect(container.querySelector('[data-composer-layout="single-column"]')).toBeTruthy();
     expect(
       container.querySelector('[data-composer-footer="native"]')?.classList.contains("pb-safe"),

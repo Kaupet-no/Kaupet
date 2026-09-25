@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { ChevronLeft, Eye, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { hapticNotification, hapticSelection } from "@/lib/haptics";
 import { ComposerErrorSummary } from "./composer-error-summary";
@@ -27,7 +28,9 @@ export function ListingComposerShell({
   footer,
   firstStep,
   contentClassName,
-  aside,
+  preview,
+  previewSection,
+  strength,
 }: {
   /** Annonsens egen tittel, oppgitt på landingsskjermen — vist gjennom hele
    * wizarden så brukeren ser hva de holder på med, i stedet for et eget
@@ -59,21 +62,31 @@ export function ListingComposerShell({
   footer: ReactNode;
   firstStep: boolean;
   contentClassName?: string;
-  /** Desktop-only secondary panel. It is deliberately rendered outside the
-   * content column so mobile/native keep the existing one-column composer. */
-  aside?: ReactNode;
+  /** Annonsesiden slik kjøperen ser den på mobil. Kun desktop-web: står fast i
+   * en telefonramme ved siden av skjemaet fra 1100 px, og åpnes fra
+   * «Forhåndsvis» i stegraden som et panel fra høyre under det — rammen og
+   * et skjema på 36 rem får ikke plass side om side smalere enn det. */
+  preview?: ReactNode;
+  /** Delen av annonsesiden steget redigerer (`data-preview-section`) —
+   * telefonrammen scroller dit når steget byttes. */
+  previewSection?: string;
+  /** Annonsestyrken, vist i stegraden ved siden av «Forhåndsvis». Kun desktop-web. */
+  strength?: ReactNode;
 }) {
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const focusFrameRef = useRef<number | null>(null);
   const previousPageRef = useRef(pageKey);
+  const previewFrameRef = useRef<HTMLDivElement>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [dismissedValidationAttempt, setDismissedValidationAttempt] = useState(0);
   const showValidationFeedback =
     native &&
     !!errorSummary &&
     validationAttempt > 0 &&
     validationAttempt !== dismissedValidationAttempt;
-  const showAside = !native && !!aside;
+  const showToolbar = !native && !!(preview || strength);
+  const showPreview = !native && !!preview;
 
   const ensureFocusedFieldVisible = useCallback(() => {
     if (!native) return;
@@ -116,6 +129,24 @@ export function ListingComposerShell({
       if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
     };
   }, [ensureFocusedFieldVisible, native, pageKey]);
+
+  // Scroller telefonrammen (ikke siden) til delen av annonsen steget
+  // redigerer. Rammen er display:none under 1100 px — da er alle mål 0 og
+  // scrollTo gjør ingenting.
+  useEffect(() => {
+    const frame = previewFrameRef.current;
+    if (!frame || !previewSection) return;
+    const target = frame.querySelector<HTMLElement>(`[data-preview-section="${previewSection}"]`);
+    if (!target) return;
+    frame.scrollTo({
+      top:
+        target.getBoundingClientRect().top -
+        frame.getBoundingClientRect().top +
+        frame.scrollTop -
+        16,
+      behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  }, [previewSection, pageKey]);
 
   useEffect(() => {
     if (!native || validationAttempt === 0) return;
@@ -205,23 +236,58 @@ export function ListingComposerShell({
       )}
       {notice}
 
-      {progress && (
+      {(progress || showToolbar) && (
         <div className="sticky top-[var(--site-header-h)] z-10 -mx-4 mt-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           {progress}
+          {showToolbar && (
+            <div data-composer-toolbar="desktop" className="mt-2 hidden items-center gap-3 lg:flex">
+              <div className="min-w-0 flex-1">{strength}</div>
+              {preview && (
+                <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="-mr-2 shrink-0 gap-1.5 dock:hidden"
+                    >
+                      <Eye className="size-4" aria-hidden />
+                      Forhåndsvis
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent
+                    side="right"
+                    aria-describedby={undefined}
+                    data-composer-preview="desktop"
+                    className="flex w-full flex-col overflow-y-auto bg-muted sm:max-w-md"
+                  >
+                    <SheetHeader>
+                      <SheetTitle className="text-sm font-medium text-muted-foreground">
+                        Slik ser kjøperen annonsen
+                      </SheetTitle>
+                    </SheetHeader>
+                    <PhoneFrame className="mx-auto min-h-0 w-full max-w-[20rem] flex-1">
+                      {preview}
+                    </PhoneFrame>
+                  </SheetContent>
+                </Sheet>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       <ComposerErrorSummary message={errorSummary ?? null} />
 
       <div
-        data-composer-layout={showAside ? "split" : "single-column"}
+        data-composer-layout={showPreview ? "preview-dock" : "single-column"}
         className={cn(
-          showAside
-            ? "grid min-w-0 lg:grid-cols-[minmax(25rem,30rem)_minmax(0,1.1fr)] lg:items-start lg:gap-10 lg:mt-2"
-            : "contents",
+          "contents",
+          showPreview &&
+            "lg:mx-auto lg:block lg:w-full lg:max-w-[40rem] dock:grid dock:max-w-none dock:grid-cols-[minmax(0,36rem)_20rem] dock:items-start dock:justify-center dock:gap-16",
         )}
       >
-        <div className={showAside ? "min-w-0" : "contents"}>
+        <div className={showPreview ? "min-w-0" : "contents"}>
           <div
             ref={scrollContainerRef}
             data-composer-scroll={native || undefined}
@@ -282,15 +348,49 @@ export function ListingComposerShell({
           </div>
         </div>
 
-        {showAside && aside && (
-          <aside
-            aria-label="Oppsummering av annonsen"
-            data-composer-aside="desktop"
-            className="hidden min-w-0 space-y-6 rounded-2xl border border-border bg-background p-5 lg:sticky lg:top-[calc(var(--site-header-h)+1.5rem)] lg:block lg:max-h-[calc(100dvh-var(--site-header-h)-3rem)] lg:overflow-y-auto"
+        {showPreview && (
+          <div
+            data-composer-preview-dock
+            className="sticky top-[calc(var(--site-header-h)+7rem)] mt-8 hidden space-y-2 dock:block"
           >
-            {aside}
-          </aside>
+            <p className="text-center text-xs text-muted-foreground">Slik ser kjøperen annonsen</p>
+            <PhoneFrame
+              ref={previewFrameRef}
+              className="h-[min(46rem,calc(100dvh-var(--site-header-h)-14rem))]"
+            >
+              {preview}
+            </PhoneFrame>
+          </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Telefonrammen rundt forhåndsvisningen: skiller visningen fra skjemaet og
+ * minner om at de fleste kjøpere ser annonsen på mobil. Innholdet er `inert`
+ * — lenker og knapper i annonsesiden skal ikke kunne trykkes eller fokuseres
+ * herfra, og skjermlesere har skjemaet som kilde. Rammen selv scroller.
+ */
+function PhoneFrame({
+  ref,
+  className,
+  children,
+}: {
+  ref?: Ref<HTMLDivElement>;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-[2rem] border-[6px] border-foreground bg-background shadow-lg",
+        className,
+      )}
+    >
+      <div ref={ref} className="h-full overflow-y-auto overscroll-contain">
+        <div inert>{children}</div>
       </div>
     </div>
   );

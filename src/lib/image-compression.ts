@@ -42,7 +42,10 @@ export async function compressImage(file: File, preset: CompressPreset): Promise
       fileType,
       preserveExif: false,
       useWebWorker: true,
-      libURL: new URL(imageCompressionLibUrl, location.href).href,
+      // Absolutt URL: workeren er en blob:-URL som ikke kan resolve relative
+      // stier. `import.meta.url` (ikke `location`) så dette ikke kaster i
+      // Node-testmiljø og stille sender alle tester til catch-grenen.
+      libURL: new URL(imageCompressionLibUrl, import.meta.url).href,
     });
     // Behold den minste av original og komprimert.
     if (cfg.alwaysUseCompressed || compressed.size < file.size) {

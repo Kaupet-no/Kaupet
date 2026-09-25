@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 
 const imageCompression = vi.hoisted(() => vi.fn());
@@ -30,7 +29,7 @@ describe("compressImage", () => {
     await compressImage(new File(["xx"], "bilde.jpg", { type: "image/jpeg" }), "listing");
     const { libURL, useWebWorker } = imageCompression.mock.lastCall![1];
     expect(useWebWorker).toBe(true);
-    expect(new URL(libURL).origin).toBe(location.origin);
-    expect(libURL).toMatch(/browser-image-compression.*\.js/);
+    expect(libURL).not.toContain("jsdelivr");
+    expect(libURL).toMatch(/\/browser-image-compression[^/]*\.js$/);
   });
 });

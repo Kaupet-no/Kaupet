@@ -1798,6 +1798,9 @@ function NewListingPage() {
   const desktopImprovements = deriveComposerImprovements(sharedProps);
 
   const groups = currentPage?.groups ?? [];
+  // Kjøretøy legger Sted og Se over på samme side, så currentStepKey (første
+  // gruppe) holder ikke for å vite om ReviewPublishGroup vises.
+  const isReviewPage = groups.some((g) => g.key === "review-publish");
   // Native gives the description textarea a flex-fill layout so it grows to
   // fill the remaining page height instead of a fixed row count — needed on
   // any solo native page containing it: the generic description-keywords
@@ -2062,7 +2065,7 @@ function NewListingPage() {
           // annonsestyrken vises inline øverst i ReviewPublishGroup — der
           // trengs verken «Forhåndsvis» eller styrken i stegraden.
           preview={
-            !native && currentStepKey !== "review-publish" ? (
+            !native && !isReviewPage ? (
               <PhoneListingPreview draft={buildPreviewDraft()} />
             ) : undefined
           }
@@ -2070,7 +2073,7 @@ function NewListingPage() {
           // Antallet mangler avhenger av kategorien — før den er valgt ville
           // tallet vært en gjetning som hopper så snart kategorien settes.
           strength={
-            !native && currentStepKey !== "review-publish" && categoryId ? (
+            !native && !isReviewPage && categoryId ? (
               <div data-testid="listing-strength">
                 <ListingStrengthIndicator
                   inline

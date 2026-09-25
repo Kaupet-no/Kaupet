@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 
 const imageCompression = vi.hoisted(() => vi.fn());
@@ -22,5 +23,14 @@ describe("compressImage", () => {
       original,
       expect.objectContaining({ maxWidthOrHeight: 480, preserveExif: false }),
     );
+  });
+
+  it("laster worker-biblioteket fra eget domene, ikke fra CDN (CSP)", async () => {
+    imageCompression.mockResolvedValueOnce(new Blob(["x"]));
+    await compressImage(new File(["xx"], "bilde.jpg", { type: "image/jpeg" }), "listing");
+    const { libURL, useWebWorker } = imageCompression.mock.lastCall![1];
+    expect(useWebWorker).toBe(true);
+    expect(new URL(libURL).origin).toBe(location.origin);
+    expect(libURL).toMatch(/browser-image-compression.*\.js/);
   });
 });

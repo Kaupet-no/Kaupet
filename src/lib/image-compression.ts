@@ -5,6 +5,12 @@
 // presetene i image-presets.ts).
 
 import imageCompression from "browser-image-compression";
+// Workeren gjør `importScripts(libURL)`. Uten egen `libURL` henter biblioteket
+// seg selv fra cdn.jsdelivr.net, som CSP-ens `script-src` blokkerer. Da faller
+// det stille tilbake til hovedtråden, eller feiler, og KI-miniatyrene forkastes.
+// Serveres derfor fra eget domene (dekket av `script-src 'self'` og
+// `worker-src 'self' blob:` i security-headers.ts).
+import imageCompressionLibUrl from "browser-image-compression/dist/browser-image-compression.js?url";
 
 import { PRESETS } from "@/lib/image-presets";
 export type { CompressPreset } from "@/lib/image-presets";
@@ -36,6 +42,7 @@ export async function compressImage(file: File, preset: CompressPreset): Promise
       fileType,
       preserveExif: false,
       useWebWorker: true,
+      libURL: new URL(imageCompressionLibUrl, location.href).href,
     });
     // Behold den minste av original og komprimert.
     if (cfg.alwaysUseCompressed || compressed.size < file.size) {

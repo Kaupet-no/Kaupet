@@ -190,9 +190,8 @@ function PersonvernPage() {
                 autentiseringsleverandøren Supabase.
               </li>
               <li>
-                <strong>kaupet_recent_searches_v1</strong> — de siste søkene du har gjort, slik at
-                du kan navigere tilbake til søkereslutatene dine etter å ha sett på en annonse.
-                Forlater ikke enheten din.
+                <strong>kaupet_recent_searches_v1</strong> — de siste søkeordene dine, slik at du
+                raskt kan søke på dem igjen fra søkefeltet. Forlater ikke enheten din.
               </li>
               <li>
                 <strong>kaupet_view_mode</strong> — husker om du foretrekker annonser vist i

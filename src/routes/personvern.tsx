@@ -41,7 +41,7 @@ function PersonvernPage() {
           <p>
             Hos Kaupet.no lagrer vi kun det som er nødvendig for at tjenesten skal fungere. Vi
             bruker <strong>ingen tredjepartssporing</strong>,{" "}
-            <strong>ingen markedsføringscookies</strong> og{" "}
+            <strong>ingen sporende informasjonskapsler</strong> og{" "}
             <strong>ingen eksterne analyseplattformer</strong>. Derfor benytter vi heller ikke en
             cookie-banner som ber om samtykke. Vi lagrer kun det som er strengt nødvendig for at
             tjenesten skal fungere. Alle data som lagres er beskrevet i sin helhet lenger ned på
@@ -185,8 +185,9 @@ function PersonvernPage() {
             <ul className="space-y-2 border-t border-border px-4 py-4 list-disc pl-9">
               <li>
                 <strong>Innloggingssesjon</strong>: nødvendig for at du skal kunne være logget inn
-                mellom besøk. Lagres i nettleserens <code>localStorage</code> av vår
-                autentiseringsleverandør, Supabase.
+                mellom besøk. Lagres som en informasjonskapsel (<code>sb-…-auth-token</code>) av vår
+                autentiseringsleverandør, Supabase. Dette er den eneste informasjonskapselen vanlige
+                brukere får, og den brukes ikke til sporing.
               </li>
               <li>
                 <strong>kaupet_recent_searches_v1</strong>: de siste søkeordene dine, slik at du

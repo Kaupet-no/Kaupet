@@ -32,7 +32,7 @@ function PersonvernPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Personvernerklæring
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 1. september 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 25. september 2026</p>
         </header>
       )}
 
@@ -301,8 +301,10 @@ function PersonvernPage() {
             må bekreftes av deg før annonsen publiseres. Du kan også velge kategori selv.
           </p>
           <p className="mt-3">
-            Mistral AI er en selvstendig databehandler med driftssted i EU. Data sendt via deres API
-            brukes ikke til modelltrening som standard. Du kan lese mer i{" "}
+            Mistral AI er vår <strong>databehandler</strong> for denne funksjonen, med driftssted i
+            EU. Vi har avtalt med Mistral at data sendt via API-et ikke brukes til modelltrening, og
+            Mistral lagrer forespørselen i inntil 30 dager for misbrukskontroll før den slettes
+            automatisk. Du kan lese mer i{" "}
             <a
               href="https://legal.mistral.ai/terms/privacy-policy"
               target="_blank"
@@ -312,6 +314,48 @@ function PersonvernPage() {
               Mistral AIs personvernerklæring
             </a>
             .
+          </p>
+        </section>
+
+        <section id="bildeforslag" className="scroll-mt-24">
+          <h2 className="font-display text-2xl">Forslag fra bildene dine (KI)</h2>
+          <p className="mt-3">
+            Når du oppretter en salgsannonse, kan du velge å få et forslag til kategori og detaljer
+            basert på bildene du har lastet opp. Dette skjer{" "}
+            <strong>kun når du selv trykker og bekrefter</strong> et eget samtykke — det skjer aldri
+            automatisk. Samtykket gjelder bare de samme bildene og den samme tittelen; endrer du
+            dem, må du samtykke på nytt.
+          </p>
+          <p className="mt-3">
+            Trykker du «ja»: for kategoriforslag sender vi opptil 2 av bildene dine (nedskalert til
+            maks 480 piksler) sammen med annonsetittelen. Bekrefter du kategorien og ber om forslag
+            til detaljer, sender vi opptil 3 bilder (nedskalert til maks 768 piksler) sammen med
+            kategorien. Bildene skrives om til JPEG i nettleseren din før de sendes, og EXIF- og
+            XMP-metadata — blant annet GPS-posisjon, kameramodell og tidspunkt — fjernes samtidig.
+            Bilder som likevel inneholder slik metadata sendes ikke; dette kontrolleres både i
+            nettleseren og på serveren.
+          </p>
+          <p className="mt-3">
+            Bildene og teksten sendes til <strong>Mistral AI</strong> (modellen Mistral Small,
+            EU-endepunktet <code>api.eu.mistral.ai</code>), som er vår{" "}
+            <strong>databehandler</strong> for denne funksjonen. Mistral lagrer forespørselen
+            (bildene og teksten du sendte, og svaret vi fikk tilbake) i inntil{" "}
+            <strong>30 dager</strong> for å oppdage misbruk, og sletter den automatisk etter det. Vi
+            har avtalt med Mistral at innholdet <strong>ikke brukes til å trene KI-modeller</strong>
+            .
+          </p>
+          <p className="mt-3">
+            Kaupet lagrer ikke kopiene som sendes til Mistral, og logger ikke bildeinnholdet. Det
+            eneste som kommer tilbake, er selve forslaget (kategori og feltverdier), og det går rett
+            til nettleseren din, og du ser alltid over forslaget før noe fylles ut i annonsen — du
+            kan fritt forkaste det og fylle ut selv.
+          </p>
+          <p className="mt-3">
+            Funksjonen behandles på grunnlag av <strong>samtykke</strong> du gir for hver handling
+            (personvernforordningen art. 6 nr. 1 bokstav a). Det er helt frivillig — lar du være å
+            bruke funksjonen, fyller du ut kategori og detaljer selv som normalt. Samtykket kan ikke
+            trekkes tilbake for en forespørsel som allerede er sendt, men et nytt forslag krever
+            alltid et nytt samtykke.
           </p>
         </section>
 
@@ -453,9 +497,16 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>Mistral AI</strong> — mottar de første 100 tegnene av annonsetittelen når vårt
-              interne kategoriforslag er usikkert, se «AI-basert kategoriforslag» over. Du kan lese
-              deres personvernerklæring på{" "}
+              <strong>Mistral AI</strong> — databehandler med EU-endepunkt (
+              <code>api.eu.mistral.ai</code>). Mottar de første 100 tegnene av annonsetittelen når
+              vårt interne kategoriforslag er usikkert (se «AI-basert kategoriforslag» over), og —
+              kun når du samtykker til det — nedskalerte bildekopier uten metadata og
+              tittel/kategori for kategori- og detaljforslag (se{" "}
+              <a href="#bildeforslag" className="text-primary underline underline-offset-2">
+                «Forslag fra bildene dine (KI)»
+              </a>{" "}
+              under). Mistral lagrer forespørslene i inntil 30 dager for misbrukskontroll og bruker
+              dem ikke til modelltrening. Du kan lese deres personvernerklæring på{" "}
               <a
                 href="https://legal.mistral.ai/terms/privacy-policy"
                 target="_blank"

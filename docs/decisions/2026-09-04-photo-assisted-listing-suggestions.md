@@ -86,6 +86,29 @@ Serversiden er landet og inaktiv; klientsiden er bevisst ikke bygget ennå.
 Ikke slett endepunktene som "død kode" uten å lese § 4 først: de er
 reverseringspunktet funksjonen er designet rundt.
 
+## 2c. Leveransestatus (per 2026-09-25)
+
+Klientinngangen er nå bygget: samtykkedialogen ("Analyser valgte bilder med
+KI"), nedskalering til maks 480 px (kategoriforslag) / 768 px
+(detaljforslag), maks 2/3 bilder per kall, og EXIF-/XMP-fjerning i både
+klient og server (`PHOTO_SUGGESTION_LIMITS` i
+`src/lib/photo-suggestion-images.ts`), koblet til `inputRevision` slik at et
+endret bilde-/tittel-/kategorigrunnlag krever nytt samtykke.
+
+DPA og trenings-opt-out er bekreftet av produkteier: Mistral AI er
+databehandler under standard DPA
+(`legal.mistral.ai/terms/data-processing-addendum`), og Kaupet har reservert
+seg mot at data brukes til modelltrening. Zero Data Retention er **ikke**
+aktivert — Mistral lagrer input/output i inntil 30 rullerende dager for
+misbrukskontroll før automatisk sletting. Dette er nå dokumentert i
+personvernerklæringen (`/personvern#bildeforslag`) og i
+`docs/PERSONVERN-BEHANDLINGSPROTOKOLL.md` § 8.
+
+Det som gjenstår før `MISTRAL_PHOTO_SUGGESTIONS_ENABLED` slås på: en
+kontrollert staging-smoke-test av vision + `json_schema` sammen, der
+`usage.prompt_tokens` i Mistral-svaret logges for å bekrefte
+kostnadsanslaget for funksjonen.
+
 ## 3. Alternativer som faktisk ble vurdert
 
 - **Ingen fotoassistanse, kun tekstbasert KI-forslag.** Beholder status quo.

@@ -149,18 +149,18 @@ hel organisasjon er ikke dekket av køen.
 | E-postadresse + varselinnhold for transaksjonelle varsler                         | Sende varsler brukeren har bedt om | Samtykke             | Resend                                                              | Resend DPA, SCC + EU–US Data Privacy Framework. Data lagres i USA                       |
 | Enhets-token, varselinnhold for app-push (iOS/Android)                            | Sende push-varsler i appen         | Samtykke             | Google Firebase Cloud Messaging (viderefører til Apple APNs på iOS) | Googles standard personvernbestemmelser (SCC)                                           |
 
-## 10. Anonym produktmåling og annonsevisninger
+## 10. Feilstatistikk og annonsevisninger
 
 Disse dataene er bevisst konstruert til **ikke** å inneholde noen klient- eller
 brukeridentifikator — se `docs/decisions/2026-08-29-remove-client-side-analytics-identifiers.md`.
 
-| Data                                                                                                            | Formål                                                   | Grunnlag             | Lagring           | Slettefrist                       |
-| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------- | ----------------- | --------------------------------- |
-| `product_events` (hendelsesnavn, plattform, rute, kontrollerte egenskaper — **ingen sesjons- eller bruker-ID**) | Forstå bruksmønster i søk/annonsering på aggregert nivå  | Berettiget interesse | Supabase Postgres | 90 dager                          |
-| `product_event_rate_limits` (SHA-256-hash av IP)                                                                | Hindre misbruk av målings-endepunktet                    | Berettiget interesse | Supabase Postgres | 1 døgn                            |
-| `listing_view_totals` (annonse-ID → antall visninger)                                                           | Vise selger et visningstall                              | Berettiget interesse | Supabase Postgres | Følger annonsen (slettes med den) |
-| `listing_view_events` (annonse-ID + tidspunkt, **ingen besøkende-ID**)                                          | Beregne visninger siste 7 dager for «populært nå»        | Berettiget interesse | Supabase Postgres | 90 dager                          |
-| `listing_view_rate_limits` (SHA-256-hash av IP + annonse-ID)                                                    | Maks én telling per nettverk per annonse per 30 minutter | Berettiget interesse | Supabase Postgres | 1 døgn                            |
+| Data                                                                                                                                   | Formål                                                    | Grunnlag             | Lagring           | Slettefrist                       |
+| -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------- | ----------------- | --------------------------------- |
+| `product_events` (kun feilhendelsen `listing_publish_failed`: plattform, rute, annonsetype, steg — **ingen sesjons- eller bruker-ID**) | Oppdage og rette feil. Atferd måles ikke (fra 25.09.2026) | Berettiget interesse | Supabase Postgres | 90 dager                          |
+| `product_event_rate_limits` (SHA-256-hash av IP)                                                                                       | Hindre misbruk av målings-endepunktet                     | Berettiget interesse | Supabase Postgres | 1 døgn                            |
+| `listing_view_totals` (annonse-ID → antall visninger)                                                                                  | Vise selger et visningstall                               | Berettiget interesse | Supabase Postgres | Følger annonsen (slettes med den) |
+| `listing_view_events` (annonse-ID + tidspunkt, **ingen besøkende-ID**)                                                                 | Beregne visninger siste 7 dager for «populært nå»         | Berettiget interesse | Supabase Postgres | 90 dager                          |
+| `listing_view_rate_limits` (SHA-256-hash av IP + annonse-ID)                                                                           | Maks én telling per nettverk per annonse per 30 minutter  | Berettiget interesse | Supabase Postgres | 1 døgn                            |
 
 ## 11. Lokal enhetslagring (krever samtykke med mindre strengt nødvendig)
 

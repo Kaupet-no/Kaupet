@@ -257,6 +257,33 @@ function PersonvernPage() {
           </details>
         </section>
 
+        <section id="bruksstatistikk" className="scroll-mt-24">
+          <h2 className="font-display text-2xl">Bruksstatistikk</h2>
+          <p className="mt-3">
+            Vi måler ikke hvordan du bruker Kaupet. Vi registrerer bare når noe går galt, slik at vi
+            kan oppdage og rette feil. I dag gjelder dette kun for én hendelse: at publisering av en
+            annonse feiler.
+          </p>
+          <h3 className="mt-5 font-semibold">Dette lagres</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>Hva som feilet, og når.</li>
+            <li>Plattform: nettleser, iOS eller Android.</li>
+            <li>Hvilken side det skjedde på (uten søkeord).</li>
+            <li>
+              Annonsetype (salg eller «ønskes kjøpt») og hvilket steg i registreringen du var på.
+            </li>
+          </ul>
+          <p className="mt-3">
+            <strong>Vi lagrer ikke</strong> innholdet i annonsen, søkeord, posisjon, bruker-ID eller
+            noe som kobler flere hendelser til samme person eller enhet. Hendelsene slettes etter 90
+            dager.
+          </p>
+          <p className="mt-3">
+            For å hindre at statistikken fylles av samme hendelse, lagrer vi i tillegg en hash (en
+            ugjenkjennelig omskriving) av IP-adressen i inntil ett døgn.
+          </p>
+        </section>
+
         <section>
           <h2 className="font-display text-2xl">Push-varslinger</h2>
           <p className="mt-3">
@@ -285,8 +312,7 @@ function PersonvernPage() {
             i profilen din på Kaupet.no. Da slettes abonnementsdataene fra serveren. Hvis du kun
             trekker tilbake tillatelsen i telefonens/nettleserens systeminnstillinger uten å skru av
             varsler i Kaupet, kan abonnementet bli stående til varseltjenesten (Apple/Google eller
-            nettleseren) rapporterer at det ikke lenger er gyldig — det brukes uansett ikke til noe
-            før det.
+            nettleseren) rapporterer at det ikke lenger er gyldig.
           </p>
         </section>
 
@@ -309,28 +335,28 @@ function PersonvernPage() {
           </p>
           <h3 className="mt-5 font-semibold">Dette sendes</h3>
           <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>For å foreslå kategori sendes opptil 2 nedskaleter bilder og eventuell tittel.</li>
             <li>
-              For å foreslå kategori: opptil 2 bilder, nedskalert til maks 480 piksler, og tittelen.
+              For å foreslå detaljer, etter at du har bekreftet kategorien sendes opptil 3
+              nedskalerte bilder, og annonsens kategori.
             </li>
-            <li>
-              For å foreslå detaljer, etter at du har bekreftet kategorien: opptil 3 bilder,
-              nedskalert til maks 768 piksler, og kategorien.
-            </li>
-            <li>Vi sender ikke navnet ditt, e-postadressen din eller bruker-ID-en din.</li>
           </ul>
-          <h3 className="mt-5 font-semibold">Dette fjernes først</h3>
           <p className="mt-2">
-            Bildene lagres på nytt i nettleseren din før de sendes. Da fjernes informasjonen som
-            ligger skjult i bildefilen, blant annet GPS-posisjon, kameramodell og tidspunkt. Bilder
-            der dette ikke lykkes, blir ikke sendt.
+            Vi sender ingen data som kan assosieres med deg, som navnet ditt, e-postadressen din
+            eller bruker-ID-en din.
           </p>
-          <h3 className="mt-5 font-semibold">Hvem får bildene, og hvor lenge</h3>
           <p className="mt-2">
-            Bildene sendes til <strong>Mistral AI</strong> i EU, som behandler dem på våre vegne.
-            Mistral lagrer forespørselen i inntil <strong>30 dager</strong> for å oppdage misbruk og
-            sletter den så automatisk. Bildene <strong>brukes ikke til å trene KI-modeller</strong>.
-            Kaupet lagrer ikke kopiene og ser ikke på dem. Det eneste vi får tilbake, er forslaget.
-            Du kan lese mer i{" "}
+            Bildene mellomlagres i nettleseren din før de sendes for å fjerne informasjonen som kan
+            ligge skjult i bildefilen, slik som blant annet GPS-posisjon, kameramodell og tidspunkt.
+            Om vi ikke får til dette, blir ingen bilder sendt.
+          </p>
+          <h3 className="mt-5 font-semibold">Hvem får bildene</h3>
+          <p className="mt-2">
+            Bildene sendes til <strong>Mistral AI</strong>, som er et fransk KI-selskap med
+            egenutviklede modeller og europeiske datasentre. Mistral lagrer forespørselen i inntil{" "}
+            <strong>30 dager</strong> for å oppdage eventuelt misbruk før den slettes automatisk.
+            Bildene <strong>brukes ikke til å trene KI-modeller</strong>. Kaupet lagrer ikke kopiene
+            og ser ikke på dem. Det eneste vi får tilbake, er forslaget. Du kan lese mer i{" "}
             <a
               href="https://legal.mistral.ai/terms/privacy-policy"
               target="_blank"
@@ -353,11 +379,11 @@ function PersonvernPage() {
           <p className="mt-3">
             Vi lagrer opplysninger så lenge du har en aktiv konto og de er nødvendige for tjenesten.
             Annonser, meldinger og vurderinger beholdes til du selv sletter dem eller sletter
-            kontoen din. Datatyper med en kortere, fast frist er angitt eksplisitt i listen over
-            («Informasjonen vi lagrer») — blant annet utkast (90 dager), leste varsler (180 dager),
-            kjøretøyoppslag og feilsøkingslogger (90 dager), og angrefristen på 7 dager ved
-            kontosletting. Den fullstendige, interne oversikten over lagringstid per datatype føres
-            i Kaupets behandlingsprotokoll og oppdateres i takt med denne erklæringen.
+            kontoen din. Datatyper med en kortere, fast frist er angitt eksplisitt over — blant
+            annet utkast (90 dager), leste varsler (180 dager), kjøretøyoppslag, feilsøkingslogger
+            og bruksstatistikk (90 dager), og angrefristen på 7 dager ved kontosletting. Den
+            fullstendige, interne oversikten over lagringstid per datatype føres i Kaupets
+            behandlingsprotokoll og oppdateres i takt med denne erklæringen.
           </p>
         </section>
 
@@ -374,11 +400,11 @@ function PersonvernPage() {
             tjenesten du har bedt om, og behandles på grunnlag av <strong>avtale</strong>.
           </p>
           <p className="mt-3">
-            Sikkerhet, misbruksforebygging (bl.a. IP-blokkering, bot-beskyttelse med Cloudflare
-            Turnstile og hastighetsbegrensning), moderering, feilsøking og aggregert bruksstatistikk
-            til produktforbedring behandles på grunnlag av <strong>berettiget interesse</strong>. Vi
-            har vurdert at denne interessen ikke går ut over din interesse i personvern, blant annet
-            fordi bruksstatistikken ikke inneholder noen identifikator som kan kobles til deg.
+            Sikkerhet, misbruksforebygging (bl.a. IP-blokkering, bot-beskyttelse og
+            hastighetsbegrensning), moderering, feilsøking og bruksstatistikk (se «Bruksstatistikk»)
+            behandles på grunnlag av <strong>berettiget interesse</strong>. Vi har vurdert at denne
+            interessen ikke går ut over din interesse i personvern, blant annet fordi
+            bruksstatistikken ikke inneholder noen identifikator som kan kobles til deg.
           </p>
           <p className="mt-3">
             Enkelte opplysninger (f.eks. transaksjonsdata knyttet til betaling) kan i tillegg

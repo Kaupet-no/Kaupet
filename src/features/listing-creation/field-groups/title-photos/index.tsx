@@ -1,9 +1,12 @@
 ﻿import { useEffect } from "react";
+import { Sparkles } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/image-uploader";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
+import { PhotoSuggestionConsentDialog } from "@/features/listing-creation/photo-suggestion-consent-dialog";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
@@ -103,7 +106,31 @@ export function PhotosGroup({
   setImages,
   uploadProgress,
   noImageConfirmPending,
-}: Pick<WizardSharedProps, "images" | "setImages" | "uploadProgress" | "noImageConfirmPending">) {
+  setValue,
+  photoSuggestionEnabled,
+  photoSuggestionStatus,
+  photoConsentOpen,
+  openPhotoConsent,
+  closePhotoConsent,
+  confirmPhotoConsent,
+  photoTitleSuggestion,
+  dismissPhotoTitleSuggestion,
+}: Pick<
+  WizardSharedProps,
+  | "images"
+  | "setImages"
+  | "uploadProgress"
+  | "noImageConfirmPending"
+  | "setValue"
+  | "photoSuggestionEnabled"
+  | "photoSuggestionStatus"
+  | "photoConsentOpen"
+  | "openPhotoConsent"
+  | "closePhotoConsent"
+  | "confirmPhotoConsent"
+  | "photoTitleSuggestion"
+  | "dismissPhotoTitleSuggestion"
+>) {
   return (
     <section className="space-y-2">
       <Label>Legg til bilder</Label>
@@ -115,6 +142,56 @@ export function PhotosGroup({
         <p role="status" className="text-sm text-foreground">
           Annonser med bilder får flere henvendelser. Du kan legge til bilder senere.
         </p>
+      )}
+      {photoSuggestionEnabled && images.length > 0 && (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid="photo-suggestion-button"
+            className="native-touch-target h-auto gap-1.5 px-0 text-brand-text hover:bg-transparent hover:text-brand-text"
+            onClick={openPhotoConsent}
+            disabled={photoSuggestionStatus === "analyzing"}
+          >
+            <Sparkles className="size-4 shrink-0" aria-hidden />
+            Foreslå kategori og detaljer fra bildene
+          </Button>
+          {photoSuggestionStatus === "analyzing" && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Analyserer bildene …
+            </p>
+          )}
+          {photoSuggestionStatus === "unavailable" && (
+            <p className="text-sm text-muted-foreground">
+              Fikk ikke til å analysere bildene nå. Du kan fylle ut selv.
+            </p>
+          )}
+          {photoTitleSuggestion && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm">
+              <span className="inline-flex items-center gap-1 font-medium text-brand-text">
+                <Sparkles className="size-4 shrink-0" aria-hidden />
+                Kaupet foreslår tittel: {photoTitleSuggestion}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                className="native-touch-target"
+                onClick={() => {
+                  setValue("title", photoTitleSuggestion, { shouldValidate: true });
+                  dismissPhotoTitleSuggestion();
+                }}
+              >
+                Bruk
+              </Button>
+            </div>
+          )}
+          <PhotoSuggestionConsentDialog
+            open={photoConsentOpen}
+            onOpenChange={(open) => (open ? openPhotoConsent() : closePhotoConsent())}
+            onConfirm={confirmPhotoConsent}
+          />
+        </>
       )}
     </section>
   );

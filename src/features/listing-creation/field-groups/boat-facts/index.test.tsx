@@ -86,6 +86,18 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     keywordsFetching: false,
     keywordSuggestions: [],
     appendTagToDescription: vi.fn(),
+    photoSuggestionEnabled: false,
+    photoSuggestionStatus: "idle",
+    photoConsentOpen: false,
+    openPhotoConsent: vi.fn(),
+    closePhotoConsent: vi.fn(),
+    confirmPhotoConsent: vi.fn(),
+    photoCategorySuggestions: [],
+    photoTitleSuggestion: null,
+    dismissPhotoTitleSuggestion: vi.fn(),
+    photoAttributesAvailable: false,
+    photoAttributeSuggestionLoading: false,
+    requestPhotoAttributeSuggestions: vi.fn(async () => []),
     ...overrides,
   } as unknown as WizardSharedProps;
 }

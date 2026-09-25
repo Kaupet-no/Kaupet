@@ -235,6 +235,36 @@ export type WizardSharedProps = {
    * saved yet (e.g. title too short). */
   ensureDraftId: () => Promise<string | null>;
 
+  // photo-assisted suggestions (see
+  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md), one
+  // usePhotoSuggestion() instance shared by the photos and category-
+  // attributes steps — see use-photo-suggestion.ts.
+  photoSuggestionEnabled: boolean;
+  photoSuggestionStatus: "idle" | "analyzing" | "ok" | "unavailable";
+  photoConsentOpen: boolean;
+  openPhotoConsent: () => void;
+  closePhotoConsent: () => void;
+  confirmPhotoConsent: () => void;
+  /** 0-2 candidates from the photo `identify` call, same shape as
+   * `categorySuggestions` — merged into the category-attributes chip ahead
+   * of the title-based suggestions when present. */
+  photoCategorySuggestions: {
+    category_id: string;
+    parent_id: string | null;
+    name_nb: string;
+    parent_name_nb: string | null;
+  }[];
+  photoTitleSuggestion: string | null;
+  dismissPhotoTitleSuggestion: () => void;
+  /** True once consent covers the images+title currently on the form — the
+   * gate for offering "Foreslå detaljer fra bildene" once a category is
+   * confirmed. */
+  photoAttributesAvailable: boolean;
+  photoAttributeSuggestionLoading: boolean;
+  requestPhotoAttributeSuggestions: (
+    categorySlug: string,
+  ) => Promise<{ key: string; value: string | number | boolean }[]>;
+
   // location
   locationMethod: "gps" | "postal" | null;
   setLocationMethod: (m: "gps" | "postal" | null) => void;

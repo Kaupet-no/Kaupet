@@ -30,6 +30,7 @@ import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
+import { usePhotoSuggestion } from "@/features/listing-creation/use-photo-suggestion";
 import { suggestVehicleCategoryForTitle } from "@/lib/search-category-match";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -48,7 +49,7 @@ import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
 } from "@/lib/vehicle/vehicle-lookup.types";
-import type { TurnstileInstance } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-user-roles";
@@ -512,6 +513,12 @@ function NewListingPage() {
     setValue,
     clientCategoryHint,
   });
+
+  // Fotoassistert kategori-/egenskapsforslag (salg), se
+  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2. Én
+  // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
+  // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
+  const photoSuggestion = usePhotoSuggestion({ images, title });
 
   // category-confirm holdes bare for forslag som gir en annen flyt enn
   // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
@@ -1758,6 +1765,19 @@ function NewListingPage() {
     draftId,
     ensureDraftId,
 
+    photoSuggestionEnabled: photoSuggestion.enabled,
+    photoSuggestionStatus: photoSuggestion.status,
+    photoConsentOpen: photoSuggestion.consentOpen,
+    openPhotoConsent: photoSuggestion.openConsent,
+    closePhotoConsent: photoSuggestion.closeConsent,
+    confirmPhotoConsent: photoSuggestion.confirmConsent,
+    photoCategorySuggestions: photoSuggestion.categorySuggestions,
+    photoTitleSuggestion: photoSuggestion.titleSuggestion,
+    dismissPhotoTitleSuggestion: photoSuggestion.dismissTitleSuggestion,
+    photoAttributesAvailable: photoSuggestion.canRequestAttributes,
+    photoAttributeSuggestionLoading: photoSuggestion.attributeSuggestionLoading,
+    requestPhotoAttributeSuggestions: photoSuggestion.requestAttributeSuggestions,
+
     locationMethod,
     setLocationMethod,
     locationLoading,
@@ -1949,6 +1969,16 @@ function NewListingPage() {
 
   return (
     <>
+      {photoSuggestion.enabled && (
+        // Usynlig, montert på veiviser-nivå (ikke i et enkeltsteg) siden
+        // samme token må dekke både bildestegets identify-kall og et senere
+        // attributes-kall fra "Om tingen" — se use-photo-suggestion.ts.
+        <Turnstile
+          ref={photoSuggestion.turnstileRef}
+          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+          options={{ appearance: "interaction-only", action: "kaupet" }}
+        />
+      )}
       <form onSubmit={submitComposer}>
         <ListingComposerShell
           title={title}

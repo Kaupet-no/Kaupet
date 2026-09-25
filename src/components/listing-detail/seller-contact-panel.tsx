@@ -151,7 +151,7 @@ export function SellerContactPanel({
           ) : seller?.kind === "business" ? (
             hideBusinessIdentity ? (
               <>
-                <p className="font-medium">Bedriftskonto</p>
+                <p className="font-medium">Denne selges av en bedrift</p>
                 {seller.visitingAddress && (
                   <p className="text-xs text-muted-foreground">
                     Besøksadresse: {seller.visitingAddress}
@@ -193,7 +193,7 @@ export function SellerContactPanel({
 
       {!isOwner && (
         <div className="mt-4 space-y-3">
-          <TradeSafetyAdvice context="contact" />
+          {seller?.kind !== "business" && <TradeSafetyAdvice context="contact" />}
           <Button className="w-full gap-2" onClick={onContact} disabled={contacting}>
             <MessageCircle className="size-4" />
             {contacting

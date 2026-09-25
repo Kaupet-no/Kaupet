@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PHOTO_SUGGESTION_LIMITS } from "@/lib/photo-suggestion-images";
 import type { WizardSharedProps } from "../types";
-import { PhotosGroup } from ".";
+import { PhotosGroup, TitleGroup } from ".";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
@@ -37,6 +37,7 @@ const image = {
 
 const noopPhotoSuggestionProps = {
   setValue: vi.fn(),
+  title: "",
   photoSuggestionEnabled: false,
   photoSuggestionStatus: "idle" as const,
   photoConsentOpen: false,
@@ -102,7 +103,7 @@ describe("PhotosGroup", () => {
     expect(screen.queryByTestId("photo-suggestion-button")).toBeNull();
   });
 
-  it("skjuler knappen når det ikke er noen bilder ennå, selv om funksjonen er på", () => {
+  it("deaktiverer knappen når det ikke er noen bilder ennå, selv om funksjonen er på", () => {
     render(
       <PhotosGroup
         images={[]}
@@ -113,7 +114,52 @@ describe("PhotosGroup", () => {
         photoSuggestionEnabled
       />,
     );
-    expect(screen.queryByTestId("photo-suggestion-button")).toBeNull();
+    expect((screen.getByTestId("photo-suggestion-button") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(screen.getByText(/Legg til minst ett bilde først/)).toBeTruthy();
+  });
+
+  it("fyller en tom tittel direkte med forslaget fra bildene", () => {
+    const setValue = vi.fn();
+    const dismissPhotoTitleSuggestion = vi.fn();
+    render(
+      <PhotosGroup
+        images={[image]}
+        setImages={vi.fn()}
+        uploadProgress={null}
+        noImageConfirmPending={false}
+        {...noopPhotoSuggestionProps}
+        photoSuggestionEnabled
+        setValue={setValue}
+        dismissPhotoTitleSuggestion={dismissPhotoTitleSuggestion}
+        photoTitleSuggestion="Grå sofa i stoff"
+      />,
+    );
+    expect(setValue).toHaveBeenCalledWith("title", "Grå sofa i stoff", { shouldValidate: true });
+    expect(dismissPhotoTitleSuggestion).toHaveBeenCalled();
+  });
+});
+
+describe("TitleGroup", () => {
+  const titleProps = {
+    register: (() => ({ name: "title" })) as unknown as WizardSharedProps["register"],
+    errors: {},
+    touchedFields: {},
+    title: "",
+    titleExample: null,
+  };
+
+  it("skjuler feltet bak «Jeg vil fylle ut tittel selv» og viser det ved trykk", () => {
+    render(<TitleGroup {...titleProps} titleCollapsible />);
+    expect(screen.queryByTestId("listing-title-input")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Jeg vil fylle ut tittel selv" }));
+    expect(document.activeElement).toBe(screen.getByTestId("listing-title-input"));
+  });
+
+  it("viser feltet direkte når det har innhold", () => {
+    render(<TitleGroup {...titleProps} title="Sofa" titleCollapsible />);
+    expect(screen.getByTestId("listing-title-input")).toBeTruthy();
   });
 
   it("åpner samtykke ved trykk, uten å kalle confirmPhotoConsent selv", () => {

@@ -99,9 +99,14 @@ export function effectiveFlowForCategory(
   categoryId: string | null,
   allFlows: CategoryFlowRow[],
   categoriesById: Map<string, CategoryNode>,
-  fromLanding = false,
+  entry: LandingEntry | null = null,
 ): CategoryFlow {
-  const prepend = fromLanding ? applyLandingEntry : prependCategorySelect;
+  const prepend =
+    entry === "title"
+      ? applyLandingEntry
+      : entry === "photos"
+        ? applyPhotosEntry
+        : prependCategorySelect;
   if (!categoryId) return prepend(DEFAULT_FLOW);
   const flowsByCategoryId = new Map(allFlows.map((f) => [f.category_id, f]));
   let cur: CategoryNode | undefined = categoriesById.get(categoryId);
@@ -114,6 +119,10 @@ export function effectiveFlowForCategory(
   }
   return prepend(DEFAULT_FLOW);
 }
+
+/** How the wizard was entered from the intent landing screen: with a title
+ * already typed, or photos-first with the title still to come. */
+export type LandingEntry = "title" | "photos";
 
 function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
   return { ...flow, fieldGroups: ["category-select", ...flow.fieldGroups] };
@@ -136,6 +145,20 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
 function applyLandingEntry(flow: CategoryFlow): CategoryFlow {
   const rest = flow.fieldGroups.filter((key) => key !== "photos" && key !== "title");
   return { ...flow, fieldGroups: ["photos", ...rest] };
+}
+
+/**
+ * Photos-first entry from the landing screen: like `applyLandingEntry`, but
+ * nothing is answered yet, so `title` stays — right after `photos`, on the
+ * same showcase page, where the photo suggestion's "Bruk" can fill it and
+ * the title-based category suggestion kicks in before category-confirm.
+ * Vehicle flows have no `title` group (see normalizeFieldGroupKeys), so none
+ * is added back for them.
+ */
+function applyPhotosEntry(flow: CategoryFlow): CategoryFlow {
+  const rest = flow.fieldGroups.filter((key) => key !== "photos" && key !== "title");
+  const title = flow.fieldGroups.includes("title") ? ["title"] : [];
+  return { ...flow, fieldGroups: ["photos", ...title, ...rest] };
 }
 
 /**

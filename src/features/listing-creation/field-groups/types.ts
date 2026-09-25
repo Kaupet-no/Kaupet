@@ -121,6 +121,9 @@ export type WizardSharedProps = {
    * (nearest ancestor's categories.title_example); null falls back to the
    * generic example. */
   titleExample: string | null;
+  /** Bildene-først-inngangen med KI på: tittelfeltet ligger bak "Jeg vil
+   * fylle ut tittel selv" til brukeren åpner det eller det har innhold. */
+  titleCollapsible: boolean;
   setCategoryPickerOpen: (open: boolean) => void;
   onCategorySelect: (categoryId: string, parentId: string) => void;
   /** Fired when the user re-opens an already-collapsed/highlighted category

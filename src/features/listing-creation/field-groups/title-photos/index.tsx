@@ -1,5 +1,5 @@
-﻿import { useEffect } from "react";
-import { Sparkles } from "lucide-react";
+﻿import { useEffect, useState } from "react";
+import { ChevronDown, Sparkles } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -68,9 +68,27 @@ export function VehicleTitleFields({
 export function TitleGroup(
   props: Pick<
     WizardSharedProps,
-    "register" | "errors" | "touchedFields" | "title" | "titleExample"
+    "register" | "errors" | "touchedFields" | "title" | "titleExample" | "titleCollapsible"
   >,
 ) {
+  const [opened, setOpened] = useState(false);
+  // Sammenslått bak "Jeg vil fylle ut tittel selv" så lenge KI-knappen på
+  // bildesiden er hovedvalget — men aldri når feltet har innhold eller en
+  // feil som må synes.
+  if (props.titleCollapsible && !opened && !props.title && !props.errors.title) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        className="native-touch-target h-auto w-full justify-between px-0 hover:bg-transparent"
+        aria-expanded={false}
+        onClick={() => setOpened(true)}
+      >
+        Jeg vil fylle ut tittel selv
+        <ChevronDown className="size-4 shrink-0" aria-hidden />
+      </Button>
+    );
+  }
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
@@ -90,6 +108,8 @@ export function TitleGroup(
         aria-required="true"
         aria-invalid={!!props.errors.title}
         aria-describedby={props.errors.title ? "title-error" : undefined}
+        // Bare når brukeren nettopp åpnet feltet selv, ikke ved vanlig lasting.
+        autoFocus={opened}
         {...props.register("title")}
       />
       {props.errors.title && (
@@ -107,6 +127,7 @@ export function PhotosGroup({
   uploadProgress,
   noImageConfirmPending,
   setValue,
+  title,
   photoSuggestionEnabled,
   photoSuggestionStatus,
   photoConsentOpen,
@@ -122,6 +143,7 @@ export function PhotosGroup({
   | "uploadProgress"
   | "noImageConfirmPending"
   | "setValue"
+  | "title"
   | "photoSuggestionEnabled"
   | "photoSuggestionStatus"
   | "photoConsentOpen"
@@ -131,6 +153,16 @@ export function PhotosGroup({
   | "photoTitleSuggestion"
   | "dismissPhotoTitleSuggestion"
 >) {
+  // Brukeren ba om å få tittelen fylt ut: er feltet tomt, brukes forslaget
+  // direkte. Har de skrevet noe selv, får de heller velge med "Bruk" under.
+  useEffect(() => {
+    if (photoTitleSuggestion && !title.trim()) {
+      setValue("title", photoTitleSuggestion, { shouldValidate: true });
+      dismissPhotoTitleSuggestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoTitleSuggestion]);
+
   return (
     <section className="space-y-2">
       <Label>Legg til bilder</Label>
@@ -143,20 +175,27 @@ export function PhotosGroup({
           Annonser med bilder får flere henvendelser. Du kan legge til bilder senere.
         </p>
       )}
-      {photoSuggestionEnabled && images.length > 0 && (
+      {photoSuggestionEnabled && (
         <>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid="photo-suggestion-button"
-            className="native-touch-target h-auto gap-1.5 px-0 text-brand-text hover:bg-transparent hover:text-brand-text"
-            onClick={openPhotoConsent}
-            disabled={photoSuggestionStatus === "analyzing"}
-          >
-            <Sparkles className="size-4 shrink-0" aria-hidden />
-            Foreslå kategori og detaljer fra bildene
-          </Button>
+          <div className="space-y-1.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="photo-suggestion-button"
+              className="native-touch-target h-12 w-full gap-2 rounded-xl border-brand/40 text-brand-text hover:text-brand-text"
+              onClick={openPhotoConsent}
+              disabled={images.length === 0 || photoSuggestionStatus === "analyzing"}
+              aria-describedby="photo-suggestion-help"
+            >
+              <Sparkles className="size-4 shrink-0" aria-hidden />
+              Fyll ut tittel og kategori for meg
+            </Button>
+            <p id="photo-suggestion-help" className="text-xs text-muted-foreground">
+              {images.length === 0 ? "Legg til minst ett bilde først. " : ""}
+              Vi bruker KI til å analysere bildene og foreslå tittel og kategori. Du ser hva som
+              sendes før noe skjer.
+            </p>
+          </div>
           {photoSuggestionStatus === "analyzing" && (
             <p role="status" className="text-sm text-muted-foreground">
               Analyserer bildene …

@@ -64,6 +64,7 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     categoryLabel: "Båter",
     title: "",
     titleExample: null,
+    titleCollapsible: false,
     condition: "good",
     isFree: false,
     canShip: "pickup",

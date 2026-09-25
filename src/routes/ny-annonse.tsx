@@ -20,6 +20,7 @@ import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import {
   effectiveFlowForCategory,
   withRuntimeFieldGroups,
+  type LandingEntry,
   resolveWizardPages,
   suggestionNeedsCategoryConfirm,
 } from "@/features/listing-creation/category-flows";
@@ -164,6 +165,7 @@ export const Route = createFileRoute("/ny-annonse")({
     .object({
       type: z.enum(["sell", "free"]).optional(),
       title: z.string().optional(),
+      start: z.enum(["bilder"]).optional(),
       resume: z.enum(["auth-publish"]).optional(),
     })
     .catch({}),
@@ -244,7 +246,7 @@ function NewListingPage() {
   } | null>(null);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
-  const { type: typeParam, title: titleParam, resume } = Route.useSearch();
+  const { type: typeParam, title: titleParam, start: startParam, resume } = Route.useSearch();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const listingType = typeParam ?? null;
@@ -256,7 +258,13 @@ function NewListingPage() {
   // category-confirm step, and (b) drops the `title` group and hoists
   // `photos` to the front of whatever flow applies — see
   // effectiveFlowForCategory/applyLandingEntry in category-flows.ts.
-  const [fromLanding] = useState(() => !!titleParam?.trim());
+  // `?start=bilder` is the landing screen's photos-first entry: same
+  // category handling, but the title is asked on the photos page instead
+  // (applyPhotosEntry).
+  const [landingEntry] = useState<LandingEntry | null>(() =>
+    titleParam?.trim() ? "title" : startParam === "bilder" ? "photos" : null,
+  );
+  const fromLanding = landingEntry !== null;
   // True once the user has confirmed a category on the category-confirm step
   // (suggestion click or manual pick) — removes "category-confirm" from
   // fieldGroupKeys below for the rest of the session, so the page it occupied
@@ -522,9 +530,9 @@ function NewListingPage() {
 
   const baseFieldGroupKeys = useMemo(
     () =>
-      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
+      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, landingEntry)
         .fieldGroups,
-    [categoryId, allFlows, categoriesById, fromLanding],
+    [categoryId, allFlows, categoriesById, landingEntry],
   );
   const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
@@ -1675,6 +1683,10 @@ function NewListingPage() {
     categorySlug,
     categoryLabel,
     titleExample,
+    titleCollapsible:
+      landingEntry === "photos" &&
+      photoSuggestion.enabled &&
+      photoSuggestion.status !== "unavailable",
     setCategoryPickerOpen,
     onCategorySelect: (id, parentId) => requestCategorySelect("wizard", id, parentId),
     onCategoryDeselect: requestCategoryDeselect,

@@ -128,8 +128,22 @@ describe("effectiveFlowForCategory", () => {
   });
 
   it("hoists photos first and drops title when entered from the landing screen", () => {
-    expect(effectiveFlowForCategory(null, [], byId, true).fieldGroups).toEqual([
+    expect(effectiveFlowForCategory(null, [], byId, "title").fieldGroups).toEqual([
       "photos",
+      "category-attributes",
+      "condition",
+      "price",
+      "description-keywords",
+      "delivery",
+      "location",
+      "review-publish",
+    ]);
+  });
+
+  it("keeps title right after photos, without category-select, on the photos-first entry", () => {
+    expect(effectiveFlowForCategory(null, [], byId, "photos").fieldGroups).toEqual([
+      "photos",
+      "title",
       "category-attributes",
       "condition",
       "price",
@@ -160,7 +174,7 @@ describe("effectiveFlowForCategory", () => {
     ];
     // The images step must stay step 1 both before and after the flow swap at
     // category-confirm — otherwise it reappears mid-vehicle-flow.
-    expect(effectiveFlowForCategory("cars", flows, byId, true).fieldGroups).toEqual([
+    expect(effectiveFlowForCategory("cars", flows, byId, "title").fieldGroups).toEqual([
       "photos",
       "vehicle-registration",
       "category-attributes",

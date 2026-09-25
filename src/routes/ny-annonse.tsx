@@ -98,6 +98,7 @@ import { useComposerHistoryBack } from "@/features/listing-creation/use-composer
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import {
   focusComposerField,
+  resolvePublishingRequirementLabel,
   reviewSectionSteps,
   sortComposerRequirements,
   type ComposerRequirementTarget,
@@ -981,10 +982,12 @@ function NewListingPage() {
     )
       continue;
     if (typeof result === "object") {
+      const resolved = resolvePublishingRequirementLabel(result, reviewFieldLabels, missingFilters);
+      if (resolved.skip) continue;
       // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
       addPublishingRequirement({
         key: `field-${result.field}`,
-        label: reviewFieldLabels[result.field] ?? result.field,
+        label: resolved.label,
         field: result.field,
         groupKey: group.key,
       });

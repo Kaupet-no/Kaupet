@@ -67,31 +67,35 @@ export function CategoryAttributes({
       {topSuggestion ? (
         <div
           data-testid="category-suggestion-chip"
-          className="flex flex-wrap items-center gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm"
+          className="space-y-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm"
         >
-          <span className="inline-flex items-center gap-1 font-medium text-brand-text">
-            <Sparkles className="size-4 shrink-0" aria-hidden />
-            Kaupet foreslår
-          </span>
-          <span className="min-w-0 flex-1 truncate">{suggestedPath}</span>
-          <Button
-            type="button"
-            size="sm"
-            data-testid="category-suggestion-accept"
-            className="native-touch-target"
-            onClick={() => applyCategorySuggestion(topSuggestion.category_id)}
-          >
-            Riktig
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="native-touch-target"
-            onClick={() => setCategoryPickerOpen(true)}
-          >
-            Endre
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 font-medium text-brand-text">
+              <Sparkles className="size-4 shrink-0" aria-hidden />
+              Kaupet foreslår
+            </span>
+            <span className="min-w-0">{suggestedPath}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              data-testid="category-suggestion-accept"
+              className="native-touch-target"
+              onClick={() => applyCategorySuggestion(topSuggestion.category_id)}
+            >
+              Riktig
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="native-touch-target"
+              onClick={() => setCategoryPickerOpen(true)}
+            >
+              Endre
+            </Button>
+          </div>
         </div>
       ) : (
         <button
@@ -122,7 +126,7 @@ export function CategoryAttributes({
 
       {!boatFactsActive && (
         <AttributeFields
-          categoryId={categoryId || null}
+          categoryId={categoryId || topSuggestion?.category_id || null}
           categories={categories ?? []}
           value={attributes}
           onChange={onAttributesChange}

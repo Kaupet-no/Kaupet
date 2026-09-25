@@ -26,6 +26,6 @@ describe("ImageUploader", () => {
 
   it("viser bildetips før første bilde er lagt til", () => {
     render(<ImageUploader images={[]} onChange={vi.fn()} />);
-    expect(screen.getByText(/Ta ett bilde av hele tingen i dagslys/)).toBeTruthy();
+    expect(screen.getByText(/Ta minst ett bilde av hele tingen i dagslys/)).toBeTruthy();
   });
 });

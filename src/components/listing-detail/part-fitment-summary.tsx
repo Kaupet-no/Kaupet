@@ -51,7 +51,7 @@ export function PartFitmentSummary({ attributes }: { attributes: Record<string, 
     <section className="mt-8 rounded-xl border border-border bg-surface p-4">
       <h2 className="font-display text-xl">Passer til</h2>
       {(partBrand || partNumber) && (
-        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <dl className="mt-3 grid gap-2 text-sm page-sm:grid-cols-2">
           {partBrand && (
             <div>
               <dt className="text-xs text-muted-foreground">Delmerke</dt>
@@ -73,7 +73,7 @@ export function PartFitmentSummary({ attributes }: { attributes: Record<string, 
       {scope === "specific" && (
         <>
           {vehicleIds.length > 0 ? (
-            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            <ul className="mt-3 grid gap-2 page-sm:grid-cols-2">
               {vehicleIds.map((id) => {
                 const model = modelById.get(id);
                 return (

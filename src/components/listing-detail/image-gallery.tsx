@@ -167,7 +167,7 @@ export function ImageGallery({
      på detaljsiden, så raden skal ligge tett på bildet. */
   const thumbnailStrip =
     showThumbnails && totalSlides > 1 ? (
-      <ScrollArrowRow className={thumbnailsOverlay ? "md:mt-0" : "mt-3"}>
+      <ScrollArrowRow className={thumbnailsOverlay ? "page-md:mt-0" : "mt-3"}>
         {has360 && (
           <button
             type="button"
@@ -275,13 +275,13 @@ export function ImageGallery({
           </Carousel>
           {overlaySlot}
           {thumbnailsOverlay && thumbnailStrip && (
-            <div className="absolute inset-x-0 bottom-0 z-10 hidden rounded-b-xl bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-3 pt-12 md:block">
+            <div className="absolute inset-x-0 bottom-0 z-10 hidden rounded-b-xl bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-3 pt-12 page-md:block">
               {thumbnailStrip}
             </div>
           )}
         </div>
         {/* Under md ligger raden alltid under bildet, også i overlay-modus. */}
-        <div className={thumbnailsOverlay ? "md:hidden" : undefined}>{thumbnailStrip}</div>
+        <div className={thumbnailsOverlay ? "page-md:hidden" : undefined}>{thumbnailStrip}</div>
         {editCtx?.editMode && <ImageEditControls inline={inlineImages} />}
       </>
     );
@@ -426,7 +426,7 @@ function ImageEditControls({ inline }: { inline: InlineListingImages }) {
           items={items.map((item) => item.storage_path)}
           strategy={rectSortingStrategy}
         >
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 page-sm:grid-cols-3 page-md:grid-cols-4">
             {items.map((item, index) => (
               <SortableInlineImageItem
                 key={item.storage_path}

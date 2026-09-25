@@ -42,6 +42,7 @@ export function EditableRegion<C extends BaseEditContextValue = BaseEditContextV
       <div
         role="button"
         tabIndex={0}
+        data-editable
         onClick={onOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -67,6 +68,7 @@ export function EditableRegion<C extends BaseEditContextValue = BaseEditContextV
     <div
       role="button"
       tabIndex={0}
+      data-editable
       onClick={() => setOpen(true)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

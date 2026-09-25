@@ -13,6 +13,9 @@ export type ListingEditContextValue = {
   fieldStatus: Record<string, FieldStatus>;
   openVehicleLookupModal: () => void;
   openCategoryModal: () => void;
+  /** Overstyrer kartvelgeren når sted redigeres — utkastet i annonseflyten
+   * hopper i stedet til stedssteget, der postnummer også kan endres. */
+  openLocationEditor?: () => void;
 };
 
 export const ListingEditContext = createContext<ListingEditContextValue | null>(null);

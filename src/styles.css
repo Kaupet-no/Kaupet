@@ -43,12 +43,37 @@
 /* Touch-idiomer (trykk-krymping o.l.) hører hjemme i appen, ikke i
    nettleseren — `.native` settes på <html> av native-oppstarten. */
 @custom-variant native (&:is(.native *));
+/* Annonsesidens egne sm/md: samme vindusbrytepunkt som `sm:`/`md:`, men slått
+   av inne i `[data-phone-preview]` — telefonrammen i annonseflyten viser
+   mobilversjonen av siden uansett hvor bredt vinduet er. `:where` holder
+   spesifisiteten lik `md:`, så den publiserte siden får identisk CSS. */
+@custom-variant page-sm {
+  @media (width >= 40rem) {
+    &:where(:not([data-phone-preview], [data-phone-preview] *)) {
+      @slot;
+    }
+  }
+}
+@custom-variant page-md {
+  @media (width >= 48rem) {
+    &:where(:not([data-phone-preview], [data-phone-preview] *)) {
+      @slot;
+    }
+  }
+}
 
 /*
  * Kaupet.no design system
  * Warm, Nordic, community-feeling. Cream paper background, deep forest green,
  * terracotta accent. Display font: Newsreader (editorial serif). Body: Inter.
  */
+
+/* Fra denne bredden står telefonrammen med forhåndsvisningen fast ved siden
+   av skjemaet i annonseflyten (ListingComposerShell); under den åpnes den fra
+   «Forhåndsvis». Navngitt (ikke `min-[1100px]:`) så den sorteres etter `lg:`. */
+@theme {
+  --breakpoint-dock: 68.75rem;
+}
 
 @theme inline {
   --font-display: "Newsreader Variable", ui-serif, Georgia, serif;

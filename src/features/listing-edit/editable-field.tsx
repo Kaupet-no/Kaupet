@@ -127,6 +127,7 @@ export function EditableField<T, C extends BaseEditContextValue = BaseEditContex
     <div
       role="button"
       tabIndex={0}
+      data-editable
       onClick={() => setActive(true)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

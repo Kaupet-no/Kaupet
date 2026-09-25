@@ -88,6 +88,14 @@ const MapOverlay = lazy(() =>
   import("@/components/listing-detail/map-overlay").then((m) => ({ default: m.MapOverlay })),
 );
 
+/** Grå strek i stedet for et felt selgeren ikke har fylt ut ennå — kun i
+ * telefonrammen i annonseflyten (`phonePreview`). */
+function PlaceholderLine({ className }: { className?: string }) {
+  return (
+    <span aria-hidden className={`block h-2.5 rounded-full bg-foreground/10 ${className ?? ""}`} />
+  );
+}
+
 function StatusBadge({ label }: { label: string }) {
   return (
     <span className="mb-1 inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
@@ -218,6 +226,11 @@ export type ListingDetailViewProps = {
   stickyContactSlot?: ReactNode;
   /** Sticky banner shown instead of the above when this is a pre-publish preview. */
   previewBanner?: ReactNode;
+  /** Mobilversjonen av siden inne i telefonrammen i annonseflyten: én kolonne
+   * uansett vindusbredde (se `page-md:` i styles.css), kontaktlinjen fast
+   * nederst i rammen i stedet for i vinduet, ikke noe kart, og grå streker
+   * for det selgeren ikke har fylt ut ennå. */
+  phonePreview?: boolean;
   /** Shows a "Tilbake til {label}" link above the breadcrumb, reading the
    * last saved /annonser search context for this session (see
    * last-search-context.ts). Only set by the real listing detail route —
@@ -265,6 +278,7 @@ export function ListingDetailView({
   relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
+  phonePreview,
   enableBackToSearch,
   editMode,
   children,
@@ -282,7 +296,7 @@ export function ListingDetailView({
   // ikke avhenge av at brukeren scroller forbi bilder/spesifikasjoner for å
   // finne selgerkortet. Vist på både native og mobilweb (samme fysiske
   // formfaktor); desktop web har allerede kontaktpanelet synlig i
-  // sidekolonnen uten scroll, se md:hidden på selve baren under.
+  // sidekolonnen uten scroll, se page-md:hidden på selve baren under.
   const showStickyContact = !!stickyContactSlot;
 
   // Slug-based, not the canonical filter-based `isVehicleCategory`
@@ -362,7 +376,9 @@ export function ListingDetailView({
     ? "Gis bort"
     : displayPriceKr != null
       ? `${displayPriceKr.toLocaleString("nb-NO")} kr`
-      : "Pris ved henvendelse";
+      : phonePreview
+        ? ""
+        : "Pris ved henvendelse";
 
   /** Only non-active listings say anything — an active ad needs no badge. */
   const statusBadge =
@@ -382,11 +398,15 @@ export function ListingDetailView({
       value={{ isFree, priceNok }}
       render={(v) => (
         <p className="font-display text-3xl font-semibold leading-tight text-primary">
-          {v.isFree
-            ? "Gis bort"
-            : v.priceNok != null
-              ? `${(buyerPaysAvgift ? v.priceNok + omregistreringsavgiftKr! : v.priceNok).toLocaleString("nb-NO")} kr`
-              : "Pris ved henvendelse"}
+          {v.isFree ? (
+            "Gis bort"
+          ) : v.priceNok != null ? (
+            `${(buyerPaysAvgift ? v.priceNok + omregistreringsavgiftKr! : v.priceNok).toLocaleString("nb-NO")} kr`
+          ) : phonePreview ? (
+            <PlaceholderLine className="my-3 w-2/5" />
+          ) : (
+            "Pris ved henvendelse"
+          )}
         </p>
       )}
       editRender={({ value: v, onChange, onCommit, onCancel }) => (
@@ -469,6 +489,7 @@ export function ListingDetailView({
       sellerContactSlot={sellerContactSlot}
       stickyContactSlot={stickyContactSlot}
       previewBanner={previewBanner}
+      phonePreview={phonePreview}
       enableBackToSearch={enableBackToSearch}
       activeImage={activeImage}
       setActiveImage={setActiveImage}
@@ -549,6 +570,7 @@ function ListingDetailViewBody({
   stickyContactSlot,
   relatedListingsSlot,
   previewBanner,
+  phonePreview,
   enableBackToSearch,
   activeImage,
   setActiveImage,
@@ -609,6 +631,7 @@ function ListingDetailViewBody({
   relatedListingsSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
+  phonePreview?: boolean;
   enableBackToSearch?: boolean;
   activeImage: number;
   setActiveImage: (i: number) => void;
@@ -656,7 +679,7 @@ function ListingDetailViewBody({
   // Bredde-valget gjelder bare der siden faktisk har to kolonner. Under md
   // ville "én kolonne" bare flyttet prisen opp foran bildet uten å gjøre
   // galleriet smalere, så der beholdes full bredde uansett hva som er lagret.
-  const isTwoColumn = useMediaQuery("(min-width: 768px)");
+  const isTwoColumn = useMediaQuery("(min-width: 768px)") && !phonePreview;
   const galleryInColumn = !wideGallery && isTwoColumn;
   const gallery = hasGalleryContent ? (
     <ImageGallery
@@ -674,24 +697,28 @@ function ListingDetailViewBody({
   ) : null;
 
   return (
-    <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
+    <div
+      data-phone-preview={phonePreview || undefined}
+      className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact && !phonePreview ? "pb-28 page-md:pb-8" : ""} ${phonePreview ? "pb-0" : ""}`}
+    >
       {/* titleFadesIn: siden har allerede tittelen som stor <h1> rett under
           headeren — headertittelen toner inn først når den er scrollet vekk. */}
-      <NativePageHeader title={title} titleFadesIn />
+      {/* Inne i annonseflyten har skjemaet sin egen header. */}
+      {!phonePreview && <NativePageHeader title={title} titleFadesIn />}
       {previewBanner}
       {enableBackToSearch && (
         <ClientOnly>
           <BackToSearchLink />
         </ClientOnly>
       )}
-      <header className="mt-4">
+      <header data-preview-section="title" className="mt-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             {(() => {
               const crumb =
                 breadcrumb && breadcrumb.length > 0 ? (
                   <Breadcrumb>
-                    <BreadcrumbList className="gap-1 text-xs uppercase tracking-wide sm:gap-1">
+                    <BreadcrumbList className="gap-1 text-xs uppercase tracking-wide page-sm:gap-1">
                       {breadcrumb.map((c, i) => (
                         <Fragment key={`${c.slug ?? "extra"}-${i}`}>
                           {i > 0 && <BreadcrumbSeparator />}
@@ -845,7 +872,7 @@ function ListingDetailViewBody({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="hidden md:inline-flex"
+                className="hidden page-md:inline-flex"
                 aria-pressed={wideGallery}
                 aria-label={
                   wideGallery ? "Vis galleriet i én kolonne" : "Vis galleriet i full bredde"
@@ -869,16 +896,28 @@ function ListingDetailViewBody({
           og går i full bredde. Velger brukeren én kolonne, flyttes det inn i
           innholdskolonnen i stedet, slik at pris og sidepanel kommer opp ved
           siden av det. Uten bilder rendres det ikke i det hele tatt. */}
-      {hasGalleryContent && !galleryInColumn && <div className="mb-8">{gallery}</div>}
+      {hasGalleryContent && !galleryInColumn && (
+        <div data-preview-section="photos" className="mb-8">
+          {gallery}
+        </div>
+      )}
+      {!hasGalleryContent && phonePreview && (
+        <div
+          data-preview-section="photos"
+          className="mb-8 mt-6 grid aspect-[4/3] place-items-center rounded-xl bg-foreground/5 text-xs text-muted-foreground"
+        >
+          Bilder vises her
+        </div>
+      )}
 
       {/* grid-rows-[auto_1fr]: prisraden tar bare høyden den trenger, ellers
           strekkes den og sidepanelet under får et tomrom over seg. */}
-      <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem] md:grid-rows-[auto_1fr]">
+      <div className="mt-6 grid gap-8 page-md:grid-cols-[minmax(0,1fr)_20rem] page-md:grid-rows-[auto_1fr]">
         {/* Egen grid-posisjon øverst til høyre i stedet for et kort som flyter
             over bildet — og samtidig den ene varianten som dekker både med og
             uten bilder. På mobil kollapser gridet til DOM-rekkefølge, så
             prisen kommer rett under galleriet. */}
-        <div className="md:col-start-2 md:row-start-1">
+        <div data-preview-section="price" className="page-md:col-start-2 page-md:row-start-1">
           <div className="rounded-xl border border-border bg-card p-4">
             {statusBadge && <StatusBadge label={statusBadge} />}
             {avgiftBreakdown && (
@@ -912,45 +951,54 @@ function ListingDetailViewBody({
           </div>
         </div>
 
-        <div className="min-w-0 md:col-start-1 md:row-start-1 md:row-span-2">
-          {hasGalleryContent && galleryInColumn && <div className="mb-8">{gallery}</div>}
-          {isVehicleListing && (
-            <EditableRegion
-              render={() => (
-                <VehicleInfoGrid
-                  vehicleLookup={vehicleLookup}
-                  mileageKm={mileageKm}
-                  euControlExempt={euControlExempt}
-                  driveType={driveType}
-                  attributes={attributes}
-                />
-              )}
-              panel={({ close }) => (
-                <VehicleFactsPanel
-                  mileageKm={mileageKm}
-                  driveType={driveType}
-                  euControlExempt={euControlExempt}
-                  onClose={close}
-                />
-              )}
-            />
+        <div className="min-w-0 page-md:col-start-1 page-md:row-start-1 page-md:row-span-2">
+          {hasGalleryContent && galleryInColumn && (
+            <div data-preview-section="photos" className="mb-8">
+              {gallery}
+            </div>
           )}
-
-          {isBoatListing &&
-            (categoryId ? (
+          {isVehicleListing && (
+            <div data-preview-section="facts">
               <EditableRegion
-                render={() => <BoatInfoGrid attributes={attributes} />}
-                panel={({ close }) => (
-                  <GenericAttributesPanel
-                    categoryId={categoryId}
+                render={() => (
+                  <VehicleInfoGrid
+                    vehicleLookup={vehicleLookup}
+                    mileageKm={mileageKm}
+                    euControlExempt={euControlExempt}
+                    driveType={driveType}
                     attributes={attributes}
+                  />
+                )}
+                panel={({ close }) => (
+                  <VehicleFactsPanel
+                    mileageKm={mileageKm}
+                    driveType={driveType}
+                    euControlExempt={euControlExempt}
                     onClose={close}
                   />
                 )}
               />
-            ) : (
-              <BoatInfoGrid attributes={attributes} />
-            ))}
+            </div>
+          )}
+
+          {isBoatListing && (
+            <div data-preview-section="facts">
+              {categoryId ? (
+                <EditableRegion
+                  render={() => <BoatInfoGrid attributes={attributes} />}
+                  panel={({ close }) => (
+                    <GenericAttributesPanel
+                      categoryId={categoryId}
+                      attributes={attributes}
+                      onClose={close}
+                    />
+                  )}
+                />
+              ) : (
+                <BoatInfoGrid attributes={attributes} />
+              )}
+            </div>
+          )}
           {typeof attributes[PART_FITMENT_SCOPE_KEY] === "string" && (
             <PartFitmentSummary attributes={attributes} />
           )}
@@ -961,11 +1009,19 @@ function ListingDetailViewBody({
             fieldKey="description"
             value={description}
             render={(v) => (
-              <section className="mt-8">
+              <section data-preview-section="description" className="mt-8">
                 <h2 className="font-display text-xl">Beskrivelse</h2>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                  {v}
-                </p>
+                {!v && phonePreview ? (
+                  <div className="mt-4 space-y-2.5">
+                    <PlaceholderLine className="w-11/12" />
+                    <PlaceholderLine className="w-4/5" />
+                    <PlaceholderLine className="w-2/5" />
+                  </div>
+                ) : (
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                    {v}
+                  </p>
+                )}
               </section>
             )}
             editRender={({ value: v, onChange, onCommit, onCancel }) => (
@@ -1096,11 +1152,13 @@ function ListingDetailViewBody({
                 )}
               />
             ) : (
-              <GenericAttributesGrid categoryId={categoryId} attributes={attributes} />
+              <div data-preview-section="facts">
+                <GenericAttributesGrid categoryId={categoryId} attributes={attributes} />
+              </div>
             ))}
         </div>
 
-        <aside className="@container space-y-5 md:col-start-2 md:row-start-2">
+        <aside className="@container space-y-5 page-md:col-start-2 page-md:row-start-2">
           {organizationBrand && <ProffListingHeader organization={organizationBrand} />}
           {(() => {
             const { label, dateStr } = getListingDateMeta(
@@ -1111,7 +1169,10 @@ function ListingDetailViewBody({
             );
 
             return (
-              <dl className="density-data grid grid-cols-2 gap-3 border-y border-border text-sm @sm:grid-cols-3">
+              <dl
+                data-preview-section="location"
+                className="density-data grid grid-cols-2 gap-3 border-y border-border text-sm @sm:grid-cols-3"
+              >
                 {/* Kjøretøy har tilstand fylt ut allerede fra opprettelsen (se
                     VehicleConditionGroup), med kjøretøytype-spesifikke etiketter
                     (se VEHICLE_CONDITIONS_BY_SLUG) — så tilen vises normalt for
@@ -1179,11 +1240,14 @@ function ListingDetailViewBody({
                       <dt className="text-muted-foreground">Lokasjon</dt>
                       <dd className="flex items-center gap-1 font-medium">
                         <MapPin className="size-3.5 text-muted-foreground" />
-                        {city || postalCode || "Ikke oppgitt"}
+                        {city ||
+                          postalCode ||
+                          (phonePreview ? <PlaceholderLine className="w-16" /> : "Ikke oppgitt")}
                       </dd>
                     </div>
                   )}
                   onOpen={() => {
+                    if (editCtx?.openLocationEditor) return editCtx.openLocationEditor();
                     setPendingCoords(
                       displayLat != null && displayLng != null
                         ? { lat: displayLat, lng: displayLng }
@@ -1201,11 +1265,15 @@ function ListingDetailViewBody({
                   <div>
                     <dt className="text-muted-foreground">Levering</dt>
                     <dd className="font-medium">
-                      {canShip === true
-                        ? "Kan sendes"
-                        : canShip === false
-                          ? "Kun henting"
-                          : "Ikke oppgitt"}
+                      {canShip === true ? (
+                        "Kan sendes"
+                      ) : canShip === false ? (
+                        "Kun henting"
+                      ) : phonePreview ? (
+                        <PlaceholderLine className="mt-2 w-16" />
+                      ) : (
+                        "Ikke oppgitt"
+                      )}
                     </dd>
                   </div>
                 )}
@@ -1279,7 +1347,7 @@ function ListingDetailViewBody({
       </div>
       {relatedListingsSlot}
 
-      {displayLat != null && displayLng != null && (
+      {!phonePreview && displayLat != null && displayLng != null && (
         <section className="mt-10">
           <button
             type="button"
@@ -1338,9 +1406,19 @@ function ListingDetailViewBody({
         )}
       </ClientOnly>
 
-      {showStickyContact && (
+      {showStickyContact && phonePreview && (
+        <div className="sticky bottom-0 -mx-4 mt-8 flex items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+          {priceLabel ? (
+            <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>
+          ) : (
+            <PlaceholderLine className="w-20" />
+          )}
+          {stickyContactSlot}
+        </div>
+      )}
+      {showStickyContact && !phonePreview && (
         <div
-          className="px-safe fixed inset-x-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
+          className="px-safe fixed inset-x-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur page-md:hidden"
           style={
             isNative
               ? // Bunnavigasjonen (AppBottomNav) ligger fast under denne

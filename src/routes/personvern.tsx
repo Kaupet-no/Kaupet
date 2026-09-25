@@ -489,10 +489,10 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Tredjeparter</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Supabase</strong> — databehandler for autentisering, database og fillagring.
+              <strong>Supabase</strong>: Databehandler for autentisering, database og fillagring.
             </li>
             <li>
-              <strong>Cloudflare</strong> — vi bruker Cloudflare Workers som driftsplattform. Det
+              <strong>Cloudflare</strong>: Vi bruker Cloudflare Workers som driftsplattform. Det
               betyr at trafikk til og fra Kaupet.no går gjennom Cloudflare sin infrastruktur, som
               dermed ser IP-adressen din og annen teknisk informasjon om forespørselen din.
               Cloudflare Turnstile brukes i tillegg til å skille mennesker fra roboter ved
@@ -510,7 +510,7 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>Vipps</strong> — betalingsleverandør for kjøp av annonsepromotering. Vipps
+              <strong>Vipps</strong>: Betalingsleverandør for kjøp av annonsepromotering. Vipps
               behandler betalingsopplysninger som navn og telefonnummer i forbindelse med
               transaksjonen. Du kan lese Vipps sin personvernerklæring på{" "}
               <a
@@ -524,9 +524,8 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>Mistral AI</strong> — databehandler i EU (<code>api.eu.mistral.ai</code>).
-              Mottar nedskalerte bilder uten skjult bildeinformasjon, sammen med tittel eller
-              kategori, men bare når du ber om forslag fra bildene dine (se{" "}
+              <strong>Mistral AI</strong>: Mottar nedskalerte bilder uten skjult bildeinformasjon,
+              sammen med tittel eller kategori, men bare når du ber om forslag fra bildene dine (se{" "}
               <a href="#bildeforslag" className="text-primary underline underline-offset-2">
                 «Forslag fra bildene dine (KI)»
               </a>
@@ -543,9 +542,8 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>Resend</strong> — sender transaksjonelle e-postvarsler du har bedt om (nye
-              meldinger, treff på lagrede søk og lignende) på våre vegne. Du kan lese deres
-              personvernerklæring på{" "}
+              <strong>Resend</strong>: Sender transaksjonelle e-postvarsler (nye meldinger, treff på
+              lagrede søk og lignende) på våre vegne. Du kan lese deres personvernerklæring på{" "}
               <a
                 href="https://resend.com/legal/privacy-policy"
                 target="_blank"
@@ -557,17 +555,18 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>Statens vegvesen (Datautlevering)</strong> — når du registrerer et kjøretøy
-              med registreringsnummer, sender vi nummeret til Statens vegvesen for å hente
+              <strong>Statens vegvesen (Datautlevering)</strong>: Når du registrerer et kjøretøy med
+              registreringsnummer, sender vi registreringsnummeret til Statens vegvesen for å hente
               kjøretøydata automatisk.
             </li>
             <li>
-              <strong>Google Firebase Cloud Messaging (FCM)</strong> — brukes for å sende
+              <strong>Google Firebase Cloud Messaging (FCM)</strong>: Brukes for å sende
               push-varsler til Kaupet-appen på Android, og til iOS via Apples varslingstjeneste
               (APNs). Varsler leveres via Googles infrastruktur, som dermed ser enhetsinformasjon og
               varselinnhold. Dette kan innebære overføring av data til land utenfor EØS, basert på
               Googles standard personvernbestemmelser (SCC) for slike overføringer. FCM brukes kun
-              når du har aktivert push-varsler. Du kan lese Googles personvernerklæring på{" "}
+              når du har aktivert push-varsler i Kaupet-appen. Du kan lese Googles
+              personvernerklæring på{" "}
               <a
                 href="https://policies.google.com/privacy"
                 target="_blank"
@@ -579,10 +578,10 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>Kartverket og OpenStreetMap</strong> — Kartverket leverer kartfliser, mens
+              <strong>Kartverket og OpenStreetMap</strong>: Kartverket leverer kartfliser, mens
               adressesøk i kartvisningen bruker Nominatim fra OpenStreetMap Foundation, for visning
               og geokoding av lokasjon på annonser. Adressesøk utføres kun når du eksplisitt trykker
-              «Søk» i et adressefelt — IP-adressen din blir da synlig for OpenStreetMap Foundation.
+              «Søk» i et adressefelt. IP-adressen din blir da synlig for OpenStreetMap Foundation.
               Kartfliser fra Kartverket lastes automatisk når et kart vises.
             </li>
           </ul>

@@ -57,7 +57,7 @@ unavailable`); en felt-provenance på `manual` blokkerer senere
   `site_settings.category_suggestion_ai_enabled !== false` og
   `MISTRAL_PHOTO_SUGGESTIONS_ENABLED === "true"` (se `.env.example` og
   `.env.staging.example`). Flagget forblir av inntil et kontrollert
-  staging-smoke-kall har bekreftet at Mistral Small 4 håndterer
+  staging-smoke-kall har bekreftet at modellen (nå Ministral 3 14B, se § 2d) håndterer
   vision + streng JSON Schema sammen, og inntil gjeldende Mistral
   API-avtale/DPA, EU-behandling, treningsopt-out og faktisk retensjon er
   bekreftet og korrekt beskrevet i personvernerklæringen og
@@ -110,6 +110,35 @@ Det som gjenstår før `MISTRAL_PHOTO_SUGGESTIONS_ENABLED` slås på: en
 kontrollert staging-smoke-test av vision + `json_schema` sammen, der
 `usage.prompt_tokens` i Mistral-svaret logges for å bekrefte
 kostnadsanslaget for funksjonen.
+
+## 2d. Modellbytte for fotoforslag (per 2026-09-25)
+
+Fotoforslaget (`suggestListingFromPhotosAi`, både `identify` og `attributes`)
+bruker nå **Ministral 3 14B** (`ministral-14b-2512`) i stedet for Mistral
+Small 4 (`mistral-small-2603`). Samme leverandør, samme EU-endepunkt og samme
+DPA — kun modellnavnet i kallet er endret. Tekstforslaget
+(`suggestCategoryForTitleAi`) står fortsatt på Small 4.
+
+Målt med `bun scripts/eval-photo-identify.ts` (11 tydelige bilder, 480 px,
+hele kategoritreet). Priser fra `mistral.ai/pricing/api` per 2026-09-25, kostnad
+per kall ved ~2 650 prompt-tokens og ~25 svar-tokens:
+
+| Modell                             | Riktig kategori (topp 1)     | Svartid maks              | Pris inn/ut per M tokens | Per kall |
+| ---------------------------------- | ---------------------------- | ------------------------- | ------------------------ | -------- |
+| `mistral-small-2603` (Small 4)     | 1/11                         | ~1,0 s                    | $0,15 / $0,60            | ~$0,0004 |
+| `ministral-14b-2512` (valgt)       | 10/11 (20/22 over to runder) | ~1,1 s (én topp på 3,7 s) | $0,20 / $0,20            | ~$0,0005 |
+| `mistral-medium-2604` (Medium 3.5) | 10/11                        | ~1,8 s                    | $1,50 / $7,50            | ~$0,004  |
+
+Årsaken er modellens bildeforståelse, ikke prompten: Small 4 kalte en tromme
+«skål med bananer» og en golfball «hjernevev» selv med bare bildet og ett kort
+spørsmål, og ble dårligere ved 768 px. Billige prompttiltak (bildet før
+teksten, et `description`-felt før sluggen, kandidater gruppert etter
+forelder, større miniatyr) ga ingen forbedring på Small 4 og ingen målbar
+gevinst på de sterkere modellene, så miniatyrstørrelsene og tidsgrensen (5 s)
+er uendret. Én prompt-endring er tatt inn: tittelen skal bare navngi
+gjenstanden. Uten den fant Ministral på egenskaper («Golfball – ny og
+uåpnet»), og med den steg treffet fra 9/11 til 10/11. Ministral 3B og 8B ga
+7–8/11. Ministral avviser `reasoning_effort`, så fotokallet sender det ikke.
 
 ## 3. Alternativer som faktisk ble vurdert
 

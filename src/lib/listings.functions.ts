@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -88,12 +88,12 @@ async function resolveListingOwnership(
     if (accessError) {
       throw await toClientError("database", accessError);
     }
-    if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
+    if (!hasAccess) throw new ClientError("Proff-tilgang er ikke aktiv.", 403);
     if (!membership.can_create_listings) {
-      throw new Error("Du har ikke tilgang til å opprette annonser.");
+      throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
     }
     if (membership.category_access === "restricted") {
-      if (!categoryId) throw new Error("Du har ikke tilgang til denne kategorien.");
+      if (!categoryId) throw new ClientError("Du har ikke tilgang til denne kategorien.", 403);
       const { data: allowed, error: categoryError } = await supabaseAdmin
         .from("organization_member_categories")
         .select("category_id")
@@ -104,10 +104,10 @@ async function resolveListingOwnership(
       if (categoryError) {
         throw await toClientError("database", categoryError);
       }
-      if (!allowed) throw new Error("Du har ikke tilgang til denne kategorien.");
+      if (!allowed) throw new ClientError("Du har ikke tilgang til denne kategorien.", 403);
     }
   }
-  if (!requestedLocationId) throw new Error("Velg en lokasjon før annonsen opprettes.");
+  if (!requestedLocationId) throw new ClientError("Velg en lokasjon før annonsen opprettes.");
   const { data: location, error: locationError } = await supabaseAdmin
     .from("organization_locations")
     .select("id")
@@ -118,7 +118,7 @@ async function resolveListingOwnership(
   if (locationError) {
     throw await toClientError("database", locationError);
   }
-  if (!location) throw new Error("Lokasjonen finnes ikke eller er ikke aktiv.");
+  if (!location) throw new ClientError("Lokasjonen finnes ikke eller er ikke aktiv.", 404);
   if (membership.role !== "superuser") {
     const { data: assignment, error: assignmentError } = await supabaseAdmin
       .from("organization_location_members")
@@ -129,7 +129,7 @@ async function resolveListingOwnership(
     if (assignmentError) {
       throw await toClientError("database", assignmentError);
     }
-    if (!assignment) throw new Error("Du har ikke tilgang til denne lokasjonen.");
+    if (!assignment) throw new ClientError("Du har ikke tilgang til denne lokasjonen.", 403);
   }
   return {
     seller_id: userId,
@@ -206,7 +206,7 @@ async function assertUnderHourlyListingLimit(
     .eq("seller_id", userId)
     .gte("created_at", oneHourAgo);
   if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
-    throw new Error(errorMessage);
+    throw new ClientError(errorMessage, 429);
   }
 }
 

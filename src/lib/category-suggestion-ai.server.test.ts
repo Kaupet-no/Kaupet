@@ -170,6 +170,9 @@ describe("suggestListingFromPhotosAi", () => {
       image_url: { url: "data:image/jpeg;base64,AAAA" },
     });
     expect(body.response_format.json_schema.strict).toBe(true);
+    expect(body.model).toBe("ministral-14b-2512");
+    // Ministral svarer 400 på reasoning_effort.
+    expect(body).not.toHaveProperty("reasoning_effort");
   });
   it("bruker arvede filtre for attributtforslag", async () => {
     fetchMock.mockResolvedValue(

@@ -436,7 +436,7 @@ describe("business server functions", () => {
       inviteOrganizationMember({
         data: { name: "Kari Nordmann", email: "kari@example.com", locationAssignments },
       }),
-    ).rejects.toThrow("ikke tilgang");
+    ).rejects.toMatchObject({ message: expect.stringContaining("ikke tilgang"), status: 403 });
 
     buildAdmin({ proff: false });
     await expect(

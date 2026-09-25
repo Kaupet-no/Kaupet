@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -123,7 +123,7 @@ async function requireOrganizationMember(userId: string) {
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!membership) throw new Error(UNAUTHORIZED_MESSAGE);
+  if (!membership) throw new ClientError(UNAUTHORIZED_MESSAGE, 403);
   const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
     _organization_id: membership.organization_id,
   });
@@ -140,7 +140,7 @@ async function requireOrganizationMember(userId: string) {
 
 async function requireSuperuserOrganization(userId: string) {
   const membership = await requireOrganizationMember(userId);
-  if (membership.role !== "superuser") throw new Error(UNAUTHORIZED_MESSAGE);
+  if (membership.role !== "superuser") throw new ClientError(UNAUTHORIZED_MESSAGE, 403);
   return membership;
 }
 

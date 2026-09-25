@@ -287,6 +287,12 @@ function PersonvernPage() {
             For å hindre at statistikken fylles av samme hendelse, lagrer vi i tillegg en hash (en
             ugjenkjennelig omskriving) av IP-adressen i inntil ett døgn.
           </p>
+          <p className="mt-3">
+            Når en forespørsel til serveren feiler, registreres i tillegg en teknisk feilbeskrivelse
+            (hvilken funksjon som feilet, feiltype og feilmelding) i driftsloggen hos Cloudflare.
+            Innholdet du har sendt inn, tas ikke med, og feilbeskrivelsen slettes automatisk etter
+            inntil 7 dager.
+          </p>
         </section>
 
         <section>

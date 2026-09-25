@@ -69,12 +69,11 @@ function PersonvernPage() {
                 <strong>Bedriftskontoer</strong>: organisasjonsnummer, juridisk navn, visningsnavn
                 og bedriftens visningslokasjon (postnummer og by). Hvis du er medlem av en bedrift,
                 lagrer vi medlemskap, rolle og status. Vi lagrer også valgt plan og tidspunkt for
-                Proff-prøveperioden.
+                eventuell prøveperiode av Proff-planen.
               </li>
               <li>
-                <strong>Bedriftsprofilering</strong>: logo, fargevalg og nettsidelenke når bedriften
-                bruker disse feltene. Opplysningene beholdes når Proff-tilgangen avsluttes, men
-                vises ikke på annonser uten effektiv Proff-tilgang.
+                <strong>Bedriftsprofilering</strong>: logo, fargevalg og nettsidelenke dersom dette
+                er lagt inn av bedriften.
               </li>
               <li>
                 <strong>Annonser</strong> du har lagt ut (salg eller «ønskes kjøpt»), med tilhørende
@@ -86,7 +85,7 @@ function PersonvernPage() {
                 <strong>Meldinger</strong> mellom deg og andre brukere.
               </li>
               <li>
-                <strong>Lest-status på samtaler</strong> — tidspunkt for når du sist åpnet en
+                <strong>Lest-status på samtaler</strong>: tidspunkt for når du sist åpnet en
                 samtale, brukt til ulest-indikatoren i meldingsinnboksen.
               </li>
               <li>
@@ -106,13 +105,13 @@ function PersonvernPage() {
                 moderator kan behandle dem, i inntil 3 år etter at saken er avsluttet.
               </li>
               <li>
-                <strong>Blokkeringer</strong> — hvilke brukere eller samtaler du har blokkert. Dette
+                <strong>Blokkeringer</strong>: hvilke brukere eller samtaler du har blokkert. Dette
                 er privat og kun synlig for deg.
               </li>
               <li>
-                <strong>Bekreftede salg</strong> — når en selger markerer en annonse som solgt via
-                en samtale, lagres koblingen mellom annonse, kjøper og selger. Denne er kun synlig
-                for partene i salget.
+                <strong>Bekreftede salg</strong>: når en selger markerer en annonse som solgt via en
+                samtale, lagres koblingen mellom annonse, kjøper og selger. Denne er kun synlig for
+                partene i salget.
               </li>
               <li>
                 <strong>Visninger av annonser</strong>, for å gi selger et visningstall. Vi lagrer
@@ -122,7 +121,7 @@ function PersonvernPage() {
                 telling per annonse per nettverk hvert 30. minutt.
               </li>
               <li>
-                <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et
+                <strong>Push-varslinger</strong>: hvis du slår på varsler, lagrer vi et
                 kryptografisk abonnementsnøkkelpar (offentlig/privat) eller enhets-token,
                 nettleser-/enhetsinformasjon og dine preferanser for hva du vil varsles om (nye
                 meldinger, lagrede søk, prisfall og lignende).
@@ -133,31 +132,31 @@ function PersonvernPage() {
                 annonse betalingen gjelder.
               </li>
               <li>
-                <strong>Varsler om prisendringer</strong> — hvis du har lagt til en annonse som
+                <strong>Varsler om prisendringer</strong>: hvis du har lagt til en annonse som
                 favoritt eller har et lagret søk, kan vi lagre at det er sendt varsel til deg om
                 prisendring eller nytt treff, slik at du ikke varsles flere ganger om det samme.
                 Slike varsler slettes 180 dager etter at du har lest dem.
               </li>
               <li>
-                <strong>Kjøretøyoppslag</strong> — hvis du registrerer et kjøretøy, lagrer vi
+                <strong>Kjøretøyoppslag</strong>: hvis du registrerer et kjøretøy, lagrer vi
                 registreringsnummeret og resultatet av oppslaget mot Statens vegvesen i 90 dager,
                 for å hindre misbruk og varsle deg hvis samme skilt tidligere er slått opp med et
                 annet resultat.
               </li>
               <li>
-                <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
+                <strong>Moderering</strong>: ved brudd på reglene kan administrator registrere en{" "}
                 <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>.
                 Ved IP-blokkering lagres IP-adressen så lenge blokkeringen er aktiv, og fjernes når
                 den oppheves. Slike administrative handlinger logges internt med tidspunkt og årsak
                 i 3 år.
               </li>
               <li>
-                <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi
+                <strong>Sletteforespørsler</strong>: når du ber om å slette kontoen, lagrer vi
                 e-post og tidsstempel i den 7 dager lange angrefristen før permanent sletting
                 utføres.
               </li>
               <li>
-                <strong>Feilsøkingslogger</strong> — tekniske serverfeil logges i 90 dager for å
+                <strong>Feilsøkingslogger</strong>: tekniske serverfeil logges i 90 dager for å
                 rette feil i tjenesten. Loggen filtreres for å ikke inneholde personopplysninger.
               </li>
             </ul>
@@ -185,20 +184,20 @@ function PersonvernPage() {
             </summary>
             <ul className="space-y-2 border-t border-border px-4 py-4 list-disc pl-9">
               <li>
-                <strong>Innloggingssesjon</strong> — nødvendig for at du skal kunne være logget inn
-                mellom besøk. Lagres i nettleserens <code>localStorage</code> av
-                autentiseringsleverandøren Supabase.
+                <strong>Innloggingssesjon</strong>: nødvendig for at du skal kunne være logget inn
+                mellom besøk. Lagres i nettleserens <code>localStorage</code> av vår
+                autentiseringsleverandør, Supabase.
               </li>
               <li>
-                <strong>kaupet_recent_searches_v1</strong> — de siste søkeordene dine, slik at du
+                <strong>kaupet_recent_searches_v1</strong>: de siste søkeordene dine, slik at du
                 raskt kan søke på dem igjen fra søkefeltet. Forlater ikke enheten din.
               </li>
               <li>
-                <strong>kaupet_view_mode</strong> — husker om du foretrekker annonser vist i
-                rutenett eller liste. Forlater ikke enheten din.
+                <strong>kaupet_view_mode</strong>: husker om du foretrekker annonser vist i rutenett
+                eller liste. Forlater ikke enheten din.
               </li>
               <li>
-                <strong>kaupet_theme</strong> — husker om du foretrekker lyst, mørkt eller
+                <strong>kaupet_theme</strong>: husker om du foretrekker lyst, mørkt eller
                 systemstyrt fargetema. Forlater ikke enheten din.
               </li>
               <li>
@@ -206,19 +205,19 @@ function PersonvernPage() {
                 <strong>kaupet_draft_sell_listing_id</strong>,{" "}
                 <strong>kaupet_draft_sell_listing_updated_at</strong>,{" "}
                 <strong>kaupet_draft_want_listing</strong> og{" "}
-                <strong>kaupet_draft_want_listing_id</strong> — utkast til salgsannonse eller
-                «ønskes kjøpt»-annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du
-                fyller ut registreringen, slik at du ikke mister innholdet ved utilsiktet lukking.
-                Slettes når annonsen er publisert eller forkastet.
+                <strong>kaupet_draft_want_listing_id</strong>: utkast til salgsannonse eller «ønskes
+                kjøpt»-annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du fyller ut
+                registreringen, slik at du ikke mister innholdet ved utilsiktet lukking. Slettes når
+                annonsen er publisert eller forkastet.
               </li>
               <li>
                 <strong>kaupet_push_msg_hint_dismissed_v1</strong>,{" "}
                 <strong>kaupet_360_hint_seen</strong> og{" "}
-                <strong>kaupet_onboarding_completed_v1</strong> — husker at du har lukket en
+                <strong>kaupet_onboarding_completed_v1</strong>: husker at du har lukket en
                 informasjonsmelding eller sett en veiledning, slik at den ikke vises på nytt.
               </li>
               <li>
-                <strong>kaupet_pending_auth_intent</strong> — husker en handling du forsøkte (f.eks.
+                <strong>kaupet_pending_auth_intent</strong>: husker en handling du forsøkte (f.eks.
                 å legge til favoritt) mens du ikke var innlogget, slik at handlingen fullføres
                 automatisk etter innlogging. Lagres i <code>sessionStorage</code> og slettes
                 automatisk når fanen lukkes eller handlingen er fullført.
@@ -243,15 +242,15 @@ function PersonvernPage() {
             </summary>
             <ul className="space-y-2 border-t border-border px-4 py-4 list-disc pl-9">
               <li>
-                <strong>kaupet.app.location</strong> — husker posisjonen og søkeradius du sist
-                brukte i stedsfilteret (koordinater, radius i km og stedsnavn), slik at filteret er
+                <strong>kaupet.app.location</strong>: husker posisjonen og søkeradius du sist brukte
+                i stedsfilteret (koordinater, radius i km og stedsnavn), slik at filteret er
                 forhåndsutfylt neste gang du åpner appen. Selve lagringen forlater ikke enheten din,
                 men når du utfører et geografisk søk sendes koordinatene og radiusen til Kaupet for
                 å finne relevante annonser — se «Kartverket og OpenStreetMap» under Tredjeparter for
                 hvordan adressesøk og kartvisning fungerer.
               </li>
               <li>
-                <strong>kaupet_onboarding_completed_v1</strong> — husker at du har fullført
+                <strong>kaupet_onboarding_completed_v1</strong>: husker at du har fullført
                 introduksjonsguiden ved første gangs bruk av appen, slik at den ikke vises på nytt.
               </li>
             </ul>
@@ -267,16 +266,17 @@ function PersonvernPage() {
           </p>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Abonnementsdata</strong> — i nettleseren et endepunkt og et kryptografisk
-              nøkkelpar generert av nettleseren din; i appen en enhets-token utstedt av Apple (APNs)
-              eller Google (FCM). Vi kan ikke bruke disse til å spore deg på tvers av nettsteder.
+              <strong>Abonnementsdata</strong>: Ved push-varsler i nettleser, lagres endepunkt og et
+              kryptografisk nøkkelpar generert av nettleseren din. Ved push-varsler i appen (iOS og
+              Android) lagres enhets-token utstedt av Apple (APNs) eller Google (FCM). Vi kan ikke
+              bruke disse til å spore deg på tvers av nettsteder.
             </li>
             <li>
-              <strong>Enhets- og nettleserinformasjon</strong> — brukes til å sende varslet til
+              <strong>Enhets- og nettleserinformasjon</strong>: brukes til å sende varslet til
               riktig enhet.
             </li>
             <li>
-              <strong>Varselformål</strong> — hvilke hendelser du vil varsles om (for eksempel nye
+              <strong>Varselformål</strong>: hvilke hendelser du vil varsles om (for eksempel nye
               meldinger eller treff på lagrede søk).
             </li>
           </ul>

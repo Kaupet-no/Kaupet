@@ -51,6 +51,14 @@ afterEach(() => {
 });
 
 describe("lookupVehicle", () => {
+  it("gir en forståelig norsk feilmelding når SVV ikke kan nås", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+
+    await expect(lookupVehicle("TEST123")).rejects.toThrow(
+      /^Vi får ikke kontakt med Statens vegvesen akkurat nå/,
+    );
+  });
   it("henter karosseri, hengervekt og norsk førstegangsgodkjenning fra SVV-responsen", async () => {
     mockSvvResponse();
 

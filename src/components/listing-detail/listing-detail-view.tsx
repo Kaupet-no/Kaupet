@@ -778,8 +778,10 @@ function ListingDetailViewBody({
               {isVehicleListing ? (
                 // Title is auto-generated from brand/model/year for Bil og MC
                 // (never a free-text field in that category's wizard flow
-                // either), so it's not editable here.
-                <h1 className="min-w-0 flex-1 font-display text-3xl leading-tight tracking-tight">
+                // either), so it's not editable here. Telefonrammen er
+                // smalere enn en ekte mobil, så tittelen krympes der for å
+                // bryte omtrent som på telefonen.
+                <h1 className="min-w-0 flex-1 font-display text-3xl leading-tight tracking-tight in-data-phone-frame:text-2xl">
                   {title}
                 </h1>
               ) : (
@@ -788,7 +790,7 @@ function ListingDetailViewBody({
                   value={title}
                   className="min-w-0 flex-1"
                   render={(v) => (
-                    <h1 className="min-w-0 font-display text-3xl leading-tight tracking-tight">
+                    <h1 className="min-w-0 font-display text-3xl leading-tight tracking-tight in-data-phone-frame:text-2xl">
                       {v}
                     </h1>
                   )}
@@ -812,8 +814,10 @@ function ListingDetailViewBody({
                 />
               )}
             </div>
-            {nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
-              <div className="mt-2">
+            {/* Under md (og i telefonrammen) står skiltet under tittelen, så
+                tittelen får hele bredden. Native gjør det alltid. */}
+            {isVehicleListing && vehicleLookup?.registrationNumber && (
+              <div className={nativePlateUnderTitle ? "mt-2" : "mt-2 page-md:hidden"}>
                 <RegistrationPlate
                   value={vehicleLookup.registrationNumber}
                   className="h-7"
@@ -858,12 +862,14 @@ function ListingDetailViewBody({
                 handlingene til høyre i stedet for på tittellinjen — ellers
                 ligger de to på hver sin høyde i headeren. */}
             {isVehicleListing && !nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
-              <RegistrationPlate
-                value={vehicleLookup.registrationNumber}
-                className="h-7 shrink-0"
-                editable={!!editCtx?.editMode}
-                onEdit={() => editCtx?.openVehicleLookupModal()}
-              />
+              <div className="hidden page-md:block">
+                <RegistrationPlate
+                  value={vehicleLookup.registrationNumber}
+                  className="h-7 shrink-0"
+                  editable={!!editCtx?.editMode}
+                  onEdit={() => editCtx?.openVehicleLookupModal()}
+                />
+              </div>
             )}
             {/* Kun fra md og opp — under md er siden uansett én kolonne, så
                 bredde-valget ville ikke gjort noe. Står utenfor

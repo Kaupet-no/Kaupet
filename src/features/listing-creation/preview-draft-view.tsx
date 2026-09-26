@@ -247,7 +247,10 @@ export function EditableListingReview({
         )}
       </div>
       {framed ? (
-        <div className="mx-auto h-[min(52rem,calc(100dvh-12rem))] w-full max-w-[20rem] overflow-hidden rounded-[2rem] border-[6px] border-foreground bg-background shadow-lg">
+        <div
+          data-phone-frame
+          className="mx-auto h-[min(52rem,calc(100dvh-12rem))] w-full max-w-[20rem] overflow-hidden rounded-[2rem] border-[6px] border-foreground bg-background shadow-lg"
+        >
           <div className="h-full overflow-y-auto overscroll-contain">{view}</div>
         </div>
       ) : wide ? (

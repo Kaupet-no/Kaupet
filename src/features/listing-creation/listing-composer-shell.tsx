@@ -384,6 +384,7 @@ function PhoneFrame({
 }) {
   return (
     <div
+      data-phone-frame
       className={cn(
         "overflow-hidden rounded-[2rem] border-[6px] border-foreground bg-background shadow-lg",
         className,

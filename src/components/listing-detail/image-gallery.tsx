@@ -266,10 +266,12 @@ export function ImageGallery({
                 );
               })}
             </CarouselContent>
+            {/* Telefonrammen i annonseflyten er inert, så pilene ville bare
+                vært pynt som ikke finnes på mobil — skjules der. */}
             {!isNative && totalSlides > 1 && (
               <>
-                <CarouselPrevious className="left-3 border-border bg-card/90 backdrop-blur" />
-                <CarouselNext className="right-3 border-border bg-card/90 backdrop-blur" />
+                <CarouselPrevious className="left-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden" />
+                <CarouselNext className="right-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden" />
               </>
             )}
           </Carousel>

@@ -15,3 +15,24 @@ export function publishGate(state: {
   if (!state.authenticated) return "sign-in";
   return "publish";
 }
+
+/**
+ * Hindrer at Enter i et tekstfelt sender inn skjemaet (implisitt innsending).
+ * Hele veiviseren er ett <form>, og på Se over ligger annonsens innebygde
+ * redigeringsfelt og Publiser-knappen i samme skjema — uten denne sperren
+ * publiserte Enter i f.eks. tittelfeltet annonsen. Kun et eksplisitt trykk på
+ * Publiser skal sende inn.
+ */
+export function blockImplicitSubmit(e: {
+  key: string;
+  target: EventTarget | null;
+  preventDefault: () => void;
+}) {
+  if (
+    e.key === "Enter" &&
+    e.target instanceof HTMLInputElement &&
+    e.target.type !== "submit" &&
+    e.target.type !== "image"
+  )
+    e.preventDefault();
+}

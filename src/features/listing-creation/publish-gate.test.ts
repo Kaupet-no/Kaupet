@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
 
-import { publishGate } from "./publish-gate";
+import { blockImplicitSubmit, publishGate } from "./publish-gate";
 
 const base = { hasMissingAttributes: false, authenticated: true };
 
@@ -17,5 +18,29 @@ describe("publishGate", () => {
 
   it("publiserer når alt er på plass", () => {
     expect(publishGate(base)).toBe("publish");
+  });
+});
+
+describe("blockImplicitSubmit", () => {
+  function press(key: string, target: HTMLElement) {
+    const event = { key, target, preventDefault: vi.fn() };
+    blockImplicitSubmit(event);
+    return event.preventDefault.mock.calls.length > 0;
+  }
+
+  it("stopper Enter i tekstfelt, så Se over-feltene ikke publiserer", () => {
+    expect(press("Enter", document.createElement("input"))).toBe(true);
+    const price = document.createElement("input");
+    price.type = "number";
+    expect(press("Enter", price)).toBe(true);
+  });
+
+  it("lar Publiser-knappen, tekstområder og andre taster være", () => {
+    const submit = document.createElement("input");
+    submit.type = "submit";
+    expect(press("Enter", submit)).toBe(false);
+    expect(press("Enter", document.createElement("button"))).toBe(false);
+    expect(press("Enter", document.createElement("textarea"))).toBe(false);
+    expect(press("a", document.createElement("input"))).toBe(false);
   });
 });

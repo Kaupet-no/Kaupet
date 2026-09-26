@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Eye, Share2 } from "lucide-react";
+import { Check, Eye, Share2, Sparkles } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,9 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onView: () => void;
-  onPromote?: () => void;
+  onPromote: () => void;
+  /** Lukkekrysset og klikk utenfor — ikke «Se annonsen» eller «Kjøp promotering». */
   onClose: () => void;
-  canPromote?: boolean;
 };
 
 /** "48210937" -> "4821 0937" — kun visuell gruppering av den 8-sifrede koden. */
@@ -34,7 +34,6 @@ export function PublishedListingDialog({
   onView,
   onPromote,
   onClose,
-  canPromote = false,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
@@ -183,15 +182,9 @@ export function PublishedListingDialog({
           <Button variant="secondary" onClick={onView} className="w-full">
             <Eye className="size-4" /> Se annonsen
           </Button>
-          {canPromote && onPromote && (
-            <button
-              type="button"
-              onClick={onPromote}
-              className="mx-auto text-sm text-brand-text underline underline-offset-2"
-            >
-              Fremhev annonse
-            </button>
-          )}
+          <Button variant="outline" onClick={onPromote} className="w-full">
+            <Sparkles className="size-4" /> Kjøp promotering
+          </Button>
         </div>
       </ResponsiveOverlayContent>
       {listing?.kaupet_code && (

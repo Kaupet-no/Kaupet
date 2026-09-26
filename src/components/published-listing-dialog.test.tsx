@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PublishedListingDialog } from "./published-listing-dialog";
@@ -22,14 +22,15 @@ vi.mock("@/hooks/use-listing-preview", () => ({
   }),
 }));
 
-function renderDialog() {
+function renderDialog(handlers: { onPromote?: () => void; onClose?: () => void } = {}) {
   return render(
     <PublishedListingDialog
       listingId="listing-1"
       open
       onOpenChange={vi.fn()}
       onView={vi.fn()}
-      onClose={vi.fn()}
+      onPromote={handlers.onPromote ?? vi.fn()}
+      onClose={handlers.onClose ?? vi.fn()}
     />,
   );
 }
@@ -64,5 +65,21 @@ describe("PublishedListingDialog", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("48210937"));
     await waitFor(() => expect(screen.getByText("Kopiert")).toBeTruthy());
+  });
+
+  it("«Kjøp promotering» åpner kjøpet", () => {
+    const onPromote = vi.fn();
+    renderDialog({ onPromote });
+
+    screen.getByRole("button", { name: /Kjøp promotering/ }).click();
+    expect(onPromote).toHaveBeenCalledOnce();
+  });
+
+  it("lukking uten valg kaller onClose, som tar brukeren til annonsen", () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

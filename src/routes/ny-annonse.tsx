@@ -87,7 +87,7 @@ import {
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
-import { publishGate } from "@/features/listing-creation/publish-gate";
+import { blockImplicitSubmit, publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
@@ -1281,6 +1281,14 @@ function NewListingPage() {
     }
   }
 
+  // Etter publisering havner brukeren på annonsen uansett hvordan dialogene
+  // lukkes. /annonse/$listingId slår opp koden hvis svaret manglet den.
+  function goToPublishedListing() {
+    if (publishedCode) navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
+    else if (publishedId)
+      navigate({ to: "/annonse/$listingId", params: { listingId: publishedId } });
+  }
+
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -1933,7 +1941,7 @@ function NewListingPage() {
           options={{ appearance: "interaction-only", action: "kaupet" }}
         />
       )}
-      <form onSubmit={submitComposer}>
+      <form onSubmit={submitComposer} onKeyDown={blockImplicitSubmit}>
         <ListingComposerShell
           title={title}
           // Kjøretøytittelen genereres av Årsmodell/Merke/Modell
@@ -2317,19 +2325,15 @@ function NewListingPage() {
           listingId={publishedId}
           open={publishedOpen}
           onOpenChange={setPublishedOpen}
-          canPromote={isDemo}
           onView={() => {
             setPublishedOpen(false);
-            if (publishedCode)
-              navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
+            goToPublishedListing();
           }}
           onPromote={() => {
             setPublishedOpen(false);
             setPromoteOpen(true);
           }}
-          onClose={() => {
-            if (!promoteOpen) navigate({ to: "/mine-annonser" });
-          }}
+          onClose={goToPublishedListing}
         />
       )}
 
@@ -2339,7 +2343,7 @@ function NewListingPage() {
           open={promoteOpen}
           onOpenChange={(o) => {
             setPromoteOpen(o);
-            if (!o) navigate({ to: "/mine-annonser" });
+            if (!o) goToPublishedListing();
           }}
         />
       )}

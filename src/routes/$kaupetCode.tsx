@@ -866,11 +866,8 @@ function ListingDetailPage() {
             disabled={contactMutation.isPending}
           >
             <MessageCircle className="size-4" />
-            {contactMutation.isPending
-              ? "Åpner…"
-              : user
-                ? "Send melding"
-                : "Logg inn for å sende melding"}
+            {/* Også for gjester — contactMutation sender dem til innlogging. */}
+            {contactMutation.isPending ? "Åpner…" : "Send melding"}
           </Button>
         ) : undefined
       }

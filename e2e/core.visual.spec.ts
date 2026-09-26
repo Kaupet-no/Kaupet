@@ -111,10 +111,10 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .first()
     .click();
   await expect(page).toHaveURL(/\/\d{8}(?:\?|$)/);
-  // To knapper med samme tekst kan finnes samtidig på mobil: sidepanelet og
-  // den faste kontaktlinjen nederst (persistent kontakthandling) — begge
+  // To knapper matcher samtidig på mobil: sidepanelet («Send melding til
+  // selger») og den faste kontaktlinjen nederst («Send melding») — begge
   // betyr siden er klar, så .first() holder som ferdig-signal.
-  await page.getByRole("button", { name: "Logg inn for å sende melding" }).first().waitFor();
+  await page.getByRole("button", { name: "Send melding" }).first().waitFor();
   const publishedDate = page
     .locator("dt")
     .filter({ hasText: /^(?:Publisert|Sist redigert)$/ })

@@ -68,6 +68,7 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
     <nav
       aria-label={rail ? "Hovednavigasjon" : "Bunnavigasjon"}
       className={cn(
+        "app-bottom-nav",
         rail
           ? "pointer-events-none fixed inset-y-0 left-0 z-50"
           : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none",

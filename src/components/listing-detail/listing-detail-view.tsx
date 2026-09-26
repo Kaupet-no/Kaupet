@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
+import { Fragment, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ClientOnly, Link, useLocation } from "@tanstack/react-router";
 import { ChevronLeft, Expand, Loader2, MapPin, Maximize2, Shrink } from "lucide-react";
 
@@ -294,9 +294,9 @@ export function ListingDetailView({
   const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
   // Persistent kontakthandling er kjøperreisens primære konvertering — skal
   // ikke avhenge av at brukeren scroller forbi bilder/spesifikasjoner for å
-  // finne selgerkortet. Vist på både native og mobilweb (samme fysiske
-  // formfaktor); desktop web har allerede kontaktpanelet synlig i
-  // sidekolonnen uten scroll, se page-md:hidden på selve baren under.
+  // finne selgerkortet. Vist på mobilweb; desktop web har allerede
+  // kontaktpanelet synlig i sidekolonnen uten scroll, se page-md:hidden på
+  // selve baren under. Native bytter ut bunnavigasjonen med den.
   const showStickyContact = !!stickyContactSlot;
 
   // Slug-based, not the canonical filter-based `isVehicleCategory`
@@ -539,6 +539,17 @@ export function ListingDetailView({
  * continuation of the original render — nothing here changes buyer-view
  * output.
  */
+/** Skjuler AppBottomNav mens annonsebaren står i dens plass. Klassen på
+ * <html> i stedet for rute-sjekk i __root: baren vises ikke for eierens egen
+ * annonse, og da skal navigasjonen bli stående. */
+function NativeContactBar() {
+  useEffect(() => {
+    document.documentElement.classList.add("listing-contact-bar");
+    return () => document.documentElement.classList.remove("listing-contact-bar");
+  }, []);
+  return null;
+}
+
 function ListingDetailViewBody({
   title,
   subtitle,
@@ -701,7 +712,7 @@ function ListingDetailViewBody({
   return (
     <div
       data-phone-preview={phonePreview || undefined}
-      className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact && !phonePreview ? "pb-28 page-md:pb-8" : ""} ${phonePreview ? "pb-0" : ""}`}
+      className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact && !phonePreview && !isNative ? "pb-28 page-md:pb-8" : ""} ${phonePreview ? "pb-0" : ""}`}
     >
       {/* titleFadesIn: siden har allerede tittelen som stor <h1> rett under
           headeren — headertittelen toner inn først når den er scrollet vekk. */}
@@ -1415,7 +1426,10 @@ function ListingDetailViewBody({
       </ClientOnly>
 
       {showStickyContact && phonePreview && (
-        <div className="sticky bottom-0 -mx-4 mt-8 flex items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+        <div
+          data-preview-sticky-bottom
+          className="sticky bottom-0 -mx-4 mt-8 flex items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur"
+        >
           {priceLabel ? (
             <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>
           ) : (
@@ -1424,21 +1438,32 @@ function ListingDetailViewBody({
           {stickyContactSlot}
         </div>
       )}
-      {showStickyContact && !phonePreview && (
+      {showStickyContact && !phonePreview && isNative && (
+        // Tar bunnavigasjonens plass og form (se NativeContactBar): to faste
+        // barer stablet over hverandre kolliderte visuelt.
         <div
-          className="px-safe fixed inset-x-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur page-md:hidden"
-          style={
-            isNative
-              ? // Bunnavigasjonen (AppBottomNav) ligger fast under denne
-                // siden med z-50 — baren må stå over den, ikke bak den, og
-                // trenger ikke egen safe-area-padding siden tab-baren
-                // allerede reserverer den.
-                { bottom: "var(--app-bottom-nav-h)" }
-              : {
-                  bottom: 0,
-                  paddingBottom: "calc(var(--safe-bottom) + 0.75rem)",
-                }
-          }
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 page-md:hidden"
+          style={{ paddingBottom: "calc(var(--safe-bottom) + 0.5rem)" }}
+        >
+          <NativeContactBar />
+          <div
+            className="pointer-events-auto mx-auto flex max-w-md items-center justify-between gap-3 rounded-3xl border border-border bg-background/95 px-4 shadow-xl backdrop-blur"
+            // Samme høyde som AppBottomNav-pillen: py-3 + h-12-ikon + gap-0.5
+            // + .native-nav-label (0.6875rem × 1.2, skalert) + 2px ramme.
+            style={{
+              minHeight:
+                "calc(4.625rem + 0.825rem * clamp(1, var(--kaupet-text-scale, 1), 1.3) + 2px)",
+            }}
+          >
+            <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>
+            {stickyContactSlot}
+          </div>
+        </div>
+      )}
+      {showStickyContact && !phonePreview && !isNative && (
+        <div
+          className="px-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pt-3 backdrop-blur page-md:hidden"
+          style={{ paddingBottom: "calc(var(--safe-bottom) + 0.75rem)" }}
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>

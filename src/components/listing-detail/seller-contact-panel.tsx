@@ -198,11 +198,9 @@ export function SellerContactPanel({
             <MessageCircle className="size-4" />
             {contacting
               ? "Åpner samtale…"
-              : isLoggedIn
-                ? seller?.kind === "business"
-                  ? "Send melding til bedriften"
-                  : "Send melding til selger"
-                : "Logg inn for å sende melding"}
+              : seller?.kind === "business"
+                ? "Send melding til bedriften"
+                : "Send melding til selger"}
           </Button>
         </div>
       )}

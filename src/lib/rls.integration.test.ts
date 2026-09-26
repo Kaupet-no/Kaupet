@@ -439,8 +439,8 @@ describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writ
 describe.skipIf(!canRun)(
   "RLS: owner can delete their own active, categorized listing (regression for 20260622120000/20260624120000 stats triggers)",
   () => {
-    // The AFTER DELETE stats triggers (listings_remove_category_word_stats,
-    // listings_remove_keyword_stats) only fire their internal UPDATE when
+    // The AFTER DELETE stats trigger (listings_remove_category_word_stats)
+    // only fires its internal UPDATE when
     // the deleted listing had counted_category_id/counted_lexemes set —
     // which only happens for an *active, categorized* listing (see the
     // BEFORE trigger's `IF NEW.status = 'active' AND NEW.category_id IS NOT
@@ -3041,7 +3041,7 @@ describe.skipIf(!canRun)(
 );
 
 describe.skipIf(!canRun)(
-  "RLS: listing_category_word_stats / listing_keyword_stats are publicly readable, not client-writable",
+  "RLS: listing_category_word_stats is private to server code, not client-writable",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
@@ -3069,11 +3069,6 @@ describe.skipIf(!canRun)(
         .from("listing_category_word_stats")
         .insert({ lexeme, category_id: categoryId, listing_count: 1 });
       if (wordErr) throw wordErr;
-
-      const { error: keywordErr } = await admin
-        .from("listing_keyword_stats")
-        .insert({ word: lexeme, category_id: categoryId, listing_count: 1 });
-      if (keywordErr) throw keywordErr;
     });
 
     afterAll(async () => {
@@ -3082,11 +3077,6 @@ describe.skipIf(!canRun)(
         .from("listing_category_word_stats")
         .delete()
         .eq("lexeme", lexeme)
-        .eq("category_id", categoryId);
-      await admin
-        .from("listing_keyword_stats")
-        .delete()
-        .eq("word", lexeme)
         .eq("category_id", categoryId);
     });
 
@@ -3097,25 +3087,14 @@ describe.skipIf(!canRun)(
         .select("lexeme")
         .eq("lexeme", lexeme);
       expect(wordErr).not.toBeNull();
-
-      const { error: keywordErr } = await anon
-        .from("listing_keyword_stats")
-        .select("word")
-        .eq("word", lexeme);
-      expect(keywordErr).not.toBeNull();
     });
 
-    it("blocks a regular authenticated client from writing to either stats table", async () => {
+    it("blocks a regular authenticated client from writing to the stats table", async () => {
       const client = await signIn();
       const { error: wordErr } = await client
         .from("listing_category_word_stats")
         .insert({ lexeme: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
       expect(wordErr).not.toBeNull();
-
-      const { error: keywordErr } = await client
-        .from("listing_keyword_stats")
-        .insert({ word: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
-      expect(keywordErr).not.toBeNull();
     });
   },
 );

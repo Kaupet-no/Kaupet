@@ -88,7 +88,6 @@ async function clearLocalData(local) {
   // Listings must go first: related rows and category references depend on them.
   await clearByKey(local, "listings", "id");
   await clearByKey(local, "listing_category_word_stats", "category_id");
-  await clearByKey(local, "listing_keyword_stats", "category_id");
   await clearByKey(local, "vehicle_models", "id");
   await clearByKey(local, "vehicle_model_classes", "id");
   await clearByKey(local, "vehicle_brands", "id");

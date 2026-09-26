@@ -895,32 +895,6 @@ export type Database = {
           },
         ]
       }
-      listing_keyword_stats: {
-        Row: {
-          category_id: string
-          listing_count: number
-          word: string
-        }
-        Insert: {
-          category_id: string
-          listing_count?: number
-          word: string
-        }
-        Update: {
-          category_id?: string
-          listing_count?: number
-          word?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "listing_keyword_stats_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       listing_promotions: {
         Row: {
           created_at: string

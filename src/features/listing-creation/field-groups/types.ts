@@ -177,7 +177,7 @@ export type WizardSharedProps = {
   vehicleClassification: VehicleClassification | null;
   /** Set when the same user previously looked up the same registration
    * number and got a different classification — surfaced as a soft warning
-   * in the reg-nr confirmation popup (personalized plates can be transferred
+   * under the reg-nr confirmation message (personalized plates can be transferred
    * between vehicles of a different class). */
   vehiclePreviousClassificationMismatch: { slug: string | null; lookedUpAt: string } | null;
   /** Registration number as typed so far — lifted out of the field group so
@@ -186,11 +186,11 @@ export type WizardSharedProps = {
   vehicleRegNrInput: string;
   setVehicleRegNrInput: (v: string) => void;
   runVehicleLookup: (registrationNumber: string) => Promise<boolean>;
-  /** Writes the raw (unedited) SVV lookup data into `attributes` and advances
-   * the wizard — called when the user confirms the reg-nr popup with "Ja". */
+  /** Writes the raw SVV lookup data into `attributes` and advances the wizard
+   * — called by the wizard's "Neste" once the lookup is shown on the page. */
   confirmVehicleData: (leafCategoryId: string, categoryGroup: VehicleBrandGroup) => void;
-  /** Clears the current lookup so the reg-nr field is editable again — called
-   * when the user answers "Nei" to the reg-nr confirmation popup. */
+  /** Clears the current lookup — called when the user edits the registration
+   * number after a lookup. */
   resetLookupOnReturnToRegistration: () => void;
 
   // condition

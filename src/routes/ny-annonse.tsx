@@ -708,18 +708,6 @@ function NewListingPage() {
   }
   useComposerHistoryBack(isFirst || isCategoryConfirmPage, goBack);
 
-  /** Clear a confirmed lookup when navigation returns to registration, so
-   * the registration number can be changed and looked up again. */
-  const previousStepRef = useRef(step);
-  useEffect(() => {
-    const key = currentPage?.groups?.[0]?.key;
-    if (key === "vehicle-registration" && previousStepRef.current > step) {
-      resetLookupOnReturnToRegistration();
-    }
-    previousStepRef.current = step;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, step]);
-
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
   );
@@ -1164,23 +1152,14 @@ function NewListingPage() {
       return "blocked";
     }
 
-    // "Slå opp"-knappen er fjernet — oppslaget kjøres fra selve Neste-knappen
-    // når brukeren står på vehicle-registration-steget med et uslått-opp
-    // regnr. Merke/modell fylles fra oppslaget og kan korrigeres i samme
-    // bekreftelse, så registreringssiden krever ikke en ekstra inntasting.
-    // Tomt skilt faller gjennom til field-groupens egen validering.
-    if (
-      groups.some((g) => g.key === "vehicle-registration") &&
-      vehicleRegistered &&
-      !vehicleLookupResult &&
-      vehicleRegNrInput.trim()
-    ) {
-      // Ved treff blir vi stående på dette steget — VehicleRegistration viser
-      // da en bekreftelsespopup (regnr/merke/modell/farge/årsmodell) basert
-      // på at vehicleLookupResult er satt. "Ja" i popupen kaller
-      // confirmVehicleData, som selv går videre til neste steg. Ved feil blir
-      // vi stående her med vehicleLookupError synlig, slik at brukeren kan
-      // rette registreringsnummeret.
+    // Registrert kjøretøy: oppslaget kjøres normalt fra "Bekreft"-knappen ved
+    // skiltet, men Neste gjør det samme hvis brukeren hoppet over den. Vi blir
+    // stående her så brukeren ser bekreftelsesmeldingen (eller feilen) under
+    // skiltet før de går videre. Tomt skilt faller gjennom til
+    // field-groupens egen validering.
+    const onRegisteredVehicleStep =
+      groups.some((g) => g.key === "vehicle-registration") && vehicleRegistered;
+    if (onRegisteredVehicleStep && !vehicleLookupResult && vehicleRegNrInput.trim()) {
       await runVehicleLookup(vehicleRegNrInput);
       return "busy";
     }
@@ -1249,6 +1228,17 @@ function NewListingPage() {
         setValidationError(result.message);
         return "blocked";
       }
+    }
+    // Oppslaget skrives inn i attributes først her, når brukeren går videre.
+    // Går brukeren tilbake hit etter det, beholdes oppslaget og Neste går rett
+    // videre — ellers ville SVV-verdiene overskrevet rettelser gjort senere.
+    if (
+      onRegisteredVehicleStep &&
+      vehicleLookupResult &&
+      attributes.registration_number !== vehicleLookupResult.registrationNumber
+    ) {
+      confirmVehicleData(categoryId, vehicleGroup ?? "bil");
+      return "advanced";
     }
     if (returnToReviewRef.current && step === reviewSectionLastStepRef.current) {
       setReviewJumpRequested(true);

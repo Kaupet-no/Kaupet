@@ -185,7 +185,8 @@ describe("useVehicleLookupFlow", () => {
     const { result } = renderHook(() =>
       useVehicleLookupFlow(
         makeParams({
-          attributes: { existing_key: "kept" },
+          // Merke/modell gjettet fra tittelen skal vike for SVV.
+          attributes: { existing_key: "kept", brand: "Porsche", model: "911" },
           setAttributes,
           setCategoryTouchedManually,
           setSelectedParentId,

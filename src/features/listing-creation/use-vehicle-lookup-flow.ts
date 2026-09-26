@@ -162,9 +162,10 @@ export function useVehicleLookupFlow(params: {
     }
   }
 
-  /** Skriver rå SVV-data til attributes etter at brukeren har kontrollert
-   * merke/modell i vehicle-registration-popupen. Eksisterende korreksjoner
-   * vinner; ellers brukes oppslagsverdiene uten en ekstra registreringsrunde.
+  /** Skriver rå SVV-data til attributes når brukeren går videre fra
+   * vehicle-registration. Merke/modell fra SVV vinner over tittelforslaget
+   * når oppslaget har begge; mangler ett av dem, fyller brukeren dem inn på
+   * siden, og de verdiene beholdes.
    * `categoryGroup` avgjør hvilken merke-/modelltabell et ukjent merke/modell
    * (fra SVV) foreslås inn i — se proposeUnknownVehicle over. */
   function confirmVehicleData(leafCategoryId: string, categoryGroup: VehicleBrandGroup) {
@@ -177,10 +178,8 @@ export function useVehicleLookupFlow(params: {
       registration_number: lookup.registrationNumber,
       vehicle_lookup: JSON.stringify(lookup),
     };
-    if (!(typeof next.brand === "string" && next.brand.trim()) && lookup.brand) {
+    if (lookup.brand && lookup.model) {
       next.brand = lookup.brand;
-    }
-    if (!(typeof next.model === "string" && next.model.trim()) && lookup.model) {
       next.model = lookup.model;
     }
     if (lookup.year) next.year = lookup.year;
@@ -251,10 +250,9 @@ export function useVehicleLookupFlow(params: {
     setVehiclePreviousClassificationMismatch(null);
   }
 
-  /** Clears the lookup so the reg-nr field is editable again and pressing
-   * "Neste" re-runs the lookup — used both when stepping back from a later
-   * page to vehicle-registration, and when the user answers "Nei" to the
-   * reg-nr confirmation popup shown right after a successful lookup. */
+  /** Clears the lookup so "Bekreft"/"Neste" re-runs it — used when the user
+   * edits the registration number after a lookup, which makes the old
+   * result (and the subcategory picked from it) stale. */
   function resetLookupOnReturnToRegistration() {
     setVehicleLookupResult(null);
     setVehicleClassification(null);

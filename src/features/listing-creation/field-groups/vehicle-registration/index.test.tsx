@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CategoryFilter } from "@/lib/category-filters";
@@ -78,6 +78,8 @@ function props(overrides: Partial<WizardSharedProps>): WizardSharedProps {
     vehicleLookupResult: null,
     vehicleClassification: null,
     vehiclePreviousClassificationMismatch: null,
+    runVehicleLookup: vi.fn(),
+    setValue: vi.fn(),
     confirmVehicleData: vi.fn(),
     resetLookupOnReturnToRegistration: vi.fn(),
     ...overrides,
@@ -108,30 +110,66 @@ function requiredTextFilter(key: string): CategoryFilter {
 }
 
 describe("VehicleRegistration", () => {
-  it("viser registrert bil som solo oppslag og samler SVV-fakta med korreksjonen", () => {
-    const { rerender } = render(<VehicleRegistration {...props({})} />);
+  it("slår opp skiltet med Bekreft og viser kjøretøyet i en melding under skiltet", () => {
+    const runVehicleLookup = vi.fn();
+    const { rerender } = render(
+      <VehicleRegistration {...props({ vehicleRegNrInput: "EK12345", runVehicleLookup })} />,
+    );
 
-    expect(screen.getByLabelText(/Registreringsnummer/)).toBeTruthy();
-    expect(screen.queryByText(/^Merke:/)).toBeNull();
-    expect(screen.queryByText(/^Modell:/)).toBeNull();
-    expect(screen.queryByTestId("attribute-fields")).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Underkategori" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Bekreft" }));
+    expect(runVehicleLookup).toHaveBeenCalledWith("EK12345");
 
     rerender(
       <VehicleRegistration
         {...props({
+          vehicleRegNrInput: "EK12345",
           vehicleLookupResult: lookup,
           vehicleClassification: { slug: "bil", confidence: "high" },
         })}
       />,
     );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Dette registreringsnummeret tilhører en 2020 blå Toyota Corolla. Annonsen blir opprettet i underkategori Bil.",
+    );
+    expect(screen.queryByLabelText(/Kjøretøyet er ikke registrert/)).toBeNull();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByText(/^Merke:/)).toBeNull();
 
-    expect(screen.getByText("Merke: Toyota")).toBeTruthy();
-    expect(screen.getByText("Modell: Corolla")).toBeTruthy();
-    expect(screen.getByText("Kjøretøydata fra Statens vegvesen")).toBeTruthy();
-    expect(
-      screen.getByText(/Hvis registreringsnummeret eller underkategorien er feil/),
-    ).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Ja" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole("radiogroup", { name: "Underkategori" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Endre underkategori" }));
+    expect(screen.getByRole("radiogroup", { name: "Underkategori" })).toBeTruthy();
+  });
+
+  it("setter tittelen fra SVV-oppslaget", () => {
+    const setValue = vi.fn();
+    render(<VehicleRegistration {...props({ vehicleLookupResult: lookup, setValue })} />);
+
+    expect(setValue).toHaveBeenCalledWith("title", "2020 Toyota Corolla", {
+      shouldValidate: true,
+    });
+  });
+
+  it("ber om merke og modell når oppslaget mangler dem", () => {
+    render(
+      <VehicleRegistration
+        {...props({ vehicleLookupResult: { ...lookup!, brand: null, model: null } })}
+      />,
+    );
+
+    expect(screen.getByText(/^Merke:/)).toBeTruthy();
+    expect(screen.getByText(/^Modell:/)).toBeTruthy();
+    expect(screen.queryAllByTestId("attribute-fields")).toHaveLength(0);
+  });
+
+  it("deaktiverer skilt og Bekreft og viser underkategorien for uregistrerte kjøretøy", () => {
+    render(<VehicleRegistration {...props({ vehicleRegistered: false })} />);
+
+    expect((screen.getByLabelText(/Registreringsnummer/) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Bekreft" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole("radiogroup", { name: "Underkategori" })).toBeTruthy();
   });
 
   it("viser registreringsfrie kjøretøy med kun grunnfakta åpen først", () => {
@@ -152,7 +190,7 @@ describe("VehicleRegistration", () => {
     expect(fields.every((field) => field.dataset.required === "true")).toBe(true);
     expect(screen.getByText("Merke: tomt")).toBeTruthy();
     expect(screen.getByText("Modell: tomt")).toBeTruthy();
-    expect(screen.queryByLabelText("Registreringsnummer")).toBeNull();
+    expect((screen.getByLabelText("Registreringsnummer") as HTMLInputElement).disabled).toBe(true);
   });
 
   it("åpner seksjoner med tomme påkrevde felt før brukeren har forsøkt å gå videre", () => {

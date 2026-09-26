@@ -44,15 +44,11 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await wizardStep(page, "vehicle-registration").waitFor();
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
   await page.locator("#vehicle-reg-nr").fill(TEST_REGISTRATION);
-  await clickNextAndWaitFor(
-    page,
-    page.getByRole("heading", { name: /Registreringsnummer AB 12345/ }),
-    testInfo,
-  );
-  const confirmation = page.getByRole("alertdialog");
-  await expect(confirmation).toContainText("Volvo XC60");
-  await confirmation.getByRole("button", { name: "Ja" }).click();
-  await wizardStep(page, "photos").waitFor();
+  await page.getByRole("button", { name: "Bekreft" }).click();
+  await expect(
+    wizardStep(page, "vehicle-registration").getByText(/tilhører en .*Volvo XC60/),
+  ).toBeVisible();
+  await clickNextAndWaitFor(page, wizardStep(page, "photos"), testInfo);
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
 
   // Vehicle photos are optional in this deterministic fixture. Confirm the

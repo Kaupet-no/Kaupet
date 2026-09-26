@@ -55,6 +55,11 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
 
+  // FAB-en er kun forstørret i bunnpillen på telefon; i railen er den like
+  // stor som de andre knappene.
+  const fabSize = rail ? "h-12 w-12" : "h-16 w-16 shadow-lg ring-4 ring-background";
+  const fabIcon = rail ? "size-6" : "size-8";
+
   const itemClass = rail
     ? "flex flex-col items-center gap-0.5"
     : "flex flex-1 flex-col items-center gap-0.5";
@@ -140,8 +145,8 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           {authLoading ? (
             <AuthPendingButton
               label="Ny annonse"
-              className="h-16 w-16 bg-primary text-primary-foreground shadow-lg ring-4 ring-background"
-              iconClassName="size-8"
+              className={cn("bg-primary text-primary-foreground", fabSize)}
+              iconClassName={fabIcon}
             />
           ) : (
             // Åpner intensjon+tittel-velgeren for både innloggede og
@@ -159,12 +164,18 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
                   setAdPickerOpen((o) => !o);
                 }
               }}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
+              className={cn(
+                "flex items-center justify-center rounded-full bg-primary text-primary-foreground transition active:scale-95",
+                fabSize,
+              )}
             >
               {isOnNewAdPage || (native && adPickerOpen) ? (
-                <X key="x" className="size-8 animate-[fab-icon-in_0.18s_ease-out]" />
+                <X key="x" className={cn(fabIcon, "animate-[fab-icon-in_0.18s_ease-out]")} />
               ) : (
-                <Plus key="plus" className="size-8 animate-[fab-icon-in-reverse_0.18s_ease-out]" />
+                <Plus
+                  key="plus"
+                  className={cn(fabIcon, "animate-[fab-icon-in-reverse_0.18s_ease-out]")}
+                />
               )}
             </button>
           )}

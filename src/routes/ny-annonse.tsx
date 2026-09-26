@@ -1143,14 +1143,21 @@ function NewListingPage() {
     // uten å ha trykket forslagschipen eksplisitt — chippen er en tydelig
     // handling (UI-guiden), ikke en skjult overskriving, men å måtte trykke
     // "Riktig" før "Neste" i tillegg ville vært dobbeltarbeid når forslaget
-    // uansett er det eneste feltet peker mot.
+    // uansett er det eneste feltet peker mot. Bildeforslaget vinner, slik
+    // som i chippen (CategoryAttributes' mergedSuggestions).
+    const photoTop = photoSuggestion.categorySuggestions[0];
     if (
       groups.some((g) => g.key === "category-attributes") &&
       !categoryId &&
-      categorySuggestions.length > 0 &&
       !categoryTouchedManually
     ) {
-      applySuggestedCategory(categorySuggestions[0].category_id);
+      if (photoTop) {
+        setSelectedParentId(photoTop.parent_id ?? photoTop.category_id);
+        setValue("category_id", photoTop.category_id, { shouldValidate: true });
+        setCategoryTouchedManually(true);
+      } else if (categorySuggestions.length > 0) {
+        applySuggestedCategory(categorySuggestions[0].category_id);
+      }
     }
 
     // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring

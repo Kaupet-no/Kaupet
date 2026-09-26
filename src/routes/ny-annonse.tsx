@@ -1060,7 +1060,7 @@ function NewListingPage() {
     });
   }
 
-  // Utkasttilbudet ("Lagret utkast: ... / Fortsett / Start ny") skal vises
+  // Utkasttilbudet ("Du har et tidligere utkast: ... / Fortsett / Forkast") skal vises
   // ÉN gang, ved start — ikke henge igjen på hvert steg. Så snart brukeren
   // begynner å redigere (et felt blir "dirty") eller går videre til neste
   // steg uten å ta et aktivt valg, forsvinner tilbudet for resten av
@@ -1080,8 +1080,8 @@ function NewListingPage() {
     if (isDirty || step > 1) dismissDraftOffer();
   }, [hasDraftData, draftId, isDirty, step, dismissDraftOffer]);
 
-  // Utkast som bare finnes lokalt: brukeren må aktivt velge Fortsett/Start
-  // ny før hen forlater steg 1 — se blokkeringen i goToNextPage.
+  // Utkast som bare finnes lokalt: brukeren må aktivt velge Fortsett/Forkast
+  // før hen forlater steg 1 — se blokkeringen i goToNextPage.
   const draftDecisionRequired = !!hasDraftData && !draftId;
   const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
   const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1967,14 +1967,14 @@ function NewListingPage() {
                       </>
                     ) : (
                       <>
-                        Lagret utkast: <strong>{restorableDraftTitle}</strong>
+                        Du har et tidligere utkast: <strong>{restorableDraftTitle}</strong>
                       </>
                     )}
                   </p>
                   {draftDecisionPrompt && (
                     <p role="alert" aria-live="assertive" className="mt-1 text-destructive">
-                      Utkastet finnes bare på denne enheten. Velg «Fortsett utkastet» eller «Start
-                      ny annonse» før du går videre, så det ikke går tapt.
+                      Utkastet finnes bare på denne enheten. Velg «Fortsett utkastet» eller «Forkast
+                      utkastet» før du går videre, så det ikke går tapt.
                     </p>
                   )}
                 </div>
@@ -1996,7 +1996,7 @@ function NewListingPage() {
                     className="native-touch-target"
                     onClick={() => setDraftDiscardConfirmOpen(true)}
                   >
-                    Start ny annonse
+                    Forkast utkastet
                   </Button>
                 </div>
               </div>
@@ -2234,19 +2234,19 @@ function NewListingPage() {
       <AlertDialog open={draftDiscardConfirmOpen} onOpenChange={setDraftDiscardConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Starte ny annonse?</AlertDialogTitle>
+            <AlertDialogTitle>Forkaste utkastet?</AlertDialogTitle>
             <AlertDialogDescription>
               Det lagrede utkastet slettes fra denne enheten og serveren. Informasjonen du allerede
               har skrevet i denne annonsen beholdes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Fortsett utkastet</AlertDialogCancel>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => void startNewListing()}
             >
-              Start ny annonse
+              Forkast utkastet
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

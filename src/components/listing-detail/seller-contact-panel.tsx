@@ -151,7 +151,7 @@ export function SellerContactPanel({
           ) : seller?.kind === "business" ? (
             hideBusinessIdentity ? (
               <>
-                <p className="font-medium">Denne selges av en bedrift</p>
+                <p className="font-medium">Selges av en bedrift</p>
                 {seller.visitingAddress && (
                   <p className="text-xs text-muted-foreground">
                     Besøksadresse: {seller.visitingAddress}

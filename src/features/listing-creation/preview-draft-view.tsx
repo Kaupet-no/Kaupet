@@ -1,12 +1,20 @@
-import { useState } from "react";
-import { Monitor, Smartphone, UserRound } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Building2, Monitor, Smartphone, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
 import type { ListingDetailViewProps } from "@/components/listing-detail/listing-detail-view";
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
+import { hasEffectiveProffAccess } from "@/features/business-account/plans";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { organizationLogoUrl } from "@/lib/organization-logo-url";
+import { formatOrganizationNumber } from "@/lib/organization-number";
 import { cn } from "@/lib/utils";
 
 function draftDetailProps(draft: PreviewDraft) {
@@ -44,36 +52,117 @@ const disabledContact = (
   </Button>
 );
 
-/** Selgeren er generisk i utkastet, så visningen ikke avhenger av profilen,
- * og kontaktknappen er deaktivert — dette er en visning, ikke en annonse. */
-const genericSeller = (
-  <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-    <div className="flex items-center gap-3">
+/**
+ * Selgeren slik kjøperne vil se den: bedriften (med Proff-profilering når
+ * avtalen er aktiv, som på `$kaupetCode.tsx`) hvis brukeren er medlem av en,
+ * ellers egen profil — og bare «Selger» for den som ikke er innlogget.
+ * Kontaktknappen er deaktivert — dette er en visning, ikke en annonse.
+ */
+function usePreviewSeller(): {
+  sellerContactSlot: ReactNode;
+  organizationBrand?: ListingOrganizationBrand;
+} {
+  const { user } = useAuth();
+  const { data: membership } = useBusinessMembership();
+  const { data: profile } = useQuery({
+    queryKey: ["profile-seller-preview", user?.id],
+    enabled: !!user && membership === null,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url, created_at")
+        .eq("id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const organization = membership?.organization;
+  const organizationBrand: ListingOrganizationBrand | undefined =
+    organization && hasEffectiveProffAccess(organization)
+      ? {
+          id: organization.id,
+          displayName: organization.display_name,
+          organizationNumber: organization.organization_number,
+          logoUrl: organizationLogoUrl(organization.logo_path),
+          websiteUrl: organization.website_url,
+          palette: organization.brand_palette,
+          concept: organization.listing_concept,
+          font: organization.listing_font,
+          overtitle: organization.listing_overtitle,
+        }
+      : undefined;
+
+  const avatar =
+    !organization && profile?.avatar_url ? (
+      <img src={profile.avatar_url} alt="" className="size-10 rounded-full object-cover" />
+    ) : (
       <span className="grid size-10 place-items-center rounded-full bg-muted text-muted-foreground">
-        <UserRound className="size-5" aria-hidden />
+        {organization ? (
+          <Building2 className="size-5" aria-hidden />
+        ) : (
+          <UserRound className="size-5" aria-hidden />
+        )}
       </span>
-      <div>
-        <p className="font-medium">Selger</p>
-        <p className="text-sm text-muted-foreground">Privatperson</p>
+    );
+
+  const identity = organization ? (
+    organizationBrand ? (
+      // Den profilerte Proff-blokken eier allerede bedriftsidentiteten.
+      <p className="font-medium">Selges av en bedrift</p>
+    ) : (
+      <>
+        <p className="font-medium">{organization.display_name}</p>
+        <p className="text-sm text-muted-foreground">
+          Bedrift · Org.nr. {formatOrganizationNumber(organization.organization_number)}
+        </p>
+      </>
+    )
+  ) : (
+    <>
+      <p className="font-medium">{(user && profile?.display_name) || "Selger"}</p>
+      <p className="text-sm text-muted-foreground">Privatperson</p>
+      {user && profile?.created_at && (
+        <p className="text-xs text-muted-foreground">
+          Medlem siden{" "}
+          {new Date(profile.created_at).toLocaleDateString("nb-NO", {
+            month: "long",
+            year: "numeric",
+          })}
+        </p>
+      )}
+    </>
+  );
+
+  return {
+    organizationBrand,
+    sellerContactSlot: (
+      <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center gap-3">
+          {!organizationBrand && avatar}
+          <div>{identity}</div>
+        </div>
+        <Button type="button" className="w-full" disabled>
+          {organization ? "Send melding til bedriften" : "Send melding"}
+        </Button>
       </div>
-    </div>
-    <Button type="button" className="w-full" disabled>
-      Send melding
-    </Button>
-  </div>
-);
+    ),
+  };
+}
 
 /**
  * Hele annonsesiden slik en kjøper på mobil ser den, for telefonrammen ved
  * siden av skjemaet i annonseflyten (se ListingComposerShell sin `preview`).
  */
 export function PhoneListingPreview({ draft }: { draft: PreviewDraft }) {
+  const seller = usePreviewSeller();
   return (
     <ListingDetailView
       {...draftDetailProps(draft)}
       phonePreview
       stickyContactSlot={disabledContact}
-      sellerContactSlot={genericSeller}
+      {...seller}
     />
   );
 }
@@ -100,6 +189,7 @@ export function EditableListingReview({
 }) {
   const wide = useMediaQuery("(min-width: 1024px)") && !native;
   const [layout, setLayout] = useState<"desktop" | "mobile">("desktop");
+  const seller = usePreviewSeller();
   const framed = wide && layout === "mobile";
   const view = (
     <ListingDetailView
@@ -107,7 +197,7 @@ export function EditableListingReview({
       phonePreview={!wide || framed}
       editMode={{ context: editContext }}
       stickyContactSlot={framed ? disabledContact : undefined}
-      sellerContactSlot={genericSeller}
+      {...seller}
     />
   );
 

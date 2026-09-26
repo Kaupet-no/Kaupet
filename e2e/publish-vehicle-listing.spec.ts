@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 import {
   clickNextAndWaitFor,
-  fixMissingInformation,
   goToNewListing,
   listingStrengthIndicator,
   login,
@@ -66,11 +65,7 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await page.getByRole("radio", { name: "Bruktbil" }).click();
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).check();
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-price"), testInfo);
-  const indicator = listingStrengthIndicator(page);
-  await indicator.waitFor();
-  await expect(indicator.getByRole("button", { name: "Pris", exact: true })).toBeVisible();
-  await fixMissingInformation(page, "Pris");
-  await expect(page.locator("#price_nok")).toBeFocused();
+  await expect(listingStrengthIndicator(page)).toHaveCount(0);
   await page.locator("#price_nok").fill("349000");
   // Delivery, location and review/publish share the final vehicle page.
   await clickNextAndWaitFor(page, wizardStep(page, "location"), testInfo);

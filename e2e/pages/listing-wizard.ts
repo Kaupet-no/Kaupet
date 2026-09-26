@@ -60,11 +60,6 @@ export function listingStrengthIndicator(page: Page) {
   return page.getByTestId("listing-strength");
 }
 
-/** Klikker lenken for et manglende felt direkte i indikatoren — ingen egen
- * dialog lenger, lenkene ligger inline under "X opplysninger må fylles ut". */
-export async function fixMissingInformation(page: Page, label: string) {
-  await listingStrengthIndicator(page).getByRole("button", { name: label }).click();
-}
 /**
  * Clicks `trigger` and waits for `expected` to appear. Retries the click a
  * bounded number of times if `expected` doesn't show up in time — clicks in

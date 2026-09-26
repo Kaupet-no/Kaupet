@@ -644,6 +644,11 @@ function NewListingPage() {
     isFirst,
     isLast,
   } = useListingSteps(pages);
+  // Lengste steg brukeren har nådd. Stegraden viser bare mangler fra steg
+  // brukeren allerede har gått forbi — felt man ennå ikke har sett skal ikke
+  // meldes som feil (flyten guider dit selv).
+  const [furthestStep, setFurthestStep] = useState(step);
+  if (step > furthestStep) setFurthestStep(step);
   // Intentionally kept fresh every render (not in an effect) since
   // useVehicleLookupFlow's goNext callback, constructed above
   // `pages`/`goNext`, must see the latest function the moment it's called,
@@ -967,6 +972,12 @@ function NewListingPage() {
     }
   }
   const sortedPublishingRequirements = sortComposerRequirements(pages, publishingRequirements);
+  const passedPublishingRequirements = sortedPublishingRequirements.filter((requirement) => {
+    const pageIndex = pages.findIndex((page) =>
+      page.groups.some((group) => group.key === requirement.targetGroupKey),
+    );
+    return pageIndex >= 0 && pageIndex + 1 < furthestStep;
+  });
 
   const shouldBlockNav =
     publishedId === null &&
@@ -2059,12 +2070,17 @@ function NewListingPage() {
           previewSection={groups.map((g) => PREVIEW_SECTION_BY_GROUP_KEY[g.key]).find(Boolean)}
           // Antallet mangler avhenger av kategorien — før den er valgt ville
           // tallet vært en gjetning som hopper så snart kategorien settes.
+          // Mangler på steg brukeren ikke har kommet til ennå vises ikke.
           strength={
-            !native && !isReviewPage && categoryId ? (
+            !native &&
+            !isReviewPage &&
+            categoryId &&
+            (passedPublishingRequirements.length > 0 ||
+              sortedPublishingRequirements.length === 0) ? (
               <div data-testid="listing-strength">
                 <ListingStrengthIndicator
                   inline
-                  required={sortedPublishingRequirements}
+                  required={passedPublishingRequirements}
                   improvements={desktopImprovements}
                 />
               </div>

@@ -11,7 +11,6 @@ import {
   chooseCategory,
   clickNextAndWaitFor,
   fillDescriptionAndAdvance,
-  fixMissingInformation,
   goToNewListing,
   listingStrengthIndicator,
   login,
@@ -78,7 +77,7 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   await publishAndExpectSuccess(page, testInfo);
 });
 
-test("viser manglende opplysninger med snarvei til feltet", async ({ page }, testInfo) => {
+test("maser ikke om felt brukeren ikke har kommet til ennå", async ({ page }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop-web",
     "Annonsestyrke-indikatoren ligger i desktop-sidepanelet",
@@ -88,20 +87,11 @@ test("viser manglende opplysninger med snarvei til feltet", async ({ page }, tes
 
   await login(page, credentials.email, credentials.password);
   await goToNewListing(page);
-  // Indikatoren rendres bak `categoryId &&` (ui-gjennomgangen, W2): antallet
-  // manglende opplysninger avhenger av kategorien, så den finnes ikke før en
-  // kategori er valgt. Tittelen fylles derfor på photos-steget i stedet for
-  // via ?title=, slik at den ikke teller som en mangel her.
   await chooseCategory(page, TEST_CATEGORY_NAME);
   await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E statusannonse");
-  const indicator = listingStrengthIndicator(page);
-  await indicator.waitFor();
-
-  await expect(indicator).toContainText(/opplysninger? må fylles ut/);
-  await expect(indicator.getByRole("button", { name: "Beskrivelse", exact: true })).toBeVisible();
-  await expect(indicator.getByRole("button", { name: "Pris", exact: true })).toBeVisible();
-
-  await fixMissingInformation(page, "Beskrivelse");
-  await expect(page.getByTestId("listing-description-textarea")).toBeFocused();
+  // Beskrivelse og Pris ligger på senere steg — de skal ikke meldes som
+  // mangler før brukeren har vært der (flyten guider dit selv).
+  await expect(page.getByText(/opplysninger? må fylles ut/)).toHaveCount(0);
+  await expect(listingStrengthIndicator(page)).toHaveCount(0);
 });

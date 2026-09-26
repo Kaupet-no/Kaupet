@@ -358,10 +358,12 @@ export function ListingDetailView({
       : null;
   /** Når kjøper betaler avgiften er totalprisen satt sammen av to beløp, og
    * begge fortjener sin egen linje i priskortet — en sammensatt setning
-   * tvinger leseren til å regne selv. */
-  const avgiftBreakdown = buyerPaysAvgift
-    ? { sellerPriceKr: priceNok ?? 0, avgiftKr: omregistreringsavgiftKr! }
-    : null;
+   * tvinger leseren til å regne selv. Uten pris (ikke satt ennå i
+   * annonseflyten) er det ingenting å summere, og «0 kr» ville vært feil. */
+  const avgiftBreakdown =
+    buyerPaysAvgift && priceNok != null
+      ? { sellerPriceKr: priceNok, avgiftKr: omregistreringsavgiftKr! }
+      : null;
 
   const totalPriceKr =
     isVehicleListing && priceNok != null

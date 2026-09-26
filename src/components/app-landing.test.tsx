@@ -20,6 +20,15 @@ vi.mock("@tanstack/react-query", () => ({
     refetch: queryMocks.refetch,
   }),
 }));
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+vi.mock("@/components/listing-card", () => ({ ListingCard: () => null }));
+vi.mock("@/components/new-listing-dialog", () => ({ NewListingDialog: () => null }));
 vi.mock("@/hooks/use-form-factor", () => ({
   useFormFactor: () => "phone",
   useIsDesktop: () => false,
@@ -63,5 +72,15 @@ describe("AppLanding", () => {
     render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Prøv igjen" })).toBeTruthy();
+  });
+
+  it("avslutter den vertikale listen med en lenke til alle annonser", () => {
+    queryMocks.data = [{ listing_id: "a", title: "Sykkel", views_last_week: 0 }];
+
+    render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+
+    expect(screen.getByRole("link", { name: "Vis alle annonser" }).getAttribute("href")).toBe(
+      "/annonser",
+    );
   });
 });

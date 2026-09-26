@@ -78,6 +78,7 @@ export function ListingComposerShell({
   const focusFrameRef = useRef<number | null>(null);
   const previousPageRef = useRef(pageKey);
   const previewFrameRef = useRef<HTMLDivElement>(null);
+  const lastEditAtRef = useRef(0);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dismissedValidationAttempt, setDismissedValidationAttempt] = useState(0);
   const showValidationFeedback =
@@ -134,19 +135,37 @@ export function ListingComposerShell({
   // redigerer. Rammen er display:none under 1100 px — da er alle mål 0 og
   // scrollTo gjør ingenting.
   useEffect(() => {
+    lastEditAtRef.current = 0;
     const frame = previewFrameRef.current;
     if (!frame || !previewSection) return;
     const target = frame.querySelector<HTMLElement>(`[data-preview-section="${previewSection}"]`);
-    if (!target) return;
-    frame.scrollTo({
-      top:
-        target.getBoundingClientRect().top -
-        frame.getBoundingClientRect().top +
-        frame.scrollTop -
-        16,
-      behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-    });
+    if (target) scrollPreviewFrame(frame, target, "start");
   }, [previewSection, pageKey]);
+
+  // Et steg kan redigere flere deler av annonsen (f.eks. pris og frakt), så
+  // rammen følger det som faktisk endres i forhåndsvisningen rett etter at
+  // brukeren har redigert skjemaet — ikke bare delen steget starter på.
+  useEffect(() => {
+    const frame = previewFrameRef.current;
+    if (!frame) return;
+    const observer = new MutationObserver((records) => {
+      if (performance.now() - lastEditAtRef.current > 1000) return;
+      for (const record of records) {
+        const node = record.addedNodes[0] ?? record.target;
+        const target = node instanceof HTMLElement ? node : node.parentElement;
+        // Bunnlinjen (pris + «Send melding») står alltid synlig.
+        if (!target || !frame.contains(target) || target.closest("[data-preview-sticky-bottom]"))
+          continue;
+        const rect = target.getBoundingClientRect();
+        // Skjult (rammen under 1100 px, eller en skjult del av annonsen).
+        if (rect.width === 0 && rect.height === 0) continue;
+        scrollPreviewFrame(frame, target, "nearest");
+        return;
+      }
+    });
+    observer.observe(frame, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [showPreview]);
 
   useEffect(() => {
     if (!native || validationAttempt === 0) return;
@@ -306,7 +325,14 @@ export function ListingComposerShell({
             onAnimationEndCapture={() => {
               setDismissedValidationAttempt(validationAttempt);
             }}
-            onInputCapture={() => setDismissedValidationAttempt(validationAttempt)}
+            onInputCapture={() => {
+              setDismissedValidationAttempt(validationAttempt);
+              lastEditAtRef.current = performance.now();
+            }}
+            // Valg som ikke gir input-hendelser (chips, Radix Select — også i
+            // portaler, som React-hendelser bobler gjennom).
+            onPointerDownCapture={() => (lastEditAtRef.current = performance.now())}
+            onKeyDownCapture={() => (lastEditAtRef.current = performance.now())}
           >
             <h2 ref={pageHeadingRef} tabIndex={-1} className="sr-only">
               {pageTitle}
@@ -365,6 +391,31 @@ export function ListingComposerShell({
       </div>
     </div>
   );
+}
+
+/**
+ * Scroller telefonrammen til `target` uten å røre siden (scrollIntoView ville
+ * også scrollet vinduet). `nearest` lar rammen stå når elementet allerede
+ * vises helt, og bunnjusterer elementer under synsfeltet som får plass — over
+ * den faste bunnlinjen, ikke bak den.
+ */
+function scrollPreviewFrame(frame: HTMLElement, target: HTMLElement, block: "start" | "nearest") {
+  const margin = 16;
+  const frameRect = frame.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  // Den faste bunnlinjen dekker bunnen av rammen — det synlige området slutter over den.
+  const stickyBottom = frame.querySelector<HTMLElement>("[data-preview-sticky-bottom]");
+  const visibleBottom = frameRect.bottom - (stickyBottom?.offsetHeight ?? 0);
+  let delta = rect.top - frameRect.top - margin;
+  if (block === "nearest") {
+    if (rect.top >= frameRect.top && rect.bottom <= visibleBottom) return;
+    if (rect.top > frameRect.top && rect.height + 2 * margin <= visibleBottom - frameRect.top)
+      delta = rect.bottom - visibleBottom + margin;
+  }
+  frame.scrollTo({
+    top: frame.scrollTop + delta,
+    behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+  });
 }
 
 /**

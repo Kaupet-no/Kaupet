@@ -202,6 +202,79 @@ describe("ListingComposerShell", () => {
     }
   });
 
+  it("scroller telefonrammen til delen som endres når brukeren redigerer skjemaet", async () => {
+    const scrollTo = vi.fn();
+    const original = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = scrollTo;
+    try {
+      const { container } = renderShell({
+        native: false,
+        preview: (
+          <>
+            <p data-preview-section="price">1 800 kr</p>
+            <p data-testid="shipping">Frakt: 99 kr</p>
+          </>
+        ),
+        previewSection: "price",
+      });
+      const shipping = screen.getByTestId("shipping");
+      shipping.getBoundingClientRect = () =>
+        ({ top: 900, bottom: 920, width: 200, height: 20 }) as DOMRect;
+      scrollTo.mockClear();
+
+      // Endringer i forhåndsvisningen uten redigering (f.eks. bilder som lastes) flytter ikke rammen.
+      shipping.textContent = "Frakt: 129 kr";
+      await Promise.resolve();
+      expect(scrollTo).not.toHaveBeenCalled();
+
+      fireEvent.input(container.querySelector('[data-testid="composer-page-title"]')!);
+      shipping.textContent = "Frakt: 149 kr";
+      await waitFor(() => expect(scrollTo).toHaveBeenCalledOnce());
+    } finally {
+      HTMLElement.prototype.scrollTo = original;
+    }
+  });
+
+  it("scroller endrede felt fram over den faste bunnlinjen, ikke bak den", async () => {
+    const scrollTo = vi.fn();
+    const original = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = scrollTo;
+    try {
+      const { container } = renderShell({
+        native: false,
+        preview: (
+          <>
+            <p data-testid="location">Oslo</p>
+            <div data-preview-sticky-bottom>1 800 kr</div>
+          </>
+        ),
+      });
+      const frame = container.querySelector<HTMLElement>("[data-phone-frame] > div")!;
+      frame.getBoundingClientRect = () => ({ top: 0, bottom: 600, height: 600 }) as DOMRect;
+      const sticky = container.querySelector<HTMLElement>("[data-preview-sticky-bottom]")!;
+      Object.defineProperty(sticky, "offsetHeight", { value: 60 });
+      // Innenfor rammen, men bak bunnlinjen (540–600).
+      const location = screen.getByTestId("location");
+      location.getBoundingClientRect = () =>
+        ({ top: 560, bottom: 580, width: 200, height: 20 }) as DOMRect;
+
+      fireEvent.input(container.querySelector('[data-testid="composer-page-title"]')!);
+      location.textContent = "Bergen";
+      await waitFor(() => expect(scrollTo).toHaveBeenCalledOnce());
+      // 580 − (600 − 60) + 16
+      expect(scrollTo.mock.calls[0][0]).toMatchObject({ top: 56 });
+
+      // Prisen i bunnlinjen er alltid synlig og flytter ikke rammen.
+      scrollTo.mockClear();
+      fireEvent.input(container.querySelector('[data-testid="composer-page-title"]')!);
+      sticky.textContent = "1 900 kr";
+      await Promise.resolve();
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      HTMLElement.prototype.scrollTo = original;
+    }
+  });
+
   it("utelater forhåndsvisning og annonsestyrke i native og beholder én kolonne", () => {
     const { container } = renderShell({
       native: true,

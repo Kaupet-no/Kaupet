@@ -170,7 +170,8 @@ export function CategoryConfirm({
               applyCategorySuggestion(suggestion.category_id);
             }}
           >
-            {isVehicleSuggestion ? bilOgMcName : suggestionLabel(suggestion)}
+            {primaryButtons.length > 1 ? "Bruk" : "Ja, bruk"} «
+            {isVehicleSuggestion ? bilOgMcName : suggestionLabel(suggestion)}»
           </Button>
         ))}
         <Button type="button" variant="outline" onClick={() => setShowPicker(true)}>

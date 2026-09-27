@@ -37,6 +37,7 @@ import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as BedriftOrganizationIdRouteImport } from './routes/bedrift.$organizationId'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as OkIdRouteImport } from './routes/ok.$id'
+import { Route as VilkarBedriftRouteImport } from './routes/vilkar_.bedrift'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminBedrifterRouteImport } from './routes/_authenticated/admin/bedrifter'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
@@ -209,6 +210,11 @@ const BrukerIdRoute = BrukerIdRouteImport.update({
 const OkIdRoute = OkIdRouteImport.update({
   id: '/ok/$id',
   path: '/ok/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VilkarBedriftRoute = VilkarBedriftRouteImport.update({
+  id: '/vilkar_/bedrift',
+  path: '/vilkar/bedrift',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
@@ -425,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/ok/$id': typeof OkIdRoute
+  '/vilkar/bedrift': typeof VilkarBedriftRoute
   '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -485,6 +492,7 @@ export interface FileRoutesByTo {
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/ok/$id': typeof OkIdRoute
+  '/vilkar/bedrift': typeof VilkarBedriftRoute
   '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -549,6 +557,7 @@ export interface FileRoutesById {
   '/bedrift/$organizationId': typeof BedriftOrganizationIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/ok/$id': typeof OkIdRoute
+  '/vilkar_/bedrift': typeof VilkarBedriftRoute
   '/_authenticated/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -613,6 +622,7 @@ export interface FileRouteTypes {
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/ok/$id'
+    | '/vilkar/bedrift'
     | '/admin/bedrifter'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -673,6 +683,7 @@ export interface FileRouteTypes {
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/ok/$id'
+    | '/vilkar/bedrift'
     | '/admin/bedrifter'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -736,6 +747,7 @@ export interface FileRouteTypes {
     | '/bedrift/$organizationId'
     | '/bruker/$id'
     | '/ok/$id'
+    | '/vilkar_/bedrift'
     | '/_authenticated/admin/bedrifter'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
@@ -793,6 +805,7 @@ export interface RootRouteChildren {
   BedriftOrganizationIdRoute: typeof BedriftOrganizationIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   OkIdRoute: typeof OkIdRoute
+  VilkarBedriftRoute: typeof VilkarBedriftRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
   ApiV1LocationsRoute: typeof ApiV1LocationsRoute
   ApiV1OpenapiDotjsonRoute: typeof ApiV1OpenapiDotjsonRoute
@@ -1007,6 +1020,13 @@ declare module '@tanstack/react-router' {
       path: '/ok/$id'
       fullPath: '/ok/$id'
       preLoaderRoute: typeof OkIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vilkar_/bedrift': {
+      id: '/vilkar_/bedrift'
+      path: '/vilkar/bedrift'
+      fullPath: '/vilkar/bedrift'
+      preLoaderRoute: typeof VilkarBedriftRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/': {
@@ -1348,6 +1368,7 @@ const rootRouteChildren: RootRouteChildren = {
   BedriftOrganizationIdRoute: BedriftOrganizationIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   OkIdRoute: OkIdRoute,
+  VilkarBedriftRoute: VilkarBedriftRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
   ApiV1LocationsRoute: ApiV1LocationsRoute,
   ApiV1OpenapiDotjsonRoute: ApiV1OpenapiDotjsonRoute,

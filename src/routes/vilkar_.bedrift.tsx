@@ -1,42 +1,42 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { VilkarContent } from "@/components/legal/vilkar-content";
+import { BedriftsvilkarContent } from "@/components/legal/bedriftsvilkar-content";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/hooks/use-is-native";
 
-export const Route = createFileRoute("/vilkar")({
+export const Route = createFileRoute("/vilkar_/bedrift")({
   head: () => ({
     meta: [
-      { title: "Brukervilkår — Kaupet.no" },
+      { title: "Vilkår for bedrifter — Kaupet.no" },
       {
         name: "description",
         content:
-          "Reglene for bruk av Kaupet.no som privatperson. Hva du kan og ikke kan gjøre på markedsplassen, og hvilke rettigheter og plikter du har som bruker.",
+          "Vilkårene for bedriftskontoer på Kaupet.no: medlemmer, annonseregler, salg til forbrukere, Proff-abonnement og betaling.",
       },
-      { property: "og:title", content: "Brukervilkår — Kaupet.no" },
+      { property: "og:title", content: "Vilkår for bedrifter — Kaupet.no" },
       {
         property: "og:description",
-        content: "Reglene for bruk av Kaupet.no — rettigheter, plikter og akseptabel bruk.",
+        content: "Vilkårene for bedriftskontoer og Proff på Kaupet.no.",
       },
     ],
   }),
-  component: VilkarPage,
+  component: BedriftsvilkarPage,
 });
 
-function VilkarPage() {
+function BedriftsvilkarPage() {
   const native = useIsNative();
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
-      <NativePageHeader title="Vilkår" />
+      <NativePageHeader title="Vilkår for bedrifter" />
       {!native && (
         <header className="mb-10">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Brukervilkår</p>
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
-            Brukervilkår for privatpersoner
+            Vilkår for bedrifter
           </h1>
         </header>
       )}
 
-      <VilkarContent />
+      <BedriftsvilkarContent />
     </article>
   );
 }

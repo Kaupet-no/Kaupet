@@ -13,17 +13,24 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BusinessSignupFlow } from "@/features/business-account/business-signup-flow";
+import {
+  BusinessSignupFlow,
+  type BusinessLegalDoc,
+} from "@/features/business-account/business-signup-flow";
 import { isNative } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { formatResendCooldown, useResendCooldown } from "@/hooks/use-resend-cooldown";
 import { NativePageHeader } from "@/components/native-page-header";
+import { NativeSheet } from "@/components/ui/native-sheet";
+import { VilkarContent } from "@/components/legal/vilkar-content";
+import { BedriftsvilkarContent } from "@/components/legal/bedriftsvilkar-content";
+import { PersonvernContent } from "@/components/legal/personvern-content";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
 import { passwordSchema } from "@/lib/auth-schemas";
 import { authConfirmationRedirect, postAuthDestination, safeReturnTo } from "@/lib/auth-return";
 
-const TERMS_VERSION = "1.0";
+const TERMS_VERSION = "2.0";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup", "reset"]).optional().default("signin"),
@@ -70,11 +77,56 @@ const signUpSchema = signInSchema.extend({
 
 type AuthForm = z.infer<typeof signInSchema>;
 
+type LegalDoc = "vilkar" | BusinessLegalDoc;
+
+const legalTitles: Record<LegalDoc, string> = {
+  vilkar: "Brukervilkår",
+  bedriftsvilkar: "Vilkår for bedrifter",
+  personvern: "Personvernerklæring",
+};
+
+// I appen åpnes vilkår og personvern i en skuff over skjemaet, så brukeren
+// ikke mister det de har fylt ut (og ikke havner utenfor onboardingen).
+// På web åpner lenkene en ny fane som før.
+function LegalLink({
+  doc,
+  native,
+  onOpen,
+  children,
+}: {
+  doc: "vilkar" | "personvern";
+  native: boolean;
+  onOpen: (doc: LegalDoc) => void;
+  children: React.ReactNode;
+}) {
+  const className = "underline text-foreground hover:text-primary";
+  if (native) {
+    return (
+      <button type="button" onClick={() => onOpen(doc)} className={className}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link to={`/${doc}`} target="_blank" className={className}>
+      {children}
+    </Link>
+  );
+}
+
 function AuthPage() {
   const { mode, returnTo } = Route.useSearch();
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<AuthMode>(mode);
   const [signupKind, setSignupKind] = useState<"private" | "business">("private");
+  // Dokumentet beholdes etter lukking, så innholdet ikke forsvinner under
+  // lukkeanimasjonen.
+  const [legalDoc, setLegalDoc] = useState<LegalDoc>("vilkar");
+  const [legalOpen, setLegalOpen] = useState(false);
+  const openLegal = (doc: LegalDoc) => {
+    setLegalDoc(doc);
+    setLegalOpen(true);
+  };
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const resendCooldown = useResendCooldown();
@@ -252,7 +304,8 @@ function AuthPage() {
       <div
         className={
           native
-            ? "px-safe flex-1 px-4 py-6"
+            ? // Samme bredde som web-kortet, så skjemaet ikke strekkes på nettbrett.
+              "px-safe mx-auto w-full max-w-md flex-1 px-4 py-6 md:py-12"
             : "rounded-2xl border border-border bg-card p-8 shadow-sm"
         }
       >
@@ -401,7 +454,10 @@ function AuthPage() {
             role="tabpanel"
             aria-labelledby="account-type-business-tab"
           >
-            <BusinessSignupFlow onAuthenticated={finishAuth} />
+            <BusinessSignupFlow
+              onAuthenticated={finishAuth}
+              onOpenLegal={native ? openLegal : undefined}
+            />
           </div>
         ) : (
           <div
@@ -543,21 +599,13 @@ function AuthPage() {
                     />
                     <span>
                       Jeg godtar{" "}
-                      <Link
-                        to="/vilkar"
-                        target="_blank"
-                        className="underline text-foreground hover:text-primary"
-                      >
+                      <LegalLink doc="vilkar" native={native} onOpen={openLegal}>
                         brukervilkårene
-                      </Link>{" "}
+                      </LegalLink>{" "}
                       og bekrefter at jeg har lest{" "}
-                      <Link
-                        to="/personvern"
-                        target="_blank"
-                        className="underline text-foreground hover:text-primary"
-                      >
+                      <LegalLink doc="personvern" native={native} onOpen={openLegal}>
                         personvernerklæringen
-                      </Link>
+                      </LegalLink>
                       .
                     </span>
                   </label>
@@ -611,6 +659,35 @@ function AuthPage() {
           </Link>
         </p>
       )}
+
+      <NativeSheet
+        open={legalOpen}
+        onOpenChange={setLegalOpen}
+        // Samme størrelse som overskriftene i dokumentet, ikke skuffens
+        // standard (text-lg).
+        title={<span className="font-display text-2xl font-medium">{legalTitles[legalDoc]}</span>}
+        titleVisible
+        // Samme innrykk og justering som teksten under.
+        headerClassName="mb-4 px-1 text-left"
+        expandable
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+      >
+        <div className="px-1 pb-6">
+          {legalDoc === "vilkar" ? (
+            <VilkarContent
+              onOpenPersonvern={() => setLegalDoc("personvern")}
+              onOpenBedriftsvilkar={() => setLegalDoc("bedriftsvilkar")}
+            />
+          ) : legalDoc === "bedriftsvilkar" ? (
+            <BedriftsvilkarContent
+              onOpenPersonvern={() => setLegalDoc("personvern")}
+              onOpenVilkar={() => setLegalDoc("vilkar")}
+            />
+          ) : (
+            <PersonvernContent />
+          )}
+        </div>
+      </NativeSheet>
     </div>
   );
 }

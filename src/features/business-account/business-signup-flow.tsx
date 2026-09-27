@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,8 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatResendCooldown, useResendCooldown } from "@/hooks/use-resend-cooldown";
 
 /* eslint-disable react-hooks/refs */
-const TERMS_VERSION = "1.0";
-const BUSINESS_TERMS_VERSION = "1.0";
+const BUSINESS_TERMS_VERSION = "2.0";
 
 type BusinessOrganization = {
   signupToken: string;
@@ -47,7 +46,7 @@ const profileSchema = z.object({
   email: z.string().trim().email("Skriv inn en gyldig e-postadresse."),
   password: passwordSchema,
   acceptedTerms: z.boolean().refine((value) => value, {
-    message: "Du må godta vilkårene og personvernerklæringen.",
+    message: "Du må godta vilkårene for bedrifter og personvernerklæringen.",
   }),
 });
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -56,7 +55,46 @@ function webOrigin(): string {
   return isNative() ? "https://kaupet.no" : window.location.origin;
 }
 
-export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () => Promise<void> }) {
+export type BusinessLegalDoc = "bedriftsvilkar" | "personvern";
+
+const legalPaths: Record<BusinessLegalDoc, string> = {
+  bedriftsvilkar: "/vilkar/bedrift",
+  personvern: "/personvern",
+};
+
+// Med onOpenLegal (i appen) åpnes dokumentet i en skuff over skjemaet, så
+// utfylte felter ikke går tapt; ellers i en ny fane.
+function LegalAnchor({
+  doc,
+  onOpenLegal,
+  children,
+}: {
+  doc: BusinessLegalDoc;
+  onOpenLegal?: (doc: BusinessLegalDoc) => void;
+  children: ReactNode;
+}) {
+  const className = "text-foreground underline";
+  if (onOpenLegal) {
+    return (
+      <button type="button" onClick={() => onOpenLegal(doc)} className={className}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <a href={legalPaths[doc]} target="_blank" rel="noreferrer" className={className}>
+      {children}
+    </a>
+  );
+}
+
+export function BusinessSignupFlow({
+  onAuthenticated,
+  onOpenLegal,
+}: {
+  onAuthenticated: () => Promise<void>;
+  onOpenLegal?: (doc: BusinessLegalDoc) => void;
+}) {
   const [step, setStep] = useState<BusinessStep>(1);
   const [organizationNumber, setOrganizationNumber] = useState("");
   const [organization, setOrganization] = useState<BusinessOrganization | null>(null);
@@ -146,8 +184,6 @@ export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () =>
           captchaToken: token ?? undefined,
           data: {
             display_name: values.displayName.trim(),
-            terms_accepted_version: TERMS_VERSION,
-            terms_accepted_at: acceptedAt,
             business_terms_accepted_version: BUSINESS_TERMS_VERSION,
             business_terms_accepted_at: acceptedAt,
             business_signup_token: organization.signupToken,
@@ -452,23 +488,13 @@ export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () =>
               />
               <span>
                 Jeg godtar{" "}
-                <a
-                  href="/vilkar"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-foreground underline"
-                >
-                  brukervilkårene
-                </a>{" "}
-                og bekrefter at jeg har lest{" "}
-                <a
-                  href="/personvern"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-foreground underline"
-                >
+                <LegalAnchor doc="bedriftsvilkar" onOpenLegal={onOpenLegal}>
+                  vilkårene for bedrifter
+                </LegalAnchor>{" "}
+                på vegne av bedriften og bekrefter at jeg har lest{" "}
+                <LegalAnchor doc="personvern" onOpenLegal={onOpenLegal}>
                   personvernerklæringen
-                </a>
+                </LegalAnchor>
                 .
               </span>
             </label>

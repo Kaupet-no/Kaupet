@@ -140,8 +140,8 @@ describe("BusinessSignupFlow", () => {
   it("binds email before signup, stores business metadata, and supports resend", async () => {
     render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
     await reachProfile();
-    expect(screen.getByRole("link", { name: "brukervilkårene" }).getAttribute("href")).toBe(
-      "/vilkar",
+    expect(screen.getByRole("link", { name: "vilkårene for bedrifter" }).getAttribute("href")).toBe(
+      "/vilkar/bedrift",
     );
     expect(screen.getByRole("link", { name: "personvernerklæringen" }).getAttribute("href")).toBe(
       "/personvern",
@@ -150,7 +150,7 @@ describe("BusinessSignupFlow", () => {
     fireEvent.change(screen.getByLabelText("Navn"), { target: { value: "Kari Nordmann" } });
     fireEvent.change(screen.getByLabelText("E-post"), { target: { value: "KARI@example.com" } });
     fireEvent.change(screen.getByLabelText("Passord"), { target: { value: "hemmelig123" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: /brukervilkårene/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /vilkårene for bedrifter/ }));
     fireEvent.click(screen.getByRole("button", { name: "Opprett bedriftskonto" }));
 
     await screen.findByRole("heading", { name: "Sjekk e-posten din" });
@@ -164,13 +164,15 @@ describe("BusinessSignupFlow", () => {
           emailRedirectTo: `${window.location.origin}/bekreft-epost`,
           data: expect.objectContaining({
             display_name: "Kari Nordmann",
-            terms_accepted_version: "1.0",
             business_signup_token: organization.signupToken,
-            business_terms_accepted_version: "1.0",
+            business_terms_accepted_version: "2.0",
           }),
         }),
       }),
     );
+
+    // Bedriftsbrukeren får bare se bedriftsvilkårene, og godtar derfor ikke privatvilkårene.
+    expect(signUpMock.mock.calls[0][0].options.data).not.toHaveProperty("terms_accepted_version");
 
     const resendButton = screen.getByRole("button", { name: "Send bekreftelses-e-post på nytt" });
     fireEvent.click(resendButton);
@@ -198,7 +200,7 @@ describe("BusinessSignupFlow", () => {
     fireEvent.change(screen.getByLabelText("Navn"), { target: { value: "Kari Nordmann" } });
     fireEvent.change(screen.getByLabelText("E-post"), { target: { value: "KARI2@example.com" } });
     fireEvent.change(screen.getByLabelText("Passord"), { target: { value: "hemmelig123" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: /brukervilkårene/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /vilkårene for bedrifter/ }));
     fireEvent.click(screen.getByRole("button", { name: "Opprett bedriftskonto" }));
 
     await waitFor(() => expect(onAuthenticatedMock).toHaveBeenCalledOnce());

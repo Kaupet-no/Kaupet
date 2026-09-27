@@ -14,6 +14,7 @@ import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import interVariableFontUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import { SiteHeader } from "@/components/site-header";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { ModerationBanner } from "@/components/moderation-banner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
@@ -352,6 +353,20 @@ function RootComponent() {
   );
 }
 
+// Medlemmer av en bedriftskonto har godtatt bedriftsvilkårene; alle andre
+// (også gjester) ser vilkårene for privatpersoner.
+function VilkarFooterLink() {
+  const { data: businessMembership } = useBusinessMembership();
+  return (
+    <Link
+      to={businessMembership ? "/vilkar/bedrift" : "/vilkar"}
+      className="underline hover:text-foreground transition-colors"
+    >
+      brukervilkår
+    </Link>
+  );
+}
+
 function RootBody({ native }: { native: boolean }) {
   const isTest = useIsTestEnv();
   const keyboardVisible = useKeyboardVisible();
@@ -432,11 +447,7 @@ function RootBody({ native }: { native: boolean }) {
                   .
                 </p>
                 <p>
-                  Ved å bruke Kaupet.no godtar du våre{" "}
-                  <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
-                    brukervilkår
-                  </Link>
-                  .
+                  Ved å bruke Kaupet.no godtar du våre <VilkarFooterLink />.
                 </p>
               </div>
               <div className="space-y-1 sm:max-w-xl sm:text-right">

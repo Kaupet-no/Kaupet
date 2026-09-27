@@ -685,7 +685,7 @@ function ListingDetailViewBody({
   // I én kolonne (telefon, native, telefonrammen) ville sidepanelet havnet
   // under alt innholdet, så selgeren flyttes opp rett etter beskrivelsen —
   // for Bil og MC etter kjente feil og utstyr, men over lånekalkulatoren.
-  const sellerInColumn = isNative || !isTwoColumn;
+  const sellerInColumn = !isTwoColumn;
   const gallery = hasGalleryContent ? (
     <ImageGallery
       images={sortedImages}

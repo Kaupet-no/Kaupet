@@ -27,6 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useAutoHide, autoHideClass } from "@/hooks/use-auto-hide";
 import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import {
   Carousel,
@@ -118,6 +119,7 @@ export function ImageGallery({
 }) {
   const isNative = useIsNative();
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [arrowsVisible, showArrows] = useAutoHide();
   const editCtx = useListingEdit();
   const inlineImages = useInlineListingImages({
     listingId: editCtx?.listingId ?? "",
@@ -206,7 +208,7 @@ export function ImageGallery({
   if (totalSlides > 0) {
     return (
       <>
-        <div className="relative">
+        <div className="relative" onPointerMove={showArrows}>
           <Carousel
             opts={{ align: "center", loop: true, startIndex: activeImage }}
             setApi={setCarouselApi}
@@ -270,8 +272,12 @@ export function ImageGallery({
                 vært pynt som ikke finnes på mobil — skjules der. */}
             {!isNative && totalSlides > 1 && (
               <>
-                <CarouselPrevious className="left-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden" />
-                <CarouselNext className="right-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden" />
+                <CarouselPrevious
+                  className={`left-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden ${autoHideClass(arrowsVisible)}`}
+                />
+                <CarouselNext
+                  className={`right-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden ${autoHideClass(arrowsVisible)}`}
+                />
               </>
             )}
           </Carousel>

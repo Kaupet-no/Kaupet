@@ -788,6 +788,75 @@ export type Database = {
           },
         ]
       }
+      listing_image_jobs: {
+        Row: {
+          attempts: number
+          content_hash: string | null
+          created_at: string
+          customer_error: string | null
+          id: string
+          internal_error: string | null
+          listing_id: string
+          next_attempt_at: string
+          organization_id: string
+          sort_order: number
+          source_url: string
+          status: string
+          storage_path: string | null
+          transformations: number
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          content_hash?: string | null
+          created_at?: string
+          customer_error?: string | null
+          id?: string
+          internal_error?: string | null
+          listing_id: string
+          next_attempt_at?: string
+          organization_id: string
+          sort_order?: number
+          source_url: string
+          status?: string
+          storage_path?: string | null
+          transformations?: number
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          content_hash?: string | null
+          created_at?: string
+          customer_error?: string | null
+          id?: string
+          internal_error?: string | null
+          listing_id?: string
+          next_attempt_at?: string
+          organization_id?: string
+          sort_order?: number
+          source_url?: string
+          status?: string
+          storage_path?: string | null
+          transformations?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_image_jobs_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_image_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_images: {
         Row: {
           caption: string | null
@@ -795,6 +864,7 @@ export type Database = {
           id: string
           listing_id: string
           sort_order: number
+          source_url: string | null
           storage_path: string
         }
         Insert: {
@@ -803,6 +873,7 @@ export type Database = {
           id?: string
           listing_id: string
           sort_order?: number
+          source_url?: string | null
           storage_path: string
         }
         Update: {
@@ -811,6 +882,7 @@ export type Database = {
           id?: string
           listing_id?: string
           sort_order?: number
+          source_url?: string | null
           storage_path?: string
         }
         Relationships: [
@@ -819,32 +891,6 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      listing_keyword_stats: {
-        Row: {
-          category_id: string
-          listing_count: number
-          word: string
-        }
-        Insert: {
-          category_id: string
-          listing_count?: number
-          word: string
-        }
-        Update: {
-          category_id?: string
-          listing_count?: number
-          word?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "listing_keyword_stats_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
         ]
@@ -1094,6 +1140,7 @@ export type Database = {
           display_lng: number | null
           draft_expiry_notified_at: string | null
           expires_at: string | null
+          external_ref: string | null
           hidden_from_home: boolean
           id: string
           is_free: boolean
@@ -1132,6 +1179,7 @@ export type Database = {
           display_lng?: number | null
           draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          external_ref?: string | null
           hidden_from_home?: boolean
           id?: string
           is_free?: boolean
@@ -1170,6 +1218,7 @@ export type Database = {
           display_lng?: number | null
           draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          external_ref?: string | null
           hidden_from_home?: boolean
           id?: string
           is_free?: boolean
@@ -1305,6 +1354,75 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_api_keys: {
+        Row: {
+          acting_user_id: string
+          created_at: string
+          created_by: string
+          default_location_id: string
+          expires_at: string
+          expiry_notified_14_at: string | null
+          expiry_notified_3_at: string | null
+          id: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          scopes: string[]
+        }
+        Insert: {
+          acting_user_id: string
+          created_at?: string
+          created_by: string
+          default_location_id: string
+          expires_at: string
+          expiry_notified_14_at?: string | null
+          expiry_notified_3_at?: string | null
+          id?: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          organization_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes: string[]
+        }
+        Update: {
+          acting_user_id?: string
+          created_at?: string
+          created_by?: string
+          default_location_id?: string
+          expires_at?: string
+          expiry_notified_14_at?: string | null
+          expiry_notified_3_at?: string | null
+          id?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          organization_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_api_keys_default_location_fk"
+            columns: ["default_location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "organization_api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_billing_profiles: {
         Row: {
           address_line: string | null
@@ -1355,6 +1473,7 @@ export type Database = {
           import_id: string
           listing_id: string | null
           organization_id: string
+          source: string
           status: string
           updated_at: string
           user_id: string
@@ -1367,6 +1486,7 @@ export type Database = {
           import_id: string
           listing_id?: string | null
           organization_id: string
+          source?: string
           status: string
           updated_at?: string
           user_id: string
@@ -1379,6 +1499,7 @@ export type Database = {
           import_id?: string
           listing_id?: string | null
           organization_id?: string
+          source?: string
           status?: string
           updated_at?: string
           user_id?: string
@@ -1438,6 +1559,53 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organization_location_subscriptions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_location_contacts: {
+        Row: {
+          avatar_path: string | null
+          created_at: string
+          id: string
+          location_id: string
+          name: string
+          organization_id: string
+          phone: string
+          show_in_listings: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          created_at?: string
+          id?: string
+          location_id: string
+          name: string
+          organization_id: string
+          phone: string
+          show_in_listings?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar_path?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string
+          name?: string
+          organization_id?: string
+          phone?: string
+          show_in_listings?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_contacts_location_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -1557,7 +1725,10 @@ export type Database = {
           name: string
           organization_id: string
           postal_code: string | null
+          show_visiting_address: boolean
           updated_at: string
+          visiting_lat: number | null
+          visiting_lng: number | null
         }
         Insert: {
           active?: boolean
@@ -1571,7 +1742,10 @@ export type Database = {
           name: string
           organization_id: string
           postal_code?: string | null
+          show_visiting_address?: boolean
           updated_at?: string
+          visiting_lat?: number | null
+          visiting_lng?: number | null
         }
         Update: {
           active?: boolean
@@ -1585,7 +1759,10 @@ export type Database = {
           name?: string
           organization_id?: string
           postal_code?: string | null
+          show_visiting_address?: boolean
           updated_at?: string
+          visiting_lat?: number | null
+          visiting_lng?: number | null
         }
         Relationships: [
           {
@@ -3065,6 +3242,26 @@ export type Database = {
         Args: { _bucket: string; _limit: number; _user_id: string; _window_seconds: number }
         Returns: boolean
       }
+      claim_listing_image_jobs: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          content_hash: string | null
+          created_at: string
+          customer_error: string | null
+          id: string
+          internal_error: string | null
+          listing_id: string
+          next_attempt_at: string
+          organization_id: string
+          sort_order: number
+          source_url: string
+          status: string
+          storage_path: string | null
+          transformations: number
+          updated_at: string
+        }[]
+      }
       compute_wtb_matches: {
         Args: {
           _attributes: Json
@@ -3098,6 +3295,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      consume_rate_limit: {
+        Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
+        Returns: { allowed: boolean; count: number; limit: number; reset_at: string }[]
+      }
       consume_vehicle_360_upload_slot: {
         Args: { _ip_hash: string; _token: string }
         Returns: string
@@ -3125,6 +3326,42 @@ export type Database = {
             }
             Returns: Json
           }
+      create_organization_api_key: {
+        Args: {
+          _default_location_id: string
+          _key_hash: string
+          _key_prefix: string
+          _lifetime_days: number
+          _name: string
+          _organization_id: string
+          _scopes: string[]
+          _user_id: string
+        }
+        Returns: {
+          acting_user_id: string
+          created_at: string
+          created_by: string
+          default_location_id: string
+          expires_at: string
+          expiry_notified_14_at: string | null
+          expiry_notified_3_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          scopes: string[]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_api_keys"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_organization_location: {
         Args: {
           _address_line: string
@@ -3153,6 +3390,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      enqueue_listing_image_jobs: {
+        Args: {
+          _listing_id: string
+          _organization_id: string
+          _replace?: boolean
+          _urls: string[]
+        }
+        Returns: number
       }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
@@ -3189,6 +3435,10 @@ export type Database = {
       is_user_banned: { Args: { _uid: string }; Returns: boolean }
       is_user_deletion_pending: { Args: { _user_id: string }; Returns: boolean }
       is_user_suspended: { Args: { _uid: string }; Returns: boolean }
+      listing_business_contact: {
+        Args: { _listing_id: string }
+        Returns: Json
+      }
       listing_filter_facet_counts: {
         Args: {
           p_active_attrs?: Json
@@ -3304,6 +3554,11 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      notify_expiring_organization_api_keys: { Args: never; Returns: undefined }
+      peek_rate_limit: {
+        Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
+        Returns: { count: number; limit: number; reset_at: string }[]
+      }
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
         Returns: {
@@ -3352,7 +3607,32 @@ export type Database = {
         Args: { _organization_id: string; _user_id: string }
         Returns: undefined
       }
+      renew_listings_by_external_ref: {
+        Args: {
+          _external_refs: string[]
+          _import_id: string
+          _organization_id: string
+          _source: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
+      resolve_organization_api_key: {
+        Args: { _key_hash: string }
+        Returns: {
+          acting_user_id: string | null
+          default_location_id: string | null
+          key_id: string | null
+          organization_id: string | null
+          reason: string
+          scopes: string[] | null
+        }[]
+      }
+      revoke_organization_api_key: {
+        Args: { _key_id: string; _user_id: string }
+        Returns: undefined
+      }
       purge_endpoint_rate_limits: { Args: never; Returns: undefined }
       send_message_rate_limited: {
         Args: {
@@ -3427,6 +3707,10 @@ export type Database = {
           total_count: number
         }[]
       }
+      set_listing_status_by_external_ref: {
+        Args: { _external_ref: string; _organization_id: string; _status: string; _user_id: string }
+        Returns: Json
+      }
       set_organization_location_member_permissions: {
         Args: {
           _chat_access: string
@@ -3499,6 +3783,21 @@ export type Database = {
       sync_organization_entitlements: {
         Args: { _organization_id: string }
         Returns: undefined
+      }
+      upsert_listing_from_external: {
+        Args: {
+          _dry_run?: boolean
+          _external_ref: string
+          _import_id: string
+          _listing: Json
+          _location_id: string
+          _mode: string
+          _organization_id: string
+          _show_visiting_address?: boolean
+          _source: string
+          _user_id: string
+        }
+        Returns: Json
       }
       user_review_summary: {
         Args: { _user_id: string }

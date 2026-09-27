@@ -51,15 +51,18 @@ test("utlogget bruker sendes til innlogging med utkastet i behold", async ({ pag
   const publishButton = page.getByTestId("publish-listing-button");
   await expect(publishButton).toHaveText(/Logg inn og publiser/);
 
-  // Ingen forhåndsvisning er åpnet. Auth-sjekken må komme før
-  // "Publiser likevel"-dialogen, ellers treffer gjesten publiseringskallet
-  // og får "Du må være logget inn." i stedet for innloggingssiden.
+  // Auth-sjekken må komme før publiseringskallet, ellers får gjesten
+  // "Du må være logget inn." i stedet for innloggingsarket.
   await publishButton.click();
+  await expect(
+    page.getByRole("heading", { name: "Nesten ute! Logg inn for å publisere" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL(/\/auth\?/, { timeout: 10_000 });
   await expect(page).toHaveURL(/returnTo=[^&]*resume%3Dauth-publish/);
-  await expect(page.getByTestId("publish-anyway-button")).toHaveCount(0);
 
   // Utkastet må ha overlevd navigasjonen, ellers er gjenopptakelsen tom.
-  const draft = await page.evaluate(() => localStorage.getItem("kaupet_draft_ny_annonse"));
+  const draft = await page.evaluate(() => localStorage.getItem("kaupet_draft_sell_listing"));
   expect(draft).toContain("E2E gjesteannonse");
 });

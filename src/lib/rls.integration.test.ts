@@ -439,8 +439,8 @@ describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writ
 describe.skipIf(!canRun)(
   "RLS: owner can delete their own active, categorized listing (regression for 20260622120000/20260624120000 stats triggers)",
   () => {
-    // The AFTER DELETE stats triggers (listings_remove_category_word_stats,
-    // listings_remove_keyword_stats) only fire their internal UPDATE when
+    // The AFTER DELETE stats trigger (listings_remove_category_word_stats)
+    // only fires its internal UPDATE when
     // the deleted listing had counted_category_id/counted_lexemes set —
     // which only happens for an *active, categorized* listing (see the
     // BEFORE trigger's `IF NEW.status = 'active' AND NEW.category_id IS NOT
@@ -3041,7 +3041,7 @@ describe.skipIf(!canRun)(
 );
 
 describe.skipIf(!canRun)(
-  "RLS: listing_category_word_stats / listing_keyword_stats are publicly readable, not client-writable",
+  "RLS: listing_category_word_stats is private to server code, not client-writable",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
@@ -3069,11 +3069,6 @@ describe.skipIf(!canRun)(
         .from("listing_category_word_stats")
         .insert({ lexeme, category_id: categoryId, listing_count: 1 });
       if (wordErr) throw wordErr;
-
-      const { error: keywordErr } = await admin
-        .from("listing_keyword_stats")
-        .insert({ word: lexeme, category_id: categoryId, listing_count: 1 });
-      if (keywordErr) throw keywordErr;
     });
 
     afterAll(async () => {
@@ -3082,11 +3077,6 @@ describe.skipIf(!canRun)(
         .from("listing_category_word_stats")
         .delete()
         .eq("lexeme", lexeme)
-        .eq("category_id", categoryId);
-      await admin
-        .from("listing_keyword_stats")
-        .delete()
-        .eq("word", lexeme)
         .eq("category_id", categoryId);
     });
 
@@ -3097,25 +3087,14 @@ describe.skipIf(!canRun)(
         .select("lexeme")
         .eq("lexeme", lexeme);
       expect(wordErr).not.toBeNull();
-
-      const { error: keywordErr } = await anon
-        .from("listing_keyword_stats")
-        .select("word")
-        .eq("word", lexeme);
-      expect(keywordErr).not.toBeNull();
     });
 
-    it("blocks a regular authenticated client from writing to either stats table", async () => {
+    it("blocks a regular authenticated client from writing to the stats table", async () => {
       const client = await signIn();
       const { error: wordErr } = await client
         .from("listing_category_word_stats")
         .insert({ lexeme: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
       expect(wordErr).not.toBeNull();
-
-      const { error: keywordErr } = await client
-        .from("listing_keyword_stats")
-        .insert({ word: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
-      expect(keywordErr).not.toBeNull();
     });
   },
 );
@@ -5311,7 +5290,7 @@ describe.skipIf(!canRun)("RLS: interne logger, køer og rate-limit-tabeller er s
     const { data: event, error: eventError } = await admin
       .from("product_events")
       .insert({
-        event_name: "search_opened",
+        event_name: "listing_publish_failed",
         platform: "web",
         path: "/rls-test",
         properties: {},
@@ -5394,7 +5373,7 @@ describe.skipIf(!canRun)("RLS: interne logger, køer og rate-limit-tabeller er s
         changed_at: new Date().toISOString(),
       }),
       client.from("product_events").insert({
-        event_name: "search_opened",
+        event_name: "listing_publish_failed",
         platform: "web",
         path: "/client",
         properties: {},
@@ -5751,6 +5730,90 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
       .update({ billing_email: emails.owner })
       .eq("organization_id", organizationId);
     expect(serviceUpdate).toBeNull();
+  });
+
+  it("eksponerer kun valgt kontaktinfo for aktive annonser via listing_business_contact", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { error: locationUpdate } = await admin
+      .from("organization_locations")
+      .update({
+        address_line: "Testgata 1",
+        postal_code: "0001",
+        city: "Oslo",
+        show_visiting_address: true,
+        visiting_lat: 59.9,
+        visiting_lng: 10.7,
+      })
+      .eq("id", locationId);
+    expect(locationUpdate).toBeNull();
+    const { error: contactsError } = await admin.from("organization_location_contacts").insert([
+      {
+        location_id: locationId,
+        organization_id: organizationId,
+        name: "Synlig selger",
+        phone: "12345678",
+        avatar_path: `${organizationId}/contact-test.webp`,
+        // Satt eksplisitt: i en bulk-insert med ulike nøkler fyller PostgREST
+        // manglende kolonner med NULL i stedet for kolonnens standardverdi.
+        show_in_listings: true,
+        sort_order: 0,
+      },
+      {
+        location_id: locationId,
+        organization_id: organizationId,
+        name: "Skjult selger",
+        phone: "87654321",
+        show_in_listings: false,
+        sort_order: 1,
+      },
+    ]);
+    expect(contactsError).toBeNull();
+
+    const direct = await anon
+      .from("organization_location_contacts")
+      .select("id")
+      .eq("location_id", locationId);
+    expect(direct.error).not.toBeNull();
+
+    const { data, error } = await anon.rpc("listing_business_contact", { _listing_id: listingId });
+    expect(error).toBeNull();
+    const contact = data as {
+      visiting_address: { address_line: string; lat: number } | null;
+      contacts: { name: string; phone: string; avatar_path: string | null }[];
+    };
+    expect(contact.visiting_address).toMatchObject({ address_line: "Testgata 1", lat: 59.9 });
+    expect(contact.contacts).toEqual([
+      expect.objectContaining({
+        name: "Synlig selger",
+        phone: "12345678",
+        avatar_path: `${organizationId}/contact-test.webp`,
+      }),
+    ]);
+
+    // Uten Proff skjules profilbildet, og uten flagget skjules adressen.
+    await admin
+      .from("organizations")
+      .update({ proff_access_until: new Date(Date.now() - 1000).toISOString() })
+      .eq("id", organizationId);
+    await admin
+      .from("organization_locations")
+      .update({ show_visiting_address: false })
+      .eq("id", locationId);
+    const withoutProff = await anon.rpc("listing_business_contact", { _listing_id: listingId });
+    const reduced = withoutProff.data as typeof contact;
+    expect(reduced.visiting_address).toBeNull();
+    expect(reduced.contacts[0]?.avatar_path).toBeNull();
+
+    // Ikke-aktive annonser gir ingen kontaktinfo til anonyme.
+    await admin.from("listings").update({ status: "draft" }).eq("id", listingId);
+    const draft = await anon.rpc("listing_business_contact", { _listing_id: listingId });
+    expect(draft.data).toBeNull();
+
+    await admin.from("listings").update({ status: "active" }).eq("id", listingId);
+    await admin
+      .from("organizations")
+      .update({ proff_access_until: new Date(Date.now() + 86_400_000).toISOString() })
+      .eq("id", organizationId);
   });
 });
 

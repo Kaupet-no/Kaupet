@@ -43,12 +43,37 @@
 /* Touch-idiomer (trykk-krymping o.l.) hører hjemme i appen, ikke i
    nettleseren — `.native` settes på <html> av native-oppstarten. */
 @custom-variant native (&:is(.native *));
+/* Annonsesidens egne sm/md: samme vindusbrytepunkt som `sm:`/`md:`, men slått
+   av inne i `[data-phone-preview]` — telefonrammen i annonseflyten viser
+   mobilversjonen av siden uansett hvor bredt vinduet er. `:where` holder
+   spesifisiteten lik `md:`, så den publiserte siden får identisk CSS. */
+@custom-variant page-sm {
+  @media (width >= 40rem) {
+    &:where(:not([data-phone-preview], [data-phone-preview] *)) {
+      @slot;
+    }
+  }
+}
+@custom-variant page-md {
+  @media (width >= 48rem) {
+    &:where(:not([data-phone-preview], [data-phone-preview] *)) {
+      @slot;
+    }
+  }
+}
 
 /*
  * Kaupet.no design system
  * Warm, Nordic, community-feeling. Cream paper background, deep forest green,
  * terracotta accent. Display font: Newsreader (editorial serif). Body: Inter.
  */
+
+/* Fra denne bredden står telefonrammen med forhåndsvisningen fast ved siden
+   av skjemaet i annonseflyten (ListingComposerShell); under den åpnes den fra
+   «Forhåndsvis». Navngitt (ikke `min-[1100px]:`) så den sorteres etter `lg:`. */
+@theme {
+  --breakpoint-dock: 68.75rem;
+}
 
 @theme inline {
   --font-display: "Newsreader Variable", ui-serif, Georgia, serif;
@@ -378,6 +403,17 @@ html.native body::before {
 .native {
   --site-header-h: calc(3rem + 1px + var(--safe-top));
 }
+/* Composer-rutene (/ny-annonse, /ny-ok-annonse) skjuler SiteHeader og viser i
+   stedet sin egen slanke toppstripe (ListingComposerShell) — sticky-elementer
+   i shellen (progress-stripa, desktop-aside) må forskyves etter DEN høyden på
+   web. Native bruker fortsatt NativePageHeader og er uendret (mer spesifikk
+   selektor enn `.composer-route` alene, så den vinner for native). */
+.composer-route {
+  --site-header-h: calc(3.5rem + 1px + var(--safe-top));
+}
+.native .composer-route {
+  --site-header-h: calc(3rem + 1px + var(--safe-top));
+}
 .pb-bottom-nav {
   padding-bottom: var(--app-bottom-nav-h);
 }
@@ -441,6 +477,14 @@ html.native body::before {
 .nav-rail .pb-bottom-nav {
   padding-bottom: 0;
   padding-left: var(--app-nav-rail-w);
+}
+
+/* Annonsesiden på native-telefon: annonsebaren (pris + «Send melding») tar
+   bunnpillens plass, se NativeContactBar i listing-detail-view.tsx.
+   --app-bottom-nav-h beholdes — baren er like høy, så pb-bottom-nav og
+   toast-offset stemmer fortsatt. Sideskinnen på nettbrett røres ikke. */
+.listing-contact-bar:not(.nav-rail) .app-bottom-nav {
+  display: none;
 }
 
 /* Native polish (fase 7, se docs/NATIVE-UI-UX-PLAN.md). `.native` settes på
@@ -527,6 +571,15 @@ html.native body::before {
 }
 .dark .leaflet-tile {
   filter: invert(1) grayscale(1) brightness(0.78) contrast(0.82);
+}
+
+@keyframes lappen-pin-in {
+  from {
+    transform: scale(0.96) rotate(0deg);
+  }
+  to {
+    transform: scale(1) rotate(-1.5deg);
+  }
 }
 
 @keyframes fab-icon-in {

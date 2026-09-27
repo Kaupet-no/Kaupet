@@ -177,12 +177,19 @@ export function VehicleInfoGrid({
     <div className="@container">
       <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-4 @md:grid-cols-4">
         {items.map((item) => (
-          <div key={item.key} className="flex min-w-0 flex-col items-start gap-1 text-sm">
+          <div key={item.key} className="flex min-w-0 flex-col gap-1 text-sm">
             <div className="flex min-w-0 items-center gap-1">
               {item.icon && <item.icon className="size-[15px] shrink-0 text-muted-foreground" />}
-              <span className="min-w-0 truncate text-xs text-muted-foreground">{item.label}</span>
+              <span className="min-w-0 truncate text-xs text-muted-foreground" title={item.label}>
+                {item.label}
+              </span>
             </div>
-            <span className="min-w-0 font-medium leading-tight break-words">{item.value}</span>
+            <span
+              className="truncate font-medium leading-tight"
+              title={typeof item.value === "string" ? item.value : undefined}
+            >
+              {item.value}
+            </span>
           </div>
         ))}
       </div>

@@ -1,28 +1,7 @@
 import { z } from "zod";
 
-export const productEventNames = [
-  "auth_started",
-  "auth_completed",
-  "search_opened",
-  "search_submitted",
-  "search_zero_results",
-  "search_page_viewed",
-  "search_filter_opened",
-  "search_filter_applied",
-  "search_filter_cancelled",
-  "search_suggestion_selected",
-  "search_zero_results_recovered",
-  "search_map_opened",
-  "search_saved",
-  "search_result_opened",
-  "listing_opened",
-  "contact_started",
-  "favorite_toggled",
-  "listing_creation_started",
-  "listing_creation_step_completed",
-  "listing_published",
-  "onboarding_completed",
-] as const;
+// Kun feil — ikke atferd. Se personvern.tsx, «Bruksstatistikk».
+export const productEventNames = ["listing_publish_failed"] as const;
 
 const forbiddenPropertyKeys = new Set([
   "address",

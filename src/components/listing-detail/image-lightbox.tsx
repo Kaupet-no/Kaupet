@@ -7,6 +7,7 @@ import {
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { ZoomableImage } from "@/components/listing-detail/zoomable-image";
+import { useAutoHide, autoHideClass } from "@/hooks/use-auto-hide";
 import { lockPortraitOnPhone, unlockOrientation } from "@/lib/orientation";
 
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
@@ -32,6 +33,7 @@ export function ImageLightbox({
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [arrowsVisible, showArrows] = useAutoHide();
   // Zoomet bilde eier gesten selv — Emblas dra-gest slås av mens den varer.
   // Ref, ikke state: `watchDrag` leses ved pointerdown, og en reInit ville
   // hoppet karusellen tilbake til start.
@@ -128,7 +130,11 @@ export function ImageLightbox({
         </div>
 
         {/* Carousel — clicks bubble up to the backdrop and close the lightbox */}
-        <div className="relative min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
+        <div
+          className="relative min-h-0 flex-1 overflow-hidden"
+          ref={emblaRef}
+          onPointerMove={showArrows}
+        >
           <div className="flex h-full">
             {has360 && (
               <div className="relative flex h-full min-w-0 flex-[0_0_100%] items-center justify-center">
@@ -164,7 +170,7 @@ export function ImageLightbox({
                 type="button"
                 onClick={scrollPrev}
                 aria-label="Forrige bilde"
-                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                className={`absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 ${autoHideClass(arrowsVisible)}`}
               >
                 <ChevronLeft className="size-6" />
               </button>
@@ -172,7 +178,7 @@ export function ImageLightbox({
                 type="button"
                 onClick={scrollNext}
                 aria-label="Neste bilde"
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 ${autoHideClass(arrowsVisible)}`}
               >
                 <ChevronRight className="size-6" />
               </button>

@@ -138,6 +138,21 @@ export const suggestListingFromPhotos = createServerFn({ method: "POST" })
     });
   });
 
+/** Tells the client whether the "Analyser valgte bilder med KI" action should
+ * be shown at all — no secrets returned, just the same two gates
+ * suggestListingFromPhotos itself enforces. */
+export const getPhotoSuggestionAvailability = createServerFn({ method: "GET" }).handler(
+  async () => {
+    if (process.env.MISTRAL_PHOTO_SUGGESTIONS_ENABLED !== "true") return { enabled: false };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: settings } = await supabaseAdmin
+      .from("site_settings")
+      .select("category_suggestion_ai_enabled")
+      .single();
+    return { enabled: settings?.category_suggestion_ai_enabled !== false };
+  },
+);
+
 /** In-memory cache of in-flight/settled internal category requests, keyed by
  * trimmed title. */
 const suggestionCache = new Map<string, Promise<CategorySuggestionResult>>();

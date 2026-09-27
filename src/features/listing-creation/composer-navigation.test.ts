@@ -4,6 +4,7 @@ import {
   composerFieldId,
   composerForwardStep,
   composerSwipeDirection,
+  resolvePublishingRequirementLabel,
   reviewSectionSteps,
   sortComposerRequirements,
 } from "./composer-navigation";
@@ -98,6 +99,31 @@ describe("sortComposerRequirements", () => {
       "description",
       "price",
     ]);
+  });
+});
+
+describe("resolvePublishingRequirementLabel", () => {
+  it("hopper over en feltgruppes resultat når filteret allerede er dekket av missingFilters", () => {
+    const result = { field: "material", message: "Fyll inn materiale før du går videre." };
+    const missingFilters = [{ key: "material", label_nb: "Materiale" }];
+    expect(resolvePublishingRequirementLabel(result, {}, missingFilters)).toEqual({ skip: true });
+  });
+
+  it("bruker aldri en rå nøkkel som etikett — faller tilbake til gruppens melding", () => {
+    const result = { field: "known_issues", message: "Beskriv kjente feil og mangler." };
+    expect(resolvePublishingRequirementLabel(result, {}, [])).toEqual({
+      skip: false,
+      label: "Beskriv kjente feil og mangler.",
+    });
+  });
+
+  it("foretrekker den kjente feltetiketten når den finnes", () => {
+    const result = { field: "known_issues", message: "Beskriv kjente feil og mangler." };
+    const labels = { known_issues: "Kjente feil og mangler" };
+    expect(resolvePublishingRequirementLabel(result, labels, [])).toEqual({
+      skip: false,
+      label: "Kjente feil og mangler",
+    });
   });
 });
 

@@ -11,13 +11,10 @@ import {
   chooseCategory,
   clickNextAndWaitFor,
   fillDescriptionAndAdvance,
-  fixMissingInformation,
   goToNewListing,
+  listingStrengthIndicator,
   login,
-  missingInformationDialog,
-  openPublishingStatus,
   publishAndExpectSuccess,
-  publishingStatusButton,
   wizardStep,
 } from "./pages/listing-wizard";
 
@@ -48,8 +45,8 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   // Category must be chosen first — it's always the wizard's first step.
   await chooseCategory(page, TEST_CATEGORY_NAME);
 
-  // The title is part of the "Vis frem" task; condition, price, delivery and
-  // location are grouped into the later "Gjør handelen enkel" task.
+  // The title is part of the "Bilder" task; condition, price, delivery and
+  // location are grouped into the later "Pris og henting" task.
   await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
 
@@ -64,15 +61,15 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
     "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
   );
 
-  // "Gis bort gratis" now belongs to the "Gjør handelen enkel" task, not
-  // "Vis frem". Selecting it satisfies the optional-price validation without
+  // "Gis bort gratis" now belongs to the "Pris og henting" task, not
+  // "Bilder". Selecting it satisfies the optional-price validation without
   // changing the publish contract this golden path proves.
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
   // Delivery method is required for every non-vehicle, non-boat category
   // (see requiresDeliveryMethod in category-behavior.ts) and createListing
   // rejects can_ship: null server-side — but the wizard's own
   // "requiredToPublish" check for the delivery field group doesn't catch a
-  // missing selection, so skipping this silently reaches "Publiseringsklar"
+  // missing selection, so skipping this silently reaches "Klar til publisering"
   // and only fails once the publish click hits the server.
   await page.getByRole("radio", { name: /Må hentes/ }).click();
   await clickNextAndWaitFor(page, wizardStep(page, "review-publish"), testInfo);
@@ -80,31 +77,21 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   await publishAndExpectSuccess(page, testInfo);
 });
 
-test("viser manglende opplysninger med snarvei til feltet", async ({ page }, testInfo) => {
+test("maser ikke om felt brukeren ikke har kommet til ennå", async ({ page }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop-web",
-    "Publiseringsstatus ligger i desktop-sidepanelet",
+    "Annonsestyrke-indikatoren ligger i desktop-sidepanelet",
   );
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
   await login(page, credentials.email, credentials.password);
   await goToNewListing(page);
-  // Publiseringsstatus rendres bak `categoryId &&` (ui-gjennomgangen, W2):
-  // antallet manglende opplysninger avhenger av kategorien, så panelet finnes
-  // ikke før en kategori er valgt. Tittelen fylles derfor på photos-steget
-  // i stedet for via ?title=, slik at den ikke teller som en mangel her.
   await chooseCategory(page, TEST_CATEGORY_NAME);
   await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E statusannonse");
-  await publishingStatusButton(page).waitFor();
-
-  await expect(publishingStatusButton(page)).toContainText(/opplysninger? mangler/);
-  await openPublishingStatus(page);
-  const dialog = missingInformationDialog(page);
-  await expect(dialog.getByText("Beskrivelse", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Pris", { exact: true })).toBeVisible();
-
-  await fixMissingInformation(page, "Beskrivelse");
-  await expect(page.getByTestId("listing-description-textarea")).toBeFocused();
+  // Beskrivelse og Pris ligger på senere steg — de skal ikke meldes som
+  // mangler før brukeren har vært der (flyten guider dit selv).
+  await expect(page.getByText(/opplysninger? må fylles ut/)).toHaveCount(0);
+  await expect(listingStrengthIndicator(page)).toHaveCount(0);
 });

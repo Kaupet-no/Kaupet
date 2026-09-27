@@ -28,6 +28,7 @@ vi.mock("@/hooks/use-form-factor", () => ({
 vi.mock("@/features/listing-search/use-search-suggestions", () => ({
   useSearchSuggestions: () => ({ data: [] }),
 }));
+vi.mock("@/components/ui/native-choice-sheet", () => ({ NativeChoiceSheet: () => null }));
 vi.mock("@/hooks/use-overlay-history", () => ({ useOverlayHistory: () => undefined }));
 vi.mock("@/hooks/use-sheet-drag-gate", () => ({
   useSheetDragGate: () => ({
@@ -54,6 +55,7 @@ vi.mock("@/features/listing-search/submit-search", async (importOriginal) => {
   };
 });
 vi.mock("@/features/listing-search/search-panel/filter-sections", () => ({
+  TermGroupSheet: () => null,
   SearchFilterSections: ({
     setValue,
   }: {
@@ -104,6 +106,32 @@ describe("SearchPanel", () => {
       expect.objectContaining({ min: 100, categories: ["sykkel"] }),
     );
   });
+  it("fjerner gamle attributtfiltre når kategorien i utkastet endres", () => {
+    const onApply = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={[]}
+        allFilters={[]}
+        initialSection="categories"
+        results={{
+          applied: {
+            value: defaultAdvancedSearchValue(),
+            attributes: { brand: { kind: "select", value: "volvo" } },
+          },
+          onApply,
+          resultCount: 42,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Endre kategoriutkast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+
+    expect(onApply.mock.calls[0][0].value.categories).toEqual(["sykkel"]);
+    expect(onApply.mock.calls[0][0].attributes).toEqual({});
+  });
   it("sender query fra resultatpanelet som anvendt state", async () => {
     const onApply = vi.fn();
 
@@ -133,5 +161,77 @@ describe("SearchPanel", () => {
       }),
       expect.any(Array),
     );
+  });
+
+  it("bruker søkeord og aktive regler når native-bunnknappen trykkes", async () => {
+    const onApply = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={[]}
+        allFilters={[]}
+        initialSection="query"
+        results={{
+          applied: {
+            value: {
+              ...defaultAdvancedSearchValue(),
+              qMode: "any",
+              extraGroups: [{ id: "rule", mode: "any", exclude: true, terms: ["kopi"] }],
+            },
+            attributes: {},
+          },
+          onApply,
+          resultCount: 42,
+        }}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Søk i annonser" }), {
+      target: { value: "vintage lampe" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+
+    await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+    expect(onApply.mock.calls[0][0].value).toEqual(
+      expect.objectContaining({
+        terms: ["vintage", "lampe"],
+        qMode: "any",
+        extraGroups: [{ id: "rule", mode: "any", exclude: true, terms: ["kopi"] }],
+      }),
+    );
+  });
+
+  it("aktiverer Waypoints når en ekstra regel fylles ut i native-skuffen", async () => {
+    const onApply = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={[]}
+        allFilters={[]}
+        initialSection="query"
+        results={{
+          applied: { value: { ...defaultAdvancedSearchValue(), terms: ["lampe"] }, attributes: {} },
+          onApply,
+          resultCount: 42,
+        }}
+      />,
+    );
+
+    const rules = screen.getByRole("button", { name: "Søkeregler" });
+    expect(rules.className).not.toContain("bg-primary");
+    fireEvent.click(rules);
+    fireEvent.change(screen.getByRole("textbox", { name: "Skal ikke inneholde" }), {
+      target: { value: "kopi, replika" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Søkeregler, egne regler aktive" }).className,
+    ).toContain("bg-primary");
+    fireEvent.click(screen.getByRole("button", { name: "Vis 7 annonser" }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+    expect(onApply.mock.calls[0][0].value.extraGroups).toEqual([
+      expect.objectContaining({ exclude: true, terms: ["kopi", "replika"] }),
+    ]);
   });
 });

@@ -20,7 +20,7 @@ const SearchPanelLoader = lazy(() =>
 type Ctx = {
   open: boolean;
   /** Åpner det globale panelet uten å navigere eller anvende et utkast. */
-  openPanel: (section?: SearchPanelSection) => void;
+  openPanel: (section?: SearchPanelSection, queryDraft?: string) => void;
   closePanel: () => void;
   registerResults: (ctx: SearchPanelResultsContext | null) => void;
   savedLocation: LocationValue;
@@ -38,13 +38,15 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const [open, setOpen] = useState(false);
   const [panelRequested, setPanelRequested] = useState(false);
   const [section, setSection] = useState<SearchPanelSection>("query");
+  const [queryDraft, setQueryDraft] = useState<string>();
   const [results, setResults] = useState<SearchPanelResultsContext | null>(null);
   const [savedLocation, setSavedLocation] = useSavedLocation();
 
   // Kategori- og filterdata lastes først når brukeren faktisk åpner panelet.
 
-  const openPanel = useCallback((s: SearchPanelSection = "query") => {
+  const openPanel = useCallback((s: SearchPanelSection = "query", q?: string) => {
     setSection(s);
+    setQueryDraft(q);
     setPanelRequested(true);
     setOpen(true);
   }, []);
@@ -74,6 +76,7 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
             open={open}
             onOpenChange={setOpen}
             initialSection={section}
+            initialQuery={queryDraft}
             results={results ?? undefined}
             savedLocation={savedLocation}
             onSavedLocationChange={setSavedLocation}

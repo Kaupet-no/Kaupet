@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
-import { PublishActions, ReviewPreview, ReviewPublishGroup } from ".";
+import { PublishActions, ReviewPublishGroup } from ".";
 
 const categoryFilters = vi.hoisted(() => ({
   current: [] as import("@/lib/category-filters").CategoryFilter[],
@@ -76,16 +76,36 @@ describe("ReviewPublishGroup", () => {
     );
     const { rerender } = render(view(["Tittelen må være minst 5 tegn"]));
 
-    expect(screen.getByRole("heading", { name: "Publiseringsklar" })).toBeTruthy();
-    expect(screen.getByRole("alert").textContent).toContain("Tittelen må være minst 5 tegn");
-    expect(screen.getByRole("heading", { name: "Gjør annonsen bedre" })).toBeTruthy();
-    expect(screen.getByText("Legg til bilder")).toBeTruthy();
+    expect(screen.getByText("1 opplysning må fylles ut")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tittelen må være minst 5 tegn" })).toBeTruthy();
+    expect(screen.queryByText("Klar til publisering")).toBeNull();
 
     rerender(view([]));
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("Klar til publisering")).toBeTruthy();
+    expect(screen.getByText("Legg til bilder, så finner flere den")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Publiser" }));
 
     expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("viser annonsesiden fra ny-annonse.tsx som selve Se over-visningen", () => {
+    render(
+      <ReviewPublishGroup
+        {...({
+          native: false,
+          isVehicle: false,
+          attributes: {},
+          mutationIsPending: false,
+          uploadProgress: null,
+          improvementGroupKeys: [],
+          publishingRequirementErrors: [],
+          reviewListing: <p>Annonsesiden</p>,
+        } as unknown as WizardSharedProps)}
+      />,
+    );
+
+    expect(screen.getByText("Annonsesiden")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Se full forhåndsvisning" })).toBeNull();
   });
 
   it("åpner 360° som valgfri forbedring fra kjøretøyets review", async () => {
@@ -110,7 +130,6 @@ describe("ReviewPublishGroup", () => {
           draftId: "draft-1",
           ensureDraftId: vi.fn(),
           onEditReviewSection: vi.fn(),
-          onPreview: vi.fn(),
           improvementGroupKeys: ["photos", "vehicle-price", "location", "vehicle-360"],
           publishingRequirementErrors: [],
         } as unknown as WizardSharedProps)}
@@ -143,72 +162,4 @@ describe("PublishActions", () => {
       });
     },
   );
-});
-
-describe("ReviewPreview", () => {
-  it("viser en tilgjengelig tom forhåndsvisning uten å feile", () => {
-    render(
-      <ReviewPreview
-        images={[]}
-        title=""
-        subtitle=""
-        priceNok={undefined}
-        isFree={false}
-        city=""
-        postalCode=""
-        categorySlug={null}
-        attributes={{}}
-      />,
-    );
-
-    expect(screen.getByRole("region", { name: "Forhåndsvisning" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Forhåndsvisning" })).toBeTruthy();
-    expect(screen.getAllByText("Ingen bilde").length).toBeGreaterThan(0);
-    expect(screen.getByText("—")).toBeTruthy();
-    expect(screen.getByText("Pris ikke satt")).toBeTruthy();
-    expect(screen.getByRole("article").className).toContain("text-left");
-    expect(screen.queryByText("Pris ved henvendelse")).toBeNull();
-  });
-  it("gjør hele forhåndsvisningskortet trykkbart med beskrivende navn", () => {
-    const onPreview = vi.fn();
-    render(
-      <ReviewPreview
-        images={[]}
-        title="Volvo V90"
-        subtitle=""
-        priceNok={250_000}
-        isFree={false}
-        city="Oslo"
-        postalCode=""
-        categorySlug="bil"
-        attributes={{}}
-        onPreview={onPreview}
-      />,
-    );
-
-    const previewButton = screen.getByRole("button", {
-      name: "Trykk for å forhåndsvise annonsen",
-    });
-    fireEvent.click(previewButton);
-
-    expect(onPreview).toHaveBeenCalledOnce();
-    expect(screen.getByText("Trykk for å forhåndsvise annonsen")).toBeTruthy();
-  });
-  it("viser kjøretøyets pris inkludert omregistreringsavgift", () => {
-    render(
-      <ReviewPreview
-        images={[]}
-        title="Volvo V90"
-        subtitle=""
-        priceNok={250_000}
-        isFree={false}
-        city="Oslo"
-        postalCode=""
-        categorySlug="bil"
-        attributes={{ omregistreringsavgift_override_kr: 5_000 }}
-      />,
-    );
-
-    expect(screen.getByText("255 000 kr")).toBeTruthy();
-  });
 });

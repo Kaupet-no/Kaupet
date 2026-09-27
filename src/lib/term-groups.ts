@@ -23,9 +23,10 @@ export function emptyTermGroup(exclude = false): TermGroup {
 }
 
 export function describeTermGroup(g: TermGroup): string {
-  const verb = g.exclude ? "Skjul" : "Vis kun";
   const qualifier = g.mode === "all" ? "ALLE disse ordene" : "MINST ETT av disse ordene";
-  return `${verb} annonser med ${qualifier}`;
+  return g.exclude
+    ? `Skjul annonser som inneholder ${qualifier}`
+    : `Vis kun annonser med ${qualifier}`;
 }
 
 /** Combines groups that share the same mode + include/exclude setting into a

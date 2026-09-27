@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AttributeFields, useAllCategoryFilters } from "@/components/attribute-fields";
 import {
@@ -21,6 +12,7 @@ import {
 import { getMissingRequiredFilters, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { matchBrandAndModelInTitle } from "@/lib/vehicle/vehicle-brand-match";
+import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 import { CategoryIcon } from "@/lib/category-icons";
 import {
   LEAF_LABELS_NB,
@@ -177,13 +169,12 @@ function ManualSpecSection({
  * redigeres på vehicle-facts. Uregistrerte kjøretøy fyller dem manuelt her.
  *
  * Registreringsnummeret brukes kun til å hente *tekniske* data fra SVV.
- * Oppslaget kjøres fra wizardens "Neste"-knapp (se `goToNextPage` i
- * ny-annonse.tsx), ikke fra en egen knapp her — et norsk skilt har aldri mer
- * enn 7 tegn, så feltet er begrenset til det. Brukere som ikke har eller
- * ikke vil oppgi registreringsnummer krysser av boksen under skiltet og
- * fyller ut de tekniske opplysningene selv. Kategorivelgeren som lå i den
- * grenen tidligere er borte: kategorien er allerede bekreftet på steget før
- * dette.
+ * Oppslaget kjøres fra "Bekreft"-knappen ved skiltet (eller wizardens
+ * "Neste", se `goToNextPage` i ny-annonse.tsx) — et norsk skilt har aldri
+ * mer enn 7 tegn, så feltet er begrenset til det. Underkategorien vises
+ * først etter oppslaget (forhåndsvalgt fra SVV-klassifiseringen) eller når
+ * brukeren krysser av for at kjøretøyet ikke er registrert; da deaktiveres
+ * skiltet og knappen, og de tekniske opplysningene fylles ut manuelt.
  */
 export function VehicleRegistration(props: WizardSharedProps) {
   const {
@@ -196,6 +187,8 @@ export function VehicleRegistration(props: WizardSharedProps) {
     vehicleLookupError,
     vehicleRegNrInput,
     setVehicleRegNrInput,
+    runVehicleLookup,
+    setValue,
     attributes,
     onAttributesChange,
     extraFieldError,
@@ -204,7 +197,6 @@ export function VehicleRegistration(props: WizardSharedProps) {
     vehicleLookupResult,
     vehicleClassification,
     vehiclePreviousClassificationMismatch,
-    confirmVehicleData,
     resetLookupOnReturnToRegistration,
   } = props;
 
@@ -271,6 +263,15 @@ export function VehicleRegistration(props: WizardSharedProps) {
     onCategorySelect(leaf.id, leaf.parent_id ?? bilOgMcCategoryId ?? "");
   }
 
+  /** Oppslaget avgjør underkategorien: velg den SVV fant, så brukeren bare
+   * trenger å rette den hvis den er feil. */
+  const detectedLeafSlug = vehicleClassification?.slug ?? null;
+  useEffect(() => {
+    const leaf = detectedLeafSlug && leafBySlug.get(detectedLeafSlug as VehicleLeafSlug);
+    if (leaf && leaf.id !== categoryId) selectSubcategory(leaf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectedLeafSlug]);
+
   const brand = typeof attributes.brand === "string" ? attributes.brand : undefined;
   const model = typeof attributes.model === "string" ? attributes.model : undefined;
 
@@ -316,30 +317,37 @@ export function VehicleRegistration(props: WizardSharedProps) {
     extraFieldError?.field === key ? extraFieldError.message : undefined;
 
   const lookup = vehicleLookupResult;
-  const detectedSlug = vehicleClassification?.slug ?? null;
-  /** Kategorien brukeren valgte i rutenettet over (før oppslaget) stemmer
-   * ikke alltid med hva SVV faktisk finner på skiltet — vist som en
-   * advarsel i bekreftelsespopupen under, ikke en egen dialog: "Nei" der
-   * dekker begge tilfeller (feil skilt eller feil underkategori), siden
-   * begge feltene er redigerbare på denne samme siden. */
-  const categoryMismatch = !!lookup && !!detectedSlug && detectedSlug !== selectedLeafSlug;
+  /** SVV-oppslaget uten merke eller modell (sjeldent, f.eks. eldre kjøretøy)
+   * — da fyller brukeren begge inn under bekreftelsesmeldingen. */
+  const lookupMissingBrandModel = !!lookup && !(lookup.brand && lookup.model);
   const lookupSummary = lookup
-    ? [lookup.color, lookup.brand, lookup.model].filter(Boolean).join(" ")
+    ? [lookup.year, lookup.color?.toLowerCase(), lookup.brand, lookup.model]
+        .filter(Boolean)
+        .join(" ")
     : "";
-  const confirmedBrand = brand ?? lookup?.brand ?? undefined;
-  const confirmedModel = brand === undefined ? (model ?? lookup?.model ?? undefined) : model;
-  const lookupReadyToConfirm = !!confirmedBrand?.trim() && !!confirmedModel?.trim();
-  function formatRegNr(v: string) {
-    const m = /^([A-Z]{2,3})(\d{3,5})$/.exec(v);
-    return m ? `${m[1]} ${m[2]}` : v;
-  }
+
+  /** Tittelen i forhåndsvisningen følger SVV straks oppslaget er gjort — den
+   * samme tittelen VehicleTitleFields ellers ville satt på vehicle-facts. */
+  useEffect(() => {
+    if (!lookup?.brand || !lookup.model) return;
+    const next = computeVehicleTitle({
+      brand: lookup.brand,
+      model: lookup.model,
+      ...(lookup.year ? { year: lookup.year } : {}),
+    });
+    if (next !== title) setValue("title", next, { shouldValidate: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookup]);
+  const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
+
+  const showSubcategory = !vehicleRegistered || (!!lookup && subcategoryPickerOpen);
 
   return (
     <section className="space-y-5">
       {/* Registreringsnummeret først: oppslaget avgjør uansett underkategorien
-          (se detectedSlug/categoryMismatch), så feltet under skal fylles ut før
-          brukeren gjetter. Underkategorien står likevel foran de manuelle
-          merke/modell-feltene, som filtreres av den. */}
+          (se detectedSlug/categoryMismatch), så underkategorien vises først
+          etter "Bekreft" eller "ikke registrert". Den står likevel foran de
+          manuelle merke/modell-feltene, som filtreres av den. */}
       <div className="space-y-3">
         <Label htmlFor="vehicle-reg-nr">
           Registreringsnummer
@@ -347,72 +355,127 @@ export function VehicleRegistration(props: WizardSharedProps) {
         </Label>
 
         {vehicleRegistered && (
-          <>
-            <p className="text-xs text-muted-foreground">
-              Trykk Neste for å hente tekniske opplysninger automatisk fra Statens vegvesen. Du får
-              sjekke og rette opplysningene før annonsen opprettes.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div
-                className={`flex h-20 w-72 items-stretch overflow-hidden rounded-lg bg-white shadow-md ${
-                  vehicleLookupError ? "ring-2 ring-destructive" : ""
-                }`}
-              >
-                <div className="flex w-10 flex-col items-center justify-center gap-1 bg-blue-700">
-                  <svg viewBox="0 0 22 16" className="h-4 w-[22px]" aria-hidden>
-                    <rect width="22" height="16" fill="#ef2b2d" />
-                    <rect x="6" width="4" height="16" fill="#fff" />
-                    <rect y="6" width="22" height="4" fill="#fff" />
-                    <rect x="7" width="2" height="16" fill="#002868" />
-                    <rect y="7" width="22" height="2" fill="#002868" />
-                  </svg>
-                  <span className="text-lg font-bold leading-none text-white">N</span>
-                </div>
-                <input
-                  id="vehicle-reg-nr"
-                  value={vehicleRegNrInput}
-                  onChange={(e) => setVehicleRegNrInput(e.target.value.toUpperCase().slice(0, 7))}
-                  maxLength={7}
-                  placeholder="AB 12345"
-                  disabled={vehicleLookupLoading}
-                  aria-required="true"
-                  aria-invalid={!!vehicleLookupError}
-                  aria-describedby={vehicleLookupError ? "vehicle-reg-nr-error" : undefined}
-                  className="w-full flex-1 bg-white px-2 text-center font-mono text-4xl font-bold tracking-[0.08em] text-neutral-900 outline-none placeholder:text-black/20 disabled:opacity-60"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                />
-              </div>
-            </div>
-            {vehicleLookupLoading && (
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                Slår opp kjøretøy…
-              </p>
-            )}
-            {vehicleLookupError && (
-              <p
-                id="vehicle-reg-nr-error"
-                role="alert"
-                aria-live="assertive"
-                className="text-sm text-destructive"
-              >
-                {vehicleLookupError}
-              </p>
-            )}
-          </>
+          <p className="text-xs text-muted-foreground">
+            Trykk Bekreft for å hente tekniske opplysninger automatisk fra Statens vegvesen. Du får
+            sjekke og rette opplysningene før annonsen opprettes.
+          </p>
         )}
 
-        <div className="flex items-start gap-2">
-          <Checkbox
-            id="vehicle-not-registered"
-            checked={!vehicleRegistered}
-            onCheckedChange={(checked) => setVehicleRegistered(!checked)}
-          />
-          <Label htmlFor="vehicle-not-registered" className="font-normal leading-snug">
-            Kjøretøyet er ikke registrert, eller jeg vil ikke oppgi registreringsnummer
-          </Label>
+        <div className="flex flex-wrap items-center gap-3">
+          <div
+            className={`flex h-20 w-72 items-stretch overflow-hidden rounded-lg bg-white shadow-md ${
+              vehicleLookupError && vehicleRegistered ? "ring-2 ring-destructive" : ""
+            } ${vehicleRegistered ? "" : "opacity-50 grayscale"}`}
+          >
+            <div className="flex w-10 flex-col items-center justify-center gap-1 bg-blue-700">
+              <svg viewBox="0 0 22 16" className="h-4 w-[22px]" aria-hidden>
+                <rect width="22" height="16" fill="#ef2b2d" />
+                <rect x="6" width="4" height="16" fill="#fff" />
+                <rect y="6" width="22" height="4" fill="#fff" />
+                <rect x="7" width="2" height="16" fill="#002868" />
+                <rect y="7" width="22" height="2" fill="#002868" />
+              </svg>
+              <span className="text-lg font-bold leading-none text-white">N</span>
+            </div>
+            <input
+              id="vehicle-reg-nr"
+              value={vehicleRegNrInput}
+              onChange={(e) => {
+                setVehicleRegNrInput(e.target.value.toUpperCase().slice(0, 7));
+                // Et nytt skilt gjør oppslaget (og underkategorien fra det) utdatert.
+                if (lookup) {
+                  resetLookupOnReturnToRegistration();
+                  setSubcategoryPickerOpen(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                void runVehicleLookup(vehicleRegNrInput);
+              }}
+              maxLength={7}
+              placeholder="AB 12345"
+              disabled={vehicleLookupLoading || !vehicleRegistered}
+              aria-required={vehicleRegistered}
+              aria-invalid={!!vehicleLookupError && vehicleRegistered}
+              aria-describedby={
+                vehicleLookupError && vehicleRegistered ? "vehicle-reg-nr-error" : undefined
+              }
+              className="w-full flex-1 bg-white px-2 text-center font-mono text-4xl font-bold tracking-[0.08em] text-neutral-900 outline-none placeholder:text-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+              autoComplete="off"
+              autoCapitalize="characters"
+            />
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => void runVehicleLookup(vehicleRegNrInput)}
+            disabled={vehicleLookupLoading || !vehicleRegistered}
+          >
+            Bekreft
+          </Button>
         </div>
+        {vehicleRegistered && vehicleLookupLoading && (
+          <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+            Slår opp kjøretøy…
+          </p>
+        )}
+        {vehicleRegistered && vehicleLookupError && (
+          <p
+            id="vehicle-reg-nr-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-sm text-destructive"
+          >
+            {vehicleLookupError}
+          </p>
+        )}
+
+        {vehicleRegistered && lookup && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="space-y-3 rounded-lg border border-border bg-muted/50 p-4 animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none"
+          >
+            <p className="text-sm">
+              Dette registreringsnummeret tilhører en{" "}
+              <span className="font-medium">{lookupSummary}</span>. Annonsen blir opprettet i
+              underkategori <span className="font-medium">{LEAF_LABELS_NB[selectedLeafSlug]}</span>.
+            </p>
+            <p className="text-xs text-muted-foreground">Kjøretøydata fra Statens vegvesen</p>
+            {!subcategoryPickerOpen && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSubcategoryPickerOpen(true)}
+              >
+                Endre underkategori
+              </Button>
+            )}
+          </div>
+        )}
+        {vehicleRegistered && vehiclePreviousClassificationMismatch && (
+          <Alert variant="warning">
+            <AlertDescription>
+              Sist du slo opp dette registreringsnummeret fikk du en annen kjøretøytype — dette kan
+              skje ved eierskifte av personlige kjennemerker. Sjekk at opplysningene over stemmer.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!lookup && (
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="vehicle-not-registered"
+              checked={!vehicleRegistered}
+              onCheckedChange={(checked) => setVehicleRegistered(!checked)}
+            />
+            <Label htmlFor="vehicle-not-registered" className="font-normal leading-snug">
+              Kjøretøyet er ikke registrert, eller jeg vil ikke oppgi registreringsnummer
+            </Label>
+          </div>
+        )}
 
         {!vehicleRegistered && (
           <div className="space-y-2 border-t pt-3">
@@ -449,42 +512,45 @@ export function VehicleRegistration(props: WizardSharedProps) {
         )}
       </div>
 
-      <div className="space-y-2 border-t pt-4">
-        <Label>Underkategori</Label>
-        <p className="text-xs text-muted-foreground">
-          Merke og modell under filtreres etter hvilken underkategori som er valgt. Velg en annen
-          hvis den markerte ikke stemmer.
-        </p>
-        <div
-          role="radiogroup"
-          aria-label="Underkategori"
-          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
-        >
-          {VEHICLE_LEAF_SLUGS.filter((slug) => leafBySlug.has(slug)).map((slug) => {
-            const leaf = leafBySlug.get(slug)!;
-            const selected = selectedLeafSlug === slug;
-            return (
-              <button
-                key={slug}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => selectSubcategory(leaf)}
-                className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors ${
-                  selected
-                    ? "border-primary bg-primary/10 text-primary font-medium"
-                    : "border-border hover:border-primary/40"
-                }`}
-              >
-                <CategoryIcon iconName={leaf.icon} className="size-5" />
-                {LEAF_LABELS_NB[slug]}
-              </button>
-            );
-          })}
+      {showSubcategory && (
+        <div className="space-y-2 border-t pt-4">
+          <Label>Underkategori</Label>
+          <p className="text-xs text-muted-foreground">
+            {(!vehicleRegistered || lookupMissingBrandModel) &&
+              "Merke og modell under filtreres etter hvilken underkategori som er valgt. "}
+            Velg en annen hvis den markerte ikke stemmer.
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="Underkategori"
+            className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+          >
+            {VEHICLE_LEAF_SLUGS.filter((slug) => leafBySlug.has(slug)).map((slug) => {
+              const leaf = leafBySlug.get(slug)!;
+              const selected = selectedLeafSlug === slug;
+              return (
+                <button
+                  key={slug}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => selectSubcategory(leaf)}
+                  className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors ${
+                    selected
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <CategoryIcon iconName={leaf.icon} className="size-5" />
+                  {LEAF_LABELS_NB[slug]}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {!vehicleRegistered && (
+      {(!vehicleRegistered || lookupMissingBrandModel) && (
         <section className="space-y-4 border-t pt-4">
           <VehicleBrandField
             categoryGroup={categoryGroup}
@@ -501,92 +567,19 @@ export function VehicleRegistration(props: WizardSharedProps) {
             required
             error={fieldError("model")}
           />
-          <ManualSpecSection
-            heading="Grunnfakta"
-            sectionId="vehicle-manual-grunnfakta-heading"
-            visibleKeys={manualSections.grunnfakta}
-            allKeys={manualSpecKeys}
-            initialOpen
-            hasMissing={manualSections.grunnfakta.some((key) => missingManualSpecKeys.has(key))}
-            {...props}
-          />
+          {!vehicleRegistered && (
+            <ManualSpecSection
+              heading="Grunnfakta"
+              sectionId="vehicle-manual-grunnfakta-heading"
+              visibleKeys={manualSections.grunnfakta}
+              allKeys={manualSpecKeys}
+              initialOpen
+              hasMissing={manualSections.grunnfakta.some((key) => missingManualSpecKeys.has(key))}
+              {...props}
+            />
+          )}
         </section>
       )}
-
-      <AlertDialog open={!!lookup} onOpenChange={() => {}}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Registreringsnummer {lookup && formatRegNr(lookup.registrationNumber)}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Dette tilhører en {lookupSummary}
-              {lookup?.year ? ` (${lookup.year}-modell)` : ""}. Er dette korrekt?
-            </AlertDialogDescription>
-            <p className="text-sm font-medium text-foreground">Kjøretøydata fra Statens vegvesen</p>
-          </AlertDialogHeader>
-          {categoryMismatch && (
-            <Alert variant="warning">
-              <AlertDescription>
-                Registreringsnummeret matcher ikke valgt kategori: Statens vegvesen sier dette er en{" "}
-                <span className="font-medium">{LEAF_LABELS_NB[detectedSlug]}</span>, men du har
-                valgt <span className="font-medium">{LEAF_LABELS_NB[selectedLeafSlug]}</span> som
-                underkategori. Trykk «Nei» for å endre underkategori eller registreringsnummer.
-              </AlertDescription>
-            </Alert>
-          )}
-          {vehiclePreviousClassificationMismatch && (
-            <Alert variant="warning">
-              <AlertDescription>
-                Sist du slo opp dette registreringsnummeret fikk du en annen kjøretøytype — dette
-                kan skje ved eierskifte av personlige kjennemerker. Sjekk at opplysningene over
-                stemmer.
-              </AlertDescription>
-            </Alert>
-          )}
-          {lookup && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Kontroller merke og modell. Rett bare hvis opplysningene fra Statens vegvesen ikke
-                stemmer.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Du kan rette merke og modell her. Hvis registreringsnummeret eller underkategorien
-                er feil, trykk «Nei» for å gjøre oppslaget på nytt.
-              </p>
-              <VehicleBrandField
-                categoryGroup={categoryGroup}
-                value={confirmedBrand}
-                onChange={(v) => setAttribute("brand", v)}
-                required
-              />
-              <VehicleModelWithClassField
-                categoryGroup={categoryGroup}
-                brandName={confirmedBrand}
-                value={confirmedModel}
-                onChange={(v) => setAttribute("model", v)}
-                required
-              />
-              {!lookupReadyToConfirm && (
-                <p className="text-sm text-destructive">
-                  Fyll inn alle påkrevde opplysninger før du fortsetter.
-                </p>
-              )}
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => resetLookupOnReturnToRegistration()}>
-              Nei
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={!lookupReadyToConfirm}
-              onClick={() => confirmVehicleData(categoryId, categoryGroup)}
-            >
-              Ja
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </section>
   );
 }

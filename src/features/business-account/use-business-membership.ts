@@ -23,9 +23,19 @@ export type BusinessLocation = {
   lng: number | null;
   is_default: boolean;
   active: boolean;
+  show_visiting_address: boolean;
+  contacts: BusinessLocationContact[];
   created_at: string;
   updated_at: string;
   permissions: BusinessLocationPermissions;
+};
+
+export type BusinessLocationContact = {
+  id: string;
+  name: string;
+  phone: string;
+  avatar_path: string | null;
+  show_in_listings: boolean;
 };
 
 export type BusinessOrganization = {

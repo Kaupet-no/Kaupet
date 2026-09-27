@@ -295,7 +295,7 @@ export function BusinessAdminPanel({ locations, billingProfile }: Props) {
                       , fra neste fakturaperiode for opprettelse av en ny lokasjon, og bekrefter at
                       jeg har lest og godtar{" "}
                       <a
-                        href="/vilkar"
+                        href="/vilkar/bedrift"
                         target="_blank"
                         rel="noreferrer"
                         className="text-foreground underline"

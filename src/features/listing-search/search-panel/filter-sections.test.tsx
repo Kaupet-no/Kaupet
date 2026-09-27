@@ -89,13 +89,41 @@ describe("SearchFilterSections", () => {
     expect(queryByText("Alle filtre")).toBeNull();
   });
 
-  it("opens category selection from the overview", () => {
-    const { getByText } = setup("price");
+  it("viser kategori i samme panel og går tilbake til filteroversikten", () => {
+    const { getByText, getByRole, queryByText } = setup("price");
 
     fireEvent.click(getByText("Tilbake til filteroversikt"));
     fireEvent.click(getByText("Kategori"));
 
     expect(getByText("kategorivelger")).toBeTruthy();
+    expect(getByRole("heading", { name: "Velg kategori" })).toBeTruthy();
+    expect(queryByText("Pris (NOK)")).toBeNull();
+
+    fireEvent.click(getByRole("button", { name: "Tilbake til filteroversikt" }));
+    expect(getByText("Kategori")).toBeTruthy();
+    expect(queryByText("kategorivelger")).toBeNull();
+  });
+
+  it("åpner kategori direkte i desktop-sidekolonnen", () => {
+    const { getByRole, getByText, queryByText } = render(
+      <SearchFilterSections
+        layout="expanded"
+        desktopGroup="basis"
+        value={defaultAdvancedSearchValue()}
+        setValue={() => {}}
+        categories={categories}
+        section="categories"
+      />,
+    );
+
+    const trigger = getByRole("button", { name: /Kategori/ });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(getByText("kategorivelger")).toBeTruthy();
+
+    fireEvent.click(trigger);
+    expect(queryByText("kategorivelger")).toBeNull();
   });
 
   it("shows the selected value and opens the concrete primary filter", () => {

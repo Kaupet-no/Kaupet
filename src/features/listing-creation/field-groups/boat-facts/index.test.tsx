@@ -64,6 +64,7 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     categoryLabel: "Båter",
     title: "",
     titleExample: null,
+    titleCollapsible: false,
     condition: "good",
     isFree: false,
     canShip: "pickup",
@@ -86,6 +87,15 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     keywordsFetching: false,
     keywordSuggestions: [],
     appendTagToDescription: vi.fn(),
+    photoSuggestionEnabled: false,
+    photoSuggestionStatus: "idle",
+    analyzePhotos: vi.fn(),
+    photoCategorySuggestions: [],
+    photoTitleSuggestion: null,
+    dismissPhotoTitleSuggestion: vi.fn(),
+    photoAttributesAvailable: false,
+    photoAttributeSuggestionLoading: false,
+    requestPhotoAttributeSuggestions: vi.fn(async () => []),
     ...overrides,
   } as unknown as WizardSharedProps;
 }

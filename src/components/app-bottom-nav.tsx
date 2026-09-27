@@ -17,7 +17,6 @@ import { useQuery } from "@tanstack/react-query";
 import { MessagesButton } from "@/components/messages-button";
 import logoIcon from "@/assets/brand/icon-only-green-letter.png";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
-import { trackProductEvent } from "@/lib/product-analytics";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -56,6 +55,11 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
 
+  // FAB-en er kun forstørret i bunnpillen på telefon; i railen er den like
+  // stor som de andre knappene.
+  const fabSize = rail ? "h-12 w-12" : "h-16 w-16 shadow-lg ring-4 ring-background";
+  const fabIcon = rail ? "size-6" : "size-8";
+
   const itemClass = rail
     ? "flex flex-col items-center gap-0.5"
     : "flex flex-1 flex-col items-center gap-0.5";
@@ -64,6 +68,7 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
     <nav
       aria-label={rail ? "Hovednavigasjon" : "Bunnavigasjon"}
       className={cn(
+        "app-bottom-nav",
         rail
           ? "pointer-events-none fixed inset-y-0 left-0 z-50"
           : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none",
@@ -117,7 +122,6 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
             type="button"
             onClick={() => {
               void hapticImpact("light");
-              trackProductEvent("search_opened", { source: "bottom_nav" });
               openPanel("query");
             }}
             className={`flex h-12 w-12 items-center justify-center rounded-full ${
@@ -142,10 +146,14 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           {authLoading ? (
             <AuthPendingButton
               label="Ny annonse"
-              className="h-16 w-16 bg-primary text-primary-foreground shadow-lg ring-4 ring-background"
-              iconClassName="size-8"
+              className={cn("bg-primary text-primary-foreground", fabSize)}
+              iconClassName={fabIcon}
             />
-          ) : user ? (
+          ) : (
+            // Åpner intensjon+tittel-velgeren for både innloggede og
+            // utloggede brukere — utkastet lagres lokalt, innlogging skjer
+            // først ved publisering (samme mønster som ny-annonse.tsx/
+            // ny-ok-annonse.tsx sin gjestedraft).
             <button
               type="button"
               aria-label={isOnNewAdPage ? "Avbryt" : "Ny annonse"}
@@ -157,24 +165,20 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
                   setAdPickerOpen((o) => !o);
                 }
               }}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
+              className={cn(
+                "flex items-center justify-center rounded-full bg-primary text-primary-foreground transition active:scale-95",
+                fabSize,
+              )}
             >
               {isOnNewAdPage || (native && adPickerOpen) ? (
-                <X key="x" className="size-8 animate-[fab-icon-in_0.18s_ease-out]" />
+                <X key="x" className={cn(fabIcon, "animate-[fab-icon-in_0.18s_ease-out]")} />
               ) : (
-                <Plus key="plus" className="size-8 animate-[fab-icon-in-reverse_0.18s_ease-out]" />
+                <Plus
+                  key="plus"
+                  className={cn(fabIcon, "animate-[fab-icon-in-reverse_0.18s_ease-out]")}
+                />
               )}
             </button>
-          ) : (
-            <Link
-              to="/auth"
-              search={{ mode: "signup" as const }}
-              aria-label="Ny annonse"
-              onClick={() => void hapticImpact("light")}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
-            >
-              <Plus className="size-8" />
-            </Link>
           )}
           <span className="native-nav-label text-muted-foreground">
             {isOnNewAdPage ? "Avbryt" : "Ny annonse"}

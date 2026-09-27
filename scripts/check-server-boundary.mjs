@@ -35,11 +35,16 @@ function visit(path) {
         return [statement.moduleSpecifier.text];
       }),
     );
+    // Test files never ship in the browser bundle (Vite/Vitest don't build
+    // them into routes), so a unit test statically importing the *.server.ts
+    // module it exercises is not a boundary violation — only production
+    // source under these roots can leak server code into a client graph.
+    const isTestFile = /\.test\.tsx?$/.test(entry);
     const lines = source.split(/\r?\n/);
     lines.forEach((line, index) => {
       // Dynamic imports inside route server handlers are intentional; static
       // imports are the ones that can pull server modules into client graphs.
-      if (/\bfrom\s+["'][^"']+\.server(?:\.[^"']+)?["']/.test(line)) {
+      if (!isTestFile && /\bfrom\s+["'][^"']+\.server(?:\.[^"']+)?["']/.test(line)) {
         violations.push(`${relative(process.cwd(), fullPath)}:${index + 1}: ${line.trim()}`);
       }
     });

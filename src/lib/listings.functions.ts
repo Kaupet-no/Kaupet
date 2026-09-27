@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -88,12 +88,12 @@ async function resolveListingOwnership(
     if (accessError) {
       throw await toClientError("database", accessError);
     }
-    if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
+    if (!hasAccess) throw new ClientError("Proff-tilgang er ikke aktiv.", 403);
     if (!membership.can_create_listings) {
-      throw new Error("Du har ikke tilgang til å opprette annonser.");
+      throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
     }
     if (membership.category_access === "restricted") {
-      if (!categoryId) throw new Error("Du har ikke tilgang til denne kategorien.");
+      if (!categoryId) throw new ClientError("Du har ikke tilgang til denne kategorien.", 403);
       const { data: allowed, error: categoryError } = await supabaseAdmin
         .from("organization_member_categories")
         .select("category_id")
@@ -104,10 +104,10 @@ async function resolveListingOwnership(
       if (categoryError) {
         throw await toClientError("database", categoryError);
       }
-      if (!allowed) throw new Error("Du har ikke tilgang til denne kategorien.");
+      if (!allowed) throw new ClientError("Du har ikke tilgang til denne kategorien.", 403);
     }
   }
-  if (!requestedLocationId) throw new Error("Velg en lokasjon før annonsen opprettes.");
+  if (!requestedLocationId) throw new ClientError("Velg en lokasjon før annonsen opprettes.");
   const { data: location, error: locationError } = await supabaseAdmin
     .from("organization_locations")
     .select("id")
@@ -118,7 +118,7 @@ async function resolveListingOwnership(
   if (locationError) {
     throw await toClientError("database", locationError);
   }
-  if (!location) throw new Error("Lokasjonen finnes ikke eller er ikke aktiv.");
+  if (!location) throw new ClientError("Lokasjonen finnes ikke eller er ikke aktiv.", 404);
   if (membership.role !== "superuser") {
     const { data: assignment, error: assignmentError } = await supabaseAdmin
       .from("organization_location_members")
@@ -129,7 +129,7 @@ async function resolveListingOwnership(
     if (assignmentError) {
       throw await toClientError("database", assignmentError);
     }
-    if (!assignment) throw new Error("Du har ikke tilgang til denne lokasjonen.");
+    if (!assignment) throw new ClientError("Du har ikke tilgang til denne lokasjonen.", 403);
   }
   return {
     seller_id: userId,
@@ -154,27 +154,6 @@ function listingLocationFields(location: OrganizationListingLocation | null) {
     lat: location.lat,
     lng: location.lng,
   };
-}
-
-async function saveVisitingAddressSnapshot(
-  supabaseAdmin: SupabaseClient,
-  listingId: string,
-  location: OrganizationListingLocation | null,
-  showVisitingAddress: boolean,
-) {
-  await supabaseAdmin.from("listing_visiting_addresses").delete().eq("listing_id", listingId);
-  if (!showVisitingAddress || !location?.address_line || !location.postal_code || !location.city) {
-    return;
-  }
-  const { error } = await supabaseAdmin.from("listing_visiting_addresses").insert({
-    listing_id: listingId,
-    address_line: location.address_line,
-    postal_code: location.postal_code,
-    city: location.city,
-  });
-  if (error) {
-    throw await toClientError("database", error);
-  }
 }
 
 async function authorizeListingMutation(
@@ -227,7 +206,7 @@ async function assertUnderHourlyListingLimit(
     .eq("seller_id", userId)
     .gte("created_at", oneHourAgo);
   if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
-    throw new Error(errorMessage);
+    throw new ClientError(errorMessage, 429);
   }
 }
 
@@ -382,7 +361,6 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
         organization_location_id: z.string().uuid().nullable().optional(),
-        show_visiting_address: z.boolean().optional(),
         can_ship: z.boolean().nullable().optional(),
         known_issues: z.string().trim().max(2000).nullable().optional(),
         no_known_issues: z.boolean().nullable().optional(),
@@ -407,9 +385,6 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ...(data.city !== undefined && { city: data.city }),
       ...(data.lat !== undefined && { lat: data.lat }),
       ...(data.lng !== undefined && { lng: data.lng }),
-      ...(data.show_visiting_address !== undefined && {
-        show_visiting_address: data.show_visiting_address,
-      }),
       ...(data.can_ship !== undefined && { can_ship: data.can_ship }),
       ...(data.known_issues !== undefined && { known_issues: data.known_issues }),
       ...(data.no_known_issues !== undefined && { no_known_issues: !!data.no_known_issues }),
@@ -435,10 +410,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
                 ...listingLocationFields(orgLocation),
                 organization_location_id: existing.organization_location_id,
               }
-            : {
-                organization_location_id: null,
-                show_visiting_address: false,
-              }),
+            : { organization_location_id: null }),
           draft_expiry_notified_at: null,
         })
         .eq("id", data.id)
@@ -488,11 +460,8 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .insert({
         ...ownership,
         ...(ownership.organization_id
-          ? {
-              ...listingLocationFields(orgLocation),
-              show_visiting_address: data.show_visiting_address ?? false,
-            }
-          : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
+          ? listingLocationFields(orgLocation)
+          : { seller_id: userId, organization_location_id: null }),
         status: "draft",
         ...fields,
       })
@@ -545,7 +514,6 @@ export const createListing = createServerFn({ method: "POST" })
         lat: z.number().nullable(),
         lng: z.number().nullable(),
         organization_location_id: z.string().uuid().nullable().optional(),
-        show_visiting_address: z.boolean().optional(),
         can_ship: z.boolean().nullable(),
         known_issues: z.string().trim().max(2000).nullable().optional(),
         no_known_issues: z.boolean().nullable().optional(),
@@ -637,7 +605,6 @@ export const createListing = createServerFn({ method: "POST" })
       known_issues: data.known_issues ?? null,
       no_known_issues: !!data.no_known_issues,
       maintenance_history: data.maintenance_history ?? null,
-      show_visiting_address: data.show_visiting_address ?? false,
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
@@ -658,7 +625,7 @@ export const createListing = createServerFn({ method: "POST" })
                 ...listingLocationFields(orgLocation),
                 organization_location_id: existing.organization_location_id,
               }
-            : { organization_location_id: null, show_visiting_address: false }),
+            : { organization_location_id: null }),
         })
         .eq("id", data.draftId)
         .eq("status", "draft")
@@ -667,12 +634,6 @@ export const createListing = createServerFn({ method: "POST" })
       if (error) {
         throw await toClientError("database", error);
       }
-      await saveVisitingAddressSnapshot(
-        supabaseAdmin,
-        listing.id as string,
-        orgLocation,
-        existing.organization_id ? (data.show_visiting_address ?? false) : false,
-      );
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }
 
@@ -699,7 +660,7 @@ export const createListing = createServerFn({ method: "POST" })
         ...ownership,
         ...(ownership.organization_id
           ? listingLocationFields(orgLocation)
-          : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
+          : { seller_id: userId, organization_location_id: null }),
         ...listingFields,
       })
       .select("id, kaupet_code")
@@ -707,12 +668,6 @@ export const createListing = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    await saveVisitingAddressSnapshot(
-      supabaseAdmin,
-      listing.id as string,
-      orgLocation,
-      ownership.organization_id ? (data.show_visiting_address ?? false) : false,
-    );
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 

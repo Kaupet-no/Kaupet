@@ -34,7 +34,7 @@ export function RegistrationPlate({
     <div
       className={cn(
         "@container flex aspect-[4.6/1] w-fit items-stretch overflow-hidden rounded-[3px] border border-black bg-white shadow-sm",
-        !editable && className,
+        className,
       )}
     >
       <div className="flex w-[17%] flex-col items-center justify-center gap-1 border-r border-black bg-blue-700">
@@ -60,10 +60,8 @@ export function RegistrationPlate({
     <button
       type="button"
       onClick={onEdit}
-      className={cn(
-        "rounded-md border border-dashed border-border/60 p-0.5 transition-colors hover:border-primary/50 hover:bg-primary/5",
-        className,
-      )}
+      aria-label={`Endre kjennemerke ${formatRegistrationNumber(value)}`}
+      className="rounded-md border border-dashed border-border/60 p-0.5 transition-colors hover:border-primary/50 hover:bg-primary/5"
     >
       {plate}
     </button>

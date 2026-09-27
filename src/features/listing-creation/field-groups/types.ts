@@ -1,4 +1,4 @@
-﻿import type { RefObject } from "react";
+﻿import type { ReactNode, RefObject } from "react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import type {
   UseFormRegister,
@@ -28,7 +28,6 @@ export type ListingFormShape = {
   postal_code?: string | undefined;
   city?: string | undefined;
   organization_location_id?: string | null;
-  show_visiting_address?: boolean;
   known_issues?: string | undefined;
   no_known_issues?: boolean;
   maintenance_history?: string | undefined;
@@ -52,6 +51,10 @@ export type ComposerReviewGroup = {
 export type ComposerReviewEditOptions = {
   field?: string;
   groupKey?: string;
+  /** Anchor id (matches a `review-section-<reviewAnchor>` wrapper in
+   * review-publish/index.tsx) to scroll/focus back to when the edit returns
+   * to the "Se over"-steget — only meaningful for edits started from there. */
+  reviewAnchor?: string;
 };
 
 /*
@@ -118,6 +121,9 @@ export type WizardSharedProps = {
    * (nearest ancestor's categories.title_example); null falls back to the
    * generic example. */
   titleExample: string | null;
+  /** Bildene-først-inngangen med KI på: tittelfeltet ligger bak "Jeg vil
+   * fylle ut tittel selv" til brukeren åpner det eller det har innhold. */
+  titleCollapsible: boolean;
   setCategoryPickerOpen: (open: boolean) => void;
   onCategorySelect: (categoryId: string, parentId: string) => void;
   /** Fired when the user re-opens an already-collapsed/highlighted category
@@ -171,7 +177,7 @@ export type WizardSharedProps = {
   vehicleClassification: VehicleClassification | null;
   /** Set when the same user previously looked up the same registration
    * number and got a different classification — surfaced as a soft warning
-   * in the reg-nr confirmation popup (personalized plates can be transferred
+   * under the reg-nr confirmation message (personalized plates can be transferred
    * between vehicles of a different class). */
   vehiclePreviousClassificationMismatch: { slug: string | null; lookedUpAt: string } | null;
   /** Registration number as typed so far — lifted out of the field group so
@@ -180,11 +186,11 @@ export type WizardSharedProps = {
   vehicleRegNrInput: string;
   setVehicleRegNrInput: (v: string) => void;
   runVehicleLookup: (registrationNumber: string) => Promise<boolean>;
-  /** Writes the raw (unedited) SVV lookup data into `attributes` and advances
-   * the wizard — called when the user confirms the reg-nr popup with "Ja". */
+  /** Writes the raw SVV lookup data into `attributes` and advances the wizard
+   * — called by the wizard's "Neste" once the lookup is shown on the page. */
   confirmVehicleData: (leafCategoryId: string, categoryGroup: VehicleBrandGroup) => void;
-  /** Clears the current lookup so the reg-nr field is editable again — called
-   * when the user answers "Nei" to the reg-nr confirmation popup. */
+  /** Clears the current lookup — called when the user edits the registration
+   * number after a lookup. */
   resetLookupOnReturnToRegistration: () => void;
 
   // condition
@@ -218,6 +224,10 @@ export type WizardSharedProps = {
   images: PendingImage[];
   setImages: (images: PendingImage[]) => void;
   uploadProgress: { done: number; total: number } | null;
+  /** True once the user has pressed "Neste" on the bildesteget with no
+   * images and not yet confirmed — drives the inline "fortsett uten
+   * bilder"-melding (erstatter den tidligere no-image-dialog.tsx). */
+  noImageConfirmPending: boolean;
   /** Persisted draft listing id, if the draft has been saved to Supabase yet
    * (requires a title of at least 5 characters — see `ensureDraftId`). Used
    * by the vehicle 360° QR capture panel to know which listing to attach
@@ -227,6 +237,33 @@ export type WizardSharedProps = {
    * still null), then resolves with the id — or null if the draft can't be
    * saved yet (e.g. title too short). */
   ensureDraftId: () => Promise<string | null>;
+
+  // photo-assisted suggestions (see
+  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md), one
+  // usePhotoSuggestion() instance shared by the photos and category-
+  // attributes steps — see use-photo-suggestion.ts.
+  photoSuggestionEnabled: boolean;
+  photoSuggestionStatus: "idle" | "analyzing" | "ok" | "unavailable";
+  analyzePhotos: () => void;
+  /** 0-2 candidates from the photo `identify` call, same shape as
+   * `categorySuggestions` — merged into the category-attributes chip ahead
+   * of the title-based suggestions when present. */
+  photoCategorySuggestions: {
+    category_id: string;
+    parent_id: string | null;
+    name_nb: string;
+    parent_name_nb: string | null;
+  }[];
+  photoTitleSuggestion: string | null;
+  dismissPhotoTitleSuggestion: () => void;
+  /** True once consent covers the images+title currently on the form — the
+   * gate for offering "Foreslå detaljer fra bildene" once a category is
+   * confirmed. */
+  photoAttributesAvailable: boolean;
+  photoAttributeSuggestionLoading: boolean;
+  requestPhotoAttributeSuggestions: (
+    categorySlug: string,
+  ) => Promise<{ key: string; value: string | number | boolean }[]>;
 
   // location
   locationMethod: "gps" | "postal" | null;
@@ -239,10 +276,12 @@ export type WizardSharedProps = {
   fetchMyLocation: () => void | Promise<void>;
   setFullscreenMapOpen: (open: boolean) => void;
   markerMovedRef: { current: boolean };
-  onPreview: () => void;
   lastEditedRef: { current: "postal_code" | "city" | "map" | null };
 
   // review/publish
+  /** Annonsesiden i redigeringsmodus for Se over-steget — bygget i
+   * ny-annonse.tsx, som eier utkastet og hvor endringene lagres. */
+  reviewListing?: ReactNode;
   previewPrice: string | null;
   mutationIsPending: boolean;
   turnstileEnabled: boolean;

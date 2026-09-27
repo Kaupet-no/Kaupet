@@ -9,7 +9,6 @@ import { hapticImpact } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { currentReturnTo } from "@/lib/auth-return";
 import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
-import { trackProductEvent } from "@/lib/product-analytics";
 
 type Size = "sm" | "md" | "lg";
 
@@ -96,7 +95,6 @@ export function FavoriteButton({
       queryClient.invalidateQueries({ queryKey: ["user-favorites"] });
       void hapticImpact("light");
       showSuccessToast(nowFav ? "Lagt til i favoritter" : "Fjernet fra favoritter");
-      trackProductEvent("favorite_toggled", { favorite: nowFav });
     },
     onError: (e: Error) => {
       if (e.message !== "not-authenticated") {

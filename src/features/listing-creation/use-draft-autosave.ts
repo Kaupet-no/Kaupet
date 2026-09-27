@@ -10,9 +10,27 @@ import {
   saveDraftImages,
 } from "@/features/listing-creation/draft-image-store";
 
-const DRAFT_KEY = "kaupet_draft_ny_annonse";
-const DRAFT_ID_KEY = "kaupet_draft_id";
-const DRAFT_UPDATED_AT_KEY = "kaupet_draft_updated_at";
+const DRAFT_KEY = "kaupet_draft_sell_listing";
+const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id";
+const DRAFT_UPDATED_AT_KEY = "kaupet_draft_sell_listing_updated_at";
+
+// ponytail: engangsflytting fra de gamle nøkkelnavnene (oktober 2026). Lokale
+// utkast utløper etter 7 dager, så dette kan slettes når det har vært ute
+// en stund.
+const LEGACY_DRAFT_KEYS: [string, string][] = [
+  ["kaupet_draft_ny_annonse", DRAFT_KEY],
+  ["kaupet_draft_id", DRAFT_ID_KEY],
+  ["kaupet_draft_updated_at", DRAFT_UPDATED_AT_KEY],
+];
+
+function migrateLegacyDraftKeys() {
+  for (const [from, to] of LEGACY_DRAFT_KEYS) {
+    const value = localStorage.getItem(from);
+    if (value === null) continue;
+    if (localStorage.getItem(to) === null) localStorage.setItem(to, value);
+    localStorage.removeItem(from);
+  }
+}
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 type ListingCondition = "new" | "like_new" | "good" | "acceptable" | "for_parts";
@@ -30,7 +48,6 @@ type DraftFields = {
   postalCode?: string;
   city?: string;
   organizationLocationId?: string | null;
-  showVisitingAddress?: boolean;
   coords: { lat: number; lng: number } | null;
   isVehicle: boolean;
   attributes: AttributeMap;
@@ -85,7 +102,6 @@ export function useDraftAutosave(fields: DraftFields) {
     noKnownIssues,
     maintenanceHistory,
     organizationLocationId,
-    showVisitingAddress,
     coords,
     stepKey,
     authenticated,
@@ -134,6 +150,7 @@ export function useDraftAutosave(fields: DraftFields) {
   // Load draft from localStorage on mount
   useEffect(() => {
     try {
+      migrateLegacyDraftKeys();
       const savedId = localStorage.getItem(DRAFT_ID_KEY);
       draftUpdatedAtRef.current = localStorage.getItem(DRAFT_UPDATED_AT_KEY);
       if (savedId) {
@@ -206,7 +223,6 @@ export function useDraftAutosave(fields: DraftFields) {
       postal_code: postalCode,
       city,
       organization_location_id: organizationLocationId,
-      show_visiting_address: showVisitingAddress,
       coords,
       attributes,
       known_issues: knownIssues,
@@ -229,7 +245,6 @@ export function useDraftAutosave(fields: DraftFields) {
       postalCode,
       city,
       organizationLocationId,
-      showVisitingAddress,
       coords,
       attributes,
       knownIssues,
@@ -333,7 +348,6 @@ export function useDraftAutosave(fields: DraftFields) {
             postal_code: postalCode || null,
             city: city || null,
             organization_location_id: organizationLocationId || null,
-            show_visiting_address: showVisitingAddress ?? false,
             lat: coords?.lat ?? null,
             lng: coords?.lng ?? null,
             can_ship: canShip == null ? null : canShip !== "pickup",
@@ -429,7 +443,6 @@ export function useDraftAutosave(fields: DraftFields) {
     postalCode,
     city,
     organizationLocationId,
-    showVisitingAddress,
     draftId,
   ]);
 
@@ -503,8 +516,6 @@ export function useDraftAutosave(fields: DraftFields) {
     }
     if (typeof hasDraftData.organization_location_id === "string")
       setValue("organization_location_id", hasDraftData.organization_location_id);
-    if (typeof hasDraftData.show_visiting_address === "boolean")
-      setValue("show_visiting_address", hasDraftData.show_visiting_address);
     if (typeof hasDraftData.city === "string") setValue("city", hasDraftData.city);
     if (
       hasDraftData.coords &&
@@ -558,6 +569,27 @@ export function useDraftAutosave(fields: DraftFields) {
     void clearDraftImages();
   }
 
+  /** Stops offering the recoverable draft without discarding or restoring
+   * it — the on-disk/server row is left untouched — but detaches the
+   * wizard's own draftId from it, so any autosave that runs from here on
+   * writes a *new* draft instead of silently overwriting the declined one
+   * with whatever the user types next (see "ikke overskriver..." tests). */
+  function dismissDraftOffer() {
+    draftRestorePending.current = false;
+    draftConflictRef.current = false;
+    draftIdRef.current = null;
+    draftUpdatedAtRef.current = null;
+    setDraftSaveConflict(false);
+    setDraftId(null);
+    setHasDraftData(null);
+    try {
+      localStorage.removeItem(DRAFT_ID_KEY);
+      localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
   async function discardDraft() {
     const id = draftIdRef.current ?? localStorage.getItem(DRAFT_ID_KEY);
     clearDraftStorage();
@@ -585,5 +617,6 @@ export function useDraftAutosave(fields: DraftFields) {
     restoreDraft,
     clearDraftStorage,
     discardDraft,
+    dismissDraftOffer,
   };
 }

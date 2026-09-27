@@ -12,6 +12,7 @@ import {
 } from "@/lib/vehicle/vehicle-classification";
 import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
+import { displayPriceNok, formatNok, formatNokNumber, priceRange } from "@/lib/format";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
@@ -57,6 +58,7 @@ export function Price({
   attributes,
   onAttributesChange,
   lockedFree,
+  similarListings,
   heroSize = false,
 }: WizardSharedProps & {
   /** Larger price input/label — used by `vehicle-price`'s dedicated,
@@ -151,6 +153,18 @@ export function Price({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxPriceInputKr]);
+  // Dempet prisforslag under feltet, basert på lignende AKTIVE annonser i
+  // samme kategori (samme `similarListings` som "Lignende annonser"-lista
+  // under, se similar-listings.tsx — henter kun status="active", aldri
+  // solgte annonser, så teksten skal si "til salgs", ikke "solgt").
+  // 25–75-persentil, ikke min/maks, så et par ekstremverdier ikke dominerer
+  // spennet. Kun `heroSize` (vehicle-price) hopper over denne — den har sin
+  // egen SimilarListings-plassering og et eget dedikert siste-steg.
+  const similarPrices = (similarListings ?? [])
+    .filter((l) => !l.is_free)
+    .map((l) => displayPriceNok(l))
+    .filter((p): p is number => typeof p === "number");
+  const priceSpread = priceRange(similarPrices);
   const priceField = register("price_nok");
   // type=="free" (fra intent+tittel-landingsbildet): hele
   // pris-spørsmålet skal skjules — is_free er allerede forhåndssatt true av
@@ -172,17 +186,21 @@ export function Price({
           }
         />
       </div>
-      <div className={heroSize ? "flex w-full flex-col gap-3" : "flex w-full items-end gap-3"}>
+      <div className="flex w-full flex-col gap-3">
         <div className="w-full space-y-1">
-          <div className={heroSize ? "relative w-full" : "relative max-w-[200px]"}>
+          <div className="relative w-full">
             <Input
               id="price_nok"
               type="text"
               inputMode="numeric"
-              placeholder="0"
+              // Annonsens viktigste tall skal aldri late som om det allerede
+              // har en verdi — et "0" i et tomt felt ser ut som en pris.
+              placeholder={heroSize ? "0" : undefined}
               disabled={isFree}
               className={
-                heroSize ? "h-16 w-full pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
+                heroSize
+                  ? "h-16 w-full pr-12 text-right text-4xl font-semibold"
+                  : "h-16 w-full pl-3 pr-14 text-left font-display text-4xl tabular-nums"
               }
               aria-required={!isFree}
               aria-invalid={!!errors.price_nok}
@@ -209,11 +227,17 @@ export function Price({
               }}
             />
             <span
-              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground ${heroSize ? "text-xl" : "text-sm"}`}
+              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground ${heroSize ? "text-xl" : "text-lg"}`}
             >
               kr
             </span>
           </div>
+          {!heroSize && priceSpread && (
+            <p className="text-sm text-muted-foreground">
+              Lignende til salgs for {formatNokNumber(priceSpread.low)}–
+              {formatNok(priceSpread.high)}
+            </p>
+          )}
         </div>
         {isVehicle && totalprisKr != null && (
           <div className="w-full space-y-1">

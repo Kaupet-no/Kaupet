@@ -26,12 +26,13 @@ Chat Completions-endepunkt som allerede brukes for eksplisitt tekstbasert
 KI-forslag — ingen ny leverandør, ingen SDK.
 
 - **Eksplisitt, per-handling samtykke.** Automatisk intern tittelstatistikk
-  er uendret og krever ikke samtykke. Fotoforslag krever at brukeren trykker
-  en synlig "Analyser valgte bilder med KI"-handling som på forhånd
-  forklarer at inntil tre komprimerte miniatyrer (og eventuell starttekst)
-  sendes til Mistral. Samtykket gjelder kun gjeldende `inputRevision`
-  (bilder/starttekst/kategori); endres disse, kreves en ny eksplisitt
-  handling.
+  er uendret og krever ikke samtykke. Fotoforslag krever at brukeren selv
+  trykker knappen «Fyll ut tittel og kategori for meg». Trykket er
+  samtykket: det finnes ingen egen bekreftelsesdialog (fjernet 2026-09-25,
+  se § 2c). Hjelpeteksten under knappen sier at bildene analyseres med KI og
+  lenker til `/personvern#bildeforslag`, som forklarer hva som sendes til
+  Mistral. Samtykket gjelder kun gjeldende `inputRevision`
+  (bilder/starttekst/kategori); endres disse, kreves et nytt trykk.
 - **Base64-miniatyrer, ikke originalbilder.** Input er `thumbFile` —
   JPEG/PNG/WebP, maks 150 KiB dekodet per bilde, maks 450 KiB totalt, maks
   tre bilder. Et inkompatibelt/for stort bilde hoppes over; er ingen bilder
@@ -56,7 +57,7 @@ unavailable`); en felt-provenance på `manual` blokkerer senere
   `site_settings.category_suggestion_ai_enabled !== false` og
   `MISTRAL_PHOTO_SUGGESTIONS_ENABLED === "true"` (se `.env.example` og
   `.env.staging.example`). Flagget forblir av inntil et kontrollert
-  staging-smoke-kall har bekreftet at Mistral Small 4 håndterer
+  staging-smoke-kall har bekreftet at modellen (nå Ministral 3 14B, se § 2d) håndterer
   vision + streng JSON Schema sammen, og inntil gjeldende Mistral
   API-avtale/DPA, EU-behandling, treningsopt-out og faktisk retensjon er
   bekreftet og korrekt beskrevet i personvernerklæringen og
@@ -85,6 +86,59 @@ Serversiden er landet og inaktiv; klientsiden er bevisst ikke bygget ennå.
 
 Ikke slett endepunktene som "død kode" uten å lese § 4 først: de er
 reverseringspunktet funksjonen er designet rundt.
+
+## 2c. Leveransestatus (per 2026-09-25)
+
+Klientinngangen er nå bygget: knappen «Fyll ut tittel og kategori for
+meg» (først med en egen samtykkedialog, som ble fjernet samme dag slik at
+trykket på knappen er samtykket, se § 2), nedskalering til maks 480 px
+(kategoriforslag) / 768 px (detaljforslag), maks 2/3 bilder per kall, og EXIF-/XMP-fjerning i både
+klient og server (`PHOTO_SUGGESTION_LIMITS` i
+`src/lib/photo-suggestion-images.ts`), koblet til `inputRevision` slik at et
+endret bilde-/tittel-/kategorigrunnlag krever nytt samtykke.
+
+DPA og trenings-opt-out er bekreftet av produkteier: Mistral AI er
+databehandler under standard DPA
+(`legal.mistral.ai/terms/data-processing-addendum`), og Kaupet har reservert
+seg mot at data brukes til modelltrening. Zero Data Retention er **ikke**
+aktivert — Mistral lagrer input/output i inntil 30 rullerende dager for
+misbrukskontroll før automatisk sletting. Dette er nå dokumentert i
+personvernerklæringen (`/personvern#bildeforslag`) og i
+`docs/PERSONVERN-BEHANDLINGSPROTOKOLL.md` § 8.
+
+Det som gjenstår før `MISTRAL_PHOTO_SUGGESTIONS_ENABLED` slås på: en
+kontrollert staging-smoke-test av vision + `json_schema` sammen, der
+`usage.prompt_tokens` i Mistral-svaret logges for å bekrefte
+kostnadsanslaget for funksjonen.
+
+## 2d. Modellbytte for fotoforslag (per 2026-09-25)
+
+Fotoforslaget (`suggestListingFromPhotosAi`, både `identify` og `attributes`)
+bruker nå **Ministral 3 14B** (`ministral-14b-2512`) i stedet for Mistral
+Small 4 (`mistral-small-2603`). Samme leverandør, samme EU-endepunkt og samme
+DPA — kun modellnavnet i kallet er endret. Tekstforslaget
+(`suggestCategoryForTitleAi`) står fortsatt på Small 4.
+
+Målt med `bun scripts/eval-photo-identify.ts` (11 tydelige bilder, 480 px,
+hele kategoritreet). Priser fra `mistral.ai/pricing/api` per 2026-09-25, kostnad
+per kall ved ~2 650 prompt-tokens og ~25 svar-tokens:
+
+| Modell                             | Riktig kategori (topp 1)     | Svartid maks              | Pris inn/ut per M tokens | Per kall |
+| ---------------------------------- | ---------------------------- | ------------------------- | ------------------------ | -------- |
+| `mistral-small-2603` (Small 4)     | 1/11                         | ~1,0 s                    | $0,15 / $0,60            | ~$0,0004 |
+| `ministral-14b-2512` (valgt)       | 10/11 (20/22 over to runder) | ~1,1 s (én topp på 3,7 s) | $0,20 / $0,20            | ~$0,0005 |
+| `mistral-medium-2604` (Medium 3.5) | 10/11                        | ~1,8 s                    | $1,50 / $7,50            | ~$0,004  |
+
+Årsaken er modellens bildeforståelse, ikke prompten: Small 4 kalte en tromme
+«skål med bananer» og en golfball «hjernevev» selv med bare bildet og ett kort
+spørsmål, og ble dårligere ved 768 px. Billige prompttiltak (bildet før
+teksten, et `description`-felt før sluggen, kandidater gruppert etter
+forelder, større miniatyr) ga ingen forbedring på Small 4 og ingen målbar
+gevinst på de sterkere modellene, så miniatyrstørrelsene og tidsgrensen (5 s)
+er uendret. Én prompt-endring er tatt inn: tittelen skal bare navngi
+gjenstanden. Uten den fant Ministral på egenskaper («Golfball – ny og
+uåpnet»), og med den steg treffet fra 9/11 til 10/11. Ministral 3B og 8B ga
+7–8/11. Ministral avviser `reasoning_effort`, så fotokallet sender det ikke.
 
 ## 3. Alternativer som faktisk ble vurdert
 

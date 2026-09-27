@@ -1,7 +1,10 @@
-﻿import { useEffect } from "react";
+﻿import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { ChevronDown, Sparkles } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/image-uploader";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 
@@ -65,9 +68,27 @@ export function VehicleTitleFields({
 export function TitleGroup(
   props: Pick<
     WizardSharedProps,
-    "register" | "errors" | "touchedFields" | "title" | "titleExample"
+    "register" | "errors" | "touchedFields" | "title" | "titleExample" | "titleCollapsible"
   >,
 ) {
+  const [opened, setOpened] = useState(false);
+  // Sammenslått bak "Jeg vil fylle ut tittel selv" så lenge KI-knappen på
+  // bildesiden er hovedvalget — men aldri når feltet har innhold eller en
+  // feil som må synes.
+  if (props.titleCollapsible && !opened && !props.title && !props.errors.title) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        className="native-touch-target h-auto w-full justify-between px-0 hover:bg-transparent"
+        aria-expanded={false}
+        onClick={() => setOpened(true)}
+      >
+        Jeg vil fylle ut tittel selv
+        <ChevronDown className="size-4 shrink-0" aria-hidden />
+      </Button>
+    );
+  }
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
@@ -87,6 +108,8 @@ export function TitleGroup(
         aria-required="true"
         aria-invalid={!!props.errors.title}
         aria-describedby={props.errors.title ? "title-error" : undefined}
+        // Bare når brukeren nettopp åpnet feltet selv, ikke ved vanlig lasting.
+        autoFocus={opened}
         {...props.register("title")}
       />
       {props.errors.title && (
@@ -102,7 +125,41 @@ export function PhotosGroup({
   images,
   setImages,
   uploadProgress,
-}: Pick<WizardSharedProps, "images" | "setImages" | "uploadProgress">) {
+  noImageConfirmPending,
+  setValue,
+  title,
+  photoSuggestionEnabled,
+  photoSuggestionStatus,
+  analyzePhotos,
+  photoTitleSuggestion,
+  dismissPhotoTitleSuggestion,
+  photoCategorySuggestions,
+}: Pick<
+  WizardSharedProps,
+  | "images"
+  | "setImages"
+  | "uploadProgress"
+  | "noImageConfirmPending"
+  | "setValue"
+  | "title"
+  | "photoSuggestionEnabled"
+  | "photoSuggestionStatus"
+  | "analyzePhotos"
+  | "photoTitleSuggestion"
+  | "dismissPhotoTitleSuggestion"
+  | "photoCategorySuggestions"
+>) {
+  const photoCategory = photoCategorySuggestions[0];
+  // Brukeren ba om å få tittelen fylt ut: er feltet tomt, brukes forslaget
+  // direkte. Har de skrevet noe selv, får de heller velge med "Bruk" under.
+  useEffect(() => {
+    if (photoTitleSuggestion && !title.trim()) {
+      setValue("title", photoTitleSuggestion, { shouldValidate: true });
+      dismissPhotoTitleSuggestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoTitleSuggestion]);
+
   return (
     <section className="space-y-2">
       <Label>Legg til bilder</Label>
@@ -110,6 +167,88 @@ export function PhotosGroup({
         Gode bilder gjør det enklere å vurdere annonsen.
       </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
+      {noImageConfirmPending && images.length === 0 && (
+        <p role="status" className="text-sm text-foreground">
+          Annonser med bilder får flere henvendelser. Du kan legge til bilder senere.
+        </p>
+      )}
+      {photoSuggestionEnabled && (
+        <>
+          <div className="space-y-1.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="photo-suggestion-button"
+              className="native-touch-target h-12 w-full gap-2 rounded-xl border-brand/40 text-brand-text hover:text-brand-text"
+              onClick={analyzePhotos}
+              disabled={images.length === 0 || photoSuggestionStatus === "analyzing"}
+              aria-describedby="photo-suggestion-help"
+            >
+              <Sparkles className="size-4 shrink-0" aria-hidden />
+              Fyll ut tittel og kategori for meg
+            </Button>
+            <p id="photo-suggestion-help" className="text-xs text-muted-foreground">
+              {images.length === 0 ? "Legg til minst ett bilde først. " : ""}
+              Denne funksjonen benytter KI for å analysere bildene. Les mer om hvordan bildene
+              behandles i{" "}
+              <Link
+                to="/personvern"
+                hash="bildeforslag"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                personvernerklæringen
+              </Link>
+              .
+            </p>
+          </div>
+          {photoSuggestionStatus === "analyzing" && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Analyserer bildene …
+            </p>
+          )}
+          {photoSuggestionStatus === "unavailable" && (
+            <p className="text-sm text-muted-foreground">
+              Vi fikk dessverre ikke til å analysere bildene nå. Du må fylle ut selv.
+            </p>
+          )}
+          {photoTitleSuggestion && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm">
+              <span className="inline-flex items-center gap-1 font-medium text-brand-text">
+                <Sparkles className="size-4 shrink-0" aria-hidden />
+                Kaupet foreslår tittel: {photoTitleSuggestion}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                className="native-touch-target"
+                onClick={() => {
+                  setValue("title", photoTitleSuggestion, { shouldValidate: true });
+                  dismissPhotoTitleSuggestion();
+                }}
+              >
+                Bruk
+              </Button>
+            </div>
+          )}
+          {/* Settes ikke her: kategorien kan bytte sidesettet (kjøretøy/båt),
+              så den bekreftes med chippen på "Om tingen". */}
+          {photoCategory && (
+            <p
+              data-testid="photo-category-suggestion"
+              className="flex flex-wrap items-center gap-1 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm"
+            >
+              <span className="inline-flex items-center gap-1 font-medium text-brand-text">
+                <Sparkles className="size-4 shrink-0" aria-hidden />
+                Kaupet foreslår kategori:
+              </span>
+              {photoCategory.parent_name_nb
+                ? `${photoCategory.parent_name_nb} › ${photoCategory.name_nb}`
+                : photoCategory.name_nb}
+              <span className="text-muted-foreground">(bekreftes på neste steg)</span>
+            </p>
+          )}
+        </>
+      )}
     </section>
   );
 }

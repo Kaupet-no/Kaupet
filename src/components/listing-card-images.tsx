@@ -12,11 +12,6 @@ import { signListingImageUrls } from "@/lib/storage";
 type Props = {
   listing: ListingCardData;
   linkState?: Record<string, unknown>;
-  onOpen?: (position: number, resultCount: number) => void;
-  /** Kortets posisjon (1-basert) og totalt antall treff — sendes videre til
-   * onOpen ved klikk, se search_result_opened-sporingen i result-list. */
-  position?: number;
-  resultCount?: number;
   coverImageUrl?: string | null;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
@@ -31,9 +26,6 @@ type Props = {
 export const ListingCardImages = memo(function ListingCardImages({
   listing,
   linkState,
-  onOpen,
-  position = 0,
-  resultCount = 0,
   coverImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -110,7 +102,6 @@ export const ListingCardImages = memo(function ListingCardImages({
             e.preventDefault();
             return;
           }
-          onOpen?.(position, resultCount);
         }}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >

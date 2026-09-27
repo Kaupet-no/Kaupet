@@ -52,7 +52,7 @@ export type FieldGroup = {
   fieldsToValidate?: (keyof ListingFormShape)[];
   validateExtra?: (
     ctx: ValidateCtx,
-  ) => "SHOW_NO_IMAGE_DIALOG" | string | { field: string; message: string } | null;
+  ) => "CONFIRM_NO_IMAGE" | string | { field: string; message: string } | null;
 };
 
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
@@ -72,7 +72,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     key: "photos",
     classification: "recommendedForTrust",
     Component: PhotosGroup,
-    validateExtra: (ctx) => (ctx.images.length === 0 ? "SHOW_NO_IMAGE_DIALOG" : null),
+    validateExtra: (ctx) => (ctx.images.length === 0 ? "CONFIRM_NO_IMAGE" : null),
   },
   title: {
     key: "title",
@@ -93,11 +93,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       if (ctx.categoryId === ctx.bilOgMcCategoryId) {
         return "Velg underkategori før du går videre.";
       }
-      // Registrert vei fyller merke/modell fra oppslaget og lar brukeren
-      // korrigere dem i samme bekreftelse. Manuell vei må fortsatt fylle dem
-      // inn på siden.
-      if (ctx.vehicleLookupResult) return null;
-      if (ctx.vehicleRegistered) {
+      // Registrert vei fyller merke/modell fra oppslaget. Mangler SVV ett av
+      // dem, fyller brukeren begge inn på siden, som i manuell vei.
+      const lookup = ctx.vehicleLookupResult;
+      if (lookup?.brand && lookup.model) return null;
+      if (ctx.vehicleRegistered && !lookup) {
         return "Skriv inn registreringsnummer, eller kryss av for at kjøretøyet ikke er registrert.";
       }
       const brand = ctx.attributes.brand;
@@ -108,6 +108,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       if (typeof model !== "string" || !model.trim()) {
         return { field: "model", message: "Velg modell før du går videre." };
       }
+      if (lookup) return null;
       // Bobil/campingvogn og tilhenger har hvert sitt påkrevde spørsmål SVV
       // aldri kan svare på. Registrerte kjøretøy får feltene på vehicle-facts
       // sammen med andre manglende tekniske opplysninger; manuelle kjøretøy
@@ -322,9 +323,9 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
  * web next-button. Structural category/registration pages keep their own
  * labels outside the four content tasks. */
 const LISTING_TASK_LABEL_NB: Record<ListingTask, string> = {
-  showcase: "Vis frem",
-  searchable: "Gjør søkbar",
-  trade: "Gjør handelen enkel",
+  showcase: "Bilder",
+  searchable: "Om tingen",
+  trade: "Pris og henting",
   review: "Se over",
 };
 

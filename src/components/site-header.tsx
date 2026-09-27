@@ -12,7 +12,6 @@ import { useSearchPanel } from "@/features/listing-search/search-panel/search-pa
 import { BusinessPlanLogo } from "@/features/business-account/business-plan-logo";
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
-import { trackProductEvent } from "@/lib/product-analytics";
 
 const HEADER_SEARCH_SLOT_ID = "header-search-slot";
 
@@ -63,7 +62,6 @@ export function SiteHeader() {
             className="md:hidden"
             aria-label="Åpne søk"
             onClick={() => {
-              trackProductEvent("search_opened", { source: "header" });
               const input = document.getElementById(ANNONSER_SEARCH_INPUT_ID);
               if (input instanceof HTMLInputElement && input.getClientRects().length > 0) {
                 input.scrollIntoView({ block: "center" });

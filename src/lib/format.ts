@@ -34,3 +34,21 @@ export function formatNokNumber(n: number): string {
 export function formatNok(n: number): string {
   return `${formatNokNumber(n)} kr`;
 }
+
+/** 25.–75.-persentil av en prisliste — et dempet "typisk prisspenn"-hint
+ * under prisfeltet i annonseopprettelsen, ikke en påtvunget verdi. Bruker
+ * persentiler i stedet for min/maks slik at et par ekstremverdier ikke
+ * dominerer spennet. Krever minst 3 datapunkter; under det er et spenn ikke
+ * meningsfullt, så vi viser ingenting heller enn å gjette. */
+export function priceRange(prices: number[]): { low: number; high: number } | null {
+  if (prices.length < 3) return null;
+  const sorted = [...prices].sort((a, b) => a - b);
+  const percentile = (p: number) => {
+    const idx = (sorted.length - 1) * p;
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  };
+  return { low: Math.round(percentile(0.25)), high: Math.round(percentile(0.75)) };
+}

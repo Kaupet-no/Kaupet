@@ -1,11 +1,21 @@
-import { Building2, MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
+import {
+  Building2,
+  MessageCircle,
+  Phone,
+  Share2,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
 
+import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
+import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 import { formatOrganizationNumber } from "@/lib/organization-number";
+import { formatPhone, phoneHref } from "@/lib/phone";
 
 export type SellerIdentity =
   | {
@@ -21,8 +31,51 @@ export type SellerIdentity =
       displayName: string;
       organizationNumber: string;
       visitingAddress?: string | null;
+      /** Telefonnumre bedriften har valgt å vise for annonsens lokasjon. */
+      contacts?: SellerContact[];
       createdAt: string;
     };
+
+export type SellerContact = {
+  id: string;
+  name: string;
+  phone: string;
+  /** Kun satt for bedrifter med aktiv Proff. */
+  avatarUrl: string | null;
+};
+
+function SellerContactList({ contacts }: { contacts: SellerContact[] }) {
+  return (
+    <ul className="mt-4 space-y-2" aria-label="Ring selger">
+      {contacts.map((contact) => (
+        <li key={contact.id} className="flex items-center gap-3">
+          {contact.avatarUrl ? (
+            <img
+              src={contact.avatarUrl}
+              alt=""
+              className="size-10 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+              <UserIcon className="size-5 text-muted-foreground" aria-hidden="true" />
+            </span>
+          )}
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="truncate font-medium">{contact.name}</p>
+            <a
+              href={phoneHref(contact.phone)}
+              className="inline-flex min-h-8 items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+              aria-label={`Ring ${contact.name} på ${formatPhone(contact.phone)}`}
+            >
+              <Phone className="size-3.5" aria-hidden="true" />
+              {formatPhone(contact.phone)}
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function SellerContactPanel({
   isLoggedIn,
@@ -36,7 +89,7 @@ export function SellerContactPanel({
   shareOpen,
   onShareOpenChange,
   isNative,
-  hideBusinessIdentity = false,
+  organizationBrand,
 }: {
   isLoggedIn: boolean;
   seller: SellerIdentity | null;
@@ -49,14 +102,15 @@ export function SellerContactPanel({
   shareOpen: boolean;
   onShareOpenChange: (open: boolean) => void;
   isNative?: boolean;
-  /** The branded Proff block already owns the business identity. */
-  hideBusinessIdentity?: boolean;
+  /** Proff-bedrifter: profileringen erstatter den nøytrale identitetsraden. */
+  organizationBrand?: ProffOrganizationPresentation;
 }) {
+  const branded = seller?.kind === "business" && !!organizationBrand;
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center gap-3">
-        {seller?.kind === "business" && hideBusinessIdentity ? null : seller?.kind === "private" &&
-          seller.avatar_url ? (
+      {branded && <ProffListingHeader organization={organizationBrand} inCard />}
+      <div className={branded ? "text-sm" : "flex items-center gap-3"}>
+        {branded ? null : seller?.kind === "private" && seller.avatar_url ? (
           <img
             src={seller.avatar_url}
             alt={seller.display_name ? `Profilbilde av ${seller.display_name}` : "Profilbilde"}
@@ -98,15 +152,12 @@ export function SellerContactPanel({
               )}
             </>
           ) : seller?.kind === "business" ? (
-            hideBusinessIdentity ? (
-              <>
-                <p className="font-medium">Bedriftskonto</p>
-                {seller.visitingAddress && (
-                  <p className="text-xs text-muted-foreground">
-                    Besøksadresse: {seller.visitingAddress}
-                  </p>
-                )}
-              </>
+            branded ? (
+              seller.visitingAddress && (
+                <p className="text-xs text-muted-foreground">
+                  Besøksadresse: {seller.visitingAddress}
+                </p>
+              )
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -136,18 +187,20 @@ export function SellerContactPanel({
         </div>
       </div>
 
+      {seller?.kind === "business" && !!seller.contacts?.length && (
+        <SellerContactList contacts={seller.contacts} />
+      )}
+
       {!isOwner && (
         <div className="mt-4 space-y-3">
-          <TradeSafetyAdvice context="contact" />
+          {seller?.kind !== "business" && <TradeSafetyAdvice context="contact" />}
           <Button className="w-full gap-2" onClick={onContact} disabled={contacting}>
             <MessageCircle className="size-4" />
             {contacting
               ? "Åpner samtale…"
-              : isLoggedIn
-                ? seller?.kind === "business"
-                  ? "Send melding til bedriften"
-                  : "Send melding til selger"
-                : "Logg inn for å sende melding"}
+              : seller?.kind === "business"
+                ? "Send melding til bedriften"
+                : "Send melding til selger"}
           </Button>
         </div>
       )}

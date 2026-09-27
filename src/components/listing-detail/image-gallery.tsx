@@ -27,6 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useAutoHide, autoHideClass } from "@/hooks/use-auto-hide";
 import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import {
   Carousel,
@@ -118,6 +119,7 @@ export function ImageGallery({
 }) {
   const isNative = useIsNative();
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [arrowsVisible, showArrows] = useAutoHide();
   const editCtx = useListingEdit();
   const inlineImages = useInlineListingImages({
     listingId: editCtx?.listingId ?? "",
@@ -167,7 +169,7 @@ export function ImageGallery({
      på detaljsiden, så raden skal ligge tett på bildet. */
   const thumbnailStrip =
     showThumbnails && totalSlides > 1 ? (
-      <ScrollArrowRow className={thumbnailsOverlay ? "md:mt-0" : "mt-3"}>
+      <ScrollArrowRow className={thumbnailsOverlay ? "page-md:mt-0" : "mt-3"}>
         {has360 && (
           <button
             type="button"
@@ -206,7 +208,7 @@ export function ImageGallery({
   if (totalSlides > 0) {
     return (
       <>
-        <div className="relative">
+        <div className="relative" onPointerMove={showArrows}>
           <Carousel
             opts={{ align: "center", loop: true, startIndex: activeImage }}
             setApi={setCarouselApi}
@@ -266,22 +268,28 @@ export function ImageGallery({
                 );
               })}
             </CarouselContent>
+            {/* Telefonrammen i annonseflyten er inert, så pilene ville bare
+                vært pynt som ikke finnes på mobil — skjules der. */}
             {!isNative && totalSlides > 1 && (
               <>
-                <CarouselPrevious className="left-3 border-border bg-card/90 backdrop-blur" />
-                <CarouselNext className="right-3 border-border bg-card/90 backdrop-blur" />
+                <CarouselPrevious
+                  className={`left-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden ${autoHideClass(arrowsVisible)}`}
+                />
+                <CarouselNext
+                  className={`right-3 border-border bg-card/90 backdrop-blur in-data-phone-frame:hidden ${autoHideClass(arrowsVisible)}`}
+                />
               </>
             )}
           </Carousel>
           {overlaySlot}
           {thumbnailsOverlay && thumbnailStrip && (
-            <div className="absolute inset-x-0 bottom-0 z-10 hidden rounded-b-xl bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-3 pt-12 md:block">
+            <div className="absolute inset-x-0 bottom-0 z-10 hidden rounded-b-xl bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-3 pt-12 page-md:block">
               {thumbnailStrip}
             </div>
           )}
         </div>
         {/* Under md ligger raden alltid under bildet, også i overlay-modus. */}
-        <div className={thumbnailsOverlay ? "md:hidden" : undefined}>{thumbnailStrip}</div>
+        <div className={thumbnailsOverlay ? "page-md:hidden" : undefined}>{thumbnailStrip}</div>
         {editCtx?.editMode && <ImageEditControls inline={inlineImages} />}
       </>
     );
@@ -426,7 +434,7 @@ function ImageEditControls({ inline }: { inline: InlineListingImages }) {
           items={items.map((item) => item.storage_path)}
           strategy={rectSortingStrategy}
         >
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 page-sm:grid-cols-3 page-md:grid-cols-4">
             {items.map((item, index) => (
               <SortableInlineImageItem
                 key={item.storage_path}

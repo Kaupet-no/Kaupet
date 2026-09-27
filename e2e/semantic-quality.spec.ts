@@ -71,10 +71,13 @@ test("native søkepanel returnerer fokus til filterknappen etter Escape", async 
   // Søket er en knapp (SearchSummaryPill) på native resultatflater, ikke et
   // frittstående søkefelt — samme mønster som landingssiden over.
   const search = page.getByRole("button", { name: "Søk i annonser" });
+  const rules = page.getByRole("button", { name: "Søkeregler" });
   const filter = page.getByRole("button", { name: "Filtrer", exact: true });
 
   await search.focus();
   await search.press("Tab");
+  await expect(rules).toBeFocused();
+  await rules.press("Tab");
   await expect(filter).toBeFocused();
 
   await filter.press("Enter");
@@ -86,6 +89,8 @@ test("native søkepanel returnerer fokus til filterknappen etter Escape", async 
   await expect(filter).toBeFocused();
 
   await filter.press("Shift+Tab");
+  await expect(rules).toBeFocused();
+  await rules.press("Shift+Tab");
   await expect(search).toBeFocused();
 });
 

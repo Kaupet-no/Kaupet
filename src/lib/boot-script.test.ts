@@ -29,13 +29,13 @@ describe("boot.js", () => {
   });
 
   it("husker overstyringen på tvers av ruter i samme fane", () => {
-    window.sessionStorage.setItem("kaupet.forceNative", "true");
+    window.sessionStorage.setItem("kaupet_force_native", "true");
     expect(bootAt("/annonser")).toContain("native-boot");
     window.sessionStorage.clear();
   });
 
   it("respekterer ?forcenative=0", () => {
-    window.sessionStorage.setItem("kaupet.forceNative", "true");
+    window.sessionStorage.setItem("kaupet_force_native", "true");
     expect(bootAt("/?forcenative=0")).not.toContain("native-boot");
     window.sessionStorage.clear();
   });

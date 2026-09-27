@@ -348,6 +348,7 @@ export function MessagesButton({ isActive }: { isActive?: boolean } = {}) {
         onOpenChange={setOpen}
         trigger={trigger}
         title={<span className="block px-4 pb-3 pt-4">Meldinger</span>}
+        headerClassName="px-0"
         titleVisible
         expandable
         initialSnapPoint={0.6}

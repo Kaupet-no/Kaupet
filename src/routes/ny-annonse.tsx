@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,9 @@ import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import {
   effectiveFlowForCategory,
   withRuntimeFieldGroups,
+  type LandingEntry,
   resolveWizardPages,
+  suggestionNeedsCategoryConfirm,
 } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
 import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
@@ -29,6 +31,7 @@ import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
+import { usePhotoSuggestion } from "@/features/listing-creation/use-photo-suggestion";
 import { suggestVehicleCategoryForTitle } from "@/lib/search-category-match";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -47,13 +50,14 @@ import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
 } from "@/lib/vehicle/vehicle-lookup.types";
-import type { TurnstileInstance } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-user-roles";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
+import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,35 +68,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
-import {
-  PublishActions,
-  ReviewPreview,
-} from "@/features/listing-creation/field-groups/review-publish";
+import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
+import { deriveComposerImprovements } from "@/features/listing-creation/field-groups/review-publish/derive-improvements";
 import type {
   ComposerReviewEditOptions,
   ComposerReviewStatus,
   WizardSharedProps,
 } from "@/features/listing-creation/field-groups/types";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
-import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
+import {
+  EditableListingReview,
+  PhoneListingPreview,
+} from "@/features/listing-creation/preview-draft-view";
+import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
-import { publishGate } from "@/features/listing-creation/publish-gate";
+import { blockImplicitSubmit, publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
-import { ComposerReviewStatuses } from "@/features/listing-creation/composer-review";
+import { ListingStrengthIndicator } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
-import { NoImageDialog } from "@/features/listing-creation/no-image-dialog";
 import {
   focusComposerField,
+  resolvePublishingRequirementLabel,
   reviewSectionSteps,
   sortComposerRequirements,
   type ComposerRequirementTarget,
@@ -135,7 +139,6 @@ const listingSchema = z.object({
     .or(z.literal("")),
   city: z.string().trim().max(100, "Maks 100 tegn").optional().or(z.literal("")),
   organization_location_id: z.string().uuid().nullable().optional(),
-  show_visiting_address: z.boolean().optional(),
   known_issues: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   no_known_issues: z.boolean().optional(),
   maintenance_history: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
@@ -162,6 +165,7 @@ export const Route = createFileRoute("/ny-annonse")({
     .object({
       type: z.enum(["sell", "free"]).optional(),
       title: z.string().optional(),
+      start: z.enum(["bilder"]).optional(),
       resume: z.enum(["auth-publish"]).optional(),
     })
     .catch({}),
@@ -175,11 +179,27 @@ export const Route = createFileRoute("/ny-annonse")({
   errorComponent: NewListingError,
 });
 
+/** Hvilken del av annonsesiden (`data-preview-section` i ListingDetailView)
+ * en feltgruppe redigerer — telefonrammen ved siden av skjemaet scroller til
+ * delen for stegets første gruppe som har en, når steget byttes. Steg uten
+ * noen (kategorivalg, registreringsnr. osv.) lar rammen stå der den er. */
+const PREVIEW_SECTION_BY_GROUP_KEY: Record<string, string> = {
+  photos: "photos",
+  title: "title",
+  price: "price",
+  "vehicle-price": "price",
+  "category-attributes": "facts",
+  "boat-facts": "facts",
+  "vehicle-facts": "facts",
+  "description-keywords": "description",
+  location: "location",
+  delivery: "location",
+};
+
 function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
-  useEffect(() => trackProductEvent("listing_creation_started", { kind: "sell" }), []);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
@@ -187,32 +207,35 @@ function NewListingPage() {
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
-  const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const returnToReviewRef = useRef(false);
   const reviewSectionLastStepRef = useRef<number | null>(null);
   const pendingReviewFocusRef = useRef<string | null>(null);
+  /** Set from `ComposerReviewEditOptions.reviewAnchor` when an edit is
+   * started from the Se over-steget (a `data-preview-section` on the listing
+   * page there) — consumed once we land back on review to scroll to that
+   * section, per the "return goes back to where you left" rule (UI-guiden). */
+  const returnFocusAnchorRef = useRef<string | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const authResumeHandledRef = useRef(false);
   const bypassNavigationBlockerRef = useRef(false);
-  const noImagePromptShownRef = useRef(false);
-  const [showNoImageDialog, setShowNoImageDialog] = useState(false);
-  const [publishingStatusOpen, setPublishingStatusOpen] = useState(false);
+  // Inline erstatning for den tidligere no-image-dialog.tsx: første "Neste"
+  // uten bilder setter denne til true (viser en melding ved bildefeltet og
+  // bytter Neste-knappen til "Fortsett uten bilder"), andre trykk går videre
+  // — se goToNextPage.
+  const [noImageConfirmPending, setNoImageConfirmPending] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
     field: string;
     message: string;
   } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
+  const [guestPublishSheetOpen, setGuestPublishSheetOpen] = useState(false);
   const forwardAttemptPendingRef = useRef(false);
   const publishAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftDiscardConfirmOpen, setDraftDiscardConfirmOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [hasPreviewed, setHasPreviewed] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewDraft, setPreviewDraft] = useState<PreviewDraft | null>(null);
-  const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
   const [pendingCategoryChange, setPendingCategoryChange] = useState<{
@@ -223,7 +246,7 @@ function NewListingPage() {
   } | null>(null);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
-  const { type: typeParam, title: titleParam, resume } = Route.useSearch();
+  const { type: typeParam, title: titleParam, start: startParam, resume } = Route.useSearch();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const listingType = typeParam ?? null;
@@ -235,7 +258,13 @@ function NewListingPage() {
   // category-confirm step, and (b) drops the `title` group and hoists
   // `photos` to the front of whatever flow applies — see
   // effectiveFlowForCategory/applyLandingEntry in category-flows.ts.
-  const [fromLanding] = useState(() => !!titleParam?.trim());
+  // `?start=bilder` is the landing screen's photos-first entry: same
+  // category handling, but the title is asked on the photos page instead
+  // (applyPhotosEntry).
+  const [landingEntry] = useState<LandingEntry | null>(() =>
+    titleParam?.trim() ? "title" : startParam === "bilder" ? "photos" : null,
+  );
+  const fromLanding = landingEntry !== null;
   // True once the user has confirmed a category on the category-confirm step
   // (suggestion click or manual pick) — removes "category-confirm" from
   // fieldGroupKeys below for the rest of the session, so the page it occupied
@@ -281,7 +310,7 @@ function NewListingPage() {
     control,
     watch,
     trigger,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, isDirty },
   } = useForm<ListingForm>({
     resolver: zodResolver(listingSchema),
     mode: "onTouched",
@@ -297,7 +326,6 @@ function NewListingPage() {
       postal_code: "",
       city: "",
       organization_location_id: null,
-      show_visiting_address: false,
       known_issues: "",
       no_known_issues: false,
       maintenance_history: "",
@@ -318,7 +346,6 @@ function NewListingPage() {
     knownIssues,
     noKnownIssues,
     organizationLocationId,
-    showVisitingAddress,
     maintenanceHistory,
   ] = useWatch({
     control,
@@ -336,7 +363,6 @@ function NewListingPage() {
       "known_issues",
       "no_known_issues",
       "organization_location_id",
-      "show_visiting_address",
       "maintenance_history",
     ],
   });
@@ -411,11 +437,102 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
+  // Fanger opp kjøretøytitler `suggest_category_for_title` (RPC-en bak
+  // useListingTitleHints) bommer på: den matcher kun mot historiske
+  // annonser og kategorinavn, så en tittel med bare merke/modell/karosseri
+  // ("Volvo V70 stasjonsvogn") gir ingen treff siden ingen kategori heter
+  // "Volvo". Gjenbruker søkets eksisterende merke-/attributtmatching
+  // (search-category-match.ts) som allerede løser akkurat dette for
+  // søkefeltet på /annonser — se suggestVehicleCategoryForTitle. Debounces
+  // på samme 400 ms som RPC-en for å unngå å flimre et annet forslag mens
+  // brukeren fortsatt skriver.
+  //
+  // Hentet opp hit (foran baseFieldGroupKeys) fordi showCategoryConfirm
+  // under trenger å vite om AI-forslaget er kjøretøy/båt før resten av
+  // flyten regnes ut — se suggestionNeedsCategoryConfirm.
+  const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
+  const { data: vehicleBrands } = useAllVehicleBrands();
+  // Samme react-query-cache-oppføring som useVehicleLookupFlow (kalt lenger
+  // ned på denne siden) allerede henter via useAllVehicleModels — ingen
+  // ekstra nettverkskall her.
+  const { data: vehicleModels } = useAllVehicleModels();
+  const clientCategoryHint = useMemo(
+    () =>
+      debouncedTitleForVehicleHint.length >= 5
+        ? suggestVehicleCategoryForTitle({
+            title: debouncedTitleForVehicleHint,
+            vehicleBrands: vehicleBrands ?? [],
+            vehicleModels: vehicleModels ?? [],
+            allFilters: allFilters ?? [],
+            categories: categories ?? [],
+            categoriesById,
+            bilOgMcCategoryId,
+          })
+        : null,
+    [
+      debouncedTitleForVehicleHint,
+      vehicleBrands,
+      vehicleModels,
+      allFilters,
+      categories,
+      categoriesById,
+      bilOgMcCategoryId,
+    ],
+  );
+
+  const {
+    categorySuggestions,
+    categorySuggestionLoading,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
+    title,
+    description,
+    categoryId,
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    priceNok: typeof priceNok === "number" ? priceNok : undefined,
+    isFree,
+    attributes,
+    setValue,
+    clientCategoryHint,
+  });
+
+  // Fotoassistert kategori-/egenskapsforslag (salg), se
+  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2. Én
+  // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
+  // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
+  const photoSuggestion = usePhotoSuggestion({ images, title });
+
+  // category-confirm holdes bare for forslag som gir en annen flyt enn
+  // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
+  // avgjørelsen må stå fast før resten av sidene regnes ut, siden bl.a.
+  // vehicle-registration er en solo-side som forutsetter avklart kategori.
+  // For alle andre forslag vises kategorien i stedet som en endrebar chip
+  // øverst på "Om tingen" (category-attributes) — mens forslaget ennå ikke
+  // er lastet holdes steget midlertidig for å unngå å måtte bytte sidesett
+  // etter at brukeren allerede har bladd forbi det.
+  const suggestionCategoryIds = [
+    ...categorySuggestions.map((s) => s.category_id),
+    ...(clientCategoryHint ? [clientCategoryHint.category_id] : []),
+  ];
+  const showCategoryConfirm =
+    fromLanding &&
+    !categoryConfirmed &&
+    (categorySuggestionLoading ||
+      suggestionNeedsCategoryConfirm(suggestionCategoryIds, allFlows ?? [], categoriesById));
+
   const baseFieldGroupKeys = useMemo(
     () =>
-      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
+      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, landingEntry)
         .fieldGroups,
-    [categoryId, allFlows, categoriesById, fromLanding],
+    [categoryId, allFlows, categoriesById, landingEntry],
   );
   const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
@@ -470,7 +587,7 @@ function NewListingPage() {
   const isCarLeaf = categoriesById.get(categoryId)?.slug === "bil";
   const fieldGroupKeys = useMemo(() => {
     let keys = withRuntimeFieldGroups(baseFieldGroupKeys, {
-      showCategoryConfirm: fromLanding && !categoryConfirmed,
+      showCategoryConfirm,
     });
     if (behavior.requiresDeliveryMethod && !keys.includes("delivery")) {
       const insertAt = keys.indexOf("location");
@@ -486,8 +603,7 @@ function NewListingPage() {
     );
   }, [
     baseFieldGroupKeys,
-    fromLanding,
-    categoryConfirmed,
+    showCategoryConfirm,
     behavior.requiresDeliveryMethod,
     isVehicleFlow,
     isCarLeaf,
@@ -528,6 +644,11 @@ function NewListingPage() {
     isFirst,
     isLast,
   } = useListingSteps(pages);
+  // Lengste steg brukeren har nådd. Stegraden viser bare mangler fra steg
+  // brukeren allerede har gått forbi — felt man ennå ikke har sett skal ikke
+  // meldes som feil (flyten guider dit selv).
+  const [furthestStep, setFurthestStep] = useState(step);
+  if (step > furthestStep) setFurthestStep(step);
   // Intentionally kept fresh every render (not in an effect) since
   // useVehicleLookupFlow's goNext callback, constructed above
   // `pages`/`goNext`, must see the latest function the moment it's called,
@@ -555,20 +676,29 @@ function NewListingPage() {
     return () => cancelAnimationFrame(frame);
   }, [pages.length, reviewJumpRequested, setStep]);
 
+  // Lander vi på Se over med et pending anker (satt av editReviewSection når
+  // redigeringen startet derfra), scroll/fokuser dit i stedet for toppen —
+  // ellers no-op (vanlig ankomst til review har ingen anker satt).
+  useEffect(() => {
+    if (step !== pages.length) return;
+    const anchor = returnFocusAnchorRef.current;
+    if (!anchor) return;
+    returnFocusAnchorRef.current = null;
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-testid="listing-review"] [data-preview-section="${anchor}"]`)
+        ?.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [step, pages.length]);
+
   const currentStepKey = currentPage?.groups[0]?.key ?? "unknown";
   // Category selection (suggestion click or manual pick) auto-advances the
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
   // so no separate Next/Back controls are needed or wanted here.
   const isCategoryConfirmPage =
     currentPage?.groups.length === 1 && currentPage.groups[0]?.key === "category-confirm";
-  useEffect(() => {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "viewed",
-      step: currentStepKey,
-      stepNumber: step,
-    });
-  }, [currentStepKey, step]);
+  useEffect(() => {}, [currentStepKey, step]);
 
   function goBack() {
     // Mirrors the hidden Tilbake/Forrige buttons on category-confirm — this
@@ -579,27 +709,9 @@ function NewListingPage() {
     returnToReviewRef.current = false;
     reviewSectionLastStepRef.current = null;
     pendingReviewFocusRef.current = null;
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "back",
-      step: currentStepKey,
-      stepNumber: step,
-    });
     goBackStep();
   }
   useComposerHistoryBack(isFirst || isCategoryConfirmPage, goBack);
-
-  /** Clear a confirmed lookup when navigation returns to registration, so
-   * the registration number can be changed and looked up again. */
-  const previousStepRef = useRef(step);
-  useEffect(() => {
-    const key = currentPage?.groups?.[0]?.key;
-    if (key === "vehicle-registration" && previousStepRef.current > step) {
-      resetLookupOnReturnToRegistration();
-    }
-    previousStepRef.current = step;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, step]);
 
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
@@ -608,12 +720,6 @@ function NewListingPage() {
     section: "category" | "content" | "details" | "location",
     options?: ComposerReviewEditOptions,
   ) => {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "review_fix",
-      reason: section,
-      step: currentStepKey,
-    });
     returnToReviewRef.current = true;
     pendingReviewFocusRef.current = options?.field ?? null;
     setValidationError(null);
@@ -649,6 +755,7 @@ function NewListingPage() {
       return;
     }
     reviewSectionLastStepRef.current = target.last;
+    returnFocusAnchorRef.current = options?.reviewAnchor ?? null;
     setStep(target.first);
     if (target.first === step && options?.field) {
       requestAnimationFrame(() => {
@@ -755,7 +862,6 @@ function NewListingPage() {
       targetField: field,
       insertionOrder: insertionOrder++,
       onAction: () => {
-        setPublishingStatusOpen(false);
         editReviewSection(reviewSectionForGroup(groupKey), {
           field,
           groupKey,
@@ -842,15 +948,17 @@ function NewListingPage() {
     const result = group.validateExtra?.(publishingValidationContext);
     if (
       !result ||
-      result === "SHOW_NO_IMAGE_DIALOG" ||
+      result === "CONFIRM_NO_IMAGE" ||
       (typeof result === "string" && result === missingFilterMessage)
     )
       continue;
     if (typeof result === "object") {
+      const resolved = resolvePublishingRequirementLabel(result, reviewFieldLabels, missingFilters);
+      if (resolved.skip) continue;
       // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
       addPublishingRequirement({
         key: `field-${result.field}`,
-        label: reviewFieldLabels[result.field] ?? result.field,
+        label: resolved.label,
         field: result.field,
         groupKey: group.key,
       });
@@ -864,11 +972,12 @@ function NewListingPage() {
     }
   }
   const sortedPublishingRequirements = sortComposerRequirements(pages, publishingRequirements);
-  const missingPublishingCount = sortedPublishingRequirements.length;
-  const publishingStatus =
-    missingPublishingCount > 0
-      ? `${missingPublishingCount} ${missingPublishingCount === 1 ? "opplysning mangler" : "opplysninger mangler"}`
-      : "Klar til publisering";
+  const passedPublishingRequirements = sortedPublishingRequirements.filter((requirement) => {
+    const pageIndex = pages.findIndex((page) =>
+      page.groups.some((group) => group.key === requirement.targetGroupKey),
+    );
+    return pageIndex >= 0 && pageIndex + 1 < furthestStep;
+  });
 
   const shouldBlockNav =
     publishedId === null &&
@@ -911,6 +1020,7 @@ function NewListingPage() {
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
     discardDraft,
+    dismissDraftOffer,
   } = useDraftAutosave({
     title,
     subtitle,
@@ -931,19 +1041,13 @@ function NewListingPage() {
     knownIssues,
     noKnownIssues: !!noKnownIssues,
     organizationLocationId,
-    showVisitingAddress,
     maintenanceHistory,
     stepKey: currentStepKey,
     authenticated: !!user,
   });
 
   function restoreDraft() {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "draft_restored",
-      reason: "existing",
-      step: currentStepKey,
-    });
+    setDraftDecisionPrompt(false);
     const savedStepKey = hasDraftData?.step_key;
     if (typeof savedStepKey === "string") pendingRestoreStepKeyRef.current = savedStepKey;
     void restoreDraftFields({
@@ -955,27 +1059,43 @@ function NewListingPage() {
     });
   }
 
+  // Utkasttilbudet ("Du har et tidligere utkast: ... / Fortsett / Forkast") skal vises
+  // ÉN gang, ved start — ikke henge igjen på hvert steg. Så snart brukeren
+  // begynner å redigere (et felt blir "dirty") eller går videre til neste
+  // steg uten å ta et aktivt valg, forsvinner tilbudet for resten av
+  // økten. dismissDraftOffer lar det gamle utkastet ligge urørt (verken
+  // gjenopprettet eller slettet) — kun kobler fra den lagrede draftId-en,
+  // slik at autolagringen som fortsetter ikke overskriver det stille.
+  //
+  // Dette er kun trygt når det avviste utkastet allerede har en server-kopi
+  // (draftId) — da ligger dataene trygt hos Supabase uansett hva som skjer
+  // lokalt etterpå. Et utkast som KUN finnes i localStorage/IndexedDB ville
+  // blitt overskrevet stille av den nye annonsens autolagring (samme
+  // DRAFT_KEY/bildelager) hvis vi auto-avviste det samme veien — se
+  // draftDecisionRequired/goToNextPage, som i stedet tvinger et eksplisitt
+  // valg før brukeren kan forlate steg 1.
+  useEffect(() => {
+    if (!hasDraftData || !draftId) return;
+    if (isDirty || step > 1) dismissDraftOffer();
+  }, [hasDraftData, draftId, isDirty, step, dismissDraftOffer]);
+
+  // Utkast som bare finnes lokalt: brukeren må aktivt velge Fortsett/Forkast
+  // før hen forlater steg 1 — se blokkeringen i goToNextPage.
+  const draftDecisionRequired = !!hasDraftData && !draftId;
+  const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
+  const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     if (resume !== "auth-publish" || !user || !hasDraftData || authResumeHandledRef.current) {
       return;
     }
     authResumeHandledRef.current = true;
     restoreDraft();
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "auth_resumed",
-      step: currentStepKey,
-    });
     setReviewJumpRequested(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, hasDraftData]);
   async function startNewListing() {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "draft_started",
-      reason: "new",
-      step: currentStepKey,
-    });
+    setDraftDecisionPrompt(false);
     setDraftDiscardConfirmOpen(false);
     await discardDraft();
   }
@@ -1015,92 +1135,49 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Fanger opp kjøretøytitler `suggest_category_for_title` (RPC-en bak
-  // useListingTitleHints) bommer på: den matcher kun mot historiske
-  // annonser og kategorinavn, så en tittel med bare merke/modell/karosseri
-  // ("Volvo V70 stasjonsvogn") gir ingen treff siden ingen kategori heter
-  // "Volvo". Gjenbruker søkets eksisterende merke-/attributtmatching
-  // (search-category-match.ts) som allerede løser akkurat dette for
-  // søkefeltet på /annonser — se suggestVehicleCategoryForTitle. Debounces
-  // på samme 400 ms som RPC-en for å unngå å flimre et annet forslag mens
-  // brukeren fortsatt skriver.
-  const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
-  const { data: vehicleBrands } = useAllVehicleBrands();
-  // Samme react-query-cache-oppføring som useVehicleLookupFlow (kalt lenger
-  // ned på denne siden) allerede henter via useAllVehicleModels — ingen
-  // ekstra nettverkskall her.
-  const { data: vehicleModels } = useAllVehicleModels();
-  const clientCategoryHint = useMemo(
-    () =>
-      debouncedTitleForVehicleHint.length >= 5
-        ? suggestVehicleCategoryForTitle({
-            title: debouncedTitleForVehicleHint,
-            vehicleBrands: vehicleBrands ?? [],
-            vehicleModels: vehicleModels ?? [],
-            allFilters: allFilters ?? [],
-            categories: categories ?? [],
-            categoriesById,
-            bilOgMcCategoryId,
-          })
-        : null,
-    [
-      debouncedTitleForVehicleHint,
-      vehicleBrands,
-      vehicleModels,
-      allFilters,
-      categories,
-      categoriesById,
-      bilOgMcCategoryId,
-    ],
-  );
-
-  const {
-    categorySuggestions,
-    categorySuggestionLoading,
-    setSuggestionDismissed,
-    applyCategorySuggestion,
-    similarListings,
-    wtbMatch,
-    keywordSuggestions,
-    keywordsFetching,
-    appendTagToDescription,
-  } = useListingTitleHints({
-    title,
-    description,
-    categoryId,
-    categoryTouchedManually,
-    setSelectedParentId,
-    setCategoryTouchedManually,
-    priceNok: typeof priceNok === "number" ? priceNok : undefined,
-    isFree,
-    attributes,
-    setValue,
-    clientCategoryHint,
-  });
-
-  async function goToNextPage(options?: {
-    skipImageCheck?: boolean;
-  }): Promise<ComposerNavigationResult> {
+  async function goToNextPage(): Promise<ComposerNavigationResult> {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
 
-    // "Slå opp"-knappen er fjernet — oppslaget kjøres fra selve Neste-knappen
-    // når brukeren står på vehicle-registration-steget med et uslått-opp
-    // regnr. Merke/modell fylles fra oppslaget og kan korrigeres i samme
-    // bekreftelse, så registreringssiden krever ikke en ekstra inntasting.
-    // Tomt skilt faller gjennom til field-groupens egen validering.
+    // Kategorien regnes som valgt idet brukeren går videre fra "Om tingen"
+    // uten å ha trykket forslagschipen eksplisitt — chippen er en tydelig
+    // handling (UI-guiden), ikke en skjult overskriving, men å måtte trykke
+    // "Riktig" før "Neste" i tillegg ville vært dobbeltarbeid når forslaget
+    // uansett er det eneste feltet peker mot. Bildeforslaget vinner, slik
+    // som i chippen (CategoryAttributes' mergedSuggestions).
+    const photoTop = photoSuggestion.categorySuggestions[0];
     if (
-      groups.some((g) => g.key === "vehicle-registration") &&
-      vehicleRegistered &&
-      !vehicleLookupResult &&
-      vehicleRegNrInput.trim()
+      groups.some((g) => g.key === "category-attributes") &&
+      !categoryId &&
+      !categoryTouchedManually
     ) {
-      // Ved treff blir vi stående på dette steget — VehicleRegistration viser
-      // da en bekreftelsespopup (regnr/merke/modell/farge/årsmodell) basert
-      // på at vehicleLookupResult er satt. "Ja" i popupen kaller
-      // confirmVehicleData, som selv går videre til neste steg. Ved feil blir
-      // vi stående her med vehicleLookupError synlig, slik at brukeren kan
-      // rette registreringsnummeret.
+      if (photoTop) {
+        setSelectedParentId(photoTop.parent_id ?? photoTop.category_id);
+        setValue("category_id", photoTop.category_id, { shouldValidate: true });
+        setCategoryTouchedManually(true);
+      } else if (categorySuggestions.length > 0) {
+        applySuggestedCategory(categorySuggestions[0].category_id);
+      }
+    }
+
+    // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
+    // skrive over stille — hold brukeren på steg 1 til hen har tatt et
+    // eksplisitt valg om det tilbudte utkastet, i stedet for å bare varsle
+    // med en toast.
+    if (isFirst && draftDecisionRequired) {
+      setDraftDecisionPrompt(true);
+      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
+      return "blocked";
+    }
+
+    // Registrert kjøretøy: oppslaget kjøres normalt fra "Bekreft"-knappen ved
+    // skiltet, men Neste gjør det samme hvis brukeren hoppet over den. Vi blir
+    // stående her så brukeren ser bekreftelsesmeldingen (eller feilen) under
+    // skiltet før de går videre. Tomt skilt faller gjennom til
+    // field-groupens egen validering.
+    const onRegisteredVehicleStep =
+      groups.some((g) => g.key === "vehicle-registration") && vehicleRegistered;
+    if (onRegisteredVehicleStep && !vehicleLookupResult && vehicleRegNrInput.trim()) {
       await runVehicleLookup(vehicleRegNrInput);
       return "busy";
     }
@@ -1122,12 +1199,6 @@ function NewListingPage() {
       )
         setAttributesTouched(true);
       setValidationError("Rett feltene som er markert før du fortsetter.");
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "validation_failed",
-        step: currentStepKey,
-        reason: "form",
-      });
       return "blocked";
     }
     const validateCtx = {
@@ -1151,38 +1222,19 @@ function NewListingPage() {
     setExtraFieldError(null);
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
-      if (result === "SHOW_NO_IMAGE_DIALOG") {
+      if (result === "CONFIRM_NO_IMAGE") {
         if (native) continue;
-        if (options?.skipImageCheck || noImagePromptShownRef.current) continue;
-        noImagePromptShownRef.current = true;
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_prompt",
-          step: currentStepKey,
-          reason: "image",
-        });
-        setShowNoImageDialog(true);
+        if (noImageConfirmPending) continue;
+        setNoImageConfirmPending(true);
         return "blocked";
       }
       if (typeof result === "string") {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-          reason: group.key,
-        });
         if (group.key === "category-attributes" || group.key === "boat-facts")
           setAttributesTouched(true);
         setValidationError(result);
         return "blocked";
       }
       if (result && typeof result === "object") {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-          reason: group.key,
-        });
         if (
           group.key === "category-attributes" ||
           group.key === "boat-facts" ||
@@ -1195,12 +1247,17 @@ function NewListingPage() {
         return "blocked";
       }
     }
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "sell",
-      action: "completed",
-      step: currentStepKey,
-      stepNumber: step,
-    });
+    // Oppslaget skrives inn i attributes først her, når brukeren går videre.
+    // Går brukeren tilbake hit etter det, beholdes oppslaget og Neste går rett
+    // videre — ellers ville SVV-verdiene overskrevet rettelser gjort senere.
+    if (
+      onRegisteredVehicleStep &&
+      vehicleLookupResult &&
+      attributes.registration_number !== vehicleLookupResult.registrationNumber
+    ) {
+      confirmVehicleData(categoryId, vehicleGroup ?? "bil");
+      return "advanced";
+    }
     if (returnToReviewRef.current && step === reviewSectionLastStepRef.current) {
       setReviewJumpRequested(true);
       returnToReviewRef.current = false;
@@ -1212,18 +1269,24 @@ function NewListingPage() {
     return "advanced";
   }
 
-  async function attemptNextPage(options?: {
-    skipImageCheck?: boolean;
-  }): Promise<ComposerNavigationResult> {
+  async function attemptNextPage(): Promise<ComposerNavigationResult> {
     if (forwardAttemptPendingRef.current) return "busy";
     forwardAttemptPendingRef.current = true;
     try {
-      const result = await goToNextPage(options);
+      const result = await goToNextPage();
       if (result === "blocked" && native) setValidationAttempt((attempt) => attempt + 1);
       return result;
     } finally {
       forwardAttemptPendingRef.current = false;
     }
+  }
+
+  // Etter publisering havner brukeren på annonsen uansett hvordan dialogene
+  // lukkes. /annonse/$listingId slår opp koden hvis svaret manglet den.
+  function goToPublishedListing() {
+    if (publishedCode) navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
+    else if (publishedId)
+      navigate({ to: "/annonse/$listingId", params: { listingId: publishedId } });
   }
 
   const mutation = useMutation({
@@ -1271,7 +1334,6 @@ function NewListingPage() {
               : null,
           lng: finalCoords?.lng ?? null,
           organization_location_id: values.organization_location_id ?? null,
-          show_visiting_address: values.show_visiting_address ?? false,
           known_issues: isVehicle ? values.known_issues || null : null,
           no_known_issues: isVehicle ? !!values.no_known_issues : null,
           maintenance_history: isVehicle ? values.maintenance_history || null : null,
@@ -1327,25 +1389,14 @@ function NewListingPage() {
       // the form still populated — without this the next autosave tick would
       // INSERT the published listing back as a duplicate draft.
       clearDraftStorage({ stopAutosave: true });
-      trackProductEvent("listing_published", {
-        kind: "sell",
-        action: "success",
-        imageCount: images.length,
-        isVehicle,
-      });
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
-      showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
       setPublishedCode(result.kaupet_code);
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
       publishAttemptPendingRef.current = false;
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "publish_failed",
-        step: currentStepKey,
-      });
+      trackProductEvent("listing_publish_failed", { kind: "sell", step: currentStepKey });
       setUploadProgress(null);
       // Tokenet er engangsbruk — hent et nytt så neste forsøk ikke henger.
       turnstileRef.current?.reset();
@@ -1393,27 +1444,21 @@ function NewListingPage() {
     typeof hasDraftData?.title === "string" && hasDraftData.title.trim()
       ? hasDraftData.title.trim()
       : "Utkast";
-  const restorableDraftCategoryId =
-    typeof hasDraftData?.category_id === "string" ? hasDraftData.category_id : null;
-  const restorableDraftCategory = restorableDraftCategoryId
-    ? categoryBreadcrumb(restorableDraftCategoryId, categoriesById) || null
-    : null;
-  const restorableDraftSavedAt =
-    typeof hasDraftData?.saved_at === "number" ? new Date(hasDraftData.saved_at) : null;
-  const restorableDraftSavedAtLabel =
-    restorableDraftSavedAt && !Number.isNaN(restorableDraftSavedAt.getTime())
-      ? restorableDraftSavedAt.toLocaleString("nb-NO", {
-          dateStyle: "short",
-          timeStyle: "short",
-        })
-      : null;
+  // fromLanding-brukere kommer inn med en ny tittel fra velgeren
+  // (titleParam) — hvis den ikke matcher det lagrede utkastet, er dette et
+  // reelt valg mellom to annonser, ikke bare "fortsett der du slapp".
+  const draftTitleConflict =
+    fromLanding &&
+    !!titleParam?.trim() &&
+    !!hasDraftData &&
+    restorableDraftTitle.trim().toLowerCase() !== titleParam.trim().toLowerCase();
 
   // Derived label for the category picker button
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
-  function openPreview() {
+  function buildPreviewDraft(): PreviewDraft {
     const categoryNode = categoryId ? categoriesById.get(categoryId) : undefined;
-    setPreviewDraft({
+    return {
       title,
       subtitle: subtitle || null,
       description,
@@ -1440,11 +1485,66 @@ function NewListingPage() {
       })),
       imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
       attributes,
-    });
-    setHasPreviewed(true);
-    setPreviewNudgeOpen(false);
-    setPreviewOpen(true);
+    };
   }
+
+  /** Se over-steget redigerer annonsesiden direkte (eierens redigeringsmodus
+   * i ListingDetailView) — her lagres hver endring i utkastet i stedet for i
+   * databasen. Bilder, kategori, registreringsnummer og sted hopper tilbake
+   * til sine steg: utkastets bilder er lokale, og de andre har egne flyter. */
+  const draftEditContext: ListingEditContextValue = {
+    editMode: true,
+    listingId: "draft",
+    behavior,
+    fieldStatus: {},
+    saveField: async (patch) => {
+      const opts = { shouldDirty: true, shouldValidate: true };
+      switch (patch.group) {
+        case "title":
+          setValue("title", patch.title, opts);
+          break;
+        case "subtitle":
+          setValue("subtitle", patch.subtitle ?? "", opts);
+          break;
+        case "description":
+          setValue("description", patch.description, opts);
+          break;
+        case "condition":
+          setValue("condition", patch.condition as ListingForm["condition"], opts);
+          break;
+        case "price":
+          setValue("is_free", patch.is_free, opts);
+          setValue("price_nok", patch.price_nok ?? "", opts);
+          break;
+        case "delivery":
+          setValue(
+            "can_ship",
+            patch.can_ship == null ? null : patch.can_ship ? "ship" : "pickup",
+            opts,
+          );
+          break;
+        case "vehicle-condition":
+          setValue("known_issues", patch.known_issues ?? "", opts);
+          setValue("no_known_issues", patch.no_known_issues, opts);
+          setValue("maintenance_history", patch.maintenance_history ?? "", opts);
+          break;
+        case "attributes":
+          setAttributes(patch.attributes as AttributeMap);
+          break;
+        // "location" og "category" når aldri hit: openLocationEditor og
+        // openCategoryModal under hopper til stegene i stedet.
+      }
+    },
+    openVehicleLookupModal: () =>
+      editReviewSection("content", { groupKey: "vehicle-registration", reviewAnchor: "title" }),
+    openCategoryModal: () => editReviewSection("category"),
+    openLocationEditor: () =>
+      editReviewSection("location", {
+        groupKey: "location",
+        field: "postal_code",
+        reviewAnchor: "location",
+      }),
+  };
 
   // Redirect to home if no type selected and no draft — entry should go through the picker dialog.
   // `draftChecked` gates this: the draft is read from localStorage in an
@@ -1480,7 +1580,11 @@ function NewListingPage() {
     if (via !== "wizard") return;
     if (currentPage?.groups?.some((g) => g.key === "category-select")) {
       goToNextPage();
-    } else if (currentPage?.groups?.some((g) => g.key === "category-confirm")) {
+    } else if (
+      currentPage?.groups?.some(
+        (g) => g.key === "category-confirm" || g.key === "category-attributes",
+      )
+    ) {
       setCategoryConfirmed(true);
     } else if (
       currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
@@ -1542,7 +1646,11 @@ function NewListingPage() {
     applyCategorySuggestion(id);
     if (currentPage?.groups?.some((group) => group.key === "category-select")) {
       goToNextPage();
-    } else if (currentPage?.groups?.some((group) => group.key === "category-confirm")) {
+    } else if (
+      currentPage?.groups?.some(
+        (group) => group.key === "category-confirm" || group.key === "category-attributes",
+      )
+    ) {
       setCategoryConfirmed(true);
     }
   };
@@ -1591,6 +1699,10 @@ function NewListingPage() {
     categorySlug,
     categoryLabel,
     titleExample,
+    titleCollapsible:
+      landingEntry === "photos" &&
+      photoSuggestion.enabled &&
+      photoSuggestion.status !== "unavailable",
     setCategoryPickerOpen,
     onCategorySelect: (id, parentId) => requestCategorySelect("wizard", id, parentId),
     onCategoryDeselect: requestCategoryDeselect,
@@ -1633,8 +1745,19 @@ function NewListingPage() {
     images,
     setImages,
     uploadProgress,
+    noImageConfirmPending,
     draftId,
     ensureDraftId,
+
+    photoSuggestionEnabled: photoSuggestion.enabled,
+    photoSuggestionStatus: photoSuggestion.status,
+    analyzePhotos: photoSuggestion.analyzePhotos,
+    photoCategorySuggestions: photoSuggestion.categorySuggestions,
+    photoTitleSuggestion: photoSuggestion.titleSuggestion,
+    dismissPhotoTitleSuggestion: photoSuggestion.dismissTitleSuggestion,
+    photoAttributesAvailable: photoSuggestion.canRequestAttributes,
+    photoAttributeSuggestionLoading: photoSuggestion.attributeSuggestionLoading,
+    requestPhotoAttributeSuggestions: photoSuggestion.requestAttributeSuggestions,
 
     locationMethod,
     setLocationMethod,
@@ -1653,7 +1776,16 @@ function NewListingPage() {
     turnstileEnabled,
     turnstileRef,
     onCancel: () => navigate({ to: "/" }),
-    onPreview: openPreview,
+    reviewListing: (
+      <EditableListingReview
+        draft={buildPreviewDraft()}
+        editContext={draftEditContext}
+        native={native}
+        onEditImages={() =>
+          editReviewSection("content", { groupKey: "photos", reviewAnchor: "photos" })
+        }
+      />
+    ),
     onEditReviewSection: editReviewSection,
     improvementGroupKeys: fieldGroupsForKeys([
       ...fieldGroupKeys,
@@ -1672,8 +1804,16 @@ function NewListingPage() {
     ),
     publishingRequirements: sortedPublishingRequirements,
   };
+  // Samme avledning som mobilens ReviewPublishGroup bruker (V3) — regnet her
+  // også, siden annonsestyrken i stegraden vises gjennom hele flyten, ikke
+  // bare på Se over-steget der ReviewPublishGroup selv rendres.
+  // eslint-disable-next-line react-hooks/refs -- deriveComposerImprovements leser kun images/city/postalCode/groupKeys fra sharedProps, ingen ref
+  const desktopImprovements = deriveComposerImprovements(sharedProps);
 
   const groups = currentPage?.groups ?? [];
+  // Kjøretøy legger Sted og Se over på samme side, så currentStepKey (første
+  // gruppe) holder ikke for å vite om ReviewPublishGroup vises.
+  const isReviewPage = groups.some((g) => g.key === "review-publish");
   // Native gives the description textarea a flex-fill layout so it grows to
   // fill the remaining page height instead of a fixed row count — needed on
   // any solo native page containing it: the generic description-keywords
@@ -1684,6 +1824,16 @@ function NewListingPage() {
     groups.length === 1 &&
     (groups[0].key === "description-keywords" || groups[0].key === "vehicle-facts");
   const nextGroups = pages[step]?.groups ?? [];
+  // Brukt av GuestPublishSheet: samme redirect-flyt som gate === "sign-in"
+  // brukte før arket erstattet det direkte navigasjonshoppet.
+  async function goToAuthFromGuestSheet(mode: "signin" | "signup") {
+    if (!(await flushLocalDraft())) return;
+    bypassNavigationBlockerRef.current = true;
+    void navigate({
+      to: "/auth",
+      search: { mode, returnTo: authResumeReturnTo(currentReturnTo()) },
+    });
+  }
   function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
     const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;
     const pageIndex = firstField
@@ -1706,15 +1856,8 @@ function NewListingPage() {
       const gate = publishGate({
         hasMissingAttributes: missingFilters.length > 0,
         authenticated: !!user,
-        hasPreviewed,
-        native,
       });
       if (gate === "fill-required-attributes") {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-        });
         setAttributesTouched(true);
         pendingReviewFocusRef.current = missingFilters[0]?.key
           ? `attr-${missingFilters[0].key}`
@@ -1723,61 +1866,52 @@ function NewListingPage() {
         setValidationError("Fyll inn alle obligatoriske egenskaper før du publiserer.");
         return;
       }
-      // Auth is checked before the preview nudge: "Publiser likevel" calls
-      // mutation.mutate() directly, so a guest reaching that dialog would hit
-      // the server's auth error instead of the sign-in handoff.
       if (gate === "sign-in") {
-        if (!(await flushLocalDraft())) return;
-        bypassNavigationBlockerRef.current = true;
-        void navigate({
-          to: "/auth",
-          search: { mode: "signin", returnTo: authResumeReturnTo(currentReturnTo()) },
-        });
+        setGuestPublishSheetOpen(true);
         return;
       }
-      if (gate === "confirm-without-preview") {
-        pendingSubmitValuesRef.current = v;
-        setPreviewNudgeOpen(true);
-        return;
-      }
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "publish_started",
-        step: currentStepKey,
-      });
       publishOnce(v);
     },
     // eslint-disable-next-line react-hooks/refs -- callback runs only on form submit
     (fields) => {
       handleInvalidSubmit(fields);
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "sell",
-        action: "validation_failed",
-        step: currentStepKey,
-        reason: "publish_form",
-      });
     },
   );
+  // Neste-knappen på bildesteget bytter til "Fortsett uten bilder" (samme
+  // testid som den tidligere no-image-dialog.tsx sin bekreft-knapp) etter
+  // det første trykket uten bilder — se goToNextPage.
+  const awaitingNoImageConfirm =
+    noImageConfirmPending && images.length === 0 && groups.some((g) => g.key === "photos");
   const composerFooter = (
     <>
       {!native && !isFirst && !isCategoryConfirmPage && (
-        <Button type="button" variant="ghost" onClick={goBack}>
+        <Button type="button" variant="ghost" onClick={goBack} className="hidden lg:inline-flex">
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
       {isCategoryConfirmPage ? null : !isLast ? (
         <Button
           type="button"
-          data-testid="wizard-next-button"
+          data-testid={
+            awaitingNoImageConfirm ? "continue-without-image-button" : "wizard-next-button"
+          }
           disabled={vehicleLookupLoading}
           onClick={() => void attemptNextPage()}
-          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
+          className={
+            native
+              ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
+              : "w-full h-14 text-base lg:h-11 lg:w-auto lg:text-sm"
+          }
         >
           {vehicleLookupLoading ? (
             "Slår opp kjøretøy…"
           ) : (
             <>
-              {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups)}`}{" "}
+              {awaitingNoImageConfirm
+                ? "Fortsett uten bilder"
+                : native
+                  ? "Fortsett"
+                  : `Neste: ${pageLabel(nextGroups)}`}{" "}
               <ChevronRight className="size-4" aria-hidden />
             </>
           )}
@@ -1797,7 +1931,17 @@ function NewListingPage() {
 
   return (
     <>
-      <form onSubmit={submitComposer}>
+      {photoSuggestion.enabled && (
+        // Usynlig, montert på veiviser-nivå (ikke i et enkeltsteg) siden
+        // samme token må dekke både bildestegets identify-kall og et senere
+        // attributes-kall fra "Om tingen" — se use-photo-suggestion.ts.
+        <Turnstile
+          ref={photoSuggestion.turnstileRef}
+          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+          options={{ appearance: "interaction-only", action: "kaupet" }}
+        />
+      )}
+      <form onSubmit={submitComposer} onKeyDown={blockImplicitSubmit}>
         <ListingComposerShell
           title={title}
           // Kjøretøytittelen genereres av Årsmodell/Merke/Modell
@@ -1828,22 +1972,31 @@ function NewListingPage() {
           }
           onCancel={() => void navigate({ to: "/" })}
           notice={
-            hasDraftData ? (
-              <div className="mt-4 flex flex-col items-stretch gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm sm:flex-row sm:items-start">
+            hasDraftData && isFirst ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs sm:text-sm">
                 <div className="min-w-0 flex-1">
-                  <p>
-                    Lagret utkast: <strong>{restorableDraftTitle}</strong>
+                  <p className="truncate">
+                    {draftTitleConflict ? (
+                      <>
+                        Du har et ulagret utkast: <strong>«{restorableDraftTitle}»</strong>.
+                        Fortsett det i stedet?
+                      </>
+                    ) : (
+                      <>
+                        Du har et tidligere utkast: <strong>{restorableDraftTitle}</strong>
+                      </>
+                    )}
                   </p>
-                  {(restorableDraftCategory || restorableDraftSavedAtLabel) && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {restorableDraftCategory ? `Kategori: ${restorableDraftCategory}` : null}
-                      {restorableDraftCategory && restorableDraftSavedAtLabel ? " · " : null}
-                      {restorableDraftSavedAtLabel ? `Lagret ${restorableDraftSavedAtLabel}` : null}
+                  {draftDecisionPrompt && (
+                    <p role="alert" aria-live="assertive" className="mt-1 text-destructive">
+                      Utkastet finnes bare på denne enheten. Velg «Fortsett utkastet» eller «Forkast
+                      utkastet» før du går videre, så det ikke går tapt.
                     </p>
                   )}
                 </div>
-                <div className="flex w-full shrink-0 flex-col justify-end gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+                <div className="flex shrink-0 gap-2">
                   <Button
+                    ref={continueDraftButtonRef}
                     type="button"
                     size="sm"
                     variant="secondary"
@@ -1859,25 +2012,29 @@ function NewListingPage() {
                     className="native-touch-target"
                     onClick={() => setDraftDiscardConfirmOpen(true)}
                   >
-                    Start ny annonse
+                    Forkast utkastet
                   </Button>
                 </div>
               </div>
             ) : undefined
           }
-          /* Ingen fremdriftsindikator før kategori er valgt — et løsrevet
-             "Kategori" under tittelen leses som en tom verdi, ikke som et steg. */
+          /* Stegantallet er ikke kjent før kategori er valgt (flyten er
+             kategoriavhengig) — StepIndicator viser da "Steg 1" uten "av Y"
+             i stedet for et tall som kan endre seg når kategorien velges. */
           progress={
-            categoryId ? (
-              <StepIndicator
-                step={step}
-                pages={pages}
-                onSelectStep={(target) => {
-                  setStep(target);
-                  window.scrollTo({ top: 0 });
-                }}
-              />
-            ) : undefined
+            <StepIndicator
+              step={step}
+              pages={pages}
+              flowKnown={!!categoryId}
+              onSelectStep={
+                categoryId
+                  ? (target) => {
+                      setStep(target);
+                      window.scrollTo({ top: 0 });
+                    }
+                  : undefined
+              }
+            />
           }
           status={
             draftSaveConflict ? (
@@ -1917,63 +2074,31 @@ function NewListingPage() {
           validationAttempt={validationAttempt}
           footer={composerFooter}
           firstStep={isFirst}
-          aside={
-            !native ? (
-              <>
-                {/* Antallet manglende opplysninger telles fra feltgruppene, og
-                    feltgruppene bestemmes av kategorien — før den er valgt ville
-                    tallet vært en gjetning som hopper så snart kategorien settes. */}
-                {categoryId && (
-                  <section aria-labelledby="desktop-publishing-status-title" className="space-y-2">
-                    <h2 id="desktop-publishing-status-title" className="text-lg font-semibold">
-                      Publiseringsstatus
-                    </h2>
-                    {missingPublishingCount > 0 ? (
-                      <button
-                        type="button"
-                        data-testid="publishing-status-button"
-                        aria-haspopup="dialog"
-                        onClick={() => setPublishingStatusOpen(true)}
-                        className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left transition-[background-color,border-color] duration-150 hover:border-primary/70 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span
-                            role="status"
-                            aria-live="polite"
-                            className="block text-sm font-medium text-foreground"
-                          >
-                            {publishingStatus}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            Trykk for å se hva som mangler
-                          </span>
-                        </span>
-                        <ChevronRight
-                          className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
-                          aria-hidden
-                        />
-                      </button>
-                    ) : (
-                      <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                        {publishingStatus}
-                      </p>
-                    )}
-                  </section>
-                )}
-                <ReviewPreview
-                  headingId="desktop-listing-preview-title"
-                  images={images}
-                  title={title}
-                  subtitle={subtitle}
-                  priceNok={priceNok}
-                  isFree={isFree}
-                  city={city}
-                  postalCode={postalCode}
-                  categorySlug={categorySlug}
-                  attributes={attributes}
-                  onPreview={openPreview}
+          // På Se over-steget er hovedkolonnen allerede annonsen (N1), og
+          // annonsestyrken vises inline øverst i ReviewPublishGroup — der
+          // trengs verken «Forhåndsvis» eller styrken i stegraden.
+          preview={
+            !native && !isReviewPage ? (
+              <PhoneListingPreview draft={buildPreviewDraft()} />
+            ) : undefined
+          }
+          previewSection={groups.map((g) => PREVIEW_SECTION_BY_GROUP_KEY[g.key]).find(Boolean)}
+          // Antallet mangler avhenger av kategorien — før den er valgt ville
+          // tallet vært en gjetning som hopper så snart kategorien settes.
+          // Mangler på steg brukeren ikke har kommet til ennå vises ikke.
+          strength={
+            !native &&
+            !isReviewPage &&
+            categoryId &&
+            (passedPublishingRequirements.length > 0 ||
+              sortedPublishingRequirements.length === 0) ? (
+              <div data-testid="listing-strength">
+                <ListingStrengthIndicator
+                  inline
+                  required={passedPublishingRequirements}
+                  improvements={desktopImprovements}
                 />
-              </>
+              </div>
             ) : undefined
           }
         >
@@ -2008,53 +2133,6 @@ function NewListingPage() {
           )}
         </ListingComposerShell>
       </form>
-
-      <ResponsiveOverlay open={publishingStatusOpen} onOpenChange={setPublishingStatusOpen}>
-        <ResponsiveOverlayContent
-          className="max-h-[85vh] overflow-y-auto sm:max-w-md"
-          expandable
-          onCloseAutoFocus={(event) => event.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle>Opplysninger som mangler</DialogTitle>
-            <DialogDescription>
-              Fyll ut disse opplysningene før annonsen kan publiseres.
-            </DialogDescription>
-          </DialogHeader>
-          <ComposerReviewStatuses items={sortedPublishingRequirements} />
-        </ResponsiveOverlayContent>
-      </ResponsiveOverlay>
-
-      <AlertDialog open={previewNudgeOpen} onOpenChange={setPreviewNudgeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Annonsen er ikke forhåndsvist ennå</AlertDialogTitle>
-            <AlertDialogDescription>
-              Gå tilbake til gjennomgangen for å se forhåndsvisningen, eller publiser direkte.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              data-testid="publish-anyway-button"
-              onClick={() => {
-                setPreviewNudgeOpen(false);
-                if (pendingSubmitValuesRef.current) {
-                  trackProductEvent("listing_creation_step_completed", {
-                    kind: "sell",
-                    action: "publish_started",
-                    step: currentStepKey,
-                  });
-                  publishOnce(pendingSubmitValuesRef.current);
-                }
-              }}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            >
-              Publiser likevel
-            </AlertDialogAction>
-            <AlertDialogCancel>Tilbake</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Category picker bottom sheet */}
       <CategoryPicker
@@ -2174,31 +2252,22 @@ function NewListingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <NoImageDialog
-        open={showNoImageDialog}
-        onOpenChange={setShowNoImageDialog}
-        onContinue={() => {
-          setShowNoImageDialog(false);
-          void goToNextPage({ skipImageCheck: true });
-        }}
-      />
-
       <AlertDialog open={draftDiscardConfirmOpen} onOpenChange={setDraftDiscardConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Starte ny annonse?</AlertDialogTitle>
+            <AlertDialogTitle>Forkaste utkastet?</AlertDialogTitle>
             <AlertDialogDescription>
               Det lagrede utkastet slettes fra denne enheten og serveren. Informasjonen du allerede
               har skrevet i denne annonsen beholdes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Fortsett utkastet</AlertDialogCancel>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => void startNewListing()}
             >
-              Start ny annonse
+              Forkast utkastet
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2221,84 +2290,50 @@ function NewListingPage() {
         </ClientOnly>
       )}
 
-      {previewOpen && previewDraft && (
-        <PreviewDraftView draft={previewDraft} onClose={() => setPreviewOpen(false)} />
-      )}
-
-      {previewOpen ? (
-        <AlertDialog
-          open={blocker.status === "blocked"}
-          onOpenChange={(open) => {
-            if (!open) blocker.reset?.();
-          }}
-        >
-          <AlertDialogContent onClickOutside={() => blocker.reset?.()}>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Annonsen er ikke publisert ennå</AlertDialogTitle>
-              <AlertDialogDescription>Er du sikker på at du vil avslutte?</AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
-              <AlertDialogAction
-                className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
-                onClick={() => {
-                  setPreviewOpen(false);
-                  blocker.proceed?.();
-                }}
-              >
-                Avslutt uten å publisere
-              </AlertDialogAction>
-              <AlertDialogCancel
-                className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
-                onClick={() => blocker.reset?.()}
-              >
-                Fortsett forhåndsvisning
-              </AlertDialogCancel>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
-      ) : (
-        <DiscardListingDialog
-          open={blocker.status === "blocked"}
-          onReset={() => blocker.reset?.()}
-          onDiscard={async () => {
-            await discardDraft();
-            blocker.proceed?.();
-          }}
-          onSaveDraft={async () => {
-            if (!user) {
-              if (!(await flushLocalDraft())) return false;
-              blocker.proceed?.();
-              return true;
-            }
-            setIsSavingDraft(true);
-            const id = await saveDraftToSupabase();
-            setIsSavingDraft(false);
-            if (!id) return false;
+      <DiscardListingDialog
+        open={blocker.status === "blocked"}
+        onReset={() => blocker.reset?.()}
+        onDiscard={async () => {
+          await discardDraft();
+          blocker.proceed?.();
+        }}
+        onSaveDraft={async () => {
+          if (!user) {
+            if (!(await flushLocalDraft())) return false;
             blocker.proceed?.();
             return true;
-          }}
-          isSavingDraft={isSavingDraft}
-        />
-      )}
+          }
+          setIsSavingDraft(true);
+          const id = await saveDraftToSupabase();
+          setIsSavingDraft(false);
+          if (!id) return false;
+          blocker.proceed?.();
+          return true;
+        }}
+        isSavingDraft={isSavingDraft}
+      />
+
+      <GuestPublishSheet
+        open={guestPublishSheetOpen}
+        onOpenChange={setGuestPublishSheetOpen}
+        onSignIn={() => void goToAuthFromGuestSheet("signin")}
+        onSignUp={() => void goToAuthFromGuestSheet("signup")}
+      />
 
       {publishedId && (
         <PublishedListingDialog
           listingId={publishedId}
           open={publishedOpen}
           onOpenChange={setPublishedOpen}
-          canPromote={isDemo}
           onView={() => {
             setPublishedOpen(false);
-            if (publishedCode)
-              navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
+            goToPublishedListing();
           }}
           onPromote={() => {
             setPublishedOpen(false);
             setPromoteOpen(true);
           }}
-          onClose={() => {
-            if (!promoteOpen) navigate({ to: "/mine-annonser" });
-          }}
+          onClose={goToPublishedListing}
         />
       )}
 
@@ -2308,7 +2343,7 @@ function NewListingPage() {
           open={promoteOpen}
           onOpenChange={(o) => {
             setPromoteOpen(o);
-            if (!o) navigate({ to: "/mine-annonser" });
+            if (!o) goToPublishedListing();
           }}
         />
       )}

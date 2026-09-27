@@ -45,7 +45,7 @@ describe("useWtbDraftAutosave", () => {
     vi.useRealTimers();
   });
   it("lagrer et versjonert kjøpsønske uten å berøre salgsutkastet", () => {
-    localStorage.setItem("kaupet_draft_ny_annonse", "sell-draft");
+    localStorage.setItem("kaupet_draft_sell_listing", "sell-draft");
     renderHook(() => useWtbDraftAutosave(fields, true));
 
     act(() => vi.advanceTimersByTime(2_001));
@@ -60,7 +60,7 @@ describe("useWtbDraftAutosave", () => {
       draft_version: 1,
       title: "Ønsker sykkel",
     });
-    expect(localStorage.getItem("kaupet_draft_ny_annonse")).toBe("sell-draft");
+    expect(localStorage.getItem("kaupet_draft_sell_listing")).toBe("sell-draft");
   });
   it("lagrer gjestedraft lokalt når Supabase ikke er tilgjengelig", () => {
     const { result } = renderHook(() => useWtbDraftAutosave(fields, false));

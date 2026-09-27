@@ -48,6 +48,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
+import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const wtbSchema = z.object({
@@ -203,6 +204,7 @@ function NewWtbPage() {
   const [published, setPublished] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
+  const [guestPublishSheetOpen, setGuestPublishSheetOpen] = useState(false);
   const returnToReviewRef = useRef(false);
   const forwardBusyRef = useRef(false);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
@@ -219,18 +221,6 @@ function NewWtbPage() {
   const categoryLoadingMessage = CATEGORY_SUGGESTION_LOADING_MESSAGE;
 
   const step = steps[stepIndex];
-
-  useEffect(() => {
-    trackProductEvent("listing_creation_started", { kind: "want" });
-  }, []);
-  useEffect(() => {
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "viewed",
-      step,
-      stepNumber: stepIndex + 1,
-    });
-  }, [step, stepIndex]);
 
   const { data: allCategories = [] } = useCategories();
   const { data: isDemo = false } = useIsDemo();
@@ -378,17 +368,12 @@ function NewWtbPage() {
     },
     onSuccess: (id) => {
       clearAfterPublish();
-      trackProductEvent("listing_published", { kind: "want" });
       void import("@/lib/haptics").then((module) => module.hapticNotification("success"));
       setCreatedId(id);
       setPublished(true);
     },
     onError: (err) => {
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "want",
-        action: "publish_failed",
-        step,
-      });
+      trackProductEvent("listing_publish_failed", { kind: "want", step });
       void import("@/lib/haptics").then((module) => module.hapticNotification("error"));
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen."));
     },
@@ -396,12 +381,6 @@ function NewWtbPage() {
 
   function goNext() {
     setValidationError(null);
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "completed",
-      step,
-      stepNumber: stepIndex + 1,
-    });
     setStepIndex((i) =>
       composerForwardStep(
         Math.min(i + 1, steps.length - 1),
@@ -445,15 +424,20 @@ function NewWtbPage() {
     if (step === "category-confirm") return;
     returnToReviewRef.current = false;
     setValidationError(null);
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "back",
-      step,
-      stepNumber: stepIndex + 1,
-    });
     setStepIndex((i) => Math.max(i - 1, 0));
   }
   useComposerHistoryBack(stepIndex === 0, goBack);
+
+  // Brukt av GuestPublishSheet: samme redirect-flyt som ble kalt direkte før
+  // arket erstattet det umiddelbare navigasjonshoppet.
+  function goToAuthFromGuestSheet(mode: "signin" | "signup") {
+    if (!flushLocalDraft()) return;
+    bypassNavigationBlockerRef.current = true;
+    void navigate({
+      to: "/auth",
+      search: { mode, returnTo: authResumeReturnTo(currentReturnTo()) },
+    });
+  }
 
   function handleInvalid(fields: FieldErrors<WtbForm>) {
     const targetStep = fields.title
@@ -486,11 +470,6 @@ function NewWtbPage() {
     setAttributes(restorableDraft.attributes);
     setCheckedKeys(restorableDraft.checked_keys);
     dismissRestore();
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "draft_restored",
-      step,
-    });
   }
 
   useEffect(() => {
@@ -499,11 +478,6 @@ function NewWtbPage() {
     }
     authResumeHandledRef.current = true;
     restoreDraft();
-    trackProductEvent("listing_creation_step_completed", {
-      kind: "want",
-      action: "auth_resumed",
-      step,
-    });
     requestAnimationFrame(() => setStepIndex(steps.length - 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, restorableDraft]);
@@ -552,7 +526,7 @@ function NewWtbPage() {
   const footer = (
     <>
       {!native && stepIndex > 0 && !isCategoryConfirmStep && (
-        <Button type="button" variant="ghost" onClick={goBack}>
+        <Button type="button" variant="ghost" onClick={goBack} className="hidden lg:inline-flex">
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
@@ -566,7 +540,11 @@ function NewWtbPage() {
               ? "wtb-continue-requirement"
               : undefined
           }
-          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
+          className={
+            native
+              ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
+              : "w-full h-14 text-base lg:h-11 lg:w-auto lg:text-sm"
+          }
         >
           {native ? "Fortsett" : `Neste: ${STEP_META[steps[stepIndex + 1]].title}`}{" "}
           <ChevronRight className="size-4" aria-hidden />
@@ -575,36 +553,23 @@ function NewWtbPage() {
         <Button
           type="button"
           onClick={handleSubmit(
-            // eslint-disable-next-line react-hooks/refs -- callback runs only on submit
             (values) => {
               if (!user) {
-                if (!flushLocalDraft()) return;
-                bypassNavigationBlockerRef.current = true;
-                void navigate({
-                  to: "/auth",
-                  search: { mode: "signin", returnTo: authResumeReturnTo(currentReturnTo()) },
-                });
+                setGuestPublishSheetOpen(true);
                 return;
               }
-              trackProductEvent("listing_creation_step_completed", {
-                kind: "want",
-                action: "publish_started",
-                step,
-              });
               publish(values);
             },
             (fields) => {
               handleInvalid(fields);
-              trackProductEvent("listing_creation_step_completed", {
-                kind: "want",
-                action: "validation_failed",
-                step,
-                reason: "publish_form",
-              });
             },
           )}
           disabled={isPending}
-          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : "gap-2"}
+          className={
+            native
+              ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
+              : "w-full h-14 gap-2 text-base lg:h-11 lg:w-auto lg:text-sm"
+          }
         >
           {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {user ? (native ? "Publiser" : "Publiser ønskes kjøpt") : "Logg inn og publiser"}
@@ -1061,6 +1026,13 @@ function NewWtbPage() {
         }}
         isSavingDraft={isSaving}
         saveDraftLabel="Lagre som utkast"
+      />
+
+      <GuestPublishSheet
+        open={guestPublishSheetOpen}
+        onOpenChange={setGuestPublishSheetOpen}
+        onSignIn={() => goToAuthFromGuestSheet("signin")}
+        onSignUp={() => goToAuthFromGuestSheet("signup")}
       />
     </>
   );

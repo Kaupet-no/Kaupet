@@ -52,28 +52,14 @@ export function composerPage(page: Page, pageKey: string) {
   return page.getByTestId(`composer-page-${pageKey}`);
 }
 
-export function publishingStatusButton(page: Page) {
-  return page.getByTestId("publishing-status-button");
+/** V3 annonsestyrke-indikator — erstatter den gamle "Publiseringsstatus"-
+ * boksen/dialogen. Vises i desktop-sidekolonnen gjennom hele flyten, og
+ * øverst på Se over-steget på mobil/native (se ny-annonse.tsx sin aside og
+ * ReviewPublishGroup). */
+export function listingStrengthIndicator(page: Page) {
+  return page.getByTestId("listing-strength");
 }
 
-export function missingInformationDialog(page: Page) {
-  return page.getByRole("dialog", { name: "Opplysninger som mangler" });
-}
-
-export async function openPublishingStatus(page: Page) {
-  await publishingStatusButton(page).click();
-  await expect(missingInformationDialog(page)).toBeVisible();
-}
-
-export async function fixMissingInformation(page: Page, label: string) {
-  const dialog = missingInformationDialog(page);
-  await dialog
-    .locator("li")
-    .filter({ hasText: label })
-    .getByRole("button", { name: "Fiks dette" })
-    .click();
-  await expect(dialog).toBeHidden();
-}
 /**
  * Clicks `trigger` and waits for `expected` to appear. Retries the click a
  * bounded number of times if `expected` doesn't show up in time — clicks in
@@ -151,7 +137,7 @@ export function wizardStep(page: Page, groupKey: string) {
  * Fills and advances past the Beskrivelse-steget, which is identical
  * between the generic and kjøretøy-flyten. Assumes the wizard is already
  * showing the page containing the description field. The generic flow's
- * "Gjør søkbar" page may start with category attributes, so the stable
+ * "Om tingen" page may start with category attributes, so the stable
  * textarea test id—not the page wrapper key—is the boundary used here.
  * Vehicle callers differ in how many transitions it takes to get to their
  * vehicle-facts page, so that transition remains each caller's responsibility.
@@ -169,10 +155,10 @@ export async function fillDescriptionAndAdvance(
 /**
  * Publishes from the flow's final page. Vehicle pages also keep
  * delivery/location on this page; generic listings arrive here from their
- * separate "Gjør handelen enkel" page.
+ * separate "Pris og henting" page.
  *
- * Publishing without having opened the preview first prompts a "want to
- * preview before publishing?" dialog rather than publishing immediately.
+ * Se over-steget er selve forhåndsvisningen, så «Publiser» publiserer
+ * direkte — det finnes ingen «Publiser likevel»-dialog lenger.
  * Asserts on the PublishedListingDialog's persistent title, not the
  * success toast — the toast auto-dismisses after a few seconds and was
  * the source of an intermittent CI flake (the toast could already be gone
@@ -185,20 +171,20 @@ export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
   // skjer etter klikket, og Turnstiles utfordringsiframe fortsatt kan være
   // nettverkstreg i CI.
   testInfo.setTimeout(testInfo.timeout + 20_000);
-  await expect(page.getByTestId("publish-listing-button")).toBeEnabled({ timeout: 20_000 });
+  const publishButton = page.getByTestId("publish-listing-button");
+  await expect(publishButton).toBeEnabled({ timeout: 20_000 });
+  // Feilgjetting: en rask dobbeltklikk skal fortsatt starte nøyaktig én
+  // publisering og ikke konkurrere om Turnstile-tokenet.
+  await publishButton.dblclick();
+  // Samme vern mot klikk som ikke registreres som før; knappen er deaktivert
+  // mens publiseringen pågår, så et nytt forsøk kan ikke starte en til.
   await clickAndWaitFor(
     page,
-    page.getByTestId("publish-listing-button"),
-    page.getByTestId("publish-anyway-button"),
+    publishButton,
+    page.getByRole("heading", { name: "Lappen henger ute" }),
     testInfo,
     "no-progress-after-publish-click",
   );
-  // Feilgjetting: en rask dobbeltklikk skal fortsatt starte nøyaktig én
-  // publisering og ikke konkurrere om Turnstile-tokenet.
-  await page.getByTestId("publish-anyway-button").dblclick();
-  await page
-    .getByRole("heading", { name: "Annonsen din er publisert, bra jobba!" })
-    .waitFor({ timeout: 20_000 });
 }
 
 /**

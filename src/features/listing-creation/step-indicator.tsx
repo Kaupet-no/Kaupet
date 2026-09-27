@@ -18,14 +18,16 @@ export function ComposerStepIndicator({
   onSelectStep,
 }: {
   current: number;
-  total: number;
+  /** Utelates "av Y" når stegantallet ikke er kjent ennå (kategoriavhengig
+   * flyt ikke bestemt) — se UI-guiden. */
+  total?: number;
   label: string;
   /** Etikett per steg, indeks 0 = steg 1. Sammen med `onSelectStep` gjør den telleren til en meny. */
   stepLabels?: string[];
   onSelectStep?: (step: number) => void;
 }) {
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-  const counter = `Steg ${current} av ${total}`;
+  const percent = total && total > 0 ? Math.round((current / total) * 100) : 0;
+  const counter = total ? `Steg ${current} av ${total}` : `Steg ${current}`;
   const navigable = stepLabels && onSelectStep;
 
   return (
@@ -79,10 +81,15 @@ export function ComposerStepIndicator({
 export function StepIndicator({
   step,
   pages,
+  flowKnown = true,
   onSelectStep,
 }: {
   step: number;
   pages: WizardPage[];
+  /** Før kategorien er bekreftet er ikke det endelige stegantallet kjent —
+   * vis fremdriftslinje + etikett uten "av Y" i stedet for et tall som
+   * kan endre seg når kategorien velges. */
+  flowKnown?: boolean;
   onSelectStep?: (step: number) => void;
 }) {
   const displaySteps = pages.map((page, index) => ({
@@ -97,7 +104,7 @@ export function StepIndicator({
   return (
     <ComposerStepIndicator
       current={currentStepNumber}
-      total={total}
+      total={flowKnown ? total : undefined}
       label={current?.label ?? ""}
       stepLabels={onSelectStep ? displaySteps.map((ds) => ds.label) : undefined}
       onSelectStep={onSelectStep}

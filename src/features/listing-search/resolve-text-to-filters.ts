@@ -167,6 +167,9 @@ export async function resolveTextToFilters(params: {
   // listing with no chip explaining why.
   const appliedMatches: typeof synonymMatches = [];
   for (const m of synonymMatches) {
+    // Farger er vanlige søkeord på tvers av kategorier. La «rød» finne både
+    // annonsetekst og fargeattributter i stedet for å låse søket til et filter.
+    if (m.filterKey === "color") continue;
     // attrFilters is category-scoped (empty when no category was
     // recognized) — fall back to the unscoped list so a globally-resolved
     // match still finds its filter `type` (select/multiselect/boolean).

@@ -46,6 +46,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -57,10 +58,12 @@ import { buildTree, descendants, type Category } from "@/lib/categories";
 import { categoryBreadcrumb } from "@/lib/category-filters";
 import { cn } from "@/lib/utils";
 import { formatErrorMessage } from "@/lib/errors";
+import { INTEGRATION_LIMITS } from "@/lib/integration-limits";
 import { showErrorToast } from "@/lib/toast";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useIsDemo } from "@/hooks/use-user-roles";
 import { useAllCategoryFilters } from "@/hooks/use-category-filters";
+import { ImportHistory } from "./ImportHistory";
 import { createListingsFromImport, type BulkImportResult } from "./listing-bulk-import.functions";
 import {
   attributeMetaFromFilters,
@@ -68,11 +71,25 @@ import {
   type ParsedBulkImport,
 } from "./parse-import-file";
 
+type ImportMode = "create" | "upsert";
+
+/** Etikettene forhåndsvisningens dry-run-kall bruker: fremtidsform siden
+ * ingenting er skrevet ennå. Resultatvisningen etter selve importen bruker
+ * fortsatt fortidsformer (`RESULT_STATUS_LABELS_NB` under). */
+const PREVIEW_STATUS_LABELS_NB: Record<BulkImportResult["status"], string> = {
+  created: "Ny",
+  updated: "Oppdateres",
+  unchanged: "Uendret",
+  duplicate: "Finnes allerede",
+  failed: "Feil",
+};
+
 export function BulkListingImport({
   open,
   onOpenChange,
   locations = [],
   selectedLocationId,
+  organizationId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -84,6 +101,8 @@ export function BulkListingImport({
     city: string | null;
   }>;
   selectedLocationId?: string | null;
+  /** Vises som «Siste importer» i startvisningen når satt. */
+  organizationId?: string | null;
 }) {
   const { data: allCategories = [], isLoading: categoriesLoading } = useCategories();
   const { data: isDemo = false } = useIsDemo();
@@ -94,7 +113,6 @@ export function BulkListingImport({
   const { data: filters = [] } = useAllCategoryFilters();
   const [templateCategoryId, setTemplateCategoryId] = useState<string | null>(null);
   const [locationId, setLocationId] = useState(selectedLocationId ?? locations[0]?.id ?? "");
-  const [showVisitingAddress, setShowVisitingAddress] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null);
@@ -104,17 +122,51 @@ export function BulkListingImport({
   const [importId, setImportId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [results, setResults] = useState<BulkImportResult[] | null>(null);
+  const [mode, setMode] = useState<ImportMode>("upsert");
+  const [preview, setPreview] = useState<BulkImportResult[] | null>(null);
   const createImport = useMutation({
     mutationFn: (variables: {
       importId: string;
       rows: ParsedBulkImport["rows"];
       locationId: string;
-      showVisitingAddress: boolean;
+      mode: ImportMode;
     }) => createListingsFromImport({ data: variables }),
     onSuccess: setResults,
     onError: (error: Error) =>
       showErrorToast(formatErrorMessage(error, "Kunne ikke opprette annonsene.")),
   });
+  const previewImport = useMutation({
+    mutationFn: (variables: {
+      importId: string;
+      rows: ParsedBulkImport["rows"];
+      locationId: string;
+      mode: ImportMode;
+    }) => createListingsFromImport({ data: { ...variables, dryRun: true } }),
+    onSuccess: setPreview,
+    onError: (error: Error) =>
+      showErrorToast(
+        formatErrorMessage(error, "Kunne ikke sjekke radene mot eksisterende annonser."),
+      ),
+  });
+  /** Kjører dry-run mot tjenesten for gjeldende rader og modus. Kalles etter
+   * en gyldig fil er lest inn, og på nytt hver gang modus endres. Tar
+   * `explicitImportId` fordi den kalles rett etter en fil er lest inn, før
+   * `importId`-state-oppdateringen fra samme hendelse har rukket å committe. */
+  const runPreview = (
+    rows: ParsedBulkImport["rows"],
+    nextMode: ImportMode,
+    explicitImportId?: string,
+  ) => {
+    const usedImportId = explicitImportId ?? importId;
+    if (!usedImportId || !locationId || rows.length === 0) return;
+    setPreview(null);
+    previewImport.mutate({
+      importId: usedImportId,
+      rows,
+      locationId,
+      mode: nextMode,
+    });
+  };
   // Malbyggeren drar med seg logo-PNG-en og OOXML-skriveren, som ingen
   // trenger før de faktisk laster ned malen.
   const downloadTemplate = async () => {
@@ -168,8 +220,10 @@ export function BulkListingImport({
     setFileError(null);
     setImportId(null);
     setResults(null);
+    setPreview(null);
     setConfirmOpen(false);
     createImport.reset();
+    previewImport.reset();
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -178,14 +232,39 @@ export function BulkListingImport({
     setFileError(null);
     setParsed(null);
     setResults(null);
+    setPreview(null);
     try {
       const next = await parseImportFile(file, attributeMetaFromFilters(filters));
       setParsed(next);
-      setImportId(crypto.randomUUID());
+      const nextImportId = crypto.randomUUID();
+      setImportId(nextImportId);
+      if (next.errors.length === 0) runPreview(next.rows, mode, nextImportId);
     } catch (error) {
       setFileError(formatErrorMessage(error, "Filen kunne ikke leses."));
     }
   };
+
+  const changeMode = (nextMode: ImportMode) => {
+    setMode(nextMode);
+    if (parsed && parsed.errors.length === 0) runPreview(parsed.rows, nextMode);
+  };
+
+  /** Rad→forhåndsvisningsresultat, for statuskolonnen i tabellen. */
+  const previewByRowNumber = new Map((preview ?? []).map((result) => [result.rowNumber, result]));
+  const previewCounts = {
+    created: preview?.filter((result) => result.status === "created").length ?? 0,
+    updated: preview?.filter((result) => result.status === "updated").length ?? 0,
+    unchanged: preview?.filter((result) => result.status === "unchanged").length ?? 0,
+    duplicate: preview?.filter((result) => result.status === "duplicate").length ?? 0,
+    failed: preview?.filter((result) => result.status === "failed").length ?? 0,
+  };
+  const previewSummaryParts = [
+    previewCounts.created > 0 && `${previewCounts.created} nye`,
+    previewCounts.updated > 0 && `${previewCounts.updated} oppdateres`,
+    previewCounts.unchanged > 0 && `${previewCounts.unchanged} uendret`,
+    previewCounts.duplicate > 0 && `${previewCounts.duplicate} finnes allerede`,
+    previewCounts.failed > 0 && `${previewCounts.failed} feiler`,
+  ].filter((part): part is string => Boolean(part));
 
   const downloadErrors = () => {
     if (!parsed && !results) return;
@@ -205,6 +284,8 @@ export function BulkListingImport({
   };
 
   const createdCount = results?.filter((result) => result.status === "created").length ?? 0;
+  const updatedCount = results?.filter((result) => result.status === "updated").length ?? 0;
+  const unchangedCount = results?.filter((result) => result.status === "unchanged").length ?? 0;
   const duplicateCount = results?.filter((result) => result.status === "duplicate").length ?? 0;
   const failedCount = results?.filter((result) => result.status === "failed").length ?? 0;
   const pending = createImport.isPending;
@@ -239,10 +320,49 @@ export function BulkListingImport({
                   <code>title</code>, <code>description</code> og <code>price</code>. Bruk{" "}
                   <code>external_id</code> som bedriftens egen stabile referanse, for eksempel
                   varenummer, SKU eller lager-ID. Verdien må være unik i filen. Pris er hele kroner
-                  i NOK. Én annonse per rad; maks 500 rader og 5 MB. Bilder importeres ikke, og
-                  bilde-URL-er støttes ikke.
+                  i NOK. Én annonse per rad; maks 500 rader og 5 MB. Bilde-URL-er (
+                  <code>images</code>) må starte med https:// og skilles med semikolon.
                 </AlertDescription>
               </Alert>
+              <div className="space-y-2 rounded-md border p-3">
+                <Label>Import-modus</Label>
+                <RadioGroup
+                  value={mode}
+                  onValueChange={(value) => changeMode(value as ImportMode)}
+                  className="gap-3"
+                >
+                  <div className="flex items-start gap-2">
+                    <RadioGroupItem value="upsert" id="bulk-mode-upsert" className="mt-1" />
+                    <Label htmlFor="bulk-mode-upsert" className="flex flex-col gap-0.5 font-normal">
+                      <span className="font-medium text-foreground">Opprett og oppdater</span>
+                      <span className="text-xs text-muted-foreground">
+                        Nye <code>external_id</code>-er opprettes, kjente oppdateres og fornyes.
+                      </span>
+                    </Label>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <RadioGroupItem value="create" id="bulk-mode-create" className="mt-1" />
+                    <Label htmlFor="bulk-mode-create" className="flex flex-col gap-0.5 font-normal">
+                      <span className="font-medium text-foreground">Kun nye annonser</span>
+                      <span className="text-xs text-muted-foreground">
+                        Rader med en kjent <code>external_id</code> røres ikke og vises som «Finnes
+                        allerede».
+                      </span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Annonser som er med i en opplasting fornyes {INTEGRATION_LIMITS.listingRenewalDays}{" "}
+                dager frem. Last opp hele lageret minst hver {INTEGRATION_LIMITS.listingRenewalDays}
+                . dag for at annonsene ikke skal utløpe.
+              </p>
+              {!parsed && !results && organizationId && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Siste importer</h3>
+                  <ImportHistory organizationId={organizationId} />
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="bulk-location">Lokasjon for annonsene</Label>
@@ -261,26 +381,6 @@ export function BulkListingImport({
                   <p className="text-xs text-muted-foreground">
                     Lokasjon velges før import. Kolonnene postnummer og sted i filen brukes ikke.
                   </p>
-                </div>
-                <div
-                  role="group"
-                  aria-label="Vis besøksadresse"
-                  className="flex items-start gap-3 rounded-md border p-3 text-sm"
-                >
-                  <input
-                    id="bulk-show-address"
-                    type="checkbox"
-                    aria-label="Vis besøksadresse"
-                    className="mt-1 size-4 accent-primary"
-                    checked={showVisitingAddress}
-                    onChange={(event) => setShowVisitingAddress(event.target.checked)}
-                  />
-                  <span>
-                    <span className="font-medium">Vis besøksadresse</span>
-                    <span className="block text-muted-foreground">
-                      Publiser full gateadresse på annonsene.
-                    </span>
-                  </span>
                 </div>
               </div>
               <div className="space-y-3">
@@ -468,6 +568,21 @@ export function BulkListingImport({
                       </Table>
                     </div>
                   )}
+                  {previewImport.isPending && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Loader2 className="size-4 animate-spin" />
+                      Sjekker rader mot eksisterende annonser…
+                    </div>
+                  )}
+                  {preview && previewSummaryParts.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {previewSummaryParts.join(", ")}
+                    </p>
+                  )}
                   <div className="overflow-x-auto rounded-md border">
                     <Table>
                       <TableHeader>
@@ -477,18 +592,40 @@ export function BulkListingImport({
                           <TableHead>Kategori</TableHead>
                           <TableHead>Tittel</TableHead>
                           <TableHead>Pris</TableHead>
+                          <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {parsed.rows.map((row) => (
-                          <TableRow key={row.rowNumber}>
-                            <TableCell>{row.rowNumber}</TableCell>
-                            <TableCell>{row.externalId}</TableCell>
-                            <TableCell>{row.category}</TableCell>
-                            <TableCell>{row.title}</TableCell>
-                            <TableCell>{row.priceNok.toLocaleString("nb-NO")} kr</TableCell>
-                          </TableRow>
-                        ))}
+                        {parsed.rows.map((row) => {
+                          const previewResult = previewByRowNumber.get(row.rowNumber);
+                          return (
+                            <TableRow key={row.rowNumber}>
+                              <TableCell>{row.rowNumber}</TableCell>
+                              <TableCell>{row.externalId}</TableCell>
+                              <TableCell>{row.category}</TableCell>
+                              <TableCell>{row.title}</TableCell>
+                              <TableCell>{row.priceNok.toLocaleString("nb-NO")} kr</TableCell>
+                              <TableCell>
+                                {previewResult ? (
+                                  <span
+                                    className={
+                                      previewResult.status === "failed"
+                                        ? "text-destructive"
+                                        : undefined
+                                    }
+                                  >
+                                    {PREVIEW_STATUS_LABELS_NB[previewResult.status]}
+                                    {previewResult.status === "failed" && previewResult.error
+                                      ? `: ${previewResult.error}`
+                                      : ""}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">–</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -496,7 +633,7 @@ export function BulkListingImport({
                     <div role="status" aria-live="polite" className="space-y-2">
                       <div className="flex items-center gap-2 text-sm">
                         <Loader2 className="size-4 animate-spin" />
-                        Oppretter annonser…
+                        Importerer annonser…
                       </div>
                       <Progress value={undefined} />
                     </div>
@@ -504,10 +641,15 @@ export function BulkListingImport({
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      disabled={parsed.errors.length > 0 || parsed.rows.length === 0 || pending}
+                      disabled={
+                        parsed.errors.length > 0 ||
+                        parsed.rows.length === 0 ||
+                        pending ||
+                        previewImport.isPending
+                      }
                       onClick={() => setConfirmOpen(true)}
                     >
-                      Opprett annonser
+                      Start import
                     </Button>
                   </div>
                 </section>
@@ -517,6 +659,8 @@ export function BulkListingImport({
             <ImportResult
               results={results}
               createdCount={createdCount}
+              updatedCount={updatedCount}
+              unchangedCount={unchangedCount}
               duplicateCount={duplicateCount}
               failedCount={failedCount}
               onDownloadErrors={downloadErrors}
@@ -529,10 +673,12 @@ export function BulkListingImport({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Opprette annonser?</AlertDialogTitle>
+            <AlertDialogTitle>Importere annonser?</AlertDialogTitle>
             <AlertDialogDescription>
-              Du er i ferd med å opprette {parsed?.rows.length ?? 0} annonser. Annonsene opprettes
-              med status aktiv.
+              Du er i ferd med å importere {parsed?.rows.length ?? 0} rader
+              {previewSummaryParts.length > 0 ? `: ${previewSummaryParts.join(", ")}` : ""}. Nye
+              annonser opprettes som aktive, og annonser som er med fornyes{" "}
+              {INTEGRATION_LIMITS.listingRenewalDays} dager frem.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -546,12 +692,12 @@ export function BulkListingImport({
                     importId,
                     rows: parsed.rows,
                     locationId,
-                    showVisitingAddress,
+                    mode,
                   });
                 }
               }}
             >
-              Bekreft oppretting
+              Bekreft import
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -560,9 +706,20 @@ export function BulkListingImport({
   );
 }
 
+/** Norske etiketter for radstatusene `syncListings` kan returnere. */
+const RESULT_STATUS_LABELS_NB: Record<BulkImportResult["status"], string> = {
+  created: "Opprettet",
+  updated: "Oppdatert",
+  unchanged: "Uendret",
+  duplicate: "Duplikat",
+  failed: "Feilet",
+};
+
 function ImportResult({
   results,
   createdCount,
+  updatedCount,
+  unchangedCount,
   duplicateCount,
   failedCount,
   onDownloadErrors,
@@ -571,6 +728,8 @@ function ImportResult({
 }: {
   results: BulkImportResult[];
   createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
   duplicateCount: number;
   failedCount: number;
   onDownloadErrors: () => void;
@@ -589,6 +748,8 @@ function ImportResult({
             label="Opprettet"
             count={createdCount}
           />
+          {updatedCount > 0 && <ResultCount label="Oppdatert" count={updatedCount} />}
+          {unchangedCount > 0 && <ResultCount label="Uendret" count={unchangedCount} />}
           <ResultCount label="Duplikat" count={duplicateCount} />
           <ResultCount icon={<XCircle className="size-4" />} label="Feilet" count={failedCount} />
         </div>
@@ -608,13 +769,7 @@ function ImportResult({
               <TableRow key={`${result.rowNumber}-${result.externalId}`}>
                 <TableCell>{result.rowNumber}</TableCell>
                 <TableCell>{result.externalId}</TableCell>
-                <TableCell>
-                  {result.status === "created"
-                    ? "Opprettet"
-                    : result.status === "duplicate"
-                      ? "Duplikat"
-                      : "Feilet"}
-                </TableCell>
+                <TableCell>{RESULT_STATUS_LABELS_NB[result.status]}</TableCell>
                 <TableCell>
                   {result.kaupetCode ? (
                     <Link

@@ -45,17 +45,23 @@ export function buildListingsSearchRpcArgs({
   offset,
 }: SearchRequestInput) {
   const extraGroups = search.extraGroups ?? [];
-  const includeGroups = [
-    { mode: search.qMode ?? "all", terms },
-    ...extraGroups.filter((group) => !group.exclude),
-  ].filter((group) => group.terms.length > 0);
+  const primaryMode = search.qMode ?? "all";
+  const includeGroups = [primaryMode, primaryMode === "all" ? "any" : "all"]
+    .map((mode) => ({
+      mode,
+      terms: [
+        ...new Set([
+          ...(mode === primaryMode ? terms : []),
+          ...extraGroups
+            .filter((group) => !group.exclude && group.mode === mode)
+            .flatMap((group) => group.terms),
+        ]),
+      ],
+    }))
+    .filter((group) => group.terms.length > 0);
   const excludeAnyTerms = extraGroups
-    .filter((group) => group.exclude && group.mode === "any")
+    .filter((group) => group.exclude)
     .flatMap((group) => group.terms);
-  const excludeAllGroups = extraGroups
-    .filter((group) => group.exclude && group.mode === "all")
-    .map((group) => group.terms)
-    .filter((groupTerms) => groupTerms.length > 0);
   const categoryIds =
     effectiveCategories.length > 0 && categories
       ? (resolveCategoryIds(effectiveCategories, categories) ?? [])
@@ -78,7 +84,7 @@ export function buildListingsSearchRpcArgs({
   return {
     _include_groups: includeGroups as Json,
     _exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : null,
-    _exclude_all_groups: excludeAllGroups as Json,
+    _exclude_all_groups: [] as Json,
     _category_ids: categoryIds,
     _conditions: search.conditions.length > 0 ? search.conditions : null,
     _include_free: search.includeFree ?? true,

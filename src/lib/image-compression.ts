@@ -1,57 +1,56 @@
-// Klientside-komprimering av bilder før opplasting til Supabase Storage.
-// Sparer både lagringsplass og brukernes opplastingsbåndbredde. Biblioteket
-// håndterer EXIF-rotasjon (viktig for mobilbilder), nedskalering og kjører i en
-// web worker slik at UI ikke blokkeres. Utdata er alltid WebP — formatet er
-// allerede tillatt i begge bucketene (se ALLOWED_MIME i storage.ts).
+// Klientside-komprimering av bilder før opplasting. Sparer både lagringsplass
+// og brukernes opplastingsbåndbredde. Biblioteket håndterer EXIF-rotasjon
+// (viktig for mobilbilder), nedskalering og kjører i en web worker slik at UI
+// ikke blokkeres. Utdata er WebP for opplasting og JPEG for KI-miniatyrer (se
+// presetene i image-presets.ts).
 
 import imageCompression from "browser-image-compression";
+// Workeren gjør `importScripts(libURL)`. Uten egen `libURL` henter biblioteket
+// seg selv fra cdn.jsdelivr.net, som CSP-ens `script-src` blokkerer. Da faller
+// det stille tilbake til hovedtråden, eller feiler, og KI-miniatyrene forkastes.
+// Serveres derfor fra eget domene (dekket av `script-src 'self'` og
+// `worker-src 'self' blob:` i security-headers.ts).
+import imageCompressionLibUrl from "browser-image-compression/dist/browser-image-compression.js?url";
 
-export type CompressPreset = "avatar" | "listing" | "listing-thumb" | "vehicle360";
+import { PRESETS } from "@/lib/image-presets";
+export type { CompressPreset } from "@/lib/image-presets";
+import type { CompressPreset } from "@/lib/image-presets";
 
-type PresetConfig = {
-  maxWidthOrHeight: number;
-  maxSizeMB: number;
-  initialQuality: number;
-};
-
-// Avatarer rendres lite (~80px) og kan komprimeres hardt. Annonsebilder trenger
-// høyere oppløsning, men kan fortsatt skaleres betraktelig ned fra originalen.
-// 360-frames vises kun små/animert i spin-visningen, aldri i full skjerm
-// enkeltvis — komprimeres derfor hardere enn galleribilder. "listing-thumb"
-// er den lille varianten som vises på annonsekort i søk/favoritter/etc.
-const PRESETS: Record<CompressPreset, PresetConfig> = {
-  avatar: { maxWidthOrHeight: 512, maxSizeMB: 0.15, initialQuality: 0.7 },
-  listing: { maxWidthOrHeight: 1600, maxSizeMB: 0.6, initialQuality: 0.8 },
-  "listing-thumb": { maxWidthOrHeight: 480, maxSizeMB: 0.1, initialQuality: 0.75 },
-  vehicle360: { maxWidthOrHeight: 1024, maxSizeMB: 0.3, initialQuality: 0.82 },
-};
-
-function toWebpName(name: string): string {
+function toPresetFileName(name: string, fileType: string): string {
   const dot = name.lastIndexOf(".");
   const base = dot > 0 ? name.slice(0, dot) : name;
-  return `${base}.webp`;
+  const ext = fileType === "image/jpeg" ? "jpg" : "webp";
+  return `${base}.${ext}`;
 }
 
 /**
- * Komprimer og nedskaler et bilde til WebP. Fail-safe: hvis komprimeringen
- * feiler, eller resultatet blir større enn originalen, returneres originalfilen
- * uendret — opplasting skal aldri brytes av komprimeringssteget.
+ * Komprimer og nedskaler et bilde til presetets format. Fail-safe: hvis
+ * komprimeringen feiler, eller resultatet blir større enn originalen, returneres
+ * originalfilen uendret — opplasting skal aldri brytes av komprimeringssteget.
+ * Unntak: presets med `alwaysUseCompressed` (KI-miniatyrer) bruker alltid den
+ * re-enkodede filen. `preserveExif` sendes alltid eksplisitt som `false`.
  */
 export async function compressImage(file: File, preset: CompressPreset): Promise<File> {
   const cfg = PRESETS[preset];
+  const fileType = cfg.fileType ?? "image/webp";
   let result = file;
   try {
     const compressed = await imageCompression(file, {
       maxWidthOrHeight: cfg.maxWidthOrHeight,
       maxSizeMB: cfg.maxSizeMB,
       initialQuality: cfg.initialQuality,
-      fileType: "image/webp",
+      fileType,
+      preserveExif: false,
       useWebWorker: true,
+      // Absolutt URL: workeren er en blob:-URL som ikke kan resolve relative
+      // stier. `import.meta.url` (ikke `location`) så dette ikke kaster i
+      // Node-testmiljø og stille sender alle tester til catch-grenen.
+      libURL: new URL(imageCompressionLibUrl, import.meta.url).href,
     });
     // Behold den minste av original og komprimert.
-    if (compressed.size < file.size) {
-      result = new File([compressed], toWebpName(file.name), {
-        type: "image/webp",
+    if (cfg.alwaysUseCompressed || compressed.size < file.size) {
+      result = new File([compressed], toPresetFileName(file.name, fileType), {
+        type: fileType,
         lastModified: Date.now(),
       });
     }

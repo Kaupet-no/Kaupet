@@ -99,9 +99,14 @@ export function effectiveFlowForCategory(
   categoryId: string | null,
   allFlows: CategoryFlowRow[],
   categoriesById: Map<string, CategoryNode>,
-  fromLanding = false,
+  entry: LandingEntry | null = null,
 ): CategoryFlow {
-  const prepend = fromLanding ? applyLandingEntry : prependCategorySelect;
+  const prepend =
+    entry === "title"
+      ? applyLandingEntry
+      : entry === "photos"
+        ? applyPhotosEntry
+        : prependCategorySelect;
   if (!categoryId) return prepend(DEFAULT_FLOW);
   const flowsByCategoryId = new Map(allFlows.map((f) => [f.category_id, f]));
   let cur: CategoryNode | undefined = categoriesById.get(categoryId);
@@ -114,6 +119,10 @@ export function effectiveFlowForCategory(
   }
   return prepend(DEFAULT_FLOW);
 }
+
+/** How the wizard was entered from the intent landing screen: with a title
+ * already typed, or photos-first with the title still to come. */
+export type LandingEntry = "title" | "photos";
 
 function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
   return { ...flow, fieldGroups: ["category-select", ...flow.fieldGroups] };
@@ -136,6 +145,20 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
 function applyLandingEntry(flow: CategoryFlow): CategoryFlow {
   const rest = flow.fieldGroups.filter((key) => key !== "photos" && key !== "title");
   return { ...flow, fieldGroups: ["photos", ...rest] };
+}
+
+/**
+ * Photos-first entry from the landing screen: like `applyLandingEntry`, but
+ * nothing is answered yet, so `title` stays — right after `photos`, on the
+ * same showcase page, where the photo suggestion's "Bruk" can fill it and
+ * the title-based category suggestion kicks in before category-confirm.
+ * Vehicle flows have no `title` group (see normalizeFieldGroupKeys), so none
+ * is added back for them.
+ */
+function applyPhotosEntry(flow: CategoryFlow): CategoryFlow {
+  const rest = flow.fieldGroups.filter((key) => key !== "photos" && key !== "title");
+  const title = flow.fieldGroups.includes("title") ? ["title"] : [];
+  return { ...flow, fieldGroups: ["photos", ...title, ...rest] };
 }
 
 /**
@@ -184,6 +207,45 @@ const SOLO_FIELD_GROUP_KEYS: Record<string, true> = {
   "vehicle-registration": true,
   "vehicle-price": true,
 };
+
+/** The subset of `SOLO_FIELD_GROUP_KEYS` that is category-flow content
+ * rather than the always-present structural picking steps themselves
+ * (`category-select`/`category-confirm`) — i.e. a solo page a category's
+ * *stored* `field_groups` can opt into (currently only
+ * `vehicle-registration`; `vehicle-price` is runtime-injected alongside it,
+ * see withRuntimeFieldGroups, so checking for either is equivalent here). */
+const FLOW_DEFINING_SOLO_KEYS = new Set(
+  Object.keys(SOLO_FIELD_GROUP_KEYS).filter(
+    (key) => key !== "category-select" && key !== "category-confirm",
+  ),
+);
+
+/**
+ * Whether the AI category suggestion(s) offered on the landing-entry flow
+ * still need the dedicated category-confirm solo step, rather than the
+ * inline "Kaupet foreslår"-chip on category-attributes. True whenever any
+ * suggested category's effective flow (see effectiveFlowForCategory)
+ * contains a `FLOW_DEFINING_SOLO_KEYS` entry — a structural solo page that
+ * must know the resolved category before the rest of the flow can render
+ * (in practice `vehicle-registration`), same reasoning as
+ * withRuntimeFieldGroups' own category-confirm injection. This is a
+ * flow-shape check, not a category-type check (no vehicle/boat-specific
+ * logic here — see AGENTS.md on keeping the generic core vertical-agnostic):
+ * any category whose flow has no such page is safe to resolve later, inline
+ * on category-attributes, because its task-page structure never depends on
+ * which leaf ends up chosen. Pure so it's testable without mounting the
+ * wizard.
+ */
+export function suggestionNeedsCategoryConfirm(
+  suggestionCategoryIds: string[],
+  allFlows: CategoryFlowRow[],
+  categoriesById: Map<string, CategoryNode>,
+): boolean {
+  return suggestionCategoryIds.some((id) => {
+    const { fieldGroups } = effectiveFlowForCategory(id, allFlows, categoriesById);
+    return fieldGroups.some((key) => FLOW_DEFINING_SOLO_KEYS.has(key));
+  });
+}
 
 /**
  * Ordinære flyter: samme fire oppgavegrenser på web og native — vis tingen,

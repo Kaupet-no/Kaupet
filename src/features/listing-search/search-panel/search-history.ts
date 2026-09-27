@@ -31,3 +31,28 @@ export function clearSearchHistory(): void {
     /* ignore */
   }
 }
+
+// Nylig brukte kategorier (slugs), vist som snarveier over kategorirutenettet.
+const RECENT_CATEGORIES_KEY = "kaupet_recent_categories_v1";
+const MAX_RECENT_CATEGORIES = 4;
+
+export function getRecentCategories(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(RECENT_CATEGORIES_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentCategory(slug: string): void {
+  try {
+    const prev = getRecentCategories().filter((s) => s !== slug);
+    localStorage.setItem(
+      RECENT_CATEGORIES_KEY,
+      JSON.stringify([slug, ...prev].slice(0, MAX_RECENT_CATEGORIES)),
+    );
+  } catch {
+    /* ignore */
+  }
+}

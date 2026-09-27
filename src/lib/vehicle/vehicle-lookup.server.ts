@@ -61,6 +61,8 @@ function assertVehicleLookupConfigured() {
     );
   }
 }
+const SVV_UNAVAILABLE_MESSAGE =
+  "Vi får ikke kontakt med Statens vegvesen akkurat nå. Prøv igjen om litt, eller kryss av for at kjøretøyet ikke er registrert og fyll inn opplysningene selv.";
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
 
 const vehicleLookupUrl =
@@ -256,12 +258,20 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   const url = new URL(vehicleLookupUrl);
   url.searchParams.set("kjennemerke", regNr);
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      "SVV-Authorization": `Apikey ${process.env.STATENS_VEGVESEN_API_KEY}`,
-      Accept: "application/json",
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: {
+        "SVV-Authorization": `Apikey ${process.env.STATENS_VEGVESEN_API_KEY}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (e) {
+    // Nettverksfeil (fetch kaster en TypeError med den lite hjelpsomme
+    // meldingen "fetch failed") — SVV nede eller utilgjengelig herfra.
+    console.error("SVV-oppslag nådde ikke fram", e);
+    throw new Error(SVV_UNAVAILABLE_MESSAGE, { cause: e });
+  }
 
   // 422 = "Antall kjoretoy i respons overstiger kvote" (kvote brukt opp), med
   // Retry-After-header ("Prøv igjen etter midnatt (norsk tid)").
@@ -271,8 +281,8 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     );
   }
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Kjøretøyoppslag feilet: ${res.status} ${text}`);
+    console.error("SVV-oppslag feilet", res.status, await res.text());
+    throw new Error(SVV_UNAVAILABLE_MESSAGE);
   }
 
   // Root response (KjoretoydataResponse): `feilmelding` er rot-nivå, ikke per

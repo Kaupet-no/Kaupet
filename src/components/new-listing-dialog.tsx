@@ -5,10 +5,8 @@ import { IntentTitleLanding } from "@/components/intent-title-landing";
 type Intent = "sell" | "buy" | "free";
 
 /**
- * Shared "Ny annonse"-overlay (intent + tittel, med kategoriforslag) for
- * inngangspunkter utenfor bunn-nav/forside. Direkte lenker til /ny-annonse
- * eller /ny-ok-annonse uten title-param hopper over category-confirm-steget
- * i wizarden — se ny-annonse.tsx/ny-ok-annonse.tsx sin skipCategoryStep.
+ * Shared "Ny annonse"-overlay (valg av annonsetype) for inngangspunkter
+ * utenfor bunn-nav/forside — se IntentTitleLanding.
  */
 export function NewListingDialog({
   open,

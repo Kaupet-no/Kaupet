@@ -54,6 +54,7 @@ export function CategoryFilterFields({
   brandLookupFilters,
   counts,
   isNative = false,
+  compactRanges = false,
 }: {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
@@ -69,6 +70,7 @@ export function CategoryFilterFields({
   counts?: Record<string, Record<string, number>>;
   /** Search-panel-only: selection lists open in the shared native sheet. */
   isNative?: boolean;
+  compactRanges?: boolean;
 }) {
   const brandScope = brandLookupFilters ?? filters;
   // Shared by the plain range fallback below and the grouped fields
@@ -81,6 +83,7 @@ export function CategoryFilterFields({
       <RangeFilterField
         key={filter.id}
         label={filter.label_nb}
+        compact={compactRanges}
         bounds={boundsForFilter(filter)}
         value={{ min: range.min, max: range.max }}
         onChange={(next) =>

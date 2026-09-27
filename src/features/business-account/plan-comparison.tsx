@@ -40,7 +40,7 @@ export type PlanComparisonProps = {
 const planOrder: BusinessPlan[] = ["proff_basis", "proff"];
 
 function formatPrice(config: BusinessPlanConfig, term: ProffTerm) {
-  if (config.monthlyPriceNok === 0) return "Gratis – alltid";
+  if (config.monthlyPriceNok === 0) return "Alltid gratis";
   return formatProffTermPrice(term);
 }
 

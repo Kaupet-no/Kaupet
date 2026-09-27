@@ -5,6 +5,7 @@ import {
   type CategoryNode,
 } from "@/lib/category-filters";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { containsImageMetadata } from "@/lib/image-metadata";
 import { z } from "zod";
 
 const inputSchema = z.object({ title: z.string().min(3).max(200) });
@@ -193,14 +194,28 @@ ${examplesBlock}Annonsetittel: "${truncatedTitle}"`;
 
 const PHOTO_MAX_BYTES = 150 * 1024;
 const PHOTO_MAX_TOTAL_BYTES = 450 * 1024;
+const PHOTO_MAX_IMAGES: Record<"identify" | "attributes", number> = {
+  identify: 2,
+  attributes: 3,
+};
 const PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const PHOTO_CATEGORY_CACHE_TTL_MS = 60_000;
+// Not Small 4: mistral-small-2603 misreads even clear photos (drum -> "bowl of
+// bananas"). Ministral 14B identifies them as well as Medium 3.5 at about an
+// eighth of the price. Measured with scripts/eval-photo-identify.ts — see the
+// decision doc § 2d. Ministral rejects `reasoning_effort`, so it is not sent.
+const PHOTO_MODEL = "ministral-14b-2512";
 const PHOTO_UNAVAILABLE = {
   status: "unavailable" as const,
   source: "photo-ai" as const,
   categories: [],
   attributes: [],
 };
+/** Every silent fallback logs why, so `wrangler tail` shows which gate fired. */
+function photoUnavailable(reason: string, detail?: unknown) {
+  console.warn("[photo-ai] unavailable:", reason, ...(detail === undefined ? [] : [detail]));
+  return PHOTO_UNAVAILABLE;
+}
 type PhotoSuggestionInput = {
   operation: "identify" | "attributes";
   title?: string;
@@ -235,20 +250,30 @@ async function loadPhotoCategories(): Promise<CategoryRow[] | null> {
   return photoCategoryLoad;
 }
 
-function boundedPhotoImages(images: PhotoSuggestionInput["images"]) {
+function boundedPhotoImages(
+  images: PhotoSuggestionInput["images"],
+  operation: "identify" | "attributes",
+) {
   let totalBytes = 0;
   const valid: PhotoSuggestionInput["images"] = [];
-  for (const image of images) {
+  for (const image of images.slice(0, PHOTO_MAX_IMAGES[operation])) {
     const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/u.exec(
       image.dataUrl,
     );
     if (!match || match[1] !== image.mime || match[2].length % 4 !== 0) continue;
     try {
-      const bytes = atob(match[2]).length;
-      if (bytes === 0 || bytes > PHOTO_MAX_BYTES || totalBytes + bytes > PHOTO_MAX_TOTAL_BYTES) {
+      const binary = atob(match[2]);
+      const size = binary.length;
+      if (size === 0 || size > PHOTO_MAX_BYTES || totalBytes + size > PHOTO_MAX_TOTAL_BYTES) {
         continue;
       }
-      totalBytes += bytes;
+      // Defense in depth: the client re-encodes and strips metadata before
+      // sending, but never trust that alone — reject any image that still
+      // carries EXIF/XMP bytes instead of forwarding it to Mistral.
+      const bytes = new Uint8Array(size);
+      for (let i = 0; i < size; i += 1) bytes[i] = binary.charCodeAt(i);
+      if (containsImageMetadata(bytes)) continue;
+      totalBytes += size;
       valid.push(image);
     } catch {
       // Invalid base64 is a manual-fallback case, not a provider error.
@@ -347,23 +372,23 @@ export async function suggestListingFromPhotosAi(input: unknown) {
     .strict()
     .safeParse(input);
   if (!parsed.success || process.env.MISTRAL_PHOTO_SUGGESTIONS_ENABLED !== "true") {
-    return PHOTO_UNAVAILABLE;
+    return photoUnavailable(parsed.success ? "disabled" : "invalid input");
   }
-  const images = boundedPhotoImages(parsed.data.images);
-  if (images.length === 0) return PHOTO_UNAVAILABLE;
+  const images = boundedPhotoImages(parsed.data.images, parsed.data.operation);
+  if (images.length === 0) return photoUnavailable("no valid images");
 
   const categoryRows = await loadPhotoCategories();
-  if (!categoryRows) return PHOTO_UNAVAILABLE;
+  if (!categoryRows) return photoUnavailable("categories load failed");
   const parentIds = new Set(
     categoryRows.flatMap((category) => (category.parent_id ? [category.parent_id] : [])),
   );
   const leafCategories = categoryRows.filter((category) => !parentIds.has(category.id));
-  if (leafCategories.length === 0) return PHOTO_UNAVAILABLE;
+  if (leafCategories.length === 0) return photoUnavailable("no leaf categories");
 
   let filters: CategoryFilter[] = [];
   if (parsed.data.operation === "attributes") {
     const category = categoryRows.find((candidate) => candidate.slug === parsed.data.categorySlug);
-    if (!category) return PHOTO_UNAVAILABLE;
+    if (!category) return photoUnavailable("unknown category slug");
     const categoryById = new Map<string, CategoryNode>(
       categoryRows.map((candidate) => [candidate.id, candidate]),
     );
@@ -379,7 +404,7 @@ export async function suggestListingFromPhotosAi(input: unknown) {
         "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
       )
       .in("category_id", [...categoryIds]);
-    if (filterError || !filterRows) return PHOTO_UNAVAILABLE;
+    if (filterError || !filterRows) return photoUnavailable("filters load failed");
     filters = effectiveFiltersForCategory(
       category.id,
       filterRows.map((row) => normalizeFilter(row)),
@@ -393,7 +418,7 @@ export async function suggestListingFromPhotosAi(input: unknown) {
   const prompt =
     parsed.data.operation === "identify"
       ? `Finn én eller to sannsynlige bladkategorier for bildene på en norsk markedsplass.
-Velg bare sluger fra kandidatlisten. Foreslå også en kort tittel hvis bildet viser én tydelig gjenstand.
+Velg bare sluger fra kandidatlisten. Hvis bildet viser én tydelig gjenstand, foreslå en kort tittel som bare navngir gjenstanden (og merke/modell hvis det står synlig). Ikke beskriv tilstand, alder, pris eller bruk.
 Ikke ta med personopplysninger, adresse, registreringsnummer eller kontaktinformasjon.
 Kandidater: ${candidateBlock}`
       : `Finn bare tydelige, synlige verdier for tillatte kategorifelt i bildene.
@@ -448,7 +473,7 @@ Tillatte felt: ${filters
           required: ["attributes"],
           additionalProperties: false,
         };
-  if (!process.env.MISTRAL_API_KEY) return PHOTO_UNAVAILABLE;
+  if (!process.env.MISTRAL_API_KEY) return photoUnavailable("MISTRAL_API_KEY missing");
 
   try {
     const response = await fetch("https://api.eu.mistral.ai/v1/chat/completions", {
@@ -458,10 +483,9 @@ Tillatte felt: ${filters
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "mistral-small-2603",
+        model: PHOTO_MODEL,
         messages: [{ role: "user", content }],
         max_tokens: 256,
-        reasoning_effort: "none",
         temperature: 0,
         response_format: {
           type: "json_schema",
@@ -477,12 +501,17 @@ Tillatte felt: ${filters
       }),
       signal: AbortSignal.timeout(5_000),
     });
-    if (!response.ok) return PHOTO_UNAVAILABLE;
+    if (!response.ok) {
+      return photoUnavailable(
+        `Mistral HTTP ${response.status}`,
+        (await response.text().catch(() => "")).slice(0, 300),
+      );
+    }
     const result = (await response.json()) as {
       choices?: Array<{ message?: { content?: string | null } }>;
     };
     const generated = result.choices?.[0]?.message?.content;
-    if (!generated) return PHOTO_UNAVAILABLE;
+    if (!generated) return photoUnavailable("empty Mistral response");
     if (parsed.data.operation === "identify") {
       const output = z
         .object({
@@ -499,7 +528,7 @@ Tillatte felt: ${filters
             categories: suggestions,
             ...(output.title ? { title: output.title } : {}),
           }
-        : PHOTO_UNAVAILABLE;
+        : photoUnavailable("no known category in Mistral response", output.categories);
     }
     const output = z
       .object({
@@ -519,8 +548,11 @@ Tillatte felt: ${filters
     );
     return attributes.length > 0
       ? { status: "pending" as const, source: "photo-ai" as const, attributes }
-      : PHOTO_UNAVAILABLE;
-  } catch {
-    return PHOTO_UNAVAILABLE;
+      : photoUnavailable("no allowed attributes in Mistral response");
+  } catch (error) {
+    return photoUnavailable(
+      "Mistral request threw",
+      error instanceof Error ? error.name + ": " + error.message : error,
+    );
   }
 }

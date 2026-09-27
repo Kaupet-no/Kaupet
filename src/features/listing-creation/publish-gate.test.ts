@@ -1,40 +1,46 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
 
-import { publishGate } from "./publish-gate";
+import { blockImplicitSubmit, publishGate } from "./publish-gate";
 
-const base = {
-  hasMissingAttributes: false,
-  authenticated: true,
-  hasPreviewed: true,
-  native: false,
-};
+const base = { hasMissingAttributes: false, authenticated: true };
 
 describe("publishGate", () => {
   it("ber om manglende egenskaper først", () => {
-    expect(publishGate({ ...base, hasMissingAttributes: true, authenticated: false })).toBe(
+    expect(publishGate({ hasMissingAttributes: true, authenticated: false })).toBe(
       "fill-required-attributes",
     );
   });
 
-  // Regresjonsvakt: forhåndsvisningsdialogen publiserer direkte, så en utlogget
-  // bruker må sendes til innlogging FØR den dialogen kan vises.
-  it("sender en utlogget bruker til innlogging, også uten forhåndsvisning", () => {
-    expect(publishGate({ ...base, authenticated: false, hasPreviewed: false })).toBe("sign-in");
-  });
-
-  it("sender en utlogget bruker til innlogging på native", () => {
-    expect(publishGate({ ...base, authenticated: false, native: true })).toBe("sign-in");
-  });
-
-  it("nudger innloggede web-brukere som ikke har forhåndsvist", () => {
-    expect(publishGate({ ...base, hasPreviewed: false })).toBe("confirm-without-preview");
-  });
-
-  it("hopper over nudgen på native", () => {
-    expect(publishGate({ ...base, hasPreviewed: false, native: true })).toBe("publish");
+  it("sender en utlogget bruker til innlogging før publisering", () => {
+    expect(publishGate({ ...base, authenticated: false })).toBe("sign-in");
   });
 
   it("publiserer når alt er på plass", () => {
     expect(publishGate(base)).toBe("publish");
+  });
+});
+
+describe("blockImplicitSubmit", () => {
+  function press(key: string, target: HTMLElement) {
+    const event = { key, target, preventDefault: vi.fn() };
+    blockImplicitSubmit(event);
+    return event.preventDefault.mock.calls.length > 0;
+  }
+
+  it("stopper Enter i tekstfelt, så Se over-feltene ikke publiserer", () => {
+    expect(press("Enter", document.createElement("input"))).toBe(true);
+    const price = document.createElement("input");
+    price.type = "number";
+    expect(press("Enter", price)).toBe(true);
+  });
+
+  it("lar Publiser-knappen, tekstområder og andre taster være", () => {
+    const submit = document.createElement("input");
+    submit.type = "submit";
+    expect(press("Enter", submit)).toBe(false);
+    expect(press("Enter", document.createElement("button"))).toBe(false);
+    expect(press("Enter", document.createElement("textarea"))).toBe(false);
+    expect(press("a", document.createElement("input"))).toBe(false);
   });
 });

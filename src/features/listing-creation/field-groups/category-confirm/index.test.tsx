@@ -74,7 +74,7 @@ describe("CategoryConfirm", () => {
     expect(
       screen.getByText("Denne annonsen blir opprettet i kategori Bil og MC. Er det riktig?"),
     ).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Bil og MC" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Ja, bruk «Bil og MC»" })).toHaveLength(1);
     expect(screen.queryByText("Bil")).toBeNull();
     expect(screen.queryByText("Motorsykkel")).toBeNull();
   });
@@ -98,7 +98,7 @@ describe("CategoryConfirm", () => {
       />,
     );
 
-    screen.getByRole("button", { name: "Bil og MC" }).click();
+    screen.getByRole("button", { name: "Ja, bruk «Bil og MC»" }).click();
     expect(applyCategorySuggestion).toHaveBeenCalledWith(BIL_ID);
   });
 

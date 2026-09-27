@@ -14,12 +14,12 @@ export function isNative(): boolean {
       if (params.has("forcenative")) {
         const value = params.get("forcenative");
         if (value === "0" || value === "false") {
-          window.sessionStorage.removeItem("kaupet.forceNative");
+          window.sessionStorage.removeItem("kaupet_force_native");
         } else {
-          window.sessionStorage.setItem("kaupet.forceNative", "true");
+          window.sessionStorage.setItem("kaupet_force_native", "true");
         }
       }
-      if (window.sessionStorage.getItem("kaupet.forceNative") === "true") return true;
+      if (window.sessionStorage.getItem("kaupet_force_native") === "true") return true;
     } catch {
       // Storage can be unavailable in restricted webviews; use Capacitor below.
     }
@@ -71,8 +71,11 @@ export function nativePlatform(): "ios" | "android" | "web" {
 /**
  * Take or pick a photo on native. Returns a File suitable for upload via
  * the existing web pipeline. Returns null if the user cancels.
+ * `source` picks the camera directly or the gallery directly — the two big
+ * actions on the bildesteget — rather than the OS's own "camera/gallery"
+ * prompt, since that choice is now made in our own UI.
  */
-export async function pickNativePhoto(): Promise<File | null> {
+export async function pickNativePhoto(source: "camera" | "gallery"): Promise<File | null> {
   if (!isNative()) return null;
   const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
   try {
@@ -80,10 +83,7 @@ export async function pickNativePhoto(): Promise<File | null> {
       quality: 85,
       allowEditing: false,
       resultType: CameraResultType.Uri,
-      source: CameraSource.Prompt,
-      promptLabelHeader: "Legg til bilde",
-      promptLabelPhoto: "Velg fra galleri",
-      promptLabelPicture: "Ta bilde",
+      source: source === "camera" ? CameraSource.Camera : CameraSource.Photos,
     });
     if (!photo.webPath) return null;
     const res = await fetch(photo.webPath);

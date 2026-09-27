@@ -4,13 +4,10 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 import {
   clickNextAndWaitFor,
-  fixMissingInformation,
   goToNewListing,
+  listingStrengthIndicator,
   login,
-  missingInformationDialog,
-  openPublishingStatus,
   publishAndExpectSuccess,
-  publishingStatusButton,
   wizardStep,
 } from "./pages/listing-wizard";
 
@@ -46,15 +43,11 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await wizardStep(page, "vehicle-registration").waitFor();
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
   await page.locator("#vehicle-reg-nr").fill(TEST_REGISTRATION);
-  await clickNextAndWaitFor(
-    page,
-    page.getByRole("heading", { name: /Registreringsnummer AB 12345/ }),
-    testInfo,
-  );
-  const confirmation = page.getByRole("alertdialog");
-  await expect(confirmation).toContainText("Volvo XC60");
-  await confirmation.getByRole("button", { name: "Ja" }).click();
-  await wizardStep(page, "photos").waitFor();
+  await page.getByRole("button", { name: "Bekreft" }).click();
+  await expect(
+    wizardStep(page, "vehicle-registration").getByText(/tilhører en .*Volvo XC60/),
+  ).toBeVisible();
+  await clickNextAndWaitFor(page, wizardStep(page, "photos"), testInfo);
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
 
   // Vehicle photos are optional in this deterministic fixture. Confirm the
@@ -69,21 +62,16 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
     .fill("Velholdt Volvo XC60 med komplett servicehistorikk og gode dekk.");
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-condition"), testInfo);
 
-  await page.getByRole("combobox", { name: "Tilstand" }).click();
-  await page.getByRole("option", { name: "Bruktbil" }).click();
+  await page.getByRole("radio", { name: "Bruktbil" }).click();
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).check();
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-price"), testInfo);
-  await publishingStatusButton(page).waitFor();
-  await openPublishingStatus(page);
-  await expect(missingInformationDialog(page).getByText("Pris", { exact: true })).toBeVisible();
-  await fixMissingInformation(page, "Pris");
-  await expect(page.locator("#price_nok")).toBeFocused();
+  await expect(listingStrengthIndicator(page)).toHaveCount(0);
   await page.locator("#price_nok").fill("349000");
   // Delivery, location and review/publish share the final vehicle page.
   await clickNextAndWaitFor(page, wizardStep(page, "location"), testInfo);
 
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);
-  await expect(page.getByText("Publiseringsklar")).toBeVisible();
+  await expect(page.getByText("Klar til publisering")).toBeVisible();
   // desktop-web is also the shared Proff superuser fixture (see
   // global-setup.ts) — LocationGroup shows the organization's own location
   // picker for it instead of a personal postal-code input, and auto-selects

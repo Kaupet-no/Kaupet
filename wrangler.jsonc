@@ -8,4 +8,11 @@
   // redirected-config mode used by Nitro's deployConfig rejects `env.*`
   // blocks, so a plain `wrangler.jsonc` env can't be used here.
   "name": "kaupet-no",
+  // Cloudflare Images-binding brukt av src/lib/image-compression.server.ts til
+  // å komprimere bilder hentet serverside (Excel-/API-/MCP-synk), med samme
+  // presets som klientkomprimeringen (src/lib/image-presets.ts). Bindingen
+  // finnes kun i selve Worker-kjøretiden — i dev (Vite uten Nitro) og vitest
+  // er `env.IMAGES` fraværende, noe `image-compression.server.ts` håndterer
+  // som en INTERN feil (jobben utsettes, aldri en kundefeil), ikke en krasj.
+  "images": { "binding": "IMAGES" },
 }

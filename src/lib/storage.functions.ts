@@ -186,7 +186,9 @@ export const uploadOrganizationLogo = createServerFn({ method: "POST" })
       throw new Error("Ugyldig organisasjons-id");
     }
     if (!(file instanceof File)) throw new Error("Mangler logofil");
-    return { organizationId, file };
+    // «contact» = profilbilde for en kontaktperson (Proff), ellers logo.
+    const kind = formData.get("kind") === "contact" ? "contact" : "logo";
+    return { organizationId, file, kind };
   })
   .handler(async ({ data, context }) => {
     assertServerSideImage(data.file);
@@ -202,7 +204,7 @@ export const uploadOrganizationLogo = createServerFn({ method: "POST" })
       throw new Error("Du har ikke tilgang til å laste opp logo for denne organisasjonen");
     }
 
-    const key = `${data.organizationId}/logo-${crypto.randomUUID()}.${extFromMime(data.file.type)}`;
+    const key = `${data.organizationId}/${data.kind}-${crypto.randomUUID()}.${extFromMime(data.file.type)}`;
     await putObject("BILDER", key, await data.file.arrayBuffer(), data.file.type);
     return { path: key };
   });

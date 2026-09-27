@@ -1,7 +1,6 @@
 import { SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { useSearchPanel } from "./search-panel-context";
 
 /**
@@ -22,11 +21,6 @@ export function MobileFilterButton({ activeFilterCount }: { activeFilterCount: n
       size="sm"
       className="gap-1.5"
       onClick={() => {
-        trackProductEvent("search_filter_opened", {
-          section: "categories",
-          source: "filter_button",
-          filterCount: activeFilterCount,
-        });
         openPanel("categories");
       }}
       aria-label={

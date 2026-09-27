@@ -25,6 +25,7 @@ export function RangeFilterField({
   value,
   onChange,
   disabled = false,
+  compact = false,
 }: {
   label: string;
   bounds: RangeBounds;
@@ -34,6 +35,7 @@ export function RangeFilterField({
   /** Greys out the slider/inputs — for a field that only makes sense once a
    * sibling toggle is on (e.g. "Tillatt hengervekt" needs "Hengerfeste"). */
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const [minDraft, setMinDraft] = useState(value.min != null ? String(value.min) : "");
   const [maxDraft, setMaxDraft] = useState(value.max != null ? String(value.max) : "");
@@ -70,47 +72,56 @@ export function RangeFilterField({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <Label>{label}</Label>
-        <span className="text-xs text-muted-foreground">
+    <div className={compact ? "space-y-2" : "space-y-4"}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+        <Label className="font-semibold">{label}</Label>
+        <span className="text-xs tabular-nums text-muted-foreground">
           {formatRangeValue(sliderMin, bounds.unit, bounds.noGrouping)} –{" "}
           {formatRangeValue(sliderMax, bounds.unit, bounds.noGrouping)}
           {sliderMax === bounds.max ? "+" : ""}
         </span>
       </div>
-      <RangeSlider
-        min={bounds.min}
-        max={bounds.max}
-        step={bounds.step}
-        value={[sliderMin, sliderMax]}
-        thumbLabels={[`Fra ${label.toLowerCase()}`, `Til ${label.toLowerCase()}`]}
-        onValueChange={onSlide}
-        onValueCommit={([mn, mx]) =>
-          commit(mn === bounds.min ? "" : String(mn), mx === bounds.max ? "" : String(mx))
-        }
-        disabled={disabled}
-      />
-      <div className="flex items-center gap-2">
-        <Input
-          inputMode="numeric"
-          aria-label={`Fra ${label.toLowerCase()}`}
-          placeholder="Fra"
-          value={formatThousands(minDraft, bounds.max, bounds.noGrouping)}
-          onChange={(e) => setMinDraft(digitsOnlyClamped(e.target.value, bounds.max))}
-          onBlur={() => commit(minDraft, maxDraft)}
-          onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
-          disabled={disabled}
-        />
-        <span className="text-muted-foreground">–</span>
-        <Input
-          inputMode="numeric"
-          aria-label={`Til ${label.toLowerCase()}`}
-          placeholder="Til"
-          value={formatThousands(maxDraft, bounds.max, bounds.noGrouping)}
-          onChange={(e) => setMaxDraft(digitsOnlyClamped(e.target.value, bounds.max))}
-          onBlur={() => commit(minDraft, maxDraft)}
-          onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1.5 text-xs font-medium text-muted-foreground">
+          <span className="block">Fra</span>
+          <Input
+            inputMode="numeric"
+            aria-label={`Fra ${label.toLowerCase()}`}
+            placeholder="Ingen grense"
+            className={`${compact ? "h-9 rounded-md text-sm" : "rounded-xl"} bg-background tabular-nums`}
+            value={formatThousands(minDraft, bounds.max, bounds.noGrouping)}
+            onChange={(e) => setMinDraft(digitsOnlyClamped(e.target.value, bounds.max))}
+            onBlur={() => commit(minDraft, maxDraft)}
+            onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-1.5 text-xs font-medium text-muted-foreground">
+          <span className="block">Til</span>
+          <Input
+            inputMode="numeric"
+            aria-label={`Til ${label.toLowerCase()}`}
+            placeholder="Ingen grense"
+            className={`${compact ? "h-9 rounded-md text-sm" : "rounded-xl"} bg-background tabular-nums`}
+            value={formatThousands(maxDraft, bounds.max, bounds.noGrouping)}
+            onChange={(e) => setMaxDraft(digitsOnlyClamped(e.target.value, bounds.max))}
+            onBlur={() => commit(minDraft, maxDraft)}
+            onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+      <div className={compact ? "px-3 py-1" : "px-3 py-3"}>
+        <RangeSlider
+          min={bounds.min}
+          max={bounds.max}
+          step={bounds.step}
+          value={[sliderMin, sliderMax]}
+          thumbLabels={[`Fra ${label.toLowerCase()}`, `Til ${label.toLowerCase()}`]}
+          onValueChange={onSlide}
+          onValueCommit={([mn, mx]) =>
+            commit(mn === bounds.min ? "" : String(mn), mx === bounds.max ? "" : String(mx))
+          }
           disabled={disabled}
         />
       </div>

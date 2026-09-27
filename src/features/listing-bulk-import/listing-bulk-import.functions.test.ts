@@ -39,31 +39,40 @@ const categoryId = "22222222-2222-4222-8222-222222222222";
 
 function setup({ membership = true, duplicate = false } = {}) {
   supabaseAdmin.from.mockImplementation((table: string) => {
-    const chain: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "order", "in", "update"])
-      chain[method] = vi.fn(() => chain);
+    const chain: Record<string, unknown> = { _select: undefined as unknown };
+    for (const method of ["eq", "order", "in", "update", "gte"]) chain[method] = vi.fn(() => chain);
+    chain.select = vi.fn((arg: unknown) => {
+      chain._select = arg;
+      return chain;
+    });
     chain.single = vi.fn(async () =>
-      table === "organizations"
-        ? { data: { postal_code: "0150", city: "Oslo", lat: 59.91, lng: 10.75 }, error: null }
-        : table === "organization_locations"
-          ? {
-              data: {
-                postal_code: "0150",
-                city: "Oslo",
-                lat: 59.91,
-                lng: 10.75,
-                address_line: "Storgata 1",
-              },
-              error: null,
-            }
-          : { data: null, error: null },
+      table === "organization_locations"
+        ? {
+            data: {
+              postal_code: "0150",
+              city: "Oslo",
+              lat: 59.91,
+              lng: 10.75,
+              address_line: "Storgata 1",
+            },
+            error: null,
+          }
+        : { data: null, error: null },
     );
     chain.maybeSingle = vi.fn(async () =>
       table === "organization_members"
         ? membership
-          ? { data: { organization_id: "org-1", role: "superuser", status: "active" }, error: null }
+          ? {
+              data: {
+                organization_id: "org-1",
+                role: "superuser",
+                status: "active",
+                category_access: "all",
+              },
+              error: null,
+            }
           : { data: null, error: null }
-        : { data: table === "listings" ? { kaupet_code: "12345678" } : null, error: null },
+        : { data: null, error: null },
     );
     chain.then = (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) =>
       Promise.resolve(
@@ -74,14 +83,21 @@ function setup({ membership = true, duplicate = false } = {}) {
             }
           : table === "category_filters" || table === "category_flows"
             ? { data: [], error: null }
-            : { data: null, error: null },
+            : table === "listings" && chain._select === "id, kaupet_code"
+              ? { data: [{ id: "listing-1", kaupet_code: "12345678" }], error: null }
+              : table === "listings"
+                ? { data: [], error: null } // ingen eksisterende external_ref-er fra før
+                : table === "organization_listing_imports"
+                  ? { data: null, count: 0, error: null }
+                  : { data: null, error: null },
       ).then(resolve, reject);
     return chain;
   });
   let createCalls = 0;
   supabaseAdmin.rpc.mockImplementation(async (name: string) => {
     if (name === "organization_has_proff_access") return { data: true, error: null };
-    if (name === "create_listing_from_import_row") {
+    if (name === "sync_organization_entitlements") return { data: null, error: null };
+    if (name === "upsert_listing_from_external") {
       createCalls += 1;
       return duplicate || createCalls > 1
         ? { data: { status: "duplicate", listing_id: "listing-1" }, error: null }
@@ -159,7 +175,7 @@ describe("createListingsFromImport", () => {
     setup();
     await createListingsFromImport({ data: { importId, rows: [validRow], locationId } });
     const call = supabaseAdmin.rpc.mock.calls.find(
-      ([name]) => name === "create_listing_from_import_row",
+      ([name]) => name === "upsert_listing_from_external",
     );
     expect(call?.[1]).toMatchObject({
       _location_id: locationId,
@@ -183,7 +199,7 @@ describe("createListingsFromImport", () => {
       kaupetCode: "12345678",
     });
     expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
-      "create_listing_from_import_row",
+      "upsert_listing_from_external",
       expect.objectContaining({ _import_id: importId }),
     );
   });

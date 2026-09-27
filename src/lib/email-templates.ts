@@ -12,7 +12,13 @@ const COLOR = {
 };
 
 export type NotificationEmailType =
-  "message" | "conversation_created" | "saved_search" | "price_drop" | "sold" | "wtb_match";
+  | "message"
+  | "conversation_created"
+  | "saved_search"
+  | "price_drop"
+  | "sold"
+  | "wtb_match"
+  | "api_key_expiring";
 
 const COPY: Record<NotificationEmailType, { eyebrow: string; intro: string; cta: string }> = {
   message: {
@@ -44,6 +50,12 @@ const COPY: Record<NotificationEmailType, { eyebrow: string; intro: string; cta:
     eyebrow: "Solgt",
     intro: "En favoritt-annonse er ikke lenger tilgjengelig.",
     cta: "Se annonsen",
+  },
+  api_key_expiring: {
+    eyebrow: "API-nøkkel utløper snart",
+    intro:
+      "En av bedriftens API-nøkler utløper snart. Opprett en ny nøkkel i god tid slik at integrasjonen ikke stopper.",
+    cta: "Administrer API-nøkler",
   },
 };
 

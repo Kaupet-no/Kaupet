@@ -10,10 +10,12 @@ const ListingDetailMap = lazy(() =>
 type Props = {
   lat: number;
   lng: number;
+  /** Eksakt besøksadresse; ellers er posisjonen omtrentlig. */
+  exactLocationLabel?: string | null;
   onClose: () => void;
 };
 
-export function MapOverlay({ lat, lng, onClose }: Props) {
+export function MapOverlay({ lat, lng, exactLocationLabel, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -40,8 +42,9 @@ export function MapOverlay({ lat, lng, onClose }: Props) {
         >
           <div className="flex items-start justify-between px-4 py-3">
             <p className="mt-1 text-xs text-muted-foreground">
-              Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det
-              markerte området.
+              {exactLocationLabel
+                ? `Besøksadresse: ${exactLocationLabel}`
+                : "Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det markerte området."}
             </p>
             <button
               ref={closeRef}
@@ -56,7 +59,7 @@ export function MapOverlay({ lat, lng, onClose }: Props) {
 
           <div className="min-h-0 flex-1 overflow-hidden px-4 pb-4">
             <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
-              <ListingDetailMap lat={lat} lng={lng} />
+              <ListingDetailMap lat={lat} lng={lng} exact={!!exactLocationLabel} />
             </Suspense>
           </div>
         </div>

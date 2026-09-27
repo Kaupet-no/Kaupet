@@ -55,9 +55,22 @@ import { ListingDetailSkeleton } from "@/components/listing-detail-skeleton";
 import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 import { currentReturnTo } from "@/lib/auth-return";
 import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
 import { toListingCardData } from "@/lib/listing-card-data";
+import { publicImageUrl } from "@/lib/image-url";
+
+/** Svaret fra RPC-en `listing_business_contact` — kun det bedriften har valgt
+ * å vise for annonsens lokasjon. */
+type BusinessContactResponse = {
+  visiting_address: {
+    address_line: string;
+    postal_code: string | null;
+    city: string | null;
+    lat: number | null;
+    lng: number | null;
+  } | null;
+  contacts: { id: string; name: string; phone: string; avatar_path: string | null }[];
+};
 
 // This route serves two very different pages behind one dynamic segment: a
 // listing (8-digit kaupet-koder) and a main-category landing page (any other
@@ -406,7 +419,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, show_visiting_address, listing_visiting_addresses(address_line, postal_code, city), listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -428,13 +441,19 @@ function ListingDetailPage() {
               .maybeSingle()
           ).data
         : null;
-      const visitingAddress = Array.isArray(data.listing_visiting_addresses)
-        ? data.listing_visiting_addresses[0]
-        : data.listing_visiting_addresses;
       if (organization) {
+        const { data: contactData } = await supabase.rpc("listing_business_contact", {
+          _listing_id: data.id,
+        });
+        const contact = contactData as BusinessContactResponse | null;
+        const visitingAddress = contact?.visiting_address ?? null;
         return {
           ...data,
           organization,
+          visitingLocation:
+            visitingAddress?.lat != null && visitingAddress.lng != null
+              ? { lat: visitingAddress.lat, lng: visitingAddress.lng }
+              : null,
           seller: {
             kind: "business" as const,
             displayName: organization.display_name,
@@ -444,6 +463,12 @@ function ListingDetailPage() {
                   .filter(Boolean)
                   .join(", ")
               : null,
+            contacts: (contact?.contacts ?? []).map((person) => ({
+              id: person.id,
+              name: person.name,
+              phone: person.phone,
+              avatarUrl: person.avatar_path ? publicImageUrl(person.avatar_path) : null,
+            })),
             createdAt: organization.created_at,
           } satisfies SellerIdentity,
         };
@@ -463,6 +488,7 @@ function ListingDetailPage() {
       return {
         ...data,
         organization: null,
+        visitingLocation: null,
         seller: profile
           ? {
               kind: "private" as const,
@@ -624,7 +650,6 @@ function ListingDetailPage() {
     },
     onSuccess: (conversationId) => {
       if (conversationId) {
-        trackProductEvent("contact_started", { listingType: "sell" });
         navigate({ to: "/meldinger/$id", params: { id: conversationId } });
       }
     },
@@ -638,11 +663,6 @@ function ListingDetailPage() {
     replayedContact.current = true;
     contactMutation.mutate();
   }, [contactMutation, data, user]);
-
-  useEffect(() => {
-    if (!data) return;
-    trackProductEvent("listing_opened", { hasImages: (data.listing_images?.length ?? 0) > 0 });
-  }, [data]);
 
   const images = useMemo(
     () => (data?.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
@@ -753,8 +773,11 @@ function ListingDetailPage() {
       condition={data.condition}
       city={data.city}
       postalCode={data.postal_code}
-      displayLat={data.display_lat}
-      displayLng={data.display_lng}
+      displayLat={data.visitingLocation?.lat ?? data.display_lat}
+      displayLng={data.visitingLocation?.lng ?? data.display_lng}
+      exactLocationLabel={
+        data.visitingLocation && seller?.kind === "business" ? seller.visitingAddress : null
+      }
       createdAt={data.created_at}
       updatedAt={data.updated_at}
       publishedAt={data.published_at}
@@ -766,7 +789,6 @@ function ListingDetailPage() {
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
       listingStatus={data.status}
-      organizationBrand={organizationBrand}
       relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}
       enableBackToSearch
@@ -831,7 +853,7 @@ function ListingDetailPage() {
           shareOpen={shareOpen}
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
-          hideBusinessIdentity={!!organizationBrand}
+          organizationBrand={organizationBrand}
         />
       }
       stickyContactSlot={
@@ -843,11 +865,8 @@ function ListingDetailPage() {
             disabled={contactMutation.isPending}
           >
             <MessageCircle className="size-4" />
-            {contactMutation.isPending
-              ? "Åpner…"
-              : user
-                ? "Send melding"
-                : "Logg inn for å sende melding"}
+            {/* Også for gjester — contactMutation sender dem til innlogging. */}
+            {contactMutation.isPending ? "Åpner…" : "Send melding"}
           </Button>
         ) : undefined
       }

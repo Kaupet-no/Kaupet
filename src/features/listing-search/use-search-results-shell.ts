@@ -116,7 +116,7 @@ export function useSearchResultsShell({
   };
 
   useTextToFilterPipeline({
-    qDraft,
+    qDraft: search.q,
     setQDraft,
     updateSearch,
     attrFilters,

@@ -11,6 +11,23 @@ export function reviewSectionSteps(pages: ComposerPage[], groupKeys: readonly st
   return steps.length > 0 ? { first: steps[0], last: steps.at(-1)! } : null;
 }
 
+/**
+ * Resolves the requirement-list label for a `{field, message}` result from a
+ * field group's `validateExtra`. Skips entries already covered by the
+ * `missingFilters` loop (same category filter, different requirement key),
+ * and never falls back to the raw field/filter key as a label — prefers the
+ * filter's own `label_nb` over the group's free-text `message`.
+ */
+export function resolvePublishingRequirementLabel(
+  result: { field: string; message: string },
+  reviewFieldLabels: Record<string, string>,
+  missingFilters: readonly { key: string; label_nb: string }[],
+): { skip: true } | { skip: false; label: string } {
+  const missingFilter = missingFilters.find((filter) => filter.key === result.field);
+  if (missingFilter) return { skip: true };
+  return { skip: false, label: reviewFieldLabels[result.field] ?? result.message };
+}
+
 export type ComposerRequirementTarget = {
   targetGroupKey?: string;
   targetField?: string;

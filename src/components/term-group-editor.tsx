@@ -1,17 +1,28 @@
-import { Fragment, useState } from "react";
-import { Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { describeTermGroup, emptyTermGroup, type TermGroup } from "@/lib/term-groups";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
 
 type Props = {
   groups: TermGroup[];
   onChange: (groups: TermGroup[]) => void;
+  deferEmpty?: boolean;
 };
 
-export function TermGroupEditor({ groups, onChange }: Props) {
+export function TermGroupEditor({ groups, onChange, deferEmpty = false }: Props) {
+  const [pending, setPending] = useState<TermGroup | null>(() =>
+    deferEmpty ? emptyTermGroup() : null,
+  );
+
   return (
     <div className="space-y-3">
       {groups.map((g) => (
@@ -22,14 +33,31 @@ export function TermGroupEditor({ groups, onChange }: Props) {
           onRemove={() => onChange(groups.filter((x) => x.id !== g.id))}
         />
       ))}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => onChange([...groups, emptyTermGroup()])}
-      >
-        <Plus className="size-4" /> Legg til regel
-      </Button>
+      {pending && (
+        <TermGroupRow
+          group={pending}
+          deferCommit
+          onChange={(next) => {
+            if (next.terms.length > 0) {
+              onChange([...groups, next]);
+              setPending(deferEmpty ? emptyTermGroup() : null);
+            } else {
+              setPending(next);
+            }
+          }}
+          onRemove={deferEmpty ? undefined : () => setPending(null)}
+        />
+      )}
+      {!pending && !deferEmpty && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onChange([...groups, emptyTermGroup()])}
+        >
+          <Plus className="size-4" /> Legg til regel
+        </Button>
+      )}
     </div>
   );
 }
@@ -38,26 +66,24 @@ export function TermGroupRow({
   group,
   onChange,
   onRemove,
+  deferCommit = false,
 }: {
   group: TermGroup;
   onChange: (g: TermGroup) => void;
   onRemove?: () => void;
+  deferCommit?: boolean;
 }) {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(group.terms.join(", "));
+  const focused = useRef(false);
 
-  const addTerm = () => {
-    const t = draft.trim();
-    if (!t) return;
-    if (group.terms.includes(t)) {
-      setDraft("");
-      return;
-    }
-    onChange({ ...group, terms: [...group.terms, t] });
-    setDraft("");
+  useEffect(() => {
+    if (!focused.current) setDraft(group.terms.join(", "));
+  }, [group.terms]);
+
+  const updateTerms = (value: string) => {
+    const terms = [...new Set(value.split(/[\s,]+/).filter(Boolean))];
+    if (terms.join("\0") !== group.terms.join("\0")) onChange({ ...group, terms });
   };
-
-  const removeTerm = (t: string) =>
-    onChange({ ...group, terms: group.terms.filter((x) => x !== t) });
 
   return (
     <div
@@ -65,64 +91,69 @@ export function TermGroupRow({
         group.exclude ? "border-destructive/40 bg-destructive/5" : "border-border"
       }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 native:w-full native:flex-none">
-          <InclusionToggle
-            value={group.exclude}
-            onChange={(exclude) => onChange({ ...group, exclude })}
-          />
-          <ModeToggle
-            compact
-            value={group.mode}
-            onChange={(mode) => onChange({ ...group, mode })}
-            labels={
-              group.exclude ? ["Alle ordene", "Minst ett ord"] : ["Må inneholde", "Kan inneholde"]
-            }
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          value={group.exclude ? "exclude" : group.mode}
+          onValueChange={(value: "all" | "any" | "exclude") =>
+            onChange({
+              ...group,
+              mode: value === "exclude" ? "any" : value,
+              exclude: value === "exclude",
+            })
+          }
+        >
+          <SelectTrigger aria-label="Søkeregel" className="h-10 w-52 native:w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Må inneholde</SelectItem>
+            <SelectItem value="any">Kan inneholde</SelectItem>
+            <SelectItem value="exclude">Skal ikke inneholde</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="min-w-48 flex-1 native:w-full native:flex-none">
+          <Input
+            aria-label="Ord i søkeregelen"
+            aria-describedby={`term-group-help-${group.id}`}
+            value={draft}
+            onFocus={() => {
+              focused.current = true;
+            }}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (!deferCommit) updateTerms(e.target.value);
+            }}
+            onBlur={() => {
+              focused.current = false;
+              updateTerms(draft);
+              setDraft([...new Set(draft.split(/[\s,]+/).filter(Boolean))].join(", "));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder="Skriv søkeord"
           />
         </div>
         {onRemove && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={onRemove}
-            className="-m-2 rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="size-10 shrink-0 text-muted-foreground"
             aria-label="Fjern søkelinje"
           >
             <Trash2 className="size-3.5" />
-          </button>
+          </Button>
         )}
       </div>
 
-      <div
-        className={`flex items-center gap-1.5 text-xs ${
-          group.exclude ? "text-destructive" : "text-muted-foreground"
-        }`}
-      >
-        {group.exclude ? (
-          <EyeOff className="size-3.5 shrink-0" />
-        ) : (
-          <Eye className="size-3.5 shrink-0" />
-        )}
-        {describeTermGroup(group)}
-      </div>
-
-      <div className="flex gap-2">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addTerm();
-            }
-          }}
-          placeholder="Legg til ord"
-        />
-        <Button type="button" size="sm" variant="outline" onClick={addTerm}>
-          <Plus className="size-4" /> Legg til
-        </Button>
-      </div>
-
-      <TermGroupChips group={group} onRemoveTerm={removeTerm} />
+      <p id={`term-group-help-${group.id}`} className="text-xs text-muted-foreground">
+        Skill flere ord med mellomrom eller komma.
+      </p>
     </div>
   );
 }
@@ -150,7 +181,7 @@ export function TermGroupChips({
         <Fragment key={t}>
           {i > 0 && (
             <span className="text-xs font-medium text-muted-foreground">
-              {group.mode === "all" ? "OG" : "ELLER"}
+              {group.exclude ? "ELLER" : group.mode === "all" ? "OG" : "ELLER"}
             </span>
           )}
           <span
@@ -174,43 +205,6 @@ export function TermGroupChips({
           </span>
         </Fragment>
       ))}
-    </div>
-  );
-}
-
-function InclusionToggle({
-  value,
-  onChange,
-}: {
-  value: boolean;
-  onChange: (exclude: boolean) => void;
-}) {
-  return (
-    <div className="flex w-fit max-w-full rounded-lg border border-border bg-card p-0.5 text-sm native:w-full native:p-1">
-      <button
-        type="button"
-        onClick={() => onChange(false)}
-        aria-pressed={!value}
-        className={`native-touch-target h-9 rounded-md px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring native:h-auto native:flex-1 native:py-2 ${
-          !value
-            ? "bg-muted font-medium text-foreground native:bg-primary native:text-primary-foreground"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-        }`}
-      >
-        Inkluder
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange(true)}
-        aria-pressed={value}
-        className={`native-touch-target h-9 rounded-md px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring native:h-auto native:flex-1 native:py-2 ${
-          value
-            ? "bg-destructive/10 font-medium text-destructive native:bg-destructive native:text-destructive-foreground"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-        }`}
-      >
-        Skal ikke inneholde
-      </button>
     </div>
   );
 }

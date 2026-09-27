@@ -1,6 +1,6 @@
 import type { SearchParams } from "@/features/listing-search/search-schema";
 
-const STORAGE_KEY = "kaupet:lastAnnonserSearch";
+const STORAGE_KEY = "kaupet_last_search";
 
 export interface LastSearchContext {
   search: SearchParams;

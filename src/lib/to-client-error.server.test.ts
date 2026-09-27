@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/server-error-log", () => ({ logServerError: vi.fn().mockResolvedValue(undefined) }));
 
 import { logServerError } from "@/lib/server-error-log";
-import { toClientError } from "./to-client-error";
+import { isAlreadyLogged, toClientError } from "./to-client-error";
 
 describe("toClientError (L-14)", () => {
   it("logs the real error and returns a generic message for an unknown code", async () => {
@@ -17,5 +17,11 @@ describe("toClientError (L-14)", () => {
   it("returns a safe, specific message for a known code (unique_violation)", async () => {
     const err = await toClientError("someFn", { message: "duplicate key", code: "23505" });
     expect(err.message).toBe("Finnes allerede.");
+  });
+
+  it("marks the returned error as already logged so the serverFn middleware skips it", async () => {
+    const err = await toClientError("someFn", new Error("boom"));
+    expect(isAlreadyLogged(err)).toBe(true);
+    expect(isAlreadyLogged(new Error("boom"))).toBe(false);
   });
 });

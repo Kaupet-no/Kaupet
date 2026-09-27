@@ -9,16 +9,7 @@ import {
   SearchX,
   X,
 } from "lucide-react";
-import {
-  lazy,
-  type ReactNode,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -42,7 +33,6 @@ import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { ZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 import { useListingCardImages } from "@/hooks/use-listing-card-images";
 import { useListingFavorites } from "@/hooks/use-listing-favorites";
-import { trackProductEvent } from "@/lib/product-analytics";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -172,23 +162,8 @@ export function ResultList({
   const { favoriteIds, isReady: favoriteStateReady } = useListingFavorites(
     cards.map((card) => card.id),
   );
-  const zeroResultKey = `${q}|${effectiveCategories.join(",")}`;
-  // Stabil callback — konstrueres inline i cards.map ville gitt hvert
-  // (memoiserte) kort en ny onOpen-referanse ved hver rendring, f.eks. når
-  // bare hover-state endrer seg for et annet kort.
-  const handleResultOpen = useCallback((position: number, resultCount: number) => {
-    trackProductEvent("search_result_opened", { position, resultCount });
-  }, []);
   // new Set(...) hver rendring ville brutt memoisering av det som leser den.
   const allowedIds = useMemo(() => new Set(cards.map((l) => l.id)), [cards]);
-
-  useEffect(() => {
-    if (isLoading || cards.length > 0) return;
-    trackProductEvent("search_zero_results", {
-      hasQuery: q.trim().length > 0,
-      hasCategory: effectiveCategories.length > 0,
-    });
-  }, [cards.length, effectiveCategories.length, isLoading, q, zeroResultKey]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -378,13 +353,7 @@ export function ResultList({
               titleVisible
               className="h-[88vh] p-4"
               trigger={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => trackProductEvent("search_map_opened", { source: "map_button" })}
-                >
+                <Button type="button" variant="outline" size="sm" className="gap-1.5">
                   <MapIcon className="size-4" /> Kart
                 </Button>
               }
@@ -399,7 +368,6 @@ export function ResultList({
               size="sm"
               className="gap-1.5"
               onClick={() => {
-                trackProductEvent("search_map_opened", { source: "map_button" });
                 setDesktopMapVisible((v) => !v);
               }}
               aria-pressed={desktopMapVisible}
@@ -508,15 +476,12 @@ export function ResultList({
                     }`
               }
             >
-              {cards.map((l, index) =>
+              {cards.map((l) =>
                 viewMode === "card" ? (
                   <ListingCardExpanded
                     key={l.id}
                     listing={l}
                     linkState={SEARCH_LINK_STATE}
-                    onOpen={handleResultOpen}
-                    position={index + 1}
-                    resultCount={totalCount ?? cards.length}
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -526,9 +491,6 @@ export function ResultList({
                     key={l.id}
                     listing={l}
                     linkState={SEARCH_LINK_STATE}
-                    onOpen={handleResultOpen}
-                    position={index + 1}
-                    resultCount={totalCount ?? cards.length}
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -541,9 +503,6 @@ export function ResultList({
                     onHoverChange={setHoveredId}
                     compact={viewMode === "list"}
                     linkState={SEARCH_LINK_STATE}
-                    onOpen={handleResultOpen}
-                    position={index + 1}
-                    resultCount={totalCount ?? cards.length}
                     signedImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -632,7 +591,6 @@ export function ResultList({
             type="button"
             onClick={() => {
               void hapticImpact("medium");
-              trackProductEvent("search_map_opened", { source: "map_button" });
               setMobileMapOpen(true);
             }}
             className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition active:scale-95"

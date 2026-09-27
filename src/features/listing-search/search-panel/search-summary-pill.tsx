@@ -1,4 +1,4 @@
-import { Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Waypoints } from "lucide-react";
 import { hapticImpact } from "@/lib/haptics";
 
 type Props = {
@@ -6,12 +6,21 @@ type Props = {
   q: string;
   /** Antall aktive filtre utenom fritekst. */
   filterCount: number;
+  searchRuleCount?: number;
   onOpenQuery: () => void;
+  onOpenRules?: () => void;
   onOpenFilters: () => void;
 };
 
 /** Kompakt native oppsummering med separate query- og filterhandlinger. */
-export function SearchSummaryPill({ q, filterCount, onOpenQuery, onOpenFilters }: Props) {
+export function SearchSummaryPill({
+  q,
+  filterCount,
+  searchRuleCount = 0,
+  onOpenQuery,
+  onOpenRules,
+  onOpenFilters,
+}: Props) {
   const filterText = `${filterCount} ${filterCount === 1 ? "filter" : "filtre"}`;
   return (
     <div className="flex min-h-12 w-full items-center rounded-full border border-border bg-card shadow-sm">
@@ -30,6 +39,23 @@ export function SearchSummaryPill({ q, filterCount, onOpenQuery, onOpenFilters }
           {q.trim() || "Søk i annonser"}
         </span>
       </button>
+      {onOpenRules && (
+        <button
+          type="button"
+          onClick={() => {
+            void hapticImpact("light");
+            onOpenRules();
+          }}
+          aria-label={searchRuleCount > 0 ? "Søkeregler, egne regler aktive" : "Søkeregler"}
+          className={`native-touch-target flex size-12 shrink-0 items-center justify-center rounded-full border outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            searchRuleCount > 0
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border text-primary"
+          }`}
+        >
+          <Waypoints className="size-4" aria-hidden="true" />
+        </button>
+      )}
       <button
         type="button"
         onClick={() => {

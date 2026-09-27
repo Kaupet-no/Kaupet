@@ -20,13 +20,24 @@ Element.prototype.scrollIntoView = vi.fn();
 
 afterEach(cleanup);
 
-const mutate = vi.fn();
-
+/** Ekte react-query-oppførsel er unødvendig her: denne dobbelen kjører
+ * `mutationFn` og ruter resultatet til `onSuccess`/`onError` synkront nok til
+ * at `waitFor` fanger opp det, uten en `QueryClientProvider`. Brukes av både
+ * `createImport`- og `previewImport`-mutasjonen i komponenten. */
+vi.mock("@tanstack/react-query", () => ({
+  useMutation: (options: {
+    mutationFn: (variables: unknown) => unknown;
+    onSuccess?: (data: unknown) => void;
+    onError?: (error: Error) => void;
+  }) => {
+    const mutate = vi.fn((variables: unknown) => {
+      Promise.resolve(options.mutationFn(variables)).then(options.onSuccess, options.onError);
+    });
+    return { isPending: false, mutate, reset: vi.fn() };
+  },
+}));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/annonse">{children}</a>,
-}));
-vi.mock("@tanstack/react-query", () => ({
-  useMutation: () => ({ isPending: false, mutate, reset: vi.fn() }),
 }));
 vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
 vi.mock("@/hooks/use-categories", () => ({
@@ -52,34 +63,70 @@ vi.mock("@/hooks/use-user-roles", () => ({ useIsDemo: () => ({ data: false }) })
 vi.mock("@/hooks/use-category-filters", () => ({
   useAllCategoryFilters: () => ({ data: [] }),
 }));
-vi.mock("./listing-bulk-import.functions", () => ({ createListingsFromImport: vi.fn() }));
+vi.mock("./ImportHistory", () => ({
+  ImportHistory: ({ organizationId }: { organizationId: string }) => (
+    <div data-testid="import-history">Historikk for {organizationId}</div>
+  ),
+}));
+
+const parsedRows = [
+  {
+    rowNumber: 2,
+    externalId: "id-1",
+    category: "sykler",
+    title: "En sykkel",
+    description: "Dette er en god beskrivelse av varen.",
+    priceNok: 4500,
+    imageUrls: [] as string[],
+    attributes: {},
+  },
+  {
+    rowNumber: 3,
+    externalId: "id-2",
+    category: "sykler",
+    title: "En annen sykkel",
+    description: "Dette er en annen god beskrivelse av varen.",
+    priceNok: 3200,
+    imageUrls: [] as string[],
+    attributes: {},
+  },
+];
+
 vi.mock("./parse-import-file", () => ({
   attributeMetaFromFilters: () => ({}),
   parseImportFile: vi.fn(async () => ({
     fileName: "annonser.csv",
-    rows: [
-      {
-        rowNumber: 2,
-        externalId: "id-1",
-        category: "sykler",
-        title: "En sykkel",
-        description: "Dette er en god beskrivelse av varen.",
-        priceNok: 4500,
-        attributes: {},
-      },
-      {
-        rowNumber: 3,
-        externalId: "id-2",
-        category: "sykler",
-        title: "En annen sykkel",
-        description: "Dette er en annen god beskrivelse av varen.",
-        priceNok: 3200,
-        attributes: {},
-      },
-    ],
+    rows: parsedRows,
     errors: [],
   })),
 }));
+
+/** Fanger opp begge `createListingsFromImport`-kallene (dry-run-forhåndsvisning
+ * og selve importen) og svarer ulikt basert på `dryRun`, slik testene kan
+ * verifisere modusvalg og statusetiketter uten en ekte server. */
+const createListingsFromImportMock = vi.fn(
+  ({ data }: { data: { dryRun?: boolean; mode: string } }) => {
+    if (data.dryRun) {
+      return Promise.resolve([
+        {
+          rowNumber: 2,
+          externalId: "id-1",
+          status: data.mode === "create" ? "created" : "updated",
+        },
+        { rowNumber: 3, externalId: "id-2", status: "duplicate" },
+      ]);
+    }
+    return Promise.resolve([
+      { rowNumber: 2, externalId: "id-1", status: "created", kaupetCode: "12345678" },
+      { rowNumber: 3, externalId: "id-2", status: "duplicate" },
+    ]);
+  },
+);
+vi.mock("./listing-bulk-import.functions", () => ({
+  createListingsFromImport: (args: { data: { dryRun?: boolean; mode: string } }) =>
+    createListingsFromImportMock(args),
+}));
+
 vi.mock("@/components/ui/dialog", () => ({
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
@@ -113,33 +160,91 @@ vi.mock("@/components/ui/alert-dialog", () => ({
 
 import { BulkListingImport } from "./BulkListingImport";
 
+const location = {
+  id: "33333333-3333-4333-8333-333333333333",
+  name: "Hovedlokasjon",
+  address_line: null,
+  postal_code: null,
+  city: null,
+};
+
+async function uploadFile() {
+  fireEvent.change(screen.getByLabelText("Velg importfil"), {
+    target: { files: [new File(["data"], "annonser.csv", { type: "text/csv" })] },
+  });
+  await screen.findByText("2 gyldige · 0 ugyldige");
+}
+
 describe("BulkListingImport", () => {
-  it("viser forhåndsvisning med antall gyldige rader og lar brukeren bekrefte", async () => {
+  beforeEach(() => {
+    createListingsFromImportMock.mockClear();
+  });
+
+  it("kjører dry-run automatisk etter en gyldig fil og viser statusetiketter per rad", async () => {
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    await uploadFile();
+
+    // Automatisk dry-run i standardmodus (upsert).
+    await waitFor(() =>
+      expect(createListingsFromImportMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ dryRun: true, mode: "upsert" }),
+        }),
+      ),
+    );
+    expect(await screen.findByText("Oppdateres")).toBeTruthy();
+    expect(screen.getByText("Finnes allerede")).toBeTruthy();
+  });
+
+  it("kjører dry-run på nytt når modus endres, og oppsummerer i bekreftelsesdialogen", async () => {
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    await uploadFile();
+    await screen.findByText("Oppdateres");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Kun nye annonser/ }));
+
+    await waitFor(() =>
+      expect(createListingsFromImportMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ dryRun: true, mode: "create" }),
+        }),
+      ),
+    );
+    // I create-modus mapper doblen id-1 til "created" (vist som "Ny").
+    expect(await screen.findByText("Ny")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start import" }));
+    expect(screen.getAllByText(/1 nye, 1 finnes allerede/).length).toBeGreaterThan(0);
+  });
+
+  it("sender valgt modus når importen bekreftes, og viser resultatet", async () => {
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    await uploadFile();
+    await screen.findByText("Oppdateres");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bekreft import" }));
+
+    await waitFor(() =>
+      expect(createListingsFromImportMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ mode: "upsert", rows: parsedRows }),
+        }),
+      ),
+    );
+    expect(await screen.findByText("Import ferdig")).toBeTruthy();
+  });
+
+  it("viser Siste importer med organisasjonens historikk i startvisningen", () => {
     render(
       <BulkListingImport
         open
         onOpenChange={vi.fn()}
-        locations={[
-          {
-            id: "33333333-3333-4333-8333-333333333333",
-            name: "Hovedlokasjon",
-            address_line: null,
-            postal_code: null,
-            city: null,
-          },
-        ]}
+        locations={[location]}
+        organizationId="org-1"
       />,
     );
-    fireEvent.change(screen.getByLabelText("Velg importfil"), {
-      target: { files: [new File(["data"], "annonser.csv", { type: "text/csv" })] },
-    });
-    expect(await screen.findByText("2 gyldige · 0 ugyldige")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Opprett annonser" }));
-    expect(screen.getByText(/Du er i ferd med å opprette 2 annonser/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Bekreft oppretting" }));
-    await waitFor(() =>
-      expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ rows: expect.any(Array) })),
-    );
+    expect(screen.getByText("Historikk for org-1")).toBeTruthy();
   });
 
   it("søker gjennom hele kategoritreet og velger en underkategori som mal", async () => {

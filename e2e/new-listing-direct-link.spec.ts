@@ -36,6 +36,7 @@ test("direktelenke til /ny-annonse uten utkast åpner typevelgeren på forsiden"
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
   await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
-  await expect(page.getByRole("heading", { name: "Hva vil du selge?" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Jeg vil selge" })).toBeVisible();
+  // Typevalget er åpent inline under hero-knappen (som da heter «Avbryt»).
+  await expect(page.getByRole("button", { name: "Avbryt", expanded: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Jeg vil selge/ })).toBeVisible();
 });

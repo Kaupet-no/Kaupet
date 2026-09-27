@@ -825,18 +825,6 @@ function ListingDetailViewBody({
                 />
               )}
             </div>
-            {/* Under md (og i telefonrammen) står skiltet under tittelen, så
-                tittelen får hele bredden. Native gjør det alltid. */}
-            {isVehicleListing && vehicleLookup?.registrationNumber && (
-              <div className={nativePlateUnderTitle ? "mt-2" : "mt-2 page-md:hidden"}>
-                <RegistrationPlate
-                  value={vehicleLookup.registrationNumber}
-                  className="h-7"
-                  editable={!!editCtx?.editMode}
-                  onEdit={() => editCtx?.openVehicleLookupModal()}
-                />
-              </div>
-            )}
             <EditableField
               fieldKey="subtitle"
               value={subtitle ?? ""}
@@ -867,6 +855,18 @@ function ListingDetailViewBody({
                 await editCtx?.saveField({ group: "subtitle", subtitle: v.trim() || null });
               }}
             />
+            {/* Under md (og i telefonrammen) står skiltet under undertittelen,
+                så tittelen får hele bredden. Native gjør det alltid. */}
+            {isVehicleListing && vehicleLookup?.registrationNumber && (
+              <div className={nativePlateUnderTitle ? "mt-2" : "mt-2 page-md:hidden"}>
+                <RegistrationPlate
+                  value={vehicleLookup.registrationNumber}
+                  className="h-7"
+                  editable={!!editCtx?.editMode}
+                  onEdit={() => editCtx?.openVehicleLookupModal()}
+                />
+              </div>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2 pt-0.5">
             {/* Skiltet hører sammen med tittelen, men står på samme linje som
@@ -916,7 +916,7 @@ function ListingDetailViewBody({
           innholdskolonnen i stedet, slik at pris og sidepanel kommer opp ved
           siden av det. Uten bilder rendres det ikke i det hele tatt. */}
       {hasGalleryContent && !galleryInColumn && (
-        <div data-preview-section="photos" className="mb-8">
+        <div data-preview-section="photos" className="mb-8 mt-6">
           {gallery}
         </div>
       )}

@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
+import { cn } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -9,6 +10,7 @@ type Props = {
   trigger?: React.ReactNode;
   title: React.ReactNode;
   titleVisible?: boolean;
+  headerClassName?: string;
   className?: string;
   expandable?: boolean;
   initialSnapPoint?: number;
@@ -28,6 +30,7 @@ export function NativeSheet({
   trigger,
   title,
   titleVisible = false,
+  headerClassName,
   className,
   expandable,
   initialSnapPoint,
@@ -41,7 +44,10 @@ export function NativeSheet({
         expandable={expandable}
         initialSnapPoint={initialSnapPoint}
       >
-        <SheetHeader className={titleVisible ? undefined : "sr-only"}>
+        {/* Tittelen ligger i rulleområdet, som klipper alt som stikker ut til
+        venstre. Displayfontens halvfete vekt tegnes litt utenfor boksen, så
+        uten innrykk mister en venstrejustert tittel deler av første bokstav. */}
+        <SheetHeader className={titleVisible ? cn("px-0.5", headerClassName) : "sr-only"}>
           <SheetTitle>{title}</SheetTitle>
         </SheetHeader>
         {children}

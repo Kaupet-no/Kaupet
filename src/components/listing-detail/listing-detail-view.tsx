@@ -668,12 +668,7 @@ function ListingDetailViewBody({
   const editCtx = useListingEdit();
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null);
-  // Native app requests a distinct layout for Bil og MC and Båter listings:
-  // seller info promoted up under the spec grid instead of the bottom of
-  // the sidebar (which native stacks below all main content). The plate
-  // itself only ever renders for vehicle listings — boats have no plate.
   const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
-  const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
   const nativePlateUnderTitle = isNative && isVehicleListing;
   // Profileringen kommer fra organisasjonens lagrede profil og deles med konsollforhåndsvisningen.
   // Tilstand-etiketter er per kjøretøytype (se VEHICLE_CONDITIONS_BY_SLUG) —
@@ -687,6 +682,10 @@ function ListingDetailViewBody({
   // galleriet smalere, så der beholdes full bredde uansett hva som er lagret.
   const isTwoColumn = useMediaQuery("(min-width: 768px)") && !phonePreview;
   const galleryInColumn = !wideGallery && isTwoColumn;
+  // I én kolonne (telefon, native, telefonrammen) ville sidepanelet havnet
+  // under alt innholdet, så selgeren flyttes opp rett etter beskrivelsen —
+  // for Bil og MC etter kjente feil og utstyr, men over lånekalkulatoren.
+  const sellerInColumn = isNative || !isTwoColumn;
   const gallery = hasGalleryContent ? (
     <ImageGallery
       images={sortedImages}
@@ -1015,8 +1014,6 @@ function ListingDetailViewBody({
             <PartFitmentSummary attributes={attributes} />
           )}
 
-          {nativeSpecLayout && sellerContactSlot && <div className="mt-6">{sellerContactSlot}</div>}
-
           <EditableField
             fieldKey="description"
             value={description}
@@ -1126,7 +1123,6 @@ function ListingDetailViewBody({
                     condition={condition}
                     vehicleLeafSlug={vehicleLeafSlug}
                   />
-                  <LoanCalculator totalPriceKr={totalPriceKr} />
                 </section>
               )}
               className="mt-8"
@@ -1135,6 +1131,10 @@ function ListingDetailViewBody({
               )}
             />
           )}
+
+          {sellerInColumn && sellerContactSlot && <div className="mt-8">{sellerContactSlot}</div>}
+
+          {isVehicleListing && <LoanCalculator totalPriceKr={totalPriceKr} />}
 
           {/* Boat attributes already have a direct edit entry point via the
               BoatInfoGrid/BoatExtraInfo regions above — this fallback only
@@ -1353,7 +1353,7 @@ function ListingDetailViewBody({
           )}
 
           {ownerStatsSlot}
-          {!nativeSpecLayout && sellerContactSlot}
+          {!sellerInColumn && sellerContactSlot}
         </aside>
       </div>
       {relatedListingsSlot}

@@ -1,76 +1,151 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Bell, ChevronRight, MessageCircle, ShieldCheck } from "lucide-react";
+import { Bell, Check, ChevronRight, Loader2, LogIn } from "lucide-react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { formatErrorMessage } from "@/lib/errors";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { hapticImpact } from "@/lib/haptics";
 import { setBackOverride } from "@/lib/native-offline";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { usePushStatus } from "@/hooks/use-push-status";
-import { listSavedSearches } from "@/lib/saved-searches";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 type Props = {
   onComplete: () => void;
 };
 
-type Card = "welcome" | "how" | "trust" | "notifications";
+type Card = "welcome" | "signin" | "notifications";
 
-const infoCards: Record<"how" | "trust", { icon: typeof Bell; title: string; body: string }> = {
-  how: {
-    icon: MessageCircle,
-    title: "Direkte kontakt med selger",
-    body: "Ingen mellomledd — du snakker med den som eier tingen.",
-  },
-  trust: {
-    icon: ShieldCheck,
-    title: "Ingen reklame, minst mulig sporing",
-    body: "100 % åpen kildekode.",
-  },
-};
+// Samme liste-mønster som «Bygget for et fritt og åpent internett» på web
+// (landing-static-sections.tsx). Påstandene må stemme med personvern.tsx.
+const welcomePoints = [
+  "Gratis å legge ut annonser",
+  "Ingen sporing av brukeraktivitet",
+  "All kildekode er åpen. Sjekk selv!",
+];
 
 function CardNav({
   isLast,
-  user,
-  authLoading,
   onNext,
   onFinish,
   reduceMotion,
 }: {
   isLast: boolean;
-  user: unknown;
-  authLoading: boolean;
   onNext: () => void;
   onFinish: () => void;
   reduceMotion: boolean;
 }) {
-  if (!isLast || user) {
-    return (
-      <button
-        type="button"
-        onClick={isLast ? onFinish : onNext}
-        className="mt-12 flex flex-col items-center gap-2 text-sm text-muted-foreground"
-      >
-        <span>Kom i gang</span>
-        <ChevronRight
-          className={`size-5 ${reduceMotion ? "" : "animate-[swipe-hint_1.2s_ease-in-out_infinite]"}`}
-        />
-      </button>
-    );
-  }
   return (
-    <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
-      <Button onClick={onFinish} disabled={authLoading} className="w-full">
-        Utforsk Kaupet
-      </Button>
-      {!authLoading && (
-        <Button variant="ghost" asChild className="w-full text-muted-foreground">
-          <Link to="/auth" search={{ mode: "signin", returnTo: "/" }}>
-            Logg inn og hent lagrede søk
-          </Link>
+    <button
+      type="button"
+      onClick={isLast ? onFinish : onNext}
+      className="mt-12 flex flex-col items-center gap-2 text-sm text-muted-foreground"
+    >
+      <span>{isLast ? "Kom i gang" : "Neste"}</span>
+      <ChevronRight
+        className={`size-5 ${reduceMotion ? "" : "animate-[swipe-hint_1.2s_ease-in-out_infinite]"}`}
+      />
+    </button>
+  );
+}
+
+// Innlogging direkte i onboardingen. Etter innlogging bytter useAuth til
+// innlogget bruker, og kortet viser «Kom i gang» (eller push-tilbudet dukker
+// opp som neste kort). Registrering og glemt passord går fortsatt til /auth.
+function SignInForm({ onSkip }: { onSkip: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const turnstileToken = turnstileEnabled
+        ? await turnstileRef.current?.getResponsePromise()
+        : undefined;
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+        options: { captchaToken: turnstileToken ?? undefined },
+      });
+      if (error) throw error;
+      showSuccessToast("Velkommen tilbake!");
+    } catch (err: unknown) {
+      showErrorToast(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
+      turnstileRef.current?.reset();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-8 flex w-full max-w-xs flex-col gap-3 text-left">
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="onboarding-email">E-post</Label>
+          <Input
+            id="onboarding-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="kari@eksempel.no"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="onboarding-password">Passord</Label>
+          <Input
+            id="onboarding-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        {turnstileEnabled && (
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+            options={{ appearance: "interaction-only", action: "kaupet" }}
+          />
+        )}
+        <Button
+          type="submit"
+          className="w-full gap-2"
+          disabled={loading || !email.trim() || !password}
+        >
+          {loading && <Loader2 className="size-4 animate-spin" />}
+          Logg inn
         </Button>
-      )}
+      </form>
+      <div className="flex justify-between text-xs">
+        <Link
+          to="/auth"
+          search={{ mode: "reset", returnTo: "/" }}
+          className="font-medium text-primary hover:underline"
+        >
+          Glemt passord?
+        </Link>
+        <Link
+          to="/auth"
+          search={{ mode: "signup", returnTo: "/" }}
+          className="font-medium text-primary hover:underline"
+        >
+          Bli medlem
+        </Link>
+      </div>
+      <Button variant="ghost" onClick={onSkip} className="w-full text-muted-foreground">
+        Hopp over
+      </Button>
     </div>
   );
 }
@@ -78,25 +153,22 @@ function CardNav({
 export function OnboardingFlow({ onComplete }: Props) {
   const { user, loading: authLoading } = useAuth();
   const push = usePushStatus();
-  const { data: savedSearches } = useQuery({
-    queryKey: ["saved-searches"],
-    queryFn: listSavedSearches,
-    enabled: !!user,
-  });
-  const activeSavedSearchCount = savedSearches?.filter((search) => search.notify).length ?? 0;
   const pushOfferEligible =
-    !!user &&
-    activeSavedSearchCount > 0 &&
-    !push.loading &&
-    push.supported &&
-    push.permission === "default";
+    !!user && !push.loading && push.supported && push.permission === "default";
   const [pushOfferVisited, setPushOfferVisited] = useState(false);
   const showPushOffer = !!user && (pushOfferEligible || pushOfferVisited);
-  const cards: Card[] = ["welcome", "how", "trust"];
+  // Innloggingskortet er siste kort for utloggede. Det blir stående etter
+  // innlogging her, så kortet brukeren står på ikke forsvinner under dem.
+  const [signedOutDuringOnboarding, setSignedOutDuringOnboarding] = useState(false);
+  if (!authLoading && !user && !signedOutDuringOnboarding) setSignedOutDuringOnboarding(true);
+  const showSignIn = !user || signedOutDuringOnboarding;
+  const cards: Card[] = ["welcome"];
+  if (showSignIn) cards.push("signin");
   if (showPushOffer) cards.push("notifications");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const activeCard = cards[currentIndex];
+  // Kortlisten kan krympe (auth lastet inn som innlogget) — klem indeksen.
+  const activeCard = cards[Math.min(currentIndex, cards.length - 1)];
   const [finishing, setFinishing] = useState(false);
   const finishTimer = useRef<number | null>(null);
   const reduceMotion = useReducedMotion();
@@ -108,22 +180,22 @@ export function OnboardingFlow({ onComplete }: Props) {
     [],
   );
 
-  // Track scroll position to update dot indicators
-  useEffect(() => {
+  // Fingersveip oppdaterer gjeldende kort via onScroll på containeren. En
+  // addEventListener i en mount-effekt festet seg aldri: Radix-portalen i
+  // FullscreenOverlayContent monterer innholdet først etter første commit, så
+  // scrollRef var null. Da ble activeCard stående på «welcome», og de
+  // sveipede kortene forble inert — knappene der reagerte ikke.
+  const lastScrollIndex = useRef(0);
+  const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    let lastIndex = 0;
-    const onScroll = () => {
-      const index = Math.round(el.scrollLeft / el.clientWidth);
-      if (index !== lastIndex) {
-        lastIndex = index;
-        setCurrentIndex(index);
-        void hapticImpact("light");
-      }
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+    const index = Math.round(el.scrollLeft / el.clientWidth);
+    if (index !== lastScrollIndex.current) {
+      lastScrollIndex.current = index;
+      setCurrentIndex(index);
+      void hapticImpact("light");
+    }
+  };
 
   const scrollTo = (index: number) => {
     // Ikke stol på scroll-eventet alene for å oppdatere prikkene: en
@@ -183,7 +255,9 @@ export function OnboardingFlow({ onComplete }: Props) {
       return;
     }
     try {
-      await push.enableOnThisDevice("saved_searches");
+      // Uten type: meldinger, lagrede søk og prisfall følger brukerens
+      // eksisterende valg (på som standard) — det kortet lover.
+      await push.enableOnThisDevice();
     } catch {
       // User denied or error — continue anyway
     }
@@ -206,6 +280,7 @@ export function OnboardingFlow({ onComplete }: Props) {
         >
           <div
             ref={scrollRef}
+            onScroll={onScroll}
             className="flex h-full snap-x snap-mandatory overflow-x-scroll scrollbar-none"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
@@ -215,58 +290,77 @@ export function OnboardingFlow({ onComplete }: Props) {
               aria-hidden={activeCard !== "welcome"}
               inert={activeCard !== "welcome"}
             >
-              <div className="mb-8 flex items-baseline gap-1">
-                <span className="font-display text-4xl font-bold tracking-tight text-primary">
-                  kaupet
+              {/* Hilsen og ordmerke er én overskrift, så skjermlesere leser dem samlet. */}
+              <h1
+                aria-label="Velkommen til kaupet.no"
+                className="flex flex-col items-center font-display tracking-tight"
+              >
+                <span className="mb-1 text-lg font-normal text-muted-foreground">
+                  Velkommen til
                 </span>
-                <span className="font-display text-4xl font-bold tracking-tight text-brand">.</span>
-                <span className="font-display text-3xl font-bold tracking-tight text-muted-foreground">
-                  no
+                <span className="flex items-baseline gap-1 font-bold">
+                  <span className="text-5xl text-primary">kaupet</span>
+                  <span className="text-5xl text-brand">.</span>
+                  <span className="text-4xl text-muted-foreground">no</span>
                 </span>
-              </div>
-              <h1 className="font-display text-3xl font-semibold tracking-tight">
-                Finn, kjøp og selg brukt
               </h1>
-              <p className="mt-4 max-w-xs text-base text-muted-foreground">Enkelt og lokalt.</p>
-              <CardNav
-                isLast={false}
-                user={user}
-                authLoading={authLoading}
-                onNext={next}
-                onFinish={finish}
-                reduceMotion={reduceMotion}
-              />
+              {/* Slagordet i samme stil som hero-overskriften på web (routes/index.tsx). */}
+              <p className="mt-6 max-w-xs font-display text-xl tracking-tight">
+                Gi tingene dine <span className="italic text-brand">et nytt liv</span>.
+              </p>
+              <ul className="mt-10 flex flex-col gap-3 text-left">
+                {welcomePoints.map((point) => (
+                  <li key={point} className="flex items-start gap-2.5 text-sm">
+                    <Check className="text-brand-text mt-0.5 size-4 shrink-0" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button onClick={next} className="mt-12 w-full max-w-xs">
+                Kom i gang
+              </Button>
             </div>
 
-            {/* Card 2 & 3: Info (how it works, trust) */}
-            {(["how", "trust"] as const).map((card) => {
-              const index = cards.indexOf(card);
-              const { icon: Icon, title, body } = infoCards[card];
-              return (
-                <div
-                  key={card}
-                  className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
-                  aria-hidden={activeCard !== card}
-                  inert={activeCard !== card}
-                >
-                  <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Icon className="size-10" />
-                  </div>
-                  <h2 className="font-display text-2xl font-semibold tracking-tight">{title}</h2>
-                  <p className="mt-3 max-w-xs text-sm text-muted-foreground">{body}</p>
+            {/* Card 2: Sign in (utloggede) */}
+            {showSignIn && (
+              <div
+                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
+                aria-hidden={activeCard !== "signin"}
+                inert={activeCard !== "signin"}
+              >
+                <div className="mb-6 flex size-20 flex-none items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <LogIn className="size-10" />
+                </div>
+                <h2 className="font-display text-2xl font-semibold tracking-tight">
+                  {user ? "Du er logget inn" : "Har du allerede en konto?"}
+                </h2>
+                <p className="mt-3 max-w-xs text-sm text-muted-foreground">
+                  {user
+                    ? "Lagrede søk og meldinger er klare."
+                    : "Logg inn for å hente lagrede søk og meldinger."}
+                </p>
+                {user ? (
                   <CardNav
-                    isLast={index === cards.length - 1}
-                    user={user}
-                    authLoading={authLoading}
+                    isLast={cards.indexOf("signin") === cards.length - 1}
                     onNext={next}
                     onFinish={finish}
                     reduceMotion={reduceMotion}
                   />
-                </div>
-              );
-            })}
+                ) : authLoading ? (
+                  <Button
+                    variant="ghost"
+                    disabled
+                    className="mt-10 w-full max-w-xs text-muted-foreground"
+                  >
+                    Hopp over
+                  </Button>
+                ) : (
+                  <SignInForm onSkip={finish} />
+                )}
+              </div>
+            )}
 
-            {/* Card 4: Notifications */}
+            {/* Card 2: Notifications */}
             {showPushOffer && (
               <div
                 className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
@@ -277,16 +371,16 @@ export function OnboardingFlow({ onComplete }: Props) {
                   <Bell className="size-10" />
                 </div>
                 <h2 className="font-display text-2xl font-semibold tracking-tight">
-                  Få beskjed om nye treff
+                  Vil du ha varsler?
                 </h2>
                 <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-                  Du har {activeSavedSearchCount}{" "}
-                  {activeSavedSearchCount === 1 ? "lagret søk" : "lagrede søk"} med varsling. Vil du
-                  få beskjed når noe nytt matcher?
+                  Vi kan si fra når et lagret søk får nye treff, når noen sender deg en melding
+                  eller når en favoritt blir satt ned i pris. Du velger selv hva du vil ha under
+                  Profil.
                 </p>
                 <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
                   <Button onClick={handleNotifications} className="w-full">
-                    Ja, varsle meg
+                    Slå på varsler
                   </Button>
                   <Button variant="ghost" onClick={next} className="w-full text-muted-foreground">
                     Ikke nå
@@ -299,7 +393,7 @@ export function OnboardingFlow({ onComplete }: Props) {
 
         {/* Dot indicators */}
         <div
-          className={`flex justify-center gap-2 pb-8 pt-4 transition-opacity duration-700 ${finishing ? "opacity-0" : "opacity-100"}`}
+          className={`flex justify-center gap-2 pb-8 pt-4 transition-opacity duration-700 ${finishing ? "opacity-0" : "opacity-100"} ${cards.length === 1 ? "invisible" : ""}`}
         >
           {cards.map((card, i) => (
             <button

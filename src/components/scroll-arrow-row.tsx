@@ -101,15 +101,9 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
 
   return (
     <div className="relative">
-      {/* Full-height edge scrim, not a floating circle — a distinct rectangular
-          shape flush to the container edge reads as "more content this way"
-          on its own, rather than looking like just another rounded chip
-          sitting in the row. Taller than the row itself (extends past its
-          top/bottom edge) so it also reads as a separate navigation element
-          rather than another category panel at the same height. */}
       {!isNative && (
         <div
-          className={`pointer-events-none absolute -top-2 -bottom-2 left-0 z-10 flex w-10 items-center bg-background/95 transition-opacity ${
+          className={`pointer-events-none absolute -top-2 -bottom-2 left-0 z-10 flex w-10 items-center transition-opacity ${
             canLeft ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -143,7 +137,7 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
       </div>
       {!isNative && (
         <div
-          className={`pointer-events-none absolute -top-2 -bottom-2 right-0 z-10 flex w-10 items-center justify-end bg-background/95 transition-opacity ${
+          className={`pointer-events-none absolute -top-2 -bottom-2 right-0 z-10 flex w-10 items-center justify-end transition-opacity ${
             canRight ? "opacity-100" : "opacity-0"
           }`}
         >

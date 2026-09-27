@@ -147,9 +147,12 @@ function WebsiteLink({
 export function ProffListingHeader({
   organization,
   heading = false,
+  inCard = false,
 }: {
   organization: ProffOrganizationPresentation;
   heading?: boolean;
+  /** Øverst i kontaktkortet: kortet står for rammen og luften over. */
+  inCard?: boolean;
 }) {
   const Name = heading ? "h1" : "p";
   const { concept, font, overtitle } = presentationValues(organization);
@@ -159,7 +162,7 @@ export function ProffListingHeader({
     return (
       <section
         aria-label="Bedriftsprofil"
-        className="mb-6 border-y border-border py-5"
+        className={inCard ? "mb-4 border-b border-border pb-4" : "mb-6 border-y border-border py-5"}
         style={style}
       >
         <div className="grid items-center gap-4 border-l-[0.375rem] border-l-[var(--proff-brand)] pl-4 sm:grid-cols-[auto_1fr_auto] sm:gap-5 sm:pl-6">
@@ -189,7 +192,10 @@ export function ProffListingHeader({
     return (
       <section
         aria-label="Bedriftsprofil"
-        className="relative isolate mb-6 overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5"
+        className={cn(
+          "relative isolate overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5",
+          inCard ? "mb-4" : "mb-6",
+        )}
         style={style}
       >
         <span
@@ -219,7 +225,10 @@ export function ProffListingHeader({
   return (
     <section
       aria-label="Bedriftsprofil"
-      className="relative isolate mb-6 overflow-hidden rounded-2xl bg-[var(--proff-brand)] p-5 text-[var(--proff-on-brand)] sm:p-6"
+      className={cn(
+        "relative isolate overflow-hidden rounded-2xl bg-[var(--proff-brand)] p-5 text-[var(--proff-on-brand)] sm:p-6",
+        inCard ? "mb-4" : "mb-6",
+      )}
       style={style}
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">

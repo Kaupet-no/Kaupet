@@ -26,14 +26,12 @@ vi.mock("@/components/listing-detail/listing-detail-view", () => ({
     phonePreview,
     editMode,
     sellerContactSlot,
-    organizationBrand,
   }: {
     listingStatus?: string | null;
     categoryId?: string | null;
     phonePreview?: boolean;
     editMode?: unknown;
     sellerContactSlot?: React.ReactNode;
-    organizationBrand?: { displayName: string; palette: string | null };
   }) => (
     <>
       <p>
@@ -41,11 +39,6 @@ vi.mock("@/components/listing-detail/listing-detail-view", () => ({
         {phonePreview ? "mobil" : "desktop"}
         {editMode ? ", redigerbar" : ""}
       </p>
-      {organizationBrand && (
-        <p>
-          Profilering: {organizationBrand.displayName} {organizationBrand.palette}
-        </p>
-      )}
       {sellerContactSlot}
     </>
   ),
@@ -136,7 +129,7 @@ describe("PhoneListingPreview", () => {
 
     expect(screen.getByText("Bilhuset AS")).toBeTruthy();
     expect(screen.getByText(/Org\.nr\./)).toBeTruthy();
-    expect(screen.queryByText(/Profilering:/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Bedriftsprofil" })).toBeNull();
   });
 
   it("viser Proff-profileringen når avtalen er aktiv", () => {
@@ -146,8 +139,8 @@ describe("PhoneListingPreview", () => {
     };
     render(<PhoneListingPreview draft={{ ...baseDraft, categoryId: null }} />);
 
-    expect(screen.getByText("Profilering: Bilhuset AS #224466")).toBeTruthy();
-    expect(screen.getByText("Selges av en bedrift")).toBeTruthy();
+    expect(screen.getByText("Bilhuset AS")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Bedriftsprofil" })).toBeTruthy();
   });
 });
 

@@ -789,7 +789,6 @@ function ListingDetailPage() {
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
       listingStatus={data.status}
-      organizationBrand={organizationBrand}
       relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}
       enableBackToSearch
@@ -854,7 +853,7 @@ function ListingDetailPage() {
           shareOpen={shareOpen}
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
-          hideBusinessIdentity={!!organizationBrand}
+          organizationBrand={organizationBrand}
         />
       }
       stickyContactSlot={

@@ -4,6 +4,7 @@ import { Building2, Monitor, Smartphone, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
+import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
 import type { ListingDetailViewProps } from "@/components/listing-detail/listing-detail-view";
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
@@ -60,7 +61,6 @@ const disabledContact = (
  */
 function usePreviewSeller(): {
   sellerContactSlot: ReactNode;
-  organizationBrand?: ListingOrganizationBrand;
 } {
   const { user } = useAuth();
   const { data: membership } = useBusinessMembership();
@@ -109,8 +109,7 @@ function usePreviewSeller(): {
 
   const identity = organization ? (
     organizationBrand ? (
-      // Den profilerte Proff-blokken eier allerede bedriftsidentiteten.
-      <p className="font-medium">Selges av en bedrift</p>
+      <ProffListingHeader organization={organizationBrand} inCard />
     ) : (
       <>
         <p className="font-medium">{organization.display_name}</p>
@@ -136,13 +135,16 @@ function usePreviewSeller(): {
   );
 
   return {
-    organizationBrand,
     sellerContactSlot: (
       <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center gap-3">
-          {!organizationBrand && avatar}
-          <div>{identity}</div>
-        </div>
+        {organizationBrand ? (
+          identity
+        ) : (
+          <div className="flex items-center gap-3">
+            {avatar}
+            <div>{identity}</div>
+          </div>
+        )}
         <Button type="button" className="w-full" disabled>
           {organization ? "Send melding til bedriften" : "Send melding"}
         </Button>

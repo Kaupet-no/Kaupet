@@ -7,6 +7,8 @@ import {
   User as UserIcon,
 } from "lucide-react";
 
+import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
+import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
@@ -87,7 +89,7 @@ export function SellerContactPanel({
   shareOpen,
   onShareOpenChange,
   isNative,
-  hideBusinessIdentity = false,
+  organizationBrand,
 }: {
   isLoggedIn: boolean;
   seller: SellerIdentity | null;
@@ -100,14 +102,15 @@ export function SellerContactPanel({
   shareOpen: boolean;
   onShareOpenChange: (open: boolean) => void;
   isNative?: boolean;
-  /** The branded Proff block already owns the business identity. */
-  hideBusinessIdentity?: boolean;
+  /** Proff-bedrifter: profileringen erstatter den nøytrale identitetsraden. */
+  organizationBrand?: ProffOrganizationPresentation;
 }) {
+  const branded = seller?.kind === "business" && !!organizationBrand;
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center gap-3">
-        {seller?.kind === "business" && hideBusinessIdentity ? null : seller?.kind === "private" &&
-          seller.avatar_url ? (
+      {branded && <ProffListingHeader organization={organizationBrand} inCard />}
+      <div className={branded ? "text-sm" : "flex items-center gap-3"}>
+        {branded ? null : seller?.kind === "private" && seller.avatar_url ? (
           <img
             src={seller.avatar_url}
             alt={seller.display_name ? `Profilbilde av ${seller.display_name}` : "Profilbilde"}
@@ -149,15 +152,12 @@ export function SellerContactPanel({
               )}
             </>
           ) : seller?.kind === "business" ? (
-            hideBusinessIdentity ? (
-              <>
-                <p className="font-medium">Selges av en bedrift</p>
-                {seller.visitingAddress && (
-                  <p className="text-xs text-muted-foreground">
-                    Besøksadresse: {seller.visitingAddress}
-                  </p>
-                )}
-              </>
+            branded ? (
+              seller.visitingAddress && (
+                <p className="text-xs text-muted-foreground">
+                  Besøksadresse: {seller.visitingAddress}
+                </p>
+              )
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-1.5">

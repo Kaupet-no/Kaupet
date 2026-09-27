@@ -36,7 +36,6 @@ import {
   VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
 import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
-import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
@@ -216,8 +215,6 @@ export type ListingDetailViewProps = {
   ownerStatsSlot?: ReactNode;
   /** Contact-seller panel. */
   sellerContactSlot?: ReactNode;
-  /** Live organization identity shown only when Proff branding is effective. */
-  organizationBrand?: ListingOrganizationBrand;
   /** Optional related active organization listings section. */
   relatedListingsSlot?: ReactNode;
   /** Compact "Send melding"-button shown in the fixed mobile contact bar.
@@ -274,7 +271,6 @@ export function ListingDetailView({
   vehicle360ImgUrls,
   ownerStatsSlot,
   sellerContactSlot,
-  organizationBrand,
   relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
@@ -482,7 +478,6 @@ export function ListingDetailView({
       imgUrls={imgUrls}
       attributes={attributes}
       canShip={canShip ?? null}
-      organizationBrand={organizationBrand}
       relatedListingsSlot={relatedListingsSlot}
       vehicle360ImgUrls={vehicle360ImgUrls}
       actionsMenuSlot={actionsMenuSlot}
@@ -579,7 +574,6 @@ function ListingDetailViewBody({
   actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
-  organizationBrand,
   stickyContactSlot,
   relatedListingsSlot,
   previewBanner,
@@ -640,7 +634,6 @@ function ListingDetailViewBody({
   actionsMenuSlot?: ReactNode;
   ownerStatsSlot?: ReactNode;
   sellerContactSlot?: ReactNode;
-  organizationBrand?: ListingOrganizationBrand;
   relatedListingsSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
@@ -1178,7 +1171,6 @@ function ListingDetailViewBody({
         </div>
 
         <aside className="@container space-y-5 page-md:col-start-2 page-md:row-start-2">
-          {organizationBrand && <ProffListingHeader organization={organizationBrand} />}
           {(() => {
             const { label, dateStr } = getListingDateMeta(
               listingStatus,

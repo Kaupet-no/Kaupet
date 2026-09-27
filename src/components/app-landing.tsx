@@ -23,6 +23,11 @@ export function AppLanding({
   const { openPanel, savedLocation } = useSearchPanel();
   const { popular, popularIsError, refetchPopular, hasPopularitySignal } = usePopularListings(10);
   const isTablet = useFormFactor() === "tablet";
+  // Telefon: så mange kort i bredden som får plass på minst 9.5rem hver — én
+  // kolonne under 360 px, to på vanlige telefoner og flere i liggende modus.
+  const gridClass = isTablet
+    ? "grid grid-cols-3 gap-4 lg:grid-cols-4 xl:grid-cols-5"
+    : "grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-4";
   const searchExamples = useDefaultSearchExamples();
   const hasLocation = savedLocation.lat != null && savedLocation.lng != null;
   const locationLabel = hasLocation
@@ -187,13 +192,7 @@ export function AppLanding({
             </div>
           ) : hasListings ? (
             <>
-              <div
-                className={
-                  isTablet
-                    ? "grid grid-cols-3 gap-4 pb-2 lg:grid-cols-4 xl:grid-cols-5"
-                    : "flex flex-col gap-4"
-                }
-              >
+              <div className={`${gridClass} ${isTablet ? "pb-2" : ""}`}>
                 {popular.map((listing) => (
                   <ListingCard key={listing.id} listing={listing} />
                 ))}
@@ -215,7 +214,7 @@ export function AppLanding({
               </div>
             </>
           ) : (
-            <div className={isTablet ? "grid grid-cols-3 gap-4" : "flex flex-col gap-4"}>
+            <div className={gridClass}>
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
               ))}

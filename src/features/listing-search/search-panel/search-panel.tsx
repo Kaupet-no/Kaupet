@@ -24,6 +24,7 @@ import {
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
 import { buildTree, findCategorySuggestion, type Category } from "@/lib/categories";
+import { CategoryIcon } from "@/lib/category-icons";
 import type { LocationValue } from "@/components/location-filter";
 import {
   effectiveFiltersForCategories,
@@ -46,7 +47,13 @@ import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
-import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
+import {
+  getSearchHistory,
+  saveSearchToHistory,
+  clearSearchHistory,
+  getRecentCategories,
+  saveRecentCategory,
+} from "./search-history";
 import { SearchSuggestionList, type SearchSuggestionGroup } from "../search-suggestion-list";
 import { buildActiveFilterItems } from "./active-filter-items";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
@@ -398,6 +405,7 @@ export function SearchPanel({
 
   const goToCategory = (cat: Category) => {
     void hapticImpact("medium");
+    saveRecentCategory(cat.slug);
     if (results) {
       setDraft((previous) => ({
         value: { ...previous.value, categories: [cat.slug] },
@@ -918,6 +926,12 @@ function BrowseContent({
   onClearHistory: () => void;
   onPickCategory: (cat: Category) => void;
 }) {
+  // Panelet åpnes bare på klienten; uten localStorage (SSR) gir oppslaget [].
+  const [recentSlugs] = useState(getRecentCategories);
+  const recentCategories = recentSlugs.flatMap((slug) => {
+    const cat = categories.find((c) => c.slug === slug);
+    return cat ? [cat] : [];
+  });
   return (
     <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,var(--safe-bottom))]">
       {!q && history.length > 0 && (
@@ -948,24 +962,53 @@ function BrowseContent({
         </div>
       )}
 
+      {!q && recentCategories.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Nylig brukt
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {recentCategories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => onPickCategory(cat)}
+                className="flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-sm transition hover:bg-muted active:bg-muted"
+              >
+                <CategoryIcon
+                  iconName={cat.icon}
+                  className="size-3.5 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                {cat.name_nb}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!q && categories.length > 0 && (
         <div className="mt-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Bla etter kategori
           </p>
-          {categories
-            .filter((c) => c.parent_id === null)
-            .map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => onPickCategory(cat)}
-                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
-              >
-                <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm">{cat.name_nb}</span>
-              </button>
-            ))}
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {categories
+              .filter((c) => c.parent_id === null)
+              .map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => onPickCategory(cat)}
+                  className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl bg-card px-1.5 py-3 text-center transition hover:bg-muted active:scale-[0.97] active:bg-muted"
+                >
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <CategoryIcon iconName={cat.icon} className="size-5" aria-hidden="true" />
+                  </span>
+                  <span className="text-xs leading-tight text-balance">{cat.name_nb}</span>
+                </button>
+              ))}
+          </div>
         </div>
       )}
     </div>

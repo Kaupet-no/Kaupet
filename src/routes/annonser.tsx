@@ -483,9 +483,12 @@ function BrowsePage() {
                   q={qDraft}
                   filterCount={ordinaryFilterCount}
                   searchRuleCount={hasExtraSearchRules ? 1 : 0}
-                  onOpenQuery={() => {
-                    openPanel("query");
+                  onQChange={(q) => {
+                    setInterpretedCriteria([]);
+                    setIgnoredInterpretations(new Set());
+                    setQDraft(q);
                   }}
+                  onSubmitQ={submitQuery}
                   onOpenRules={() => {
                     openPanel("search");
                   }}

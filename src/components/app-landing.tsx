@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, LayoutGrid, MapPin, Search as SearchIcon } from "lucide-react";
 
 import { ListingCard } from "@/components/listing-card";
@@ -10,6 +10,12 @@ import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { saveSearchToHistory } from "@/features/listing-search/search-panel/search-history";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/hooks/use-category-filters";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { NewListingDialog } from "@/components/new-listing-dialog";
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +35,33 @@ export function AppLanding({
     ? "grid grid-cols-3 gap-4 lg:grid-cols-4 xl:grid-cols-5"
     : "grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-4";
   const searchExamples = useDefaultSearchExamples();
+  const navigate = useNavigate();
+  const [qDraft, setQDraft] = useState("");
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
+  const { data: allFilters } = useAllCategoryFilters();
+  const { data: vehicleBrands } = useAllVehicleBrands();
+  // Samme vei som søkepanelets fritekst: teksten tolkes til filtre, og valgt
+  // lokasjon følger med til /annonser.
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = qDraft.trim();
+    saveSearchToHistory(query);
+    void submitSearch({
+      query,
+      applied: {
+        value: { ...defaultAdvancedSearchValue(), location: savedLocation },
+        attributes: {},
+      },
+      categories,
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (search) => navigate({ to: "/annonser", search }),
+    });
+  };
   const hasLocation = savedLocation.lat != null && savedLocation.lng != null;
   const locationLabel = hasLocation
     ? `${savedLocation.label || "Valgt sted"} · ${savedLocation.radius} km`
@@ -101,19 +134,32 @@ export function AppLanding({
           <h1 className="text-center font-display text-xl tracking-tight">
             Hva leter du etter i dag?
           </h1>
-          <button
-            type="button"
-            onClick={() => openPanel("query")}
-            aria-label="Åpne søk i annonser"
-            className="relative flex h-14 w-full max-w-xl items-center rounded-full border border-border bg-card px-4 text-left text-base shadow-sm outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99]"
+          <form
+            role="search"
+            onSubmit={handleSearchSubmit}
+            className="relative flex h-14 w-full max-w-xl items-center rounded-full border border-border bg-card px-4 shadow-sm transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
           >
             <SearchIcon className="mr-3 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <AnimatedSearchPlaceholder
-              words={searchExamples}
-              paused={false}
-              className="text-base text-muted-foreground"
-            />
-          </button>
+            <div className="relative min-w-0 flex-1">
+              <input
+                type="search"
+                enterKeyHint="search"
+                value={qDraft}
+                onChange={(e) => setQDraft(e.target.value)}
+                aria-label="Søk i annonser"
+                className="w-full bg-transparent text-base outline-none [&::-webkit-search-cancel-button]:hidden"
+              />
+              {!qDraft && (
+                <span className="pointer-events-none absolute inset-0 flex items-center">
+                  <AnimatedSearchPlaceholder
+                    words={searchExamples}
+                    paused={false}
+                    className="text-base text-muted-foreground"
+                  />
+                </span>
+              )}
+            </div>
+          </form>
 
           {/* Lokasjon og kategorier veier likt — begge er inngangsvalg til
             samme søkepanel, ikke en primær og en sekundær handling. Kaupet-

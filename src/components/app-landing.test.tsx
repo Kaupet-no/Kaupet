@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLanding } from "./app-landing";
 
 const openPanel = vi.fn();
+const navigate = vi.fn();
+const submitSearch = vi.hoisted(() => vi.fn());
+vi.mock("@/features/listing-search/submit-search", () => ({ submitSearch }));
 
 const queryMocks = vi.hoisted(() => ({
   data: [] as unknown[] | undefined,
@@ -21,6 +24,7 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }));
 vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigate,
   Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
     <a href={to} {...rest}>
       {children}
@@ -46,7 +50,10 @@ vi.mock("@/components/animated-search-placeholder", () => ({
 vi.mock("@/components/app-hero-logo", () => ({ AppHeroLogo: () => null }));
 vi.mock("@/components/kaupet-code-dialog", () => ({ KaupetCodeDialog: () => null }));
 
-beforeEach(() => openPanel.mockReset());
+beforeEach(() => {
+  openPanel.mockReset();
+  submitSearch.mockReset();
+});
 afterEach(() => {
   cleanup();
   queryMocks.data = [];
@@ -55,14 +62,24 @@ afterEach(() => {
 });
 
 describe("AppLanding", () => {
-  it("åpner søk, lokasjon og kategorier gjennom samme panel", () => {
+  it("åpner lokasjon og kategorier gjennom søkepanelet", () => {
     render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Åpne søk i annonser" }));
     fireEvent.click(screen.getByRole("button", { name: "Velg lokasjon: Hele Norge" }));
     fireEvent.click(screen.getByRole("button", { name: "Alle kategorier" }));
 
-    expect(openPanel.mock.calls).toEqual([["query"], ["location"], ["categories"]]);
+    expect(openPanel.mock.calls).toEqual([["location"], ["categories"]]);
+  });
+
+  it("søker direkte fra søkefeltet uten å åpne panelet", () => {
+    render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+
+    const input = screen.getByRole("searchbox", { name: "Søk i annonser" });
+    fireEvent.change(input, { target: { value: " sykkel " } });
+    fireEvent.submit(input);
+
+    expect(openPanel).not.toHaveBeenCalled();
+    expect(submitSearch).toHaveBeenCalledWith(expect.objectContaining({ query: "sykkel" }));
   });
 
   it("viser 'Prøv igjen' i stedet for et evigvarende skjelett når populære annonser feiler", () => {

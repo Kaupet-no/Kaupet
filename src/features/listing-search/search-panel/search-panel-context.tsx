@@ -21,6 +21,9 @@ type Ctx = {
   open: boolean;
   /** Åpner det globale panelet uten å navigere eller anvende et utkast. */
   openPanel: (section?: SearchPanelSection, queryDraft?: string) => void;
+  /** Starter et nytt søk: åpner fritekstpanelet uten sidens resultatkontekst,
+   * slik at et søk fra bunnmenyen aldri redigerer søket som allerede vises. */
+  startSearch: () => void;
   closePanel: () => void;
   registerResults: (ctx: SearchPanelResultsContext | null) => void;
   savedLocation: LocationValue;
@@ -40,6 +43,7 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const [section, setSection] = useState<SearchPanelSection>("query");
   const [queryDraft, setQueryDraft] = useState<string>();
   const [results, setResults] = useState<SearchPanelResultsContext | null>(null);
+  const [fresh, setFresh] = useState(false);
   const [savedLocation, setSavedLocation] = useSavedLocation();
 
   // Kategori- og filterdata lastes først når brukeren faktisk åpner panelet.
@@ -47,6 +51,14 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const openPanel = useCallback((s: SearchPanelSection = "query", q?: string) => {
     setSection(s);
     setQueryDraft(q);
+    setFresh(false);
+    setPanelRequested(true);
+    setOpen(true);
+  }, []);
+  const startSearch = useCallback(() => {
+    setSection("query");
+    setQueryDraft(undefined);
+    setFresh(true);
     setPanelRequested(true);
     setOpen(true);
   }, []);
@@ -59,12 +71,13 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
     () => ({
       open,
       openPanel,
+      startSearch,
       closePanel,
       registerResults,
       savedLocation,
       setSavedLocation,
     }),
-    [open, openPanel, closePanel, registerResults, savedLocation, setSavedLocation],
+    [open, openPanel, startSearch, closePanel, registerResults, savedLocation, setSavedLocation],
   );
 
   return (
@@ -77,7 +90,7 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
             onOpenChange={setOpen}
             initialSection={section}
             initialQuery={queryDraft}
-            results={results ?? undefined}
+            results={fresh ? undefined : (results ?? undefined)}
             savedLocation={savedLocation}
             onSavedLocationChange={setSavedLocation}
           />

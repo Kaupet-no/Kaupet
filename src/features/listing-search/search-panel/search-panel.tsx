@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Drawer } from "vaul";
 import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
+  Bell,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   FolderOpen,
+  LayoutGrid,
   RotateCcw,
   Save,
   Search as SearchIcon,
@@ -19,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { SearchRuleFields } from "@/components/search-rule-fields";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import {
+  criteriaToValue,
   defaultAdvancedSearchValue,
   valueToCriteria,
   type AdvancedSearchValue,
@@ -39,7 +45,12 @@ import {
   type ListingSuggestion,
 } from "@/features/listing-search/use-search-suggestions";
 import { buildStructuredSearchSuggestions } from "@/features/listing-search/structured-search-suggestions";
-import { summarizeCriteria } from "@/lib/saved-searches";
+import {
+  listSavedSearches,
+  listUnreadCountsBySearch,
+  summarizeCriteria,
+  type SavedSearch,
+} from "@/lib/saved-searches";
 import { useAuth } from "@/hooks/use-auth";
 import { useFormFactor, useIsNarrow } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
@@ -155,7 +166,9 @@ export function SearchPanel({
     nativeSearchLayout && initialSection === "search" ? "query" : initialSection,
   );
   const [rulesOpen, setRulesOpen] = useState(initialSection === "search");
-  const [snap, setSnap] = useState<number | string | null>(results ? 1 : SNAP_POINTS[0]);
+  // Kategorivalget skal vise alle kategorier straks — åpnes i fullhøyde.
+  const initialSnap = results || initialSection === "categories" ? 1 : SNAP_POINTS[0];
+  const [snap, setSnap] = useState<number | string | null>(initialSnap);
   const [draft, setDraft] = useState<AppliedSearchState>(() =>
     results ? cloneSearchState(results.applied) : createLaunchState(savedLocation),
   );
@@ -186,7 +199,7 @@ export function SearchPanel({
   };
   const dragGate = useSheetDragGate({
     activeSnapPoint: snap,
-    initialSnapPoint: results ? 1 : SNAP_POINTS[0],
+    initialSnapPoint: initialSnap,
     setActiveSnapPoint: setSnap,
     onClose: close,
   });
@@ -206,11 +219,13 @@ export function SearchPanel({
       }
       return next;
     });
-    setSnap(results ? 1 : SNAP_POINTS[0]);
+    setSnap(initialSnap);
     setHistory(getSearchHistory());
     // Uten resultatflate bak er fritekst hele poenget — fokuser feltet. Over en
-    // resultatliste ville tastaturet dekket akkurat det brukeren skal se.
-    if (results) return;
+    // resultatliste ville tastaturet dekket akkurat det brukeren skal se. Det
+    // samme gjelder kategorivalget: søkefeltet er et hjelpemiddel der, og
+    // tastaturet ville skjult kategoriene.
+    if (results || initialSection === "categories") return;
     const t = setTimeout(() => inputRef.current?.focus(), 150);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -417,6 +432,23 @@ export function SearchPanel({
     navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
     close("apply");
   };
+  const runSavedSearch = async (saved: SavedSearch) => {
+    if (submitting) return;
+    void hapticImpact("medium");
+    setSubmitting(true);
+    await submitSearch({
+      applied: {
+        value: criteriaToValue(saved.criteria),
+        attributes: saved.criteria.attributes ?? {},
+      },
+      categories,
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters,
+      commit: (search) => navigate({ to: "/annonser", search }),
+    });
+    setSubmitting(false);
+    close("apply");
+  };
   const applyStructuredSuggestion = (
     suggestion: ReturnType<typeof buildStructuredSearchSuggestions>[number],
   ) => {
@@ -452,6 +484,22 @@ export function SearchPanel({
         clearSearchHistory();
         setHistory([]);
       }}
+      /* Et nytt søk (uten resultatflate) viser snarveier i stedet for hele
+         kategorirutenettet — tastaturet ville uansett dekket det. */
+      onBrowseCategories={
+        results
+          ? undefined
+          : () => {
+              inputRef.current?.blur();
+              setSection("categories");
+              setSnap(1);
+            }
+      }
+      savedSearches={
+        !results && user ? (
+          <SavedSearchShortcuts onPick={(saved) => void runSavedSearch(saved)} />
+        ) : undefined
+      }
     />
   );
 
@@ -530,7 +578,7 @@ export function SearchPanel({
                 if (e.key === "Enter") void submitText(launchQueryDraft);
               }}
               placeholder="Søk etter merke, type, sted eller pris"
-              className="h-12 min-w-0 flex-1 border-0 bg-transparent px-2 text-base focus-visible:ring-0"
+              className="h-12 min-w-0 flex-1 border-0 bg-transparent px-2 text-base shadow-none focus-visible:ring-0"
               aria-label="Søk i annonser"
             />
             {launchQueryDraft && (
@@ -814,6 +862,8 @@ function QueryBrowseContent({
   onPickFilter,
   onPickListing,
   onClearHistory,
+  onBrowseCategories,
+  savedSearches,
 }: {
   q: string;
   history: string[];
@@ -827,6 +877,8 @@ function QueryBrowseContent({
   onPickFilter: (suggestion: ReturnType<typeof buildStructuredSearchSuggestions>[number]) => void;
   onPickListing: (position: number) => void;
   onClearHistory: () => void;
+  onBrowseCategories?: () => void;
+  savedSearches?: React.ReactNode;
 }) {
   if (!q.trim()) {
     return (
@@ -837,6 +889,8 @@ function QueryBrowseContent({
         onPickHistory={onPickHistory}
         onClearHistory={onClearHistory}
         onPickCategory={onPickCategory}
+        onBrowseCategories={onBrowseCategories}
+        savedSearches={savedSearches}
       />
     );
   }
@@ -910,7 +964,48 @@ function QueryBrowseContent({
   );
 }
 
-/** Historikk og kategoriliste når panelet ikke viser resultater. */
+/** Lagrede søk som snarveier i et nytt søk. Monteres bare for innloggede. */
+function SavedSearchShortcuts({ onPick }: { onPick: (saved: SavedSearch) => void }) {
+  // Samme nøkler som /mine-sok, så listen deler cache med den siden.
+  const { data: searches = [] } = useQuery({
+    queryKey: ["saved-searches"],
+    queryFn: listSavedSearches,
+  });
+  const { data: unreadCounts } = useQuery({
+    queryKey: ["saved-search-unread-counts"],
+    queryFn: listUnreadCountsBySearch,
+  });
+  if (searches.length === 0) return null;
+  return (
+    <div className="mt-4">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Lagrede søk
+      </p>
+      {searches.slice(0, 3).map((saved) => {
+        const unread = unreadCounts?.get(saved.id) ?? 0;
+        return (
+          <button
+            key={saved.id}
+            type="button"
+            onClick={() => onPick(saved)}
+            className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
+          >
+            <Bell className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-sm">{saved.name}</span>
+            {unread > 0 && (
+              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                {unread > 99 ? "99+" : unread} nye
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Historikk og kategoriliste når panelet ikke viser resultater. Med
+ * `onBrowseCategories` erstattes kategorirutenettet av en lenke til det. */
 function BrowseContent({
   q,
   history,
@@ -918,6 +1013,8 @@ function BrowseContent({
   onPickHistory,
   onClearHistory,
   onPickCategory,
+  onBrowseCategories,
+  savedSearches,
 }: {
   q: string;
   history: string[];
@@ -925,16 +1022,22 @@ function BrowseContent({
   onPickHistory: (item: string) => void;
   onClearHistory: () => void;
   onPickCategory: (cat: Category) => void;
+  onBrowseCategories?: () => void;
+  savedSearches?: React.ReactNode;
 }) {
   // Panelet åpnes bare på klienten; uten localStorage (SSR) gir oppslaget [].
   const [recentSlugs] = useState(getRecentCategories);
+  // Hovedkategorier med underkategorier åpnes i rutenettet i stedet for å
+  // velges direkte; «Alt i …» velger nivået man står på.
+  const [drillPath, setDrillPath] = useState<Category[]>([]);
+  const drillParent = drillPath.at(-1);
   const recentCategories = recentSlugs.flatMap((slug) => {
     const cat = categories.find((c) => c.slug === slug);
     return cat ? [cat] : [];
   });
   return (
     <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,var(--safe-bottom))]">
-      {!q && history.length > 0 && (
+      {!q && !drillParent && history.length > 0 && (
         <div className="mt-2">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -962,7 +1065,9 @@ function BrowseContent({
         </div>
       )}
 
-      {!q && recentCategories.length > 0 && (
+      {!q && !drillParent && savedSearches}
+
+      {!q && !drillParent && recentCategories.length > 0 && (
         <div className="mt-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Nylig brukt
@@ -987,19 +1092,64 @@ function BrowseContent({
         </div>
       )}
 
-      {!q && categories.length > 0 && (
+      {!q && onBrowseCategories && (
+        <button
+          type="button"
+          onClick={onBrowseCategories}
+          className="mt-4 flex min-h-12 w-full items-center gap-3 rounded-xl bg-card px-3 text-left text-sm transition hover:bg-muted active:bg-muted"
+        >
+          <LayoutGrid className="size-4 shrink-0 text-primary" aria-hidden />
+          <span className="flex-1">Bla i kategorier</span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      )}
+
+      {!q && !onBrowseCategories && categories.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Bla etter kategori
-          </p>
+          {drillParent ? (
+            <div className="mb-2 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDrillPath((path) => path.slice(0, -1))}
+                className="native-touch-target -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+                aria-label="Tilbake"
+              >
+                <ChevronLeft className="size-5" aria-hidden />
+              </button>
+              <p className="min-w-0 truncate text-sm font-medium">{drillParent.name_nb}</p>
+            </div>
+          ) : (
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Bla etter kategori
+            </p>
+          )}
+          {drillParent && (
+            <button
+              type="button"
+              onClick={() => onPickCategory(drillParent)}
+              className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-xl bg-card px-3 text-left text-sm font-medium transition hover:bg-muted active:bg-muted"
+            >
+              <CategoryIcon
+                iconName={drillParent.icon}
+                className="size-4 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span className="flex-1">Alt i {drillParent.name_nb}</span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
+          )}
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {categories
-              .filter((c) => c.parent_id === null)
+              .filter((c) => c.parent_id === (drillParent?.id ?? null))
               .map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => onPickCategory(cat)}
+                  onClick={() =>
+                    categories.some((c) => c.parent_id === cat.id)
+                      ? setDrillPath((path) => [...path, cat])
+                      : onPickCategory(cat)
+                  }
                   className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl bg-card px-1.5 py-3 text-center transition hover:bg-muted active:scale-[0.97] active:bg-muted"
                 >
                   <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">

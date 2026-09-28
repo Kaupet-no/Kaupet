@@ -17,7 +17,7 @@ export function MobileFilterButton({ activeFilterCount }: { activeFilterCount: n
   return (
     <Button
       type="button"
-      variant="outline"
+      variant={activeFilterCount > 0 ? "default" : "outline"}
       size="sm"
       className="gap-1.5"
       onClick={() => {

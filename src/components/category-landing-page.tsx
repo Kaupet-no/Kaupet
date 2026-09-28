@@ -190,7 +190,8 @@ export function CategoryLandingPage({
             <SearchSummaryPill
               q={qDraft}
               filterCount={activeFilterCount}
-              onOpenQuery={() => openPanel("query")}
+              onQChange={setQDraft}
+              onSubmitQ={() => updateSearch({ q: qDraft })}
               onOpenFilters={() => openPanel("price")}
             />
           ) : (

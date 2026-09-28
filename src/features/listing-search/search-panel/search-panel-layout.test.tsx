@@ -22,7 +22,8 @@ vi.mock("vaul", () => ({
     NestedRoot: ({ children }: { children: ReactNode }) => <>{children}</>,
   },
 }));
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
+const navigate = vi.hoisted(() => vi.fn());
+vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
 vi.mock("@/components/advanced-search-sheet", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/components/advanced-search-sheet")>();
   return { ...original, SaveSearchDialog: () => null };
@@ -172,6 +173,71 @@ describe("SearchPanel filteroppsett", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
     expect(screen.queryByText("Flere søkevalg")).toBeNull();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
+  });
+
+  it("fokuserer ikke søkefeltet når forsiden åpner kategorivalget", () => {
+    vi.useFakeTimers();
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    for (const section of ["categories", "query"] as const) {
+      render(
+        <SearchPanel
+          open
+          onOpenChange={() => {}}
+          categories={categories}
+          allFilters={attributeFilters}
+          initialSection={section}
+        />,
+      );
+      vi.advanceTimersByTime(200);
+      const focused = document.activeElement === screen.getByRole("searchbox");
+      expect(focused).toBe(section === "query");
+      cleanup();
+    }
+    vi.useRealTimers();
+  });
+
+  it("viser snarveier i stedet for kategorirutenettet når et nytt søk startes", () => {
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={categories}
+        allFilters={attributeFilters}
+        initialSection="query"
+      />,
+    );
+    expect(screen.queryByText("Bla etter kategori")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Bla i kategorier" }));
+    expect(screen.getByText("Bla etter kategori")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sykkel" })).toBeTruthy();
+  });
+
+  it("lar kategoriskuffen velge underkategori før den lukkes", () => {
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    const withChild = [
+      ...(categories as unknown as object[]),
+      { id: "2", slug: "terrengsykkel", name_nb: "Terrengsykkel", parent_id: "1", sort_order: 1 },
+    ] as never;
+    const onOpenChange = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={onOpenChange}
+        categories={withChild}
+        allFilters={attributeFilters}
+        initialSection="categories"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Terrengsykkel" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sykkel" }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Alt i Sykkel" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Terrengsykkel" }));
+    expect(navigate).toHaveBeenCalledWith(
+      expect.objectContaining({ search: expect.objectContaining({ category: "terrengsykkel" }) }),
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("viser aktive søkeregler ved native-søkefeltet", () => {

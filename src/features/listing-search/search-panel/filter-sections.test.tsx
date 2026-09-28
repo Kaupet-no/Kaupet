@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
 import type { CategoryFilter } from "@/lib/category-filters";
+import { groupFilterRows } from "./filter-rows";
 import { SearchFilterSections } from "./filter-sections";
 
 vi.mock("@/components/ui/native-sheet", () => ({
@@ -182,5 +183,86 @@ describe("SearchFilterSections", () => {
     expect(names.findIndex((name) => name.includes("Karosseri"))).toBeLessThan(
       names.findIndex((name) => name.includes("Drivstoff")),
     );
+  });
+});
+
+describe("filterlisten på telefon", () => {
+  const equipment = (key: string, sort_order: number): CategoryFilter => ({
+    ...fuelFilter,
+    id: key,
+    key,
+    label_nb: key,
+    type: "multiselect",
+    options: Array.from({ length: 8 }, (_, i) => ({ value: `v${i}`, label_nb: `V${i}` })),
+    sort_order,
+    is_primary: false,
+  });
+  const frame: CategoryFilter = {
+    ...fuelFilter,
+    id: "frame",
+    key: "frame",
+    label_nb: "Rammestørrelse",
+    type: "range",
+    options: null,
+    is_primary: false,
+    sort_order: 5,
+  };
+  const hp: CategoryFilter = {
+    ...frame,
+    id: "hp",
+    key: "hp",
+    label_nb: "Hestekrefter",
+    is_primary: true,
+    depends_on_key: "fuel",
+    depends_on_not_value: "electric",
+  };
+
+  it("samler utstyrsgruppene i én rad og viser korte valg som brikker", () => {
+    const rows = groupFilterRows([
+      fuelFilter,
+      equipment("utstyr_lys", 2),
+      frame,
+      equipment("utstyr_dekk", 3),
+    ]);
+    expect(rows.map((row) => (row.kind === "inline" ? row.filter.key : row.label))).toEqual([
+      "fuel",
+      "Utstyr",
+      "Rammestørrelse",
+    ]);
+  });
+
+  function renderWorkspace(values: Record<string, never> | Record<string, unknown> = {}) {
+    return render(
+      <SearchFilterSections
+        layout="workspace"
+        value={{ ...defaultAdvancedSearchValue(), categories: ["mobler"] }}
+        setValue={() => {}}
+        categories={categories}
+        section="categories"
+        attributeFilters={[fuelFilter, hp, frame]}
+        attributeValues={values as never}
+        onAttributeChange={() => {}}
+        attributeCounts={{ fuel: { electric: 0, diesel: 4 } }}
+        categoryNotice={["Farge", "Merke"]}
+      />,
+    );
+  }
+
+  it("viser avhengige filtre først når de gjelder, og fjernede filtre ved navn", () => {
+    const hidden = renderWorkspace({ fuel: { kind: "select", value: "electric" } });
+    expect(hidden.queryByText("Hestekrefter")).toBeNull();
+    expect(hidden.getByRole("status").textContent).toContain("Farge og Merke");
+    cleanup();
+
+    const shown = renderWorkspace({ fuel: { kind: "select", value: "diesel" } });
+    expect(shown.getByText("Hestekrefter")).toBeTruthy();
+  });
+
+  it("gråer ut alternativer uten treff og folder bort tilleggsfiltre", () => {
+    const { getByRole, queryByText } = renderWorkspace();
+    expect((getByRole("button", { name: /Elektrisk/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(queryByText("Rammestørrelse")).toBeNull();
+    fireEvent.click(getByRole("button", { name: "Vis 1 flere filtre" }));
+    expect(queryByText("Rammestørrelse")).toBeTruthy();
   });
 });

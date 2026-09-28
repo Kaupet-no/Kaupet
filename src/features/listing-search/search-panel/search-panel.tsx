@@ -34,6 +34,7 @@ import { CategoryIcon } from "@/lib/category-icons";
 import type { LocationValue } from "@/components/location-filter";
 import {
   effectiveFiltersForCategories,
+  retainSearchAttributes,
   type AttributeFilterValue,
   type CategoryFilter,
 } from "@/lib/category-filters";
@@ -172,18 +173,47 @@ export function SearchPanel({
   const [draft, setDraft] = useState<AppliedSearchState>(() =>
     results ? cloneSearchState(results.applied) : createLaunchState(savedLocation),
   );
-  const setDraftValue = (next: SetStateAction<AdvancedSearchValue>) =>
+  const categoryTree = useMemo(() => buildTree(categories), [categories]);
+  /** Filtrene en kategorimengde har — det samme utvalget skuffen viser. */
+  const filtersForSlugs = (slugs: string[]) =>
+    effectiveFiltersForCategories(
+      slugs.map((slug) => categoryTree.bySlug.get(slug)?.id).filter((id): id is string => !!id),
+      allFilters,
+      categoryTree.byId,
+    );
+  /* Ved kategoribytte beholdes verdier den nye kategorien også har (Farge,
+     Merke, Tilstand-lignende felt); resten faller bort og navngis i skuffen. */
+  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
+  const setDraftValue = (next: SetStateAction<AdvancedSearchValue>) => {
+    // Forhåndsvisning mot gjeldende utkast, kun for å navngi det som faller
+    // bort — selve oppdateringen under går gjennom updater-funksjonen.
+    const preview = typeof next === "function" ? next(draft.value) : next;
+    if (preview.categories.join("\0") !== draft.value.categories.join("\0")) {
+      const { dropped } = retainSearchAttributes(
+        draft.attributes,
+        filtersForSlugs(preview.categories),
+        { dropUnknown: true },
+      );
+      setCategoryNotice([
+        ...new Set(
+          dropped.map((key) => allFilters.find((filter) => filter.key === key)?.label_nb ?? key),
+        ),
+      ]);
+    }
     setDraft((previous) => {
       const value = typeof next === "function" ? next(previous.value) : next;
       if (!results) onSavedLocationChange?.(value.location);
+      if (value.categories.join("\0") === previous.value.categories.join("\0")) {
+        return { value, attributes: previous.attributes };
+      }
       return {
         value,
-        attributes:
-          value.categories.join("\0") === previous.value.categories.join("\0")
-            ? previous.attributes
-            : {},
+        attributes: retainSearchAttributes(previous.attributes, filtersForSlugs(value.categories), {
+          dropUnknown: true,
+        }).kept,
       };
     });
+  };
   // Web og native nettbrett går via ResponsiveOverlay; native telefon får sin
   // egen dratte skuff. Overlayet velger selv skuff (smal) eller dialog (bred).
   const isWeb = formFactor === "web" || formFactor === "desktop" || formFactor === "tablet";
@@ -220,6 +250,7 @@ export function SearchPanel({
       return next;
     });
     setSnap(initialSnap);
+    setCategoryNotice([]);
     setHistory(getSearchHistory());
     // Uten resultatflate bak er fritekst hele poenget — fokuser feltet. Over en
     // resultatliste ville tastaturet dekket akkurat det brukeren skal se. Det
@@ -262,7 +293,6 @@ export function SearchPanel({
      velger du en kategori i skuffen, skal filtrene under den dukke opp med én
      gang. `results.attributeFilters` oppdateres først når utkastet committes —
      det gjorde kategorivelgeren i panelet virkningsløs. */
-  const categoryTree = useMemo(() => buildTree(categories), [categories]);
   const editedCategoryIds = useMemo(
     () =>
       editedState.value.categories
@@ -291,7 +321,11 @@ export function SearchPanel({
       const next = { ...previous.attributes };
       if (value === undefined) delete next[key];
       else next[key] = value;
-      return { ...previous, attributes: next };
+      // Tøm avhengige filtre (Modell uten Merke) i samme omgang.
+      return {
+        ...previous,
+        attributes: retainSearchAttributes(next, draftAttributeFilters).kept,
+      };
     });
   };
 
@@ -705,6 +739,7 @@ export function SearchPanel({
             includePrimary={!!results}
             hideCategory={results?.categoryLocked}
             hideSearchOptions={nativeSearchLayout}
+            categoryNotice={categoryNotice}
           />
         )
       ) : (

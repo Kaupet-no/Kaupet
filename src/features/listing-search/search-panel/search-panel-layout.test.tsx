@@ -140,12 +140,15 @@ describe("SearchPanel filteroppsett", () => {
     expect(sidebar.getByText("Rammestørrelse")).toBeTruthy();
     cleanup();
 
+    // Telefonflaten er én liste uten faner: hovedfiltrene står åpent, resten
+    // bak «Vis flere» — samme rekkefølge som sidekolonnen.
     renderPanel();
+    expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.getByText("Pris (NOK)")).toBeTruthy();
-    expect(screen.getByText("Søket ditt")).toBeTruthy();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Detaljer" }), { button: 0 });
+    expect(screen.getByText("Egenskaper for Sykkel")).toBeTruthy();
     expect(screen.getByText("Merke")).toBeTruthy();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
+    expect(screen.queryByText("Rammestørrelse")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Vis 1 flere filtre/ }));
     expect(screen.getByText("Rammestørrelse")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
   });
@@ -169,8 +172,8 @@ describe("SearchPanel filteroppsett", () => {
     vi.mocked(useFormFactor).mockReturnValue("phone");
     renderPanel();
 
-    expect(screen.getByText("Søket ditt")).toBeTruthy();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
+    expect(screen.getByText("Grunnleggende")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByText("Flere søkevalg")).toBeNull();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
   });
@@ -311,8 +314,8 @@ describe("SearchPanel filteroppsett", () => {
     vi.mocked(useFormFactor).mockReturnValue("tablet");
     renderPanel();
 
-    expect(screen.getByText("Søket ditt")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Basis" })).toBeTruthy();
+    expect(screen.getByText("Grunnleggende")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
     cleanup();
 

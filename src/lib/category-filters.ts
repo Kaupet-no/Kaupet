@@ -188,6 +188,58 @@ export function filterDependencyMet(
 }
 
 /**
+ * Search-side counterpart of `filterDependencyMet`: reads the dependency off
+ * the filter values a search holds instead of a listing's attributes. Modell
+ * (`model_select`) has no explicit dependency row but is meaningless without
+ * a Merke (`brand_select`) value in `filters`, so it counts as dependent too.
+ */
+export function searchFilterDependencyMet(
+  filter: CategoryFilter,
+  values: Record<string, AttributeFilterValue>,
+  filters: CategoryFilter[],
+): boolean {
+  if (filter.type === "model_select") {
+    const brand = filters.find((candidate) => candidate.type === "brand_select");
+    if (brand && !values[brand.key]) return false;
+  }
+  if (!filter.depends_on_key) return true;
+  const parent = values[filter.depends_on_key];
+  const raw =
+    parent && "value" in parent && typeof parent.value !== "object" ? parent.value : undefined;
+  return filterDependencyMet(filter, raw === undefined ? {} : { [filter.depends_on_key]: raw });
+}
+
+/**
+ * Keeps the search filter values that still apply under `filters`. Values
+ * whose dependency no longer holds are dropped until stable, so clearing Merke
+ * also clears Modell. With `dropUnknown`, keys `filters` doesn't define are
+ * dropped too — used when the category changes, so Farge survives a switch
+ * between two categories that both have it while Rammestørrelse does not.
+ */
+export function retainSearchAttributes(
+  values: Record<string, AttributeFilterValue>,
+  filters: CategoryFilter[],
+  { dropUnknown = false }: { dropUnknown?: boolean } = {},
+): { kept: Record<string, AttributeFilterValue>; dropped: string[] } {
+  const byKey = new Map(filters.map((filter) => [filter.key, filter]));
+  const kept = { ...values };
+  const dropped: string[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const key of Object.keys(kept)) {
+      const filter = byKey.get(key);
+      const keep = filter ? searchFilterDependencyMet(filter, kept, filters) : !dropUnknown;
+      if (keep) continue;
+      delete kept[key];
+      dropped.push(key);
+      changed = true;
+    }
+  }
+  return { kept, dropped };
+}
+
+/**
  * Splits an already-resolved filter list into those always shown on the
  * landing/category filter panel vs. those tucked behind "Se flere valg".
  */

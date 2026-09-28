@@ -179,6 +179,30 @@ for fritekstsøk; filterikonet åpner en oversikt over valgt tilstand. En
 detaljkontroll åpnes på egen flate. Ikke legg søketreff, flere dropdown-lister,
 checkboksmatriser eller flere slidere i oversikten samtidig.
 
+### Filterlisten på telefon
+
+Filterarket over resultatene er én liste uten faner. Faner passer desktopens
+sidekolonne, men på telefon skjuler de filtre bak ekstra trykk.
+
+- Rekkefølge: «Grunnleggende» (kategori, sted, pris, tilstand), deretter
+  «Egenskaper for <kategori>». Kategorien står øverst fordi den bestemmer
+  egenskapene under; uten kategori vises en rad som ber om å velge en.
+- Egenskapene følger admin-rekkefølgen (`sort_order`). Rangering etter
+  søketekst (`rankSearchFilters`) brukes bare der plassen er knapp, ikke i
+  listen der alt er synlig — ellers flytter radene seg mellom hver gang.
+- Hovedfiltre (`is_primary`) står åpent; resten ligger bak «Vis N flere
+  filtre», som står åpent så lenge et av dem er aktivt.
+- Ja/nei er en bryter og 2–5 alternativer er brikker direkte i listen;
+  lengre valg og tallområder er en rad med egen underside. Alternativer uten
+  treff gråes ut, de skjules ikke. Kjøretøyets utstyrsgrupper samles i én
+  «Utstyr»-rad.
+- Avhengige filtre (`depends_on_*`, Modell under Merke) vises først når de
+  gjelder, og tømmes når filteret de avhenger av tømmes
+  (`retainSearchAttributes`).
+- Én kategori om gangen på telefon (`CategorySlugPicker single`). Ved
+  kategoribytte beholdes verdier den nye kategorien også har; resten navngis
+  i en statuslinje over egenskapene.
+
 ### Tetthet, rader og handlinger
 
 - Bruk `px-4` (16 px) som horisontal sidemarg på telefon, `gap-6` mellom

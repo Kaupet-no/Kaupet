@@ -321,6 +321,7 @@ export function CategorySlugPicker({
   variant = "select",
   showLabel = true,
   compact = false,
+  single = false,
 }: {
   categories: Category[];
   selected: string[];
@@ -328,6 +329,10 @@ export function CategorySlugPicker({
   variant?: "select" | "icons";
   showLabel?: boolean;
   compact?: boolean;
+  /** Én underkategori om gangen i ikonvarianten. Telefonen bruker dette: med
+   * flere kategorier vises bare filtrene de har felles, og på en liten skjerm
+   * ser det ut som om filtre forsvinner uten grunn. */
+  single?: boolean;
 }) {
   const ALL = "__all__";
   const parents = useMemo(() => categories.filter((c) => c.parent_id == null), [categories]);
@@ -392,6 +397,7 @@ export function CategorySlugPicker({
           selected={selected}
           onChange={onChange}
           compact={compact}
+          single={single}
         />
       ) : (
         <>
@@ -435,11 +441,13 @@ function NativeCategoryDrilldown({
   selected,
   onChange,
   compact,
+  single,
 }: {
   categories: Category[];
   selected: string[];
   onChange: (slugs: string[]) => void;
   compact: boolean;
+  single: boolean;
 }) {
   const [path, setPath] = useState<Category[]>(() => {
     const branch: Category[] = [];
@@ -486,8 +494,14 @@ function NativeCategoryDrilldown({
       setQuery("");
       return;
     }
-    if (isBilOgMc) {
-      onChange(selectedSet.has(category.slug) ? [mainCategory.slug] : [category.slug]);
+    if (isBilOgMc || single) {
+      onChange(
+        selectedSet.has(category.slug)
+          ? mainCategory
+            ? [mainCategory.slug]
+            : []
+          : [category.slug],
+      );
       return;
     }
     const next = new Set(selected.filter((slug) => slug !== mainCategory?.slug));

@@ -29,6 +29,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PlaceholderLine } from "@/components/listing-detail/placeholder-line";
 import {
   CONDITION_LABEL,
   VEHICLE_CONDITION_LABEL_BY_SLUG,
@@ -86,14 +87,6 @@ const ImageLightbox = lazy(() =>
 const MapOverlay = lazy(() =>
   import("@/components/listing-detail/map-overlay").then((m) => ({ default: m.MapOverlay })),
 );
-
-/** Grå strek i stedet for et felt selgeren ikke har fylt ut ennå — kun i
- * telefonrammen i annonseflyten (`phonePreview`). */
-function PlaceholderLine({ className }: { className?: string }) {
-  return (
-    <span aria-hidden className={`block h-2.5 rounded-full bg-foreground/10 ${className ?? ""}`} />
-  );
-}
 
 function StatusBadge({ label }: { label: string }) {
   return (

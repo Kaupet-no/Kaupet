@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+  Bell,
   ChevronRight,
   FlaskConical,
   Heart,
@@ -20,6 +21,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useUnreadNotificationsCount, useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
@@ -78,6 +80,9 @@ function MegPage() {
   const { resolvedTheme, setTheme } = useTheme();
   const callSetTestMode = useServerFn(setTestMode);
   const showDevServerSwitch = useShouldShowDevServerSwitch();
+  // Samme tellinger som badgen på Meg-fanen i bunnmenyen: det den lover må
+  // være synlig straks siden åpnes, ikke gjemt bak klokken i toppraden.
+  const unreadCount = useUnreadNotificationsCount() + useUnreadSystemMessagesCount();
 
   async function handleToggleTest(next: boolean) {
     if (toggling) return;
@@ -142,6 +147,12 @@ function MegPage() {
             Mine ting
           </p>
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <NavRow
+              icon={<Bell className="size-5 text-primary" />}
+              label="Varsler"
+              count={unreadCount}
+              onClick={() => void navigate({ to: "/varsler" })}
+            />
             <NavRow
               icon={<ListChecks className="size-5 text-primary" />}
               label="Mine annonser"
@@ -266,7 +277,7 @@ function MegPage() {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
               <p className="text-sm text-muted-foreground">
-                Som bruker av Kaupet.no er du med på å bygge en litt annerledes markedsplass, uten
+                Som bruker av Kaupet.no er du med på å skape en litt annerledes markedsplass, uten
                 sporingscookies eller eksterne analyseverktøy. Les vår{" "}
                 <Link to="/personvern" className="underline hover:text-foreground">
                   personvernerklæring her
@@ -325,12 +336,14 @@ function NavRow({
   onClick,
   destructive,
   last,
+  count = 0,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   destructive?: boolean;
   last?: boolean;
+  count?: number;
 }) {
   return (
     <button
@@ -348,6 +361,12 @@ function NavRow({
       >
         {label}
       </span>
+      {count > 0 && (
+        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-brand-foreground">
+          {count > 99 ? "99+" : count}
+          <span className="sr-only"> nye</span>
+        </span>
+      )}
       {!destructive && <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />}
     </button>
   );

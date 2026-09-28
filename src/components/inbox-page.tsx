@@ -12,8 +12,6 @@ import {
   BellRing,
   Loader2,
   X,
-  ShieldAlert,
-  ChevronUp,
   Trash2,
   RotateCcw,
 } from "lucide-react";
@@ -30,7 +28,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { isUnread } from "@/lib/unread";
 import { usePushStatus } from "@/hooks/use-push-status";
-import { useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { formatErrorMessage } from "@/lib/errors";
 type ConversationRow = {
   id: string;
@@ -100,26 +97,17 @@ type RawConv = {
   seller?: RawProfile | RawProfile[] | null;
 };
 
-type SystemMessage = {
-  id: string;
-  body: string;
-  created_at: string;
-  read_at: string | null;
-};
-
 export function InboxPage() {
   const native = useIsNative();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [view, setView] = useState<"inbox" | "trash">("inbox");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [systemOpen, setSystemOpen] = useState(true);
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: native,
     onRefresh: async () => {
       await qc.resetQueries({ queryKey: ["my-conversations"] });
-      await qc.resetQueries({ queryKey: ["system-messages"] });
     },
   });
 
@@ -177,32 +165,6 @@ export function InboxPage() {
     },
   });
 
-  const { data: systemMessages } = useQuery({
-    queryKey: ["system-messages", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("system_messages")
-        .select("id, body, created_at, read_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SystemMessage[];
-    },
-  });
-
-  const markReadMut = useMutation({
-    mutationFn: async (id: string) => {
-      await supabase
-        .from("system_messages")
-        .update({ read_at: new Date().toISOString() })
-        .eq("id", id)
-        .is("read_at", null);
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["system-messages"] });
-      void qc.invalidateQueries({ queryKey: ["system-messages-unread"] });
-    },
-  });
   const trashMut = useMutation({
     mutationFn: async ({ row, restore }: { row: ConversationRow; restore: boolean }) => {
       if (!user) throw new Error("Ikke innlogget");
@@ -225,8 +187,6 @@ export function InboxPage() {
     onError: (error: Error) =>
       showErrorToast(formatErrorMessage(error, "Kunne ikke oppdatere samtalen")),
   });
-
-  const unreadSystemCount = useUnreadSystemMessagesCount();
 
   // Bilde-URLer for omslagsbilder
   const imgUrls = useMemo(() => {
@@ -309,47 +269,6 @@ export function InboxPage() {
         <p className="mt-2 text-xs text-muted-foreground">
           Samtaler i papirkurven tømmes automatisk etter 14 dager.
         </p>
-
-        <TabsContent value="inbox">
-          {systemMessages && systemMessages.length > 0 && (
-            <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
-              <button
-                type="button"
-                onClick={() => setSystemOpen((o) => !o)}
-                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <ShieldAlert className="size-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">Kaupet-teamet</p>
-                  <p className="text-xs text-muted-foreground">
-                    {systemMessages.length} {systemMessages.length === 1 ? "melding" : "meldinger"}
-                  </p>
-                </div>
-                {unreadSystemCount > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground">
-                    {unreadSystemCount}
-                  </span>
-                )}
-                {systemOpen ? (
-                  <ChevronUp className="size-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="size-4 text-muted-foreground" />
-                )}
-              </button>
-              {systemOpen && (
-                <ul className="divide-y divide-border border-t border-border">
-                  {systemMessages.map((msg) => (
-                    <li key={msg.id}>
-                      <SystemMessageRow msg={msg} onRead={() => markReadMut.mutate(msg.id)} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </TabsContent>
 
         {view === "inbox" && <PushHintForMessages />}
 
@@ -548,48 +467,6 @@ export function InboxPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function SystemMessageRow({ msg, onRead }: { msg: SystemMessage; onRead: () => void }) {
-  const [open, setOpen] = useState(false);
-
-  const handleOpen = () => {
-    setOpen(true);
-    if (!msg.read_at) onRead();
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className={`flex w-full items-start gap-3 p-3 text-left hover:bg-muted/40 ${!msg.read_at ? "bg-brand/5" : ""}`}
-      >
-        <div className="min-w-0 flex-1 pl-1">
-          <p className={`truncate text-sm ${!msg.read_at ? "font-semibold" : "font-medium"}`}>
-            {msg.body.slice(0, 80)}
-            {msg.body.length > 80 ? "…" : ""}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{formatRelative(msg.created_at)}</p>
-        </div>
-        {!msg.read_at && (
-          <span className="mt-1 size-2 shrink-0 rounded-full bg-brand" aria-label="Ulest" />
-        )}
-      </button>
-      {open && (
-        <div className="border-t border-border bg-muted/30 px-4 py-3">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.body}</p>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="mt-2 text-xs text-muted-foreground underline underline-offset-2"
-          >
-            Skjul
-          </button>
-        </div>
-      )}
-    </>
   );
 }
 

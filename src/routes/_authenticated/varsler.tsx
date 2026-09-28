@@ -6,6 +6,7 @@ import { CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { SystemMessagesCard } from "@/components/system-messages-card";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -73,7 +74,10 @@ function VarslerPage() {
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: native,
-    onRefresh: () => qc.resetQueries({ queryKey: ["notifications-history"] }),
+    onRefresh: async () => {
+      await qc.resetQueries({ queryKey: ["notifications-history"] });
+      await qc.resetQueries({ queryKey: ["system-messages"] });
+    },
   });
 
   const { data, isLoading } = useQuery({
@@ -187,7 +191,7 @@ function VarslerPage() {
               <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine varsler</h1>
             )}
             <p className="mt-1 text-sm text-muted-foreground">
-              Treff i lagrede søk og prisfall på favoritter.
+              Treff i lagrede søk, prisfall på favoritter og meldinger fra Kaupet-teamet.
             </p>
           </div>
           {unread > 0 && (
@@ -196,6 +200,8 @@ function VarslerPage() {
             </Button>
           )}
         </div>
+
+        <SystemMessagesCard className="mt-6" />
 
         <div className="mt-6">
           {isLoading ? (

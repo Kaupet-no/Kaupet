@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   statusCallbacks: [] as ((status: string) => void)[],
   queryCalls: [] as { key: unknown[]; opts: Record<string, unknown> }[],
   routeId: "conv-1",
+  // Overstyrer default-svaret (undefined-data) for en gitt queryKey-prefiks —
+  // brukes av blokkerings-testene under til å sette opp conv/myBlocks/
+  // blocksAgainstMe uten å måtte kjøre de ekte queryFn-ene mot Supabase.
+  queryData: {} as Record<string, unknown>,
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -34,6 +38,10 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] } & Record<string, unknown>) => {
     mocks.queryCalls.push({ key: opts.queryKey, opts });
     if (opts.queryKey[0] === "messages") return { data: [], isLoading: false };
+    const prefix = opts.queryKey[0] as string;
+    if (prefix in mocks.queryData) {
+      return { data: mocks.queryData[prefix], isLoading: false, isError: false, error: null };
+    }
     return { data: undefined, isLoading: false, isError: false, error: null };
   },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -112,6 +120,7 @@ beforeEach(() => {
   mocks.statusCallbacks = [];
   mocks.queryCalls = [];
   mocks.routeId = "conv-1";
+  mocks.queryData = {};
 });
 
 afterEach(() => {
@@ -179,5 +188,71 @@ describe("meldinger.$id — realtime-fallback (F16)", () => {
 
     expect(lastQueryOptsFor("messages")?.refetchInterval).toBe(false);
     expect(lastQueryOptsFor("conversation")?.refetchInterval).toBe(false);
+  });
+});
+
+// Blokkerings-UI (App Store 1.2): komponenten skal vise en tydelig tilstand
+// og deaktivere komposeren når innlogget bruker har blokkert motparten, eller
+// er blokkert av den. useAuth er mocket til user-1, som er buyer_id i
+// conv-fixturen under — otherId blir da seller-1.
+function baseConv(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "conv-1",
+    buyer_id: "user-1",
+    seller_id: "seller-1",
+    listing_id: null,
+    listing: null,
+    isBusinessSeller: false,
+    other: { id: "seller-1", display_name: "Selger", avatar_url: null },
+    otherOrganizationName: null,
+    otherDeleted: false,
+    otherPending: false,
+    buyer_last_read_at: null,
+    seller_last_read_at: null,
+    ...overrides,
+  };
+}
+
+describe("meldinger.$id — blokkeringstilstand", () => {
+  it("deaktiverer komposeren og viser blokkeringsbeskjed når jeg har blokkert motparten", () => {
+    mocks.queryData = {
+      conversation: baseConv(),
+      "my-blocks": [{ scope: "all", blocked_id: "seller-1", conversation_id: null }],
+      "blocks-against-me": [],
+    };
+
+    const { container } = render(<ConversationPage />);
+
+    expect(container.textContent).toContain("Du har blokkert");
+    const textarea = container.querySelector("textarea");
+    expect(textarea?.disabled).toBe(true);
+    expect(textarea?.getAttribute("placeholder")).toBe("Du har blokkert denne samtalen");
+  });
+
+  it("deaktiverer komposeren med en nøytral beskjed når motparten har blokkert meg", () => {
+    mocks.queryData = {
+      conversation: baseConv(),
+      "my-blocks": [],
+      "blocks-against-me": [{ blocker_id: "seller-1", scope: "all", conversation_id: null }],
+    };
+
+    const { container } = render(<ConversationPage />);
+
+    expect(container.textContent).toContain("Du kan ikke sende meldinger i denne samtalen");
+    const textarea = container.querySelector("textarea");
+    expect(textarea?.disabled).toBe(true);
+  });
+
+  it("lar komposeren stå aktiv når ingen av partene har blokkert hverandre", () => {
+    mocks.queryData = {
+      conversation: baseConv(),
+      "my-blocks": [],
+      "blocks-against-me": [],
+    };
+
+    const { container } = render(<ConversationPage />);
+
+    const textarea = container.querySelector("textarea");
+    expect(textarea?.disabled).toBe(false);
   });
 });

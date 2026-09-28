@@ -218,6 +218,73 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
     expect(second.data?.id).toBe(first.data?.id);
   });
 
+  it("stops a blocked pair from messaging in either direction, without affecting unrelated users", async () => {
+    const buyerId = userIds[0]!;
+    const sellerId = userIds[1]!;
+    const outsiderId = userIds[2]!;
+
+    const { data: block, error: blockErr } = await admin
+      .from("user_blocks")
+      .insert({ blocker_id: buyerId, blocked_id: sellerId, scope: "all" })
+      .select("id")
+      .single();
+    expect(blockErr).toBeNull();
+
+    // Blocked party (seller) tries to message the blocker (buyer).
+    const { error: blockedToBlockerErr } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: sellerId,
+      _body: "Forsøk fra blokkert bruker",
+      _attachment_path: null,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(blockedToBlockerErr).not.toBeNull();
+
+    // Blocker (buyer) tries to message the blocked party too — blocking is
+    // bidirectional.
+    const { error: blockerToBlockedErr } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Forsøk fra blokkerende bruker",
+      _attachment_path: null,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(blockerToBlockedErr).not.toBeNull();
+
+    await admin.from("user_blocks").delete().eq("id", block!.id);
+
+    // Unrelated conversation participants are unaffected once the block is
+    // gone — same buyer can message again.
+    const { error: afterUnblockErr } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Fungerer igjen etter oppheving",
+      _attachment_path: null,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(afterUnblockErr).toBeNull();
+
+    // An outsider blocking the seller must not affect the buyer/seller
+    // conversation.
+    const { data: unrelatedBlock, error: unrelatedBlockErr } = await admin
+      .from("user_blocks")
+      .insert({ blocker_id: outsiderId, blocked_id: sellerId, scope: "all" })
+      .select("id")
+      .single();
+    expect(unrelatedBlockErr).toBeNull();
+
+    const { error: stillWorksErr } = await admin.rpc("send_message_rate_limited", {
+      _conversation_id: conversationId,
+      _sender_id: sellerId,
+      _body: "Upåvirket av urelatert blokkering",
+      _attachment_path: null,
+      _client_id: crypto.randomUUID(),
+    });
+    expect(stillWorksErr).toBeNull();
+
+    await admin.from("user_blocks").delete().eq("id", unrelatedBlock!.id);
+  });
+
   // R2-migreringen fjernet storage.objects-eksistenssjekken for
   // meldingsvedlegg (se 20260918220000_r2_storage_objects_validation_fixes.sql)
   // — attachment_path kan ikke lenger verifiseres mot en lagret fil, kun mot

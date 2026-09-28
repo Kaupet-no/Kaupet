@@ -1,12 +1,16 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import type { AttributeMap } from "@/components/attribute-fields";
+import {
+  useTitleCategorySuggestion,
+  type CategorySuggestion,
+} from "@/features/listing-creation/use-title-category-suggestion";
+
+export type { CategorySuggestion };
 
 export const SIMILAR_STOPWORDS = new Set([
   "og",
@@ -72,13 +76,6 @@ export const SIMILAR_STOPWORDS = new Set([
   "pris",
 ]);
 
-export type CategorySuggestion = {
-  category_id: string;
-  parent_id: string | null;
-  name_nb: string;
-  parent_name_nb: string | null;
-};
-
 /**
  * Alt annonseveiviseren utleder fra tittelen mens brukeren skriver: et
  * debouncet kategoriforslag, «lignende annonser finnes allerede»-hint,
@@ -126,38 +123,12 @@ export function useListingTitleHints(params: {
     clientCategoryHint,
   } = params;
 
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
-  const debouncedTitle = useDebouncedValue((title ?? "").trim(), 400);
-
-  const suggestionsMuted = categoryTouchedManually || suggestionDismissed;
-  const {
-    data,
-    isFetching: categorySuggestionLoading,
-    isSuccess: categorySuggestionReady,
-  } = useQuery({
-    queryKey: ["category-suggestion", debouncedTitle],
-    enabled: !suggestionsMuted && debouncedTitle.length >= 5,
-    staleTime: 120_000,
-    queryFn: async (): Promise<CategorySuggestion[]> => {
-      const result = await prefetchCategorySuggestion(debouncedTitle);
-      return result.suggestions;
-    },
-  });
-  // Avledet, ikke egen state: react-query beholder forrige `data` når spørringen
-  // slås av, og et forslag skal forsvinne i samme øyeblikk brukeren velger
-  // kategori selv eller lukker det.
-  const rpcSuggestions = data ?? [];
-  // `clientCategoryHint` er en siste utvei — RPC-ens stemme-/navnetreff får
-  // alltid forrang når de faktisk finner noe (f.eks. "sofa"-treffet mot
-  // kategorinavnet), og brukes kun når RPC-en kommer tilbake tom (f.eks.
-  // «Volvo V70 stasjonsvogn», der verken stemmer eller kategorinavn treffer).
-  const categorySuggestions = suggestionsMuted
-    ? []
-    : rpcSuggestions.length > 0
-      ? rpcSuggestions
-      : categorySuggestionReady && clientCategoryHint
-        ? [clientCategoryHint]
-        : [];
+  const { categorySuggestions, categorySuggestionLoading, setSuggestionDismissed } =
+    useTitleCategorySuggestion({
+      title,
+      muted: categoryTouchedManually,
+      clientCategoryHint,
+    });
 
   /** `suggestedCategoryId` må være en av `categorySuggestions` sine id-er —
    * lar kalleren (category-confirm, eller «Bruk forslag»-chipen i

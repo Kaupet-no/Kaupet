@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -29,6 +29,12 @@ import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { describeAttrValue } from "@/components/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS, type RangeBounds } from "@/lib/filter-range-bounds";
+import {
+  bucketPrices,
+  priceQuickRanges,
+  priceScaleMax,
+  type PriceQuickRange,
+} from "@/lib/price-histogram";
 import { conditionOptionsFor, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
@@ -99,6 +105,11 @@ type Props = {
   initialAttributeKey?: string;
   /** Viser «Avansert søk» nederst i telefonlisten; kallstedet eier regelflaten. */
   onOpenSearchRules?: () => void;
+  /** Priser i søket, for fordelingen og hurtigvalgene i telefonens prisfelt. */
+  priceSample?: number[];
+  /** Meldes når telefonflaten bytter mellom oversikt og ett filter, så
+   * skuffens topp kan vise «Pris» og nullstille bare det filteret. */
+  onViewChange?: (view: { title: string; reset?: () => void } | null) => void;
 };
 
 /**
@@ -131,6 +142,8 @@ export function SearchFilterSections({
   categoryNotice,
   initialAttributeKey,
   onOpenSearchRules,
+  priceSample,
+  onViewChange,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
   const [conditionsOpen, setConditionsOpen] = useState(false);
@@ -258,6 +271,51 @@ export function SearchFilterSections({
     setOverviewOpen(false);
   };
 
+  /* Skuffens topp følger det som vises: «Filtre» i oversikten, filterets navn
+     når ett filter står alene — og «Nullstill» nullstiller da bare det. */
+  const attributeKeysKey = activeAttributeKeys?.join("\0") ?? "";
+  useEffect(() => {
+    if (!onViewChange) return;
+    if (expanded || overviewOpen) {
+      onViewChange(null);
+      return;
+    }
+    const keys = activeAttributeKeys ?? [];
+    const views: Record<SearchFilterSection, { title: string; reset?: () => void }> = {
+      price: {
+        title: "Pris",
+        reset: () => setV((previous) => ({ ...previous, min: null, max: null, includeFree: true })),
+      },
+      location: {
+        title: "Sted",
+        reset: () => onLocationChange({ lat: null, lng: null, radius: 10, label: "" }),
+      },
+      conditions: {
+        title: "Tilstand",
+        reset: () => setV((previous) => ({ ...previous, conditions: [] })),
+      },
+      categories: {
+        title: "Kategori",
+        reset: () => setV((previous) => ({ ...previous, categories: [] })),
+      },
+      attributes: {
+        title:
+          keys.length === 1
+            ? (attributeFilters?.find((filter) => filter.key === keys[0])?.label_nb ?? "Filtre")
+            : keys.length > 1
+              ? EQUIPMENT_GROUP_LABEL
+              : "Filtre",
+        reset: keys.length
+          ? () => keys.forEach((key) => onAttributeChange?.(key, undefined))
+          : undefined,
+      },
+      search: { title: "Søkeregler" },
+    };
+    onViewChange(views[activeSection]);
+    // Bare når visningen skifter; tilbakestillingene leser siste utkast selv.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, overviewOpen, activeSection, attributeKeysKey]);
+
   const overview = (
     <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+var(--safe-bottom))]">
       <div className="mb-5">
@@ -373,7 +431,23 @@ export function SearchFilterSections({
         </section>
       )}
 
-      {showSection("price") && (
+      {showSection("price") && !expanded && (
+        <section data-section="price" className={`${sectionClass} space-y-4`}>
+          {/* I oversikten trenger prisen en egen tittel; alene i skuffen
+              står «Pris» allerede i skuffens topp. */}
+          {overviewOpen && <Label className={labelClass}>Pris</Label>}
+          <NativePriceFields
+            min={v.min}
+            max={v.max}
+            includeFree={v.includeFree}
+            bounds={priceBounds}
+            prices={priceSample}
+            onChange={(patch) => setV((previous) => ({ ...previous, ...patch }))}
+          />
+        </section>
+      )}
+
+      {showSection("price") && expanded && (
         <section data-section="price" className={`${sectionClass} space-y-6`}>
           <div className="space-y-3">
             {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
@@ -1032,6 +1106,107 @@ function InlineChoiceFilter({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Faste hurtigvalg når søket har for få priser til å lage egne. */
+const FALLBACK_PRICE_RANGES: PriceQuickRange[] = [50_000, 100_000, 250_000].map((max) => ({
+  label: `Under ${max.toLocaleString("nb-NO")}`,
+  max,
+}));
+
+/**
+ * Telefonens prisfelt: fordelingen over slideren viser hvor annonsene faktisk
+ * ligger, Fra/Til er presis inntasting, og hurtigvalgene kommer fra prisene i
+ * søket. «Bare gratis» og bryteren for gratisannonser dekker de to vanligste
+ * spørsmålene om gratis.
+ */
+function NativePriceFields({
+  min,
+  max,
+  includeFree,
+  bounds,
+  prices,
+  onChange,
+}: {
+  min: number | null;
+  max: number | null;
+  includeFree: boolean;
+  bounds: RangeBounds;
+  prices?: number[];
+  onChange: (patch: { min?: number | null; max?: number | null; includeFree?: boolean }) => void;
+}) {
+  const scaledBounds = prices?.length
+    ? { ...bounds, max: priceScaleMax(prices, bounds.max, max) }
+    : bounds;
+  const histogram = prices?.length ? bucketPrices(prices, scaledBounds) : undefined;
+  const fromData = prices ? priceQuickRanges(prices) : [];
+  const ranges = (fromData.length ? fromData : FALLBACK_PRICE_RANGES).filter(
+    (range) => (range.max ?? 0) <= bounds.max,
+  );
+  const onlyFree = max === 0 && min == null;
+  const chipClass = (active: boolean) =>
+    `min-h-12 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"
+    }`;
+
+  return (
+    <div className="space-y-4">
+      <RangeFilterField
+        label="Pris"
+        variant="sheet"
+        histogram={histogram}
+        bounds={scaledBounds}
+        inputMax={bounds.max}
+        value={{ min: min ?? undefined, max: onlyFree ? undefined : (max ?? undefined) }}
+        onChange={(next) => onChange({ min: next.min ?? null, max: next.max ?? null })}
+      />
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Raske prisvalg">
+        {ranges.map((range) => {
+          const active = (range.min ?? null) === min && range.max === max;
+          return (
+            <button
+              key={range.label}
+              type="button"
+              aria-pressed={active}
+              disabled={min != null && range.max != null && range.max < min}
+              className={`${chipClass(active)} disabled:opacity-40`}
+              onClick={() => {
+                void hapticImpact("light");
+                onChange(
+                  active
+                    ? { min: null, max: null }
+                    : { min: range.min ?? null, max: range.max ?? null },
+                );
+              }}
+            >
+              {range.label}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-pressed={onlyFree}
+          className={chipClass(onlyFree)}
+          onClick={() => {
+            void hapticImpact("light");
+            onChange(
+              onlyFree ? { min: null, max: null } : { min: null, max: 0, includeFree: true },
+            );
+          }}
+        >
+          Bare gratis
+        </button>
+      </div>
+      <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 text-base">
+        Ta med gratis-annonser
+        <Switch
+          checked={includeFree}
+          disabled={onlyFree}
+          onCheckedChange={(checked) => onChange({ includeFree: checked })}
+        />
+      </label>
     </div>
   );
 }

@@ -83,9 +83,9 @@ function setup(
 
 describe("SearchFilterSections", () => {
   it("opens directly on the requested section and only renders that section", () => {
-    const { getByText, queryByText } = setup("price");
+    const { queryByText } = setup("price");
 
-    expect(getByText("Pris (NOK)")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Fra pris" })).toBeTruthy();
     expect(queryByText("Sted")).toBeNull();
     // Bare tilbakepilen peker til oversikten; selve oversikten er ikke rendret.
     expect(queryByText("Flere muligheter")).toBeNull();
@@ -99,7 +99,7 @@ describe("SearchFilterSections", () => {
 
     expect(getByText("kategorivelger")).toBeTruthy();
     expect(getByRole("heading", { name: "Velg kategori" })).toBeTruthy();
-    expect(queryByText("Pris (NOK)")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Fra pris" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
     expect(getByText("Kategori")).toBeTruthy();
@@ -129,14 +129,14 @@ describe("SearchFilterSections", () => {
   });
 
   it("shows the selected value and opens the concrete primary filter", () => {
-    const { getByText, queryByText } = setup("price");
+    const { getByText } = setup("price");
 
     fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
     expect(getByText("Elektrisk")).toBeTruthy();
     fireEvent.click(getByText("Drivstoff"));
 
     expect(getByText("1 valgt")).toBeTruthy();
-    expect(queryByText("Pris (NOK)")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Fra pris" })).toBeNull();
   });
 
   it("summarizes both extra rules and any-word mode", () => {
@@ -152,17 +152,13 @@ describe("SearchFilterSections", () => {
 
   it("disables price presets below the active minimum", () => {
     const { getByRole } = setup("price", { min: 120_000 });
+    const preset = (name: RegExp) => getByRole("button", { name }) as HTMLButtonElement;
 
-    expect((getByRole("button", { name: /Inntil 50.000/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((getByRole("button", { name: /Inntil 100.000/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((getByRole("button", { name: /Inntil 250.000/ }) as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+    expect(preset(/Under 50.000/).disabled).toBe(true);
+    expect(preset(/Under 100.000/).disabled).toBe(true);
+    expect(preset(/Under 250.000/).disabled).toBe(false);
   });
+
   it("prioriterer filteret som matcher det aktive søket", () => {
     const value = { ...defaultAdvancedSearchValue(), categories: ["mobler"] };
     const { getAllByRole } = render(

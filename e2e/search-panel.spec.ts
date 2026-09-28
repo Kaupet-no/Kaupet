@@ -125,7 +125,7 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await expect(page.getByRole("button", { name: "Bil og MC" })).toBeVisible();
   await page.getByRole("button", { name: "Tilbake til filteroversikt" }).click();
 
-  await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
+  await page.getByRole("switch", { name: "Ta med gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
   await expect(
     page.getByRole("status").filter({ hasText: "Beregner nytt antall treff" }),

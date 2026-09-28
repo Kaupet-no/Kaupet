@@ -70,6 +70,7 @@ import { SearchSuggestionList, type SearchSuggestionGroup } from "../search-sugg
 import { buildActiveFilterItems } from "./active-filter-items";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
+import { usePriceSample } from "@/features/listing-search/use-price-sample";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
 import type { InterpretedCriterion } from "@/features/listing-search/resolve-text-to-filters";
 import { priceBoundsForMax } from "@/lib/filter-range-bounds";
@@ -416,6 +417,14 @@ export function SearchPanel({
   const buttonResultCount = draftChanged
     ? (draftCount.count ?? results?.resultCount)
     : visibleResultCount;
+  // Fordeling og hurtigvalg i telefonens prisfelt.
+  const { data: priceSample } = usePriceSample({
+    draft,
+    categories,
+    enabled: open && !!results && !browserFilterLayout,
+  });
+  /** Filteret som står alene i skuffen, meldt av `SearchFilterSections`. */
+  const [filterView, setFilterView] = useState<{ title: string; reset?: () => void } | null>(null);
   const launchFilterMode = !results && section === "location";
 
   const applyLaunchFilters = async () => {
@@ -572,11 +581,23 @@ export function SearchPanel({
                 </button>
               )}
               <h2 className="font-display text-xl tracking-tight">
-                {section === "search" ? "Søkeregler" : "Filtre"}
+                {section === "search" ? "Søkeregler" : (filterView?.title ?? "Filtre")}
               </h2>
             </div>
             <div className="flex items-center gap-1">
-              {user && section !== "search" ? (
+              {filterView?.reset && section !== "search" ? (
+                /* Ett filter alene: «Nullstill» gjelder bare det filteret. */
+                <button
+                  type="button"
+                  onClick={() => {
+                    void hapticImpact("light");
+                    filterView.reset?.();
+                  }}
+                  className="native-touch-target flex shrink-0 items-center rounded-full px-3 text-sm font-medium text-primary hover:bg-muted"
+                >
+                  Nullstill
+                </button>
+              ) : user && section !== "search" ? (
                 <button
                   type="button"
                   onClick={() => setSaveOpen(true)}
@@ -588,7 +609,7 @@ export function SearchPanel({
               ) : (
                 <span />
               )}
-              {hasDraftCriteria && section !== "search" && (
+              {hasDraftCriteria && section !== "search" && !filterView?.reset && (
                 <button
                   type="button"
                   onClick={() => {
@@ -744,6 +765,8 @@ export function SearchPanel({
           <SearchFilterSections
             key={`${open}-${section}-${initialAttributeKey ?? ""}`}
             initialAttributeKey={initialAttributeKey}
+            priceSample={priceSample}
+            onViewChange={setFilterView}
             onOpenSearchRules={
               nativeSearchLayout && results ? () => setSection("search") : undefined
             }

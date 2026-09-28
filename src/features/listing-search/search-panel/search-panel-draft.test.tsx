@@ -41,6 +41,9 @@ vi.mock("@/lib/vehicle/vehicle-brands", () => ({ useAllVehicleBrands: () => ({ d
 vi.mock("@/features/listing-search/use-draft-result-count", () => ({
   useDraftResultCount: () => ({ count: 7, isPending: false }),
 }));
+vi.mock("@/features/listing-search/use-price-sample", () => ({
+  usePriceSample: () => ({ data: undefined }),
+}));
 vi.mock("@/features/listing-search/submit-search", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/features/listing-search/submit-search")>();
   return {

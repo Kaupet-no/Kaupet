@@ -60,6 +60,9 @@ vi.mock("@/components/ui/native-choice-sheet", () => ({ NativeChoiceSheet: () =>
 vi.mock("@/features/listing-search/use-draft-result-count", () => ({
   useDraftResultCount: () => ({ count: 7, isPending: false }),
 }));
+vi.mock("@/features/listing-search/use-price-sample", () => ({
+  usePriceSample: () => ({ data: undefined }),
+}));
 
 // Radix' størrelsesmåling i jsdom.
 globalThis.ResizeObserver = class {
@@ -144,7 +147,8 @@ describe("SearchPanel filteroppsett", () => {
     // bak «Vis flere» — samme rekkefølge som sidekolonnen.
     renderPanel();
     expect(screen.queryByRole("tab")).toBeNull();
-    expect(screen.getByText("Pris (NOK)")).toBeTruthy();
+    // Telefonens prisfelt har tittelen «Pris» og merkede Fra/Til-felt.
+    expect(screen.getByRole("textbox", { name: "Fra pris" })).toBeTruthy();
     expect(screen.getByText("Egenskaper for Sykkel")).toBeTruthy();
     expect(screen.getByText("Merke")).toBeTruthy();
     expect(screen.queryByText("Rammestørrelse")).toBeNull();

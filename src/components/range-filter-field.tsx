@@ -26,6 +26,9 @@ export function RangeFilterField({
   onChange,
   disabled = false,
   compact = false,
+  variant = "default",
+  histogram,
+  inputMax,
 }: {
   label: string;
   bounds: RangeBounds;
@@ -36,7 +39,17 @@ export function RangeFilterField({
    * sibling toggle is on (e.g. "Tillatt hengervekt" needs "Hengerfeste"). */
   disabled?: boolean;
   compact?: boolean;
+  /** "sheet" er telefonens filterskuff: fordeling og slider øverst, så
+   * Fra/Til som merkede felt. Skuffen har selv tittelen, så ingen etikett-rad. */
+  variant?: "default" | "sheet";
+  /** Antall treff per like bred søyle over `bounds`, vist over slideren. */
+  histogram?: number[];
+  /** Øvre grense for inntasting når slideren viser en kortere skala enn det
+   * som finnes (toppen av slideren betyr da «og mer»). */
+  inputMax?: number;
 }) {
+  const inputBounds =
+    inputMax != null ? { ...bounds, max: Math.max(bounds.max, inputMax) } : bounds;
   const [minDraft, setMinDraft] = useState(value.min != null ? String(value.min) : "");
   const [maxDraft, setMaxDraft] = useState(value.max != null ? String(value.max) : "");
 
@@ -54,8 +67,8 @@ export function RangeFilterField({
   const sliderMax = Math.max(sliderMin, sliderMaxRaw);
 
   const commit = (min: string, max: string) => {
-    const mn = min ? clampToBounds(Number(min), bounds) : undefined;
-    const mx = max ? clampToBounds(Number(max), bounds) : undefined;
+    const mn = min ? clampToBounds(Number(min), inputBounds) : undefined;
+    const mx = max ? clampToBounds(Number(max), inputBounds) : undefined;
     // Swap reversed manual entry rather than silently returning no results.
     if (mn != null && mx != null && mn > mx) {
       setMinDraft(String(mx));
@@ -70,6 +83,79 @@ export function RangeFilterField({
     setMinDraft(mn === bounds.min ? "" : String(mn));
     setMaxDraft(mx === bounds.max ? "" : String(mx));
   };
+
+  const slider = (
+    <RangeSlider
+      min={bounds.min}
+      max={bounds.max}
+      step={bounds.step}
+      value={[sliderMin, sliderMax]}
+      thumbLabels={[`Fra ${label.toLowerCase()}`, `Til ${label.toLowerCase()}`]}
+      onValueChange={onSlide}
+      onValueCommit={([mn, mx]) =>
+        commit(mn === bounds.min ? "" : String(mn), mx === bounds.max ? "" : String(mx))
+      }
+      disabled={disabled}
+    />
+  );
+
+  if (variant === "sheet") {
+    const field = (side: "min" | "max") => {
+      const draft = side === "min" ? minDraft : maxDraft;
+      const setDraft = side === "min" ? setMinDraft : setMaxDraft;
+      const name = side === "min" ? "Fra" : "Til";
+      return (
+        <label className="flex min-h-14 flex-col justify-center rounded-xl border border-border bg-card px-3 py-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
+          <span className="text-xs text-muted-foreground">{name}</span>
+          <span className="flex items-baseline gap-1">
+            <input
+              inputMode="numeric"
+              aria-label={`${name} ${label.toLowerCase()}`}
+              placeholder={side === "min" ? "0" : "Ingen grense"}
+              className="w-full min-w-0 bg-transparent text-base font-medium tabular-nums outline-none placeholder:font-normal placeholder:text-muted-foreground"
+              value={formatThousands(draft, inputBounds.max, bounds.noGrouping)}
+              onChange={(e) => setDraft(digitsOnlyClamped(e.target.value, inputBounds.max))}
+              onBlur={() => commit(minDraft, maxDraft)}
+              onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
+              disabled={disabled}
+            />
+            {bounds.unit && (draft || side === "min") && (
+              <span className="text-base font-medium">{bounds.unit}</span>
+            )}
+          </span>
+        </label>
+      );
+    };
+    const peak = Math.max(1, ...(histogram ?? []));
+    const bucketWidth = histogram?.length ? (bounds.max - bounds.min) / histogram.length : 0;
+    return (
+      <div className="space-y-4">
+        {/* Slideren tar sin egen gest; skuffen skal ikke dras av den. */}
+        <div data-vaul-no-drag className="px-3 pt-2">
+          {histogram && histogram.length > 0 && (
+            <div className="flex h-16 items-end gap-0.5" aria-hidden="true">
+              {histogram.map((count, index) => {
+                const center = bounds.min + bucketWidth * (index + 0.5);
+                const inRange = center >= sliderMin && center <= sliderMax;
+                return (
+                  <span
+                    key={index}
+                    className={`flex-1 rounded-t-sm transition-colors ${inRange ? "bg-primary/80" : "bg-border"}`}
+                    style={{ height: `${Math.max(count ? 8 : 3, (count / peak) * 100)}%` }}
+                  />
+                );
+              })}
+            </div>
+          )}
+          <div className="py-3">{slider}</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {field("min")}
+          {field("max")}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={compact ? "space-y-2" : "space-y-4"}>
@@ -111,20 +197,7 @@ export function RangeFilterField({
           />
         </div>
       </div>
-      <div className={compact ? "px-3 py-1" : "px-3 py-3"}>
-        <RangeSlider
-          min={bounds.min}
-          max={bounds.max}
-          step={bounds.step}
-          value={[sliderMin, sliderMax]}
-          thumbLabels={[`Fra ${label.toLowerCase()}`, `Til ${label.toLowerCase()}`]}
-          onValueChange={onSlide}
-          onValueCommit={([mn, mx]) =>
-            commit(mn === bounds.min ? "" : String(mn), mx === bounds.max ? "" : String(mx))
-          }
-          disabled={disabled}
-        />
-      </div>
+      <div className={compact ? "px-3 py-1" : "px-3 py-3"}>{slider}</div>
     </div>
   );
 }

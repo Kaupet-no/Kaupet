@@ -39,7 +39,7 @@ mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes ti
 
 ## AI-kategoriforslag
 
-Mistral Small 4 krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudflare
+KI-forslagene (Mistral) krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudflare
 Worker-secret. Legg den inn med SOPS (`bun run secrets:edit` og
 `bun run secrets:edit:staging`); aldri legg nøkkelen i `VITE_*` eller klartekst.
 

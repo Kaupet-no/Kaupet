@@ -98,7 +98,8 @@ export function SwipeToDeleteRow({ children, onDelete, deleteLabel = "Slett", cl
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
         style={{ transform: `translateX(${translateX}px)`, touchAction: "pan-y" }}
-        className={dragging ? "" : "transition-transform duration-200"}
+        // Opaque so the delete button behind it stays hidden at rest.
+        className={`relative bg-card ${dragging ? "" : "transition-transform duration-200"}`}
       >
         {children}
       </div>

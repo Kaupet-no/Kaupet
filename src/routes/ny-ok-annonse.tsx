@@ -51,7 +51,6 @@ import {
 } from "@/features/listing-creation/composer-navigation";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
-import { CategorySuggestionChip } from "@/features/listing-creation/category-suggestion-chip";
 import { useTitleCategorySuggestion } from "@/features/listing-creation/use-title-category-suggestion";
 import { useVehicleTitleCategoryHint } from "@/features/listing-creation/use-vehicle-title-category-hint";
 import { useAuth } from "@/hooks/use-auth";
@@ -60,6 +59,7 @@ import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
 import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 export const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
@@ -122,17 +122,14 @@ function capitalizeWord(value: unknown): string | null {
 }
 
 type WtbStep = "category" | "category-confirm" | "title" | "attributes" | "details" | "review";
-// Tittelen kommer før kategorien på begge plattformer: kategoriforslaget
-// bygger på den. Web har tittel og kategori på samme side, native på hvert sitt kort.
-const WEB_STEPS: WtbStep[] = ["category", "attributes", "details", "review"];
-const NATIVE_STEPS: WtbStep[] = ["title", "category", "attributes", "details", "review"];
+// Tittelen får sitt eget steg før kategorien: kategoriforslaget bygger på
+// den, og kategoristeget spør da bare om å bekrefte forslaget.
+const BASE_STEPS: WtbStep[] = ["title", "category", "attributes", "details", "review"];
 
-function stepMeta(step: WtbStep, native: boolean): { title: string; help: string } {
+function stepMeta(step: WtbStep): { title: string; help: string } {
   switch (step) {
     case "category":
-      return native
-        ? { title: "Velg kategori", help: "Velg kategorien som passer best." }
-        : { title: "Hva leter du etter?", help: "Skriv hva du leter etter, og velg kategori." };
+      return { title: "Velg kategori", help: "Kategorien avgjør hvilke annonser som gir treff." };
     case "category-confirm":
       return {
         title: "Bekreft kategori",
@@ -181,7 +178,7 @@ function NewWtbPage() {
   // never lands on it twice. See confirmCategory for where the wizard
   // continues afterwards.
   const [categoryConfirmed, setCategoryConfirmed] = useState(false);
-  const baseSteps = native ? NATIVE_STEPS : WEB_STEPS;
+  const baseSteps = BASE_STEPS;
   const steps = useMemo(() => {
     if (!skipCategoryStep || categoryConfirmed) return baseSteps;
     // "attributes" flyttes ut sammen med "category" og settes inn igjen rett
@@ -223,7 +220,7 @@ function NewWtbPage() {
   const [radiusKm, setRadiusKm] = useState<number | null>(50);
 
   const step = steps[stepIndex];
-  const meta = stepMeta(step, native);
+  const meta = stepMeta(step);
 
   const { data: allCategories = [] } = useCategories();
   const { data: isDemo = false } = useIsDemo();
@@ -249,7 +246,7 @@ function NewWtbPage() {
     trigger,
     control,
     setValue,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, dirtyFields, isSubmitted },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
@@ -266,6 +263,13 @@ function NewWtbPage() {
     name: ["category_id", "title", "description", "max_price_nok", "postal_code"],
   });
   const titleLength = title.length;
+  // Tittelfeltet autofokuseres, så «onTouched» alene ville vist feilen så
+  // snart fokus forsvinner fra et felt brukeren ikke har rørt. Vis den først
+  // når noe er skrevet, eller når brukeren har prøvd å gå videre/publisere.
+  const titleError =
+    errors.title && (dirtyFields.title || validationAttempt > 0 || isSubmitted)
+      ? errors.title
+      : undefined;
   const descriptionLength = (description ?? "").length;
   const validPostalCode = /^\d{4}$/.test(postalCode ?? "") ? postalCode! : "";
   const maxPriceNumber =
@@ -386,9 +390,27 @@ function NewWtbPage() {
     categoriesById,
     bilOgMcCategoryId,
   });
-  const { categorySuggestions, categorySuggestionLoading, setSuggestionDismissed } =
-    useTitleCategorySuggestion({ title, muted: !!categoryId, clientCategoryHint });
-  const topSuggestion = categorySuggestions[0] ?? null;
+  // Finner verken stemmene eller kjøretøyhintet noe, spør vi Mistral — men
+  // først når brukeren står på kategoristeget, ikke mens tittelen skrives.
+  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+  const { categorySuggestions, categorySuggestionPending } = useTitleCategorySuggestion({
+    title,
+    muted: !!categoryId,
+    clientCategoryHint,
+    aiFallback: {
+      enabled: turnstileEnabled && (step === "category" || step === "category-confirm"),
+      getToken: async () => {
+        // Uten token innen rimelig tid viser vi heller velgeren enn å vente.
+        const token = await Promise.race([
+          turnstileRef.current?.getResponsePromise() ?? Promise.resolve(null),
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8_000)),
+        ]).catch(() => null);
+        turnstileRef.current?.reset();
+        return token;
+      },
+    },
+  });
 
   const criteriaSummary = wtbCriteriaSummary(
     effectiveFiltersForCategory(categoryId ?? null, allFilters ?? [], categoriesById),
@@ -469,8 +491,7 @@ function NewWtbPage() {
     returnToReviewRef.current = false;
   }
 
-  /** Tittelen fylles ut på "category" på web og på "title" på native. */
-  const titleStep: WtbStep = native ? "title" : "category";
+  const titleStep: WtbStep = "title";
 
   const detailsFields: (keyof WtbForm)[] = [
     "description",
@@ -502,14 +523,8 @@ function NewWtbPage() {
     }
   }
 
-  function selectCategory(id: string | null) {
-    setValue("category_id", id, { shouldValidate: true });
-    // Web: tittelen står på samme side, så den valideres før vi går videre.
-    void attemptNext();
-  }
-
-  /** Native: tittelen er allerede validert på forrige kort. */
-  function confirmNativeCategory(id: string | null) {
+  /** Kategoristeget: tittelen er allerede validert på forrige steg. */
+  function chooseCategory(id: string | null) {
     setValue("category_id", id, { shouldValidate: true });
     goNext();
   }
@@ -666,40 +681,71 @@ function NewWtbPage() {
     />
   );
 
-  const categoryPicker = (
-    <>
-      {topSuggestion && (
-        <CategorySuggestionChip
-          path={
-            categoryBreadcrumb(topSuggestion.category_id, categoriesById) || topSuggestion.name_nb
-          }
-          onAccept={() =>
-            native
-              ? confirmNativeCategory(topSuggestion.category_id)
-              : selectCategory(topSuggestion.category_id)
-          }
-          onChange={() => setSuggestionDismissed(true)}
-        />
+  /** Kategorivalget på både "category" og "category-confirm": forslaget fra
+   * tittelen som et ja/nei-spørsmål når vi har et, ellers (eller etter «Nei»)
+   * kategorivelgeren. */
+  const onChoose = (id: string | null) =>
+    step === "category-confirm" ? confirmCategory(id) : chooseCategory(id);
+  const categoryChoice = (
+    <section className="space-y-3">
+      {categoryConfirmShowPicker ||
+      (categorySuggestions.length === 0 && !categorySuggestionPending) ? (
+        <>
+          <Label>Velg kategori</Label>
+          <CategoryPicker
+            inline
+            open={false}
+            onOpenChange={() => {}}
+            categories={categories}
+            selectedId={categoryId ?? ""}
+            onSelect={(id) => onChoose(id)}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="min-h-12"
+            onClick={() => onChoose(null)}
+          >
+            Jeg er usikker – fortsett uten kategori
+          </Button>
+        </>
+      ) : categorySuggestions.length === 0 ? (
+        <div className="space-y-4 py-6 text-center" role="status" aria-live="polite" aria-busy>
+          <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
+          <p className="text-sm text-muted-foreground">{CATEGORY_SUGGESTION_LOADING_MESSAGE}</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCategoryConfirmShowPicker(true)}
+          >
+            Velg kategori selv
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4 py-4 text-center">
+          <p className="text-lg font-semibold">
+            {categorySuggestions.length > 1
+              ? `Er kjøpsønsket i kategori ${categorySuggestions.map((s) => s.name_nb).join(" eller ")}?`
+              : `Kjøpsønsket blir opprettet i kategori ${categoryBreadcrumb(categorySuggestions[0].category_id, categoriesById) || categorySuggestions[0].name_nb}. Er det riktig?`}
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {categorySuggestions.map((s) => (
+              <Button key={s.category_id} type="button" onClick={() => onChoose(s.category_id)}>
+                {categorySuggestions.length > 1 ? s.name_nb : "Ja"}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCategoryConfirmShowPicker(true)}
+            >
+              Nei, velg selv
+            </Button>
+          </div>
+        </div>
       )}
-      <Label>Velg kategori</Label>
-      <CategoryPicker
-        inline
-        open={false}
-        onOpenChange={() => {}}
-        categories={categories}
-        selectedId={categoryId ?? ""}
-        onSelect={(id) => (native ? confirmNativeCategory(id) : selectCategory(id))}
-      />
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        className="min-h-12"
-        onClick={() => (native ? confirmNativeCategory(null) : selectCategory(null))}
-      >
-        Jeg er usikker – fortsett uten kategori
-      </Button>
-    </>
+    </section>
   );
 
   const isCategoryConfirmStep = step === "category-confirm";
@@ -721,7 +767,7 @@ function NewWtbPage() {
               : "w-full h-14 text-base lg:h-11 lg:w-auto lg:text-sm"
           }
         >
-          {native || !nextStep ? "Fortsett" : `Neste: ${stepMeta(nextStep, native).title}`}{" "}
+          {native || !nextStep ? "Fortsett" : `Neste: ${stepMeta(nextStep).title}`}{" "}
           <ChevronRight className="size-4" aria-hidden />
         </Button>
       ) : (
@@ -765,17 +811,17 @@ function NewWtbPage() {
         id="title"
         placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
         autoFocus
-        aria-invalid={!!errors.title}
-        aria-describedby={errors.title ? "title-error" : undefined}
+        aria-invalid={!!titleError}
+        aria-describedby={titleError ? "title-error" : undefined}
         {...register("title", {
           // Som før: bare native-kortet regnes som manuell tittel; på web kan
           // kjøretøytittelen fortsatt fylles ut fra årsmodell/merke/modell.
           onChange: native ? () => setTitleManualOverride(true) : undefined,
         })}
       />
-      {errors.title && (
+      {titleError && (
         <p id="title-error" className="text-sm text-destructive">
-          {errors.title.message}
+          {titleError.message}
         </p>
       )}
     </div>
@@ -783,6 +829,14 @@ function NewWtbPage() {
 
   return (
     <>
+      {turnstileEnabled && (
+        // Usynlig; tokenet brukes bare til KI-kategoriforslaget.
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+          options={{ appearance: "interaction-only", action: "kaupet" }}
+        />
+      )}
       <ListingComposerShell
         title="Ønskes kjøpt"
         pageKey={step}
@@ -833,7 +887,7 @@ function NewWtbPage() {
             current={stepIndex + 1}
             total={steps.length}
             label={meta.title}
-            stepLabels={steps.map((s) => stepMeta(s, native).title)}
+            stepLabels={steps.map((s) => stepMeta(s).title)}
             onSelectStep={(target) => goToStep(target - 1)}
           />
         }
@@ -887,80 +941,7 @@ function NewWtbPage() {
           slik at verken Enter i input-felter eller knappe-bytte i footeren kan utløse den. */}
           {step === "title" && <section>{titleField}</section>}
 
-          {step === "category" && (
-            <section className="space-y-3">
-              {!native && titleField}
-              {categoryPicker}
-            </section>
-          )}
-
-          {step === "category-confirm" && (
-            <section className="space-y-3">
-              {categoryConfirmShowPicker ||
-              (categorySuggestions.length === 0 && !categorySuggestionLoading) ? (
-                <>
-                  <Label>Velg kategori</Label>
-                  <CategoryPicker
-                    inline
-                    open={false}
-                    onOpenChange={() => {}}
-                    categories={categories}
-                    selectedId={categoryId ?? ""}
-                    onSelect={(id) => confirmCategory(id)}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-12"
-                    onClick={() => confirmCategory(null)}
-                  >
-                    Jeg er usikker – fortsett uten kategori
-                  </Button>
-                </>
-              ) : categorySuggestions.length === 0 ? (
-                <div className="space-y-4 py-6 text-center">
-                  <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
-                  <p className="text-sm text-muted-foreground">
-                    {CATEGORY_SUGGESTION_LOADING_MESSAGE}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCategoryConfirmShowPicker(true)}
-                  >
-                    Velg kategori selv
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4 py-4 text-center">
-                  <p className="text-lg font-semibold">
-                    {categorySuggestions.length > 1
-                      ? `Er denne annonsen i kategori ${categorySuggestions.map((s) => s.name_nb).join(" eller ")}?`
-                      : `Denne annonsen blir opprettet i kategori ${categoryBreadcrumb(categorySuggestions[0].category_id, categoriesById) || categorySuggestions[0].name_nb}. Er det riktig?`}
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {categorySuggestions.map((s) => (
-                      <Button
-                        key={s.category_id}
-                        type="button"
-                        onClick={() => confirmCategory(s.category_id)}
-                      >
-                        {categorySuggestions.length > 1 ? s.name_nb : "Ja"}
-                      </Button>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setCategoryConfirmShowPicker(true)}
-                    >
-                      Nei
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
+          {(step === "category" || step === "category-confirm") && categoryChoice}
 
           {step === "attributes" && (
             <section className="space-y-4">
@@ -1047,14 +1028,14 @@ function NewWtbPage() {
                       id="title"
                       placeholder="f.eks. 2019 BMW 320d"
                       autoFocus
-                      aria-invalid={!!errors.title}
-                      aria-describedby={errors.title ? "title-error" : undefined}
+                      aria-invalid={!!titleError}
+                      aria-describedby={titleError ? "title-error" : undefined}
                       {...register("title")}
                     />
                   )}
-                  {errors.title && (
+                  {titleError && (
                     <p id="title-error" className="text-sm text-destructive">
-                      {errors.title.message}
+                      {titleError.message}
                     </p>
                   )}
                 </section>

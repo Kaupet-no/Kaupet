@@ -9,13 +9,12 @@ sammen:
 | **Supabase Auth** | Supabase, via Resend SMTP       | Bekreft e-post, tilbakestill passord            | Dashboard per prosjekt + `supabase/templates/` |
 | **Applikasjonen** | Kaupet-workeren, via Resend SDK | Varsler til brukere, interne varsler til Kaupet | `src/lib/email.server.ts`                      |
 
-Forskjellen betyr noe: Supabase eier bekreftelseslenken og tokenet, og bruker
+Supabase eier bekreftelseslenken og tokenet, og bruker
 Resend kun som transport. Applikasjonens e-post går aldri innom Supabase Auth.
 
 Personvernsiden av dette (Resend som databehandler, overføringsgrunnlag,
 lagringstid) er dokumentert i
-[PERSONVERN-BEHANDLINGSPROTOKOLL.md](PERSONVERN-BEHANDLINGSPROTOKOLL.md) § 8 —
-ikke dupliser den her.
+[PERSONVERN-BEHANDLINGSPROTOKOLL.md](PERSONVERN-BEHANDLINGSPROTOKOLL.md) § 8.
 
 ## Felles oppsett
 
@@ -72,7 +71,7 @@ Tilsvarende med `https://kaupet.no/…` i produksjonsprosjektet.
 
 #### Hvorfor `/auth**` og ikke en eksakt URL
 
-Bekreftelseslenken peker ikke lenger på forsiden. `authConfirmationRedirect`
+Bekreftelseslenken peker ikke til forsiden. `authConfirmationRedirect`
 (`src/lib/auth-return.ts`) sender brukeren til
 `https://<origin>/auth?mode=signin&returnTo=<urlenkodet>`, slik at en utlogget
 gjest som fylte ut en annonse kommer tilbake til utkastet sitt etter

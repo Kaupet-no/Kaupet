@@ -138,6 +138,35 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
     expect(messages).toHaveLength(1);
   });
 
+  // Lokale og CI-stacker har ingen push_dispatch_url. Før
+  // 20260928130000_app_settings_url_uten_fallback.sql falt triggerne da
+  // tilbake til https://kaupet.no og postet til produksjonen. Nå skal
+  // utsendelsen i stedet havne i push_dispatch_failures.
+  it("records push dispatch as a failure instead of calling production when push_dispatch_url is unset", async () => {
+    const { data: urlRow } = await admin
+      .from("app_settings")
+      .select("key")
+      .eq("key", "push_dispatch_url")
+      .maybeSingle();
+    expect(urlRow).toBeNull();
+
+    const { data: failures, error } = await admin
+      .from("push_dispatch_failures")
+      .select("id, error")
+      .eq("kind", "conversation_created")
+      .eq("payload->>conversation_id", conversationId);
+    expect(error).toBeNull();
+    expect(failures).toHaveLength(1);
+    expect(failures![0].error).toMatch(/push_dispatch_url/);
+    await admin
+      .from("push_dispatch_failures")
+      .delete()
+      .in(
+        "id",
+        failures!.map((f) => f.id),
+      );
+  });
+
   it("hides the conversation and its messages from an unrelated user", async () => {
     const outsider = await signIn(emails.outsider);
     const { data: convs } = await outsider

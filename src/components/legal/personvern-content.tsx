@@ -298,9 +298,14 @@ export function PersonvernContent() {
         <h2 className="font-display text-2xl">Kategoriforslag</h2>
         <p className="mt-3">
           Når du skriver tittelen på en ny annonse, foreslår Kaupet en kategori ut fra hva andre har
-          valgt for lignende titler. Forslaget lages på Kaupets egne servere, og tittelen sendes
-          ikke til noen andre. Du bekrefter eller endrer alltid kategorien selv før annonsen
-          publiseres.
+          valgt for lignende titler. Forslaget lages på Kaupets egne servere. Du bekrefter eller
+          endrer alltid kategorien selv før annonsen publiseres.
+        </p>
+        <p className="mt-3">
+          Når du lager en ønskes kjøpt-annonse og vi ikke finner en kategori på denne måten, sender
+          vi de <strong>første 100 tegnene av tittelen</strong> til <strong>Mistral AI</strong> for
+          et forslag. Vi sender ikke e-postadressen din, bruker-ID-en din eller andre opplysninger
+          om deg, og Mistral bruker ikke tittelen til å trene KI-modeller.
         </p>
       </section>
 
@@ -498,8 +503,9 @@ export function PersonvernContent() {
             <a href="#bildeforslag" className="text-primary underline underline-offset-2">
               «Forslag fra bildene dine (KI)»
             </a>
-            ). Lagrer forespørselen i inntil 30 dager for å oppdage misbruk, og bruker den ikke til
-            å trene KI-modeller. Du kan lese deres personvernerklæring på{" "}
+            ), og tittelen på en ønskes kjøpt-annonse når vi ikke finner kategori selv (se
+            «Kategoriforslag»). Lagrer forespørselen i inntil 30 dager for å oppdage misbruk, og
+            bruker den ikke til å trene KI-modeller. Du kan lese deres personvernerklæring på{" "}
             <a
               href="https://legal.mistral.ai/terms/privacy-policy"
               target="_blank"

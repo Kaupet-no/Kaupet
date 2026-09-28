@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import Network
 import Capacitor
 import SplashScreenPlugin
 import FirebaseCore
@@ -101,7 +102,15 @@ private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
 @objc(KaupetBridgeViewController)
 final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
     private static let documentReadyHandler = "kaupetDocumentReady"
+    private static let documentStartHandler = "kaupetDocumentStart"
     private var messageHandler: WeakScriptMessageHandler?
+
+    // Samme 7-sekundersvakt som MainActivity.showOfflinePage() — se
+    // begrunnelsen og ponytail-avgrensningene der.
+    private static let offlineAfter: TimeInterval = 7
+    private var loadTimeout: DispatchWorkItem?
+    private var offlineTimeout: DispatchWorkItem?
+    private let pathMonitor = NWPathMonitor()
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -128,6 +137,23 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
         ))
+        // Tilsvarer Androids onPageCommitVisible: serveren har svart. Ikke
+        // documentReady — den venter på modulskriptene, som kan bruke over
+        // 7 s på tregt nett selv om kaupet.no svarer fint.
+        contentController?.add(handler, name: Self.documentStartHandler)
+        contentController?.addUserScript(WKUserScript(
+            source: "window.webkit.messageHandlers.\(Self.documentStartHandler).postMessage(null)",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+
+        loadTimeout = scheduleOfflinePage()
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            self.offlineTimeout?.cancel()
+            self.offlineTimeout = path.status == .satisfied ? nil : self.scheduleOfflinePage()
+        }
+        pathMonitor.start(queue: .main)
 
 #if DEBUG
         assert(Self.hasSameOrigin(URL(string: "https://kaupet.no")!, URL(string: "https://kaupet.no:443/path")!))
@@ -152,10 +178,33 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
     }
 
     deinit {
+        pathMonitor.cancel()
+        loadTimeout?.cancel()
+        offlineTimeout?.cancel()
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.documentReadyHandler)
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.documentStartHandler)
+    }
+
+    private func scheduleOfflinePage() -> DispatchWorkItem {
+        let item = DispatchWorkItem { [weak self] in self?.showOfflinePage() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.offlineAfter, execute: item)
+        return item
+    }
+
+    private func showOfflinePage() {
+        guard let webView, let errorURL = bridge?.config.errorPathURL, let localURL = bridge?.config.localURL else { return }
+        // Allerede på en lokal shell-side (offline-siden selv, eller
+        // staging-velgeren) — der er ingen app-tilstand å redde.
+        if let current = webView.url, Self.hasSameOrigin(current, localURL) { return }
+        webView.stopLoading()
+        webView.load(URLRequest(url: errorURL))
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == Self.documentStartHandler {
+            loadTimeout?.cancel()
+            return
+        }
         guard
             message.name == Self.documentReadyHandler,
             let href = message.body as? String,
@@ -169,6 +218,12 @@ final class KaupetBridgeViewController: CAPBridgeViewController, WKScriptMessage
         }
 
         hideSplashScreen()
+
+        // offline.html kjenner ikke app-URL-en, og location.reload() der
+        // laster bare offline-siden på nytt — se injectAppUrl i MainActivity.
+        if let appURLString = try? String(data: JSONEncoder().encode(appURL.absoluteString), encoding: .utf8) {
+            webView?.evaluateJavaScript("window.__kaupetAppUrl = \(appURLString);", completionHandler: nil)
+        }
 
 #if DEBUG
         // If a server target is stored, instanceDescriptor() above pointed the

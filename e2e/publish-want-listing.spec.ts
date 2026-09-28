@@ -12,6 +12,7 @@ import {
 } from "./pages/listing-wizard";
 import {
   advanceWantStep,
+  openWantCategoryPicker,
   publishWantAndExpectSuccess,
   startWantWithoutCategory,
 } from "./pages/want-listing-wizard";
@@ -69,16 +70,14 @@ test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, test
 
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page);
-  // Uten tittel stopper flyten på samme side som tittelfeltet, med årsaken
-  // både ved feltet og i feiloppsummeringen — ikke først på neste steg.
-  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
-  await expect(composerPage(page, "category")).toBeVisible();
+  // Uten tittel stopper flyten på tittelsteget, med årsaken både ved feltet
+  // og i feiloppsummeringen — ikke først på neste steg.
+  await page.getByRole("button", { name: /^Neste:/ }).click();
+  await expect(composerPage(page, "title")).toBeVisible();
   await expect(page.getByText("Rett feltene som er markert før du fortsetter.")).toBeVisible();
   await expect(page.getByText("Tittelen må være minst 3 tegn")).toBeVisible();
 
-  await page.getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
-  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
-  await composerPage(page, "attributes").waitFor();
+  await startWantWithoutCategory(page, "E2E ønsker å kjøpe barnestol");
 });
 
 test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, testInfo) => {
@@ -94,10 +93,7 @@ test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, t
   await expect(page.getByText("Rett feltene som er markert før du fortsetter.")).toBeVisible();
   await expect(composerPage(page, "title")).toBeVisible();
 
-  await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
-  await advanceWantStep(page, "category");
-  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
-  await composerPage(page, "attributes").waitFor();
+  await startWantWithoutCategory(page, "E2E ønsker å kjøpe barnestol");
   await advanceWantStep(page, "details");
   await advanceWantStep(page, "review");
 });
@@ -108,7 +104,9 @@ test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testI
 
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page);
-  await page.getByLabel("Tittel").fill("E2E ønsker treffsjekk");
+  await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker treffsjekk");
+  await advanceWantStep(page, "category");
+  await openWantCategoryPicker(page);
   await chooseCategory(page, TEST_CATEGORY_NAME);
   await composerPage(page, "attributes").waitFor();
 

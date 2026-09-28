@@ -9,7 +9,9 @@ nedenfor) gjelder den mest spesifikke instruksen.
 1. Les denne filen. Detaljerte, emnespesifikke regler ligger i dokumentene
    det lenkes til nedenfor: [ARCHITECTURE.md](docs/ARCHITECTURE.md) for
    systemgrenser og arkitektur, [UI-GUIDE.md](docs/UI-GUIDE.md) for
-   frontend/native UI, [STAGING.md](docs/STAGING.md) for miljø og testing,
+   frontend/native UI, [INFRASTRUKTUR.md](docs/INFRASTRUKTUR.md) for
+   miljøer, tjenester, jobber og hemmeligheter,
+   [STAGING.md](docs/STAGING.md) for staging-miljøet og testing,
    [EPOST.md](docs/EPOST.md) for e-post og Supabase Auth-oppsett,
    [src/routes/README.md](src/routes/README.md) for routing, og
    [CONTRIBUTING.md](CONTRIBUTING.md) for bidrags- og commit-praksis.

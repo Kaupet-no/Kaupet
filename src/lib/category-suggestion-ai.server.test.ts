@@ -81,7 +81,7 @@ afterEach(() => {
 });
 
 describe("suggestCategoryForTitleAi", () => {
-  it("calls Mistral Small 4 without reasoning and maps returned slugs", async () => {
+  it("calls Ministral 3 3B without reasoning_effort and maps returned slugs", async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({ choices: [{ message: { content: '{"categories":["bil"]}' } }] }),
@@ -103,8 +103,7 @@ describe("suggestCategoryForTitleAi", () => {
     const body = JSON.parse(request.body as string);
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.eu.mistral.ai/v1/chat/completions");
     expect(body).toMatchObject({
-      model: "mistral-small-2603",
-      reasoning_effort: "none",
+      model: "ministral-3b-2512",
       temperature: 0,
       max_tokens: 32,
       response_format: {
@@ -112,6 +111,8 @@ describe("suggestCategoryForTitleAi", () => {
         json_schema: { name: "category_suggestion", strict: true },
       },
     });
+    // Ministral svarer 400 på reasoning_effort.
+    expect(body).not.toHaveProperty("reasoning_effort");
     expect(body.messages[0].content).toContain("[bil]");
   });
 

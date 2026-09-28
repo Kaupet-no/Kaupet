@@ -14,6 +14,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   initialSection: SearchPanelSection;
   initialQuery?: string;
+  initialAttributeKey?: string;
   results?: SearchPanelResultsContext;
   savedLocation: LocationValue;
   onSavedLocationChange: (location: LocationValue) => void;

@@ -131,10 +131,10 @@ describe("ResultList – visningsvalg på native", () => {
       <ResultList {...baseProps} isNative q="" effectiveCategories={[]} resetFilters={vi.fn()} />,
     );
 
-    fireEvent.click(getByRole("button", { name: "Fliser" }));
+    fireEvent.click(getByRole("button", { name: "Visning: Fliser" }));
     for (const name of ["Fliser", "Liste", "Kort"]) await findByRole("option", { name });
     fireEvent.click(await findByRole("option", { name: "Bilder" }));
 
-    expect(getByRole("button", { name: "Bilder" })).toBeTruthy();
+    expect(getByRole("button", { name: "Visning: Bilder" })).toBeTruthy();
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -87,20 +87,21 @@ describe("SearchFilterSections", () => {
 
     expect(getByText("Pris (NOK)")).toBeTruthy();
     expect(queryByText("Sted")).toBeNull();
-    expect(queryByText("Alle filtre")).toBeNull();
+    // Bare tilbakepilen peker til oversikten; selve oversikten er ikke rendret.
+    expect(queryByText("Flere muligheter")).toBeNull();
   });
 
   it("viser kategori i samme panel og går tilbake til filteroversikten", () => {
     const { getByText, getByRole, queryByText } = setup("price");
 
-    fireEvent.click(getByText("Tilbake til filteroversikt"));
+    fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
     fireEvent.click(getByText("Kategori"));
 
     expect(getByText("kategorivelger")).toBeTruthy();
     expect(getByRole("heading", { name: "Velg kategori" })).toBeTruthy();
     expect(queryByText("Pris (NOK)")).toBeNull();
 
-    fireEvent.click(getByRole("button", { name: "Tilbake til filteroversikt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
     expect(getByText("Kategori")).toBeTruthy();
     expect(queryByText("kategorivelger")).toBeNull();
   });
@@ -130,7 +131,7 @@ describe("SearchFilterSections", () => {
   it("shows the selected value and opens the concrete primary filter", () => {
     const { getByText, queryByText } = setup("price");
 
-    fireEvent.click(getByText("Tilbake til filteroversikt"));
+    fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
     expect(getByText("Elektrisk")).toBeTruthy();
     fireEvent.click(getByText("Drivstoff"));
 
@@ -144,7 +145,7 @@ describe("SearchFilterSections", () => {
       extraGroups: [{ id: "rule", mode: "all", exclude: false, terms: ["hybrid"] }],
     });
 
-    fireEvent.click(getByText("Tilbake til filteroversikt"));
+    fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
 
     expect(getByText("1 regel · Minst ett ord")).toBeTruthy();
   });
@@ -164,7 +165,7 @@ describe("SearchFilterSections", () => {
   });
   it("prioriterer filteret som matcher det aktive søket", () => {
     const value = { ...defaultAdvancedSearchValue(), categories: ["mobler"] };
-    const { getByText, getAllByRole } = render(
+    const { getAllByRole } = render(
       <SearchFilterSections
         value={value}
         setValue={() => {}}
@@ -178,7 +179,7 @@ describe("SearchFilterSections", () => {
       />,
     );
 
-    fireEvent.click(getByText("Tilbake til filteroversikt"));
+    fireEvent.click(screen.getByRole("button", { name: "Tilbake til filteroversikt" }));
     const names = getAllByRole("button").map((button) => button.textContent ?? "");
     expect(names.findIndex((name) => name.includes("Karosseri"))).toBeLessThan(
       names.findIndex((name) => name.includes("Drivstoff")),

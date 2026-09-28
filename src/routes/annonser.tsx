@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderOpen, Save, X } from "lucide-react";
+import { Bell, FolderOpen, Save, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
@@ -14,6 +14,7 @@ import { SearchResultsBody } from "@/features/listing-search/search-panel/search
 import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
+import { SearchFilterChipRow } from "@/features/listing-search/search-panel/search-filter-chip-row";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -201,6 +202,13 @@ function BrowsePage() {
     () => (hero ? breadcrumbPath(hero.main, categoryTree) : []),
     [hero, categoryTree],
   );
+  const categoryTokenLabel = useMemo(() => {
+    const names = effectiveCategories
+      .map((slug: string) => categoryTree.bySlug.get(slug)?.name_nb)
+      .filter((name: string | undefined): name is string => !!name);
+    if (names.length === 0) return null;
+    return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+  }, [effectiveCategories, categoryTree]);
   const interpretedKeys = useMemo(
     () =>
       new Set(
@@ -462,7 +470,8 @@ function BrowsePage() {
             brukeren er. Rendres i samme slot som "Annonser"-tittelen (i stedet
             for som en egen rad over) så valg av hovedkategori ikke skyver
             resten av siden nedover. */}
-        {hero ? (
+        {/* Native viser kategorien som en brikke i søkefeltet i stedet. */}
+        {hero && !isNative ? (
           <CategoryBreadcrumb
             breadcrumbEntries={heroBreadcrumb}
             extraSegments={heroExtraSegments}
@@ -482,19 +491,20 @@ function BrowsePage() {
                 <SearchSummaryPill
                   q={qDraft}
                   filterCount={ordinaryFilterCount}
-                  searchRuleCount={hasExtraSearchRules ? 1 : 0}
                   onQChange={(q) => {
                     setInterpretedCriteria([]);
                     setIgnoredInterpretations(new Set());
                     setQDraft(q);
                   }}
                   onSubmitQ={submitQuery}
-                  onOpenRules={() => {
-                    openPanel("search");
-                  }}
-                  onOpenFilters={() => {
-                    openPanel("categories");
-                  }}
+                  categoryToken={
+                    categoryTokenLabel
+                      ? {
+                          label: categoryTokenLabel,
+                          onRemove: () => updateSearch({ category: "", categories: [] }),
+                        }
+                      : undefined
+                  }
                 />
               ) : (
                 <>
@@ -536,6 +546,22 @@ function BrowsePage() {
             </div>
           </div>
         </div>
+        {isNative && (
+          <SearchFilterChipRow
+            min={search.min}
+            max={search.max}
+            includeFree={search.includeFree}
+            conditions={search.conditions ?? []}
+            categorySlugs={effectiveCategories}
+            location={location}
+            sort={search.sort}
+            onSortChange={(sort) => updateSearch({ sort })}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            queryText={qDraft}
+            filterCount={ordinaryFilterCount}
+          />
+        )}
         {interpretedCriteria.length > 0 && (
           <div className="rounded-lg border border-border/70 bg-card/50 px-3 py-2">
             <SearchInterpretation
@@ -747,19 +773,22 @@ function BrowsePage() {
                 }
                 sort={search.sort}
                 onSortChange={(s) => updateSearch({ sort: s })}
-                // Native (fase 12): "Lagre søk" flyttet inn i søkepanelet.
+                // Native har sorteringen i brikkeraden.
+                hideSort={isNative}
                 toolbarLead={mobileFilterButton}
                 toolbarExtra={
-                  // Desktop har «Lagre søk» nederst i filterkolonnen.
-                  user && !isNative && !isDesktop && hasSearchCriteria ? (
+                  // Desktop har «Lagre søk» nederst i filterkolonnen. Ellers
+                  // står det ved antall treff, der interessen for søket oppstår.
+                  user && !isDesktop && hasSearchCriteria ? (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant={isNative ? "secondary" : "outline"}
                       size="sm"
                       onClick={() => setSaveSearchOpen(true)}
-                      className="gap-1.5"
+                      className={isNative ? "gap-1.5 rounded-full text-primary" : "gap-1.5"}
                     >
-                      <Save className="size-4" /> Lagre søk
+                      {isNative ? <Bell className="size-4" /> : <Save className="size-4" />} Lagre
+                      søk
                     </Button>
                   ) : undefined
                 }

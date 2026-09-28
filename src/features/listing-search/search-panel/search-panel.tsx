@@ -128,6 +128,8 @@ type Props = {
   /** Fanen panelet åpner på — lar sammendrag-pillen hoppe rett til Pris/Sted. */
   initialSection?: SearchPanelSection;
   initialQuery?: string;
+  /** Kategorifilteret panelet åpner på, når `initialSection` er «attributes». */
+  initialAttributeKey?: string;
   results?: SearchPanelResultsContext;
   savedLocation?: LocationValue;
   onSavedLocationChange?: (location: LocationValue) => void;
@@ -150,6 +152,7 @@ export function SearchPanel({
   allFilters,
   initialSection = "query",
   initialQuery,
+  initialAttributeKey,
   results,
   savedLocation,
   onSavedLocationChange,
@@ -168,7 +171,18 @@ export function SearchPanel({
   );
   const [rulesOpen, setRulesOpen] = useState(initialSection === "search");
   // Kategorivalget skal vise alle kategorier straks — åpnes i fullhøyde.
-  const initialSnap = results || initialSection === "categories" ? 1 : SNAP_POINTS[0];
+  // Et enkelt filter fra brikkeraden åpnes i halv høyde, så resultatene synes
+  // bak; sted trenger tastaturet og får full høyde som resten.
+  const singleFilterSection =
+    initialSection === "price" ||
+    initialSection === "conditions" ||
+    initialSection === "attributes";
+  const initialSnap =
+    results && singleFilterSection
+      ? SNAP_POINTS[0]
+      : results || initialSection === "categories"
+        ? 1
+        : SNAP_POINTS[0];
   const [snap, setSnap] = useState<number | string | null>(initialSnap);
   const [draft, setDraft] = useState<AppliedSearchState>(() =>
     results ? cloneSearchState(results.applied) : createLaunchState(savedLocation),
@@ -546,9 +560,21 @@ export function SearchPanel({
            «Lagre søk», så denne raden er bare for skuffen. */
         !browserFilterLayout && (
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-            <h2 className="font-display text-xl tracking-tight">
-              {section === "search" ? "Søkeregler" : "Filtre"}
-            </h2>
+            <div className="flex min-w-0 items-center gap-1">
+              {section === "search" && nativeSearchLayout && (
+                <button
+                  type="button"
+                  onClick={() => setSection("categories")}
+                  className="native-touch-target -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+                  aria-label="Tilbake til filtre"
+                >
+                  <ChevronLeft className="size-5" aria-hidden />
+                </button>
+              )}
+              <h2 className="font-display text-xl tracking-tight">
+                {section === "search" ? "Søkeregler" : "Filtre"}
+              </h2>
+            </div>
             <div className="flex items-center gap-1">
               {user && section !== "search" ? (
                 <button
@@ -716,7 +742,11 @@ export function SearchPanel({
           </div>
         ) : (
           <SearchFilterSections
-            key={`${open}-${section}`}
+            key={`${open}-${section}-${initialAttributeKey ?? ""}`}
+            initialAttributeKey={initialAttributeKey}
+            onOpenSearchRules={
+              nativeSearchLayout && results ? () => setSection("search") : undefined
+            }
             layout={results ? "workspace" : "drilldown"}
             value={draft.value}
             categories={categories}

@@ -1,4 +1,4 @@
-import { Search as SearchIcon, SlidersHorizontal, Waypoints } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Waypoints, X } from "lucide-react";
 import { hapticImpact } from "@/lib/haptics";
 
 type Props = {
@@ -10,7 +10,12 @@ type Props = {
   onQChange: (q: string) => void;
   onSubmitQ: () => void;
   onOpenRules?: () => void;
-  onOpenFilters: () => void;
+  /** Utelates der brikkeraden under feltet har «Filtre»-inngangen. */
+  onOpenFilters?: () => void;
+  /** Kategorien søket er avgrenset til, vist som en brikke i feltet. Et
+   * søkeord som ble tolket til kategori («sykkel») forsvinner da ikke
+   * sporløst, og X fjerner avgrensningen. */
+  categoryToken?: { label: string; onRemove: () => void };
 };
 
 /** Kompakt native søkefelt med separate regel- og filterhandlinger. */
@@ -22,6 +27,7 @@ export function SearchSummaryPill({
   onSubmitQ,
   onOpenRules,
   onOpenFilters,
+  categoryToken,
 }: Props) {
   const filterText = `${filterCount} ${filterCount === 1 ? "filter" : "filtre"}`;
   return (
@@ -37,13 +43,29 @@ export function SearchSummaryPill({
         className="flex min-w-0 flex-1 items-center gap-2 rounded-full pl-4 pr-2 focus-within:ring-2 focus-within:ring-ring"
       >
         <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        {categoryToken && (
+          <span className="flex max-w-[45%] shrink-0 items-center gap-0.5 rounded-full bg-primary py-0.5 pl-2.5 text-sm font-medium text-primary-foreground">
+            <span className="truncate">{categoryToken.label}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void hapticImpact("light");
+                categoryToken.onRemove();
+              }}
+              aria-label={`Fjern kategorien ${categoryToken.label}`}
+              className="native-hit-area flex size-6 shrink-0 items-center justify-center rounded-full"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </span>
+        )}
         <input
           name="q"
           type="search"
           enterKeyHint="search"
           value={q}
           onChange={(e) => onQChange(e.target.value)}
-          placeholder="Søk i annonser"
+          placeholder={categoryToken ? `Søk i ${categoryToken.label}` : "Søk i annonser"}
           aria-label="Søk i annonser"
           className="native-touch-target min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
         />
@@ -65,21 +87,23 @@ export function SearchSummaryPill({
           <Waypoints className="size-4" aria-hidden="true" />
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => {
-          void hapticImpact("light");
-          onOpenFilters();
-        }}
-        aria-label={filterCount > 0 ? `Filtrer, ${filterText} aktive` : "Filtrer"}
-        className={`native-touch-target ml-1 flex size-12 shrink-0 items-center justify-center rounded-full border outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-          filterCount > 0
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-border text-primary"
-        }`}
-      >
-        <SlidersHorizontal className="size-4" aria-hidden="true" />
-      </button>
+      {onOpenFilters && (
+        <button
+          type="button"
+          onClick={() => {
+            void hapticImpact("light");
+            onOpenFilters();
+          }}
+          aria-label={filterCount > 0 ? `Filtrer, ${filterText} aktive` : "Filtrer"}
+          className={`native-touch-target ml-1 flex size-12 shrink-0 items-center justify-center rounded-full border outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            filterCount > 0
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border text-primary"
+          }`}
+        >
+          <SlidersHorizontal className="size-4" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

@@ -84,6 +84,8 @@ type Props = {
    * er den viktigste kontrollen på en smal skjerm og skal ikke kunne skyves
    * utenfor kanten av visningsvalg/sortering/kart, som `toolbarExtra` gjør. */
   toolbarLead?: ReactNode;
+  /** Native resultatflater med brikkerad har sorteringen der i stedet. */
+  hideSort?: boolean;
 };
 
 /**
@@ -119,6 +121,7 @@ export function ResultList({
   onSortChange,
   toolbarExtra,
   toolbarLead,
+  hideSort = false,
 }: Props) {
   const formFactor = useFormFactor();
   const nativePhone = isNative && formFactor === "phone";
@@ -237,15 +240,17 @@ export function ResultList({
         <div className="flex items-center gap-2">
           {isNative ? (
             <>
+              {toolbarExtra}
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 shadow-none"
+                variant="ghost"
+                size="icon"
+                className="native-touch-target size-9 shadow-none"
                 aria-expanded={viewModeOpen}
+                aria-label={`Visning: ${viewModeLabel}`}
                 onClick={() => setViewModeOpen(true)}
               >
-                <ViewModeIcon className="size-4" /> {viewModeLabel}
+                <ViewModeIcon className="size-5" />
               </Button>
               <NativeChoiceSheet
                 open={viewModeOpen}
@@ -263,16 +268,18 @@ export function ResultList({
                   setViewModeOpen(false);
                 }}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 shadow-none"
-                aria-expanded={sortOpen}
-                onClick={() => setSortOpen(true)}
-              >
-                <ArrowUpDown className="size-4" /> {sortLabel}
-              </Button>
+              {!hideSort && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 shadow-none"
+                  aria-expanded={sortOpen}
+                  onClick={() => setSortOpen(true)}
+                >
+                  <ArrowUpDown className="size-4" /> {sortLabel}
+                </Button>
+              )}
               <NativeChoiceSheet
                 open={sortOpen}
                 onOpenChange={setSortOpen}
@@ -376,7 +383,7 @@ export function ResultList({
               <MapIcon className="size-4" /> {desktopMapVisible ? "Skjul kart" : "Vis kart"}
             </Button>
           )}
-          {toolbarExtra}
+          {!isNative && toolbarExtra}
         </div>
       </div>
 

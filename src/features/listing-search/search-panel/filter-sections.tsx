@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ChevronLeft,
   ChevronRight,
   Eye,
   EyeOff,
@@ -46,7 +47,8 @@ import { EQUIPMENT_GROUP_LABEL, groupFilterRows } from "./filter-rows";
 
 /** Section keys, kept from the old tab strip (fase 9) — now scroll targets
  * inside one continuous list instead of separate tab panels (fase 12). */
-export type SearchFilterSection = "search" | "categories" | "price" | "location" | "attributes";
+export type SearchFilterSection =
+  "search" | "categories" | "price" | "location" | "conditions" | "attributes";
 
 type Props = {
   value: AdvancedSearchValue;
@@ -93,6 +95,10 @@ type Props = {
    * statuslinje over kategoriens egenskaper, så bortfallet ikke skjer i det
    * stille utenfor skjermen. */
   categoryNotice?: string[];
+  /** Kategorifilteret som åpnes direkte når `section` er «attributes». */
+  initialAttributeKey?: string;
+  /** Viser «Avansert søk» nederst i telefonlisten; kallstedet eier regelflaten. */
+  onOpenSearchRules?: () => void;
 };
 
 /**
@@ -123,15 +129,25 @@ export function SearchFilterSections({
   activeItems,
   hideSearchOptions = false,
   categoryNotice,
+  initialAttributeKey,
+  onOpenSearchRules,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
   const [conditionsOpen, setConditionsOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
+  // Arbeidsflaten åpner på oversikten, med mindre brikkeraden ba om ett filter.
   const [overviewOpen, setOverviewOpen] = useState(
-    layout === "workspace" || section === "categories",
+    section === "categories" ||
+      (layout === "workspace" &&
+        section !== "price" &&
+        section !== "location" &&
+        section !== "conditions" &&
+        section !== "attributes"),
   );
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
-  const [activeAttributeKeys, setActiveAttributeKeys] = useState<string[] | null>(null);
+  const [activeAttributeKeys, setActiveAttributeKeys] = useState<string[] | null>(
+    initialAttributeKey ? [initialAttributeKey] : null,
+  );
   const [showAllAttributes, setShowAllAttributes] = useState(false);
   // Sidekolonnen: alltid åpen så lenge ingen kategori er valgt (også etter
   // «Nullstill»), ellers bare når brukeren selv har trykket «Endre».
@@ -804,6 +820,24 @@ export function SearchFilterSections({
           )}
         </section>
       )}
+
+      {onOpenSearchRules && (
+        <section aria-labelledby="filter-advanced-heading" className="mt-8">
+          <h3 id="filter-advanced-heading" className="font-display text-lg tracking-tight">
+            Avansert søk
+          </h3>
+          <FilterOverviewRow
+            label="Søkeregler"
+            value={advancedSearchSummary || "Av"}
+            onClick={onOpenSearchRules}
+            active={Boolean(advancedSearchSummary)}
+            quiet
+          />
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ord annonsen må inneholde, kan inneholde eller ikke skal inneholde.
+          </p>
+        </section>
+      )}
     </div>
   );
 
@@ -836,9 +870,11 @@ export function SearchFilterSections({
           <button
             type="button"
             onClick={() => setOverviewOpen(true)}
-            className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
+            aria-label="Tilbake til filteroversikt"
+            className="native-touch-target -ml-1 mb-4 flex items-center gap-1 px-1 text-sm font-medium text-primary"
           >
-            Tilbake til filteroversikt
+            <ChevronLeft className="size-4" aria-hidden />
+            Alle filtre
           </button>
           <h2 className="mb-4 font-display text-2xl tracking-tight">Velg kategori</h2>
           <CategorySlugPicker
@@ -855,11 +891,14 @@ export function SearchFilterSections({
           <button
             type="button"
             onClick={() => setOverviewOpen(true)}
-            className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
+            aria-label="Tilbake til filteroversikt"
+            className="native-touch-target -ml-1 mb-4 flex items-center gap-1 px-1 text-sm font-medium text-primary"
           >
-            Tilbake til filteroversikt
+            <ChevronLeft className="size-4" aria-hidden />
+            Alle filtre
           </button>
           {sectionFields}
+          {activeSection === "conditions" && conditionsField}
         </div>
       )}
 

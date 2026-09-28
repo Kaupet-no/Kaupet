@@ -5,8 +5,8 @@ import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { ActiveFilters } from "@/components/active-filters";
 import { ResultList } from "@/components/result-list";
 import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
-import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
+import { SearchFilterChipRow } from "@/features/listing-search/search-panel/search-filter-chip-row";
 import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
@@ -61,7 +61,6 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const isDesktop = useIsDesktop();
-  const { openPanel } = useSearchPanel();
 
   useEffect(() => setQDraft(search.q), [search.q]);
 
@@ -139,6 +138,7 @@ export function CategoryLandingPage({
     mapListings,
     mapCenter,
     searchPanelResults,
+    effectiveCategories,
   } = useSearchResultsShell({
     search: effectiveSearch,
     navigate,
@@ -187,13 +187,28 @@ export function CategoryLandingPage({
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="space-y-2">
           {isNative ? (
-            <SearchSummaryPill
-              q={qDraft}
-              filterCount={activeFilterCount}
-              onQChange={setQDraft}
-              onSubmitQ={() => updateSearch({ q: qDraft })}
-              onOpenFilters={() => openPanel("price")}
-            />
+            <>
+              <SearchSummaryPill
+                q={qDraft}
+                filterCount={activeFilterCount}
+                onQChange={setQDraft}
+                onSubmitQ={() => updateSearch({ q: qDraft })}
+              />
+              <SearchFilterChipRow
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree}
+                conditions={search.conditions ?? []}
+                categorySlugs={effectiveCategories}
+                location={location}
+                sort={search.sort}
+                onSortChange={(sort) => updateSearch({ sort })}
+                attrFilters={attrFilters}
+                attrValues={attrValues}
+                queryText={qDraft}
+                filterCount={activeFilterCount}
+              />
+            </>
           ) : (
             <SearchBar
               q={qDraft}
@@ -264,6 +279,7 @@ export function CategoryLandingPage({
             }
             sort={search.sort}
             onSortChange={(s) => updateSearch({ sort: s })}
+            hideSort={isNative}
             /* Samme filterinngang som /annonser: ett panel, ett filtersett.
                Desktop har sidekolonnen, native har SearchSummaryPill. */
             toolbarLead={

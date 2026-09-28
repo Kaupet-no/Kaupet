@@ -28,6 +28,7 @@ export function RangeFilterField({
   compact = false,
   variant = "default",
   histogram,
+  revealHistogramOnDrag = false,
   inputMax,
 }: {
   label: string;
@@ -44,6 +45,10 @@ export function RangeFilterField({
   variant?: "default" | "sheet";
   /** Antall treff per like bred søyle over `bounds`, vist over slideren. */
   histogram?: number[];
+  /** Skjul fordelingen til brukeren tar i slideren, og la den da vokse inn
+   * over innholdet ovenfor — uten å ta plass, så håndtaket ikke flytter seg
+   * under fingeren midt i bevegelsen. */
+  revealHistogramOnDrag?: boolean;
   /** Øvre grense for inntasting når slideren viser en kortere skala enn det
    * som finnes (toppen av slideren betyr da «og mer»). */
   inputMax?: number;
@@ -52,6 +57,8 @@ export function RangeFilterField({
     inputMax != null ? { ...bounds, max: Math.max(bounds.max, inputMax) } : bounds;
   const [minDraft, setMinDraft] = useState(value.min != null ? String(value.min) : "");
   const [maxDraft, setMaxDraft] = useState(value.max != null ? String(value.max) : "");
+  // Blir stående synlig etter første berøring, så grafen ikke blinker bort.
+  const [histogramRevealed, setHistogramRevealed] = useState(!revealHistogramOnDrag);
 
   // Re-sync when the applied value changes outside this field (e.g. the filter
   // was removed from the ActiveFilters row above the results).
@@ -91,7 +98,12 @@ export function RangeFilterField({
       step={bounds.step}
       value={[sliderMin, sliderMax]}
       thumbLabels={[`Fra ${label.toLowerCase()}`, `Til ${label.toLowerCase()}`]}
-      onValueChange={onSlide}
+      // Berøringen, ikke første flytt, viser grafen — og tastatur gjør det samme.
+      onPointerDown={() => setHistogramRevealed(true)}
+      onValueChange={(next) => {
+        setHistogramRevealed(true);
+        onSlide(next);
+      }}
       onValueCommit={([mn, mx]) =>
         commit(mn === bounds.min ? "" : String(mn), mx === bounds.max ? "" : String(mx))
       }
@@ -128,26 +140,43 @@ export function RangeFilterField({
     };
     const peak = Math.max(1, ...(histogram ?? []));
     const bucketWidth = histogram?.length ? (bounds.max - bounds.min) / histogram.length : 0;
+    const bars = histogram?.map((count, index) => {
+      const center = bounds.min + bucketWidth * (index + 0.5);
+      const inRange = center >= sliderMin && center <= sliderMax;
+      return (
+        <span
+          key={index}
+          className={`flex-1 rounded-t-sm transition-colors ${inRange ? "bg-primary/80" : "bg-border"}`}
+          style={{ height: `${Math.max(count ? 8 : 3, (count / peak) * 100)}%` }}
+        />
+      );
+    });
+    const hasHistogram = !!histogram && histogram.length > 0;
     return (
       <div className="space-y-4">
         {/* Slideren tar sin egen gest; skuffen skal ikke dras av den. */}
         <div data-vaul-no-drag className="px-3 pt-2">
-          {histogram && histogram.length > 0 && (
+          {hasHistogram && !revealHistogramOnDrag && (
             <div className="flex h-16 items-end gap-0.5" aria-hidden="true">
-              {histogram.map((count, index) => {
-                const center = bounds.min + bucketWidth * (index + 0.5);
-                const inRange = center >= sliderMin && center <= sliderMax;
-                return (
-                  <span
-                    key={index}
-                    className={`flex-1 rounded-t-sm transition-colors ${inRange ? "bg-primary/80" : "bg-border"}`}
-                    style={{ height: `${Math.max(count ? 8 : 3, (count / peak) * 100)}%` }}
-                  />
-                );
-              })}
+              {bars}
             </div>
           )}
-          <div className="py-3">{slider}</div>
+          <div className="relative py-3">
+            {hasHistogram && revealHistogramOnDrag && (
+              /* Absolutt over slideren: grafen vokser opp fra sporet og dekker
+                 innholdet ovenfor i stedet for å skyve slideren ned. Bare
+                 transform og opasitet animeres, så ingenting reflyter. */
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute -inset-x-3 bottom-[calc(100%-0.75rem)] z-10 flex h-16 origin-bottom items-end gap-0.5 bg-background px-3 pt-1 transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${
+                  histogramRevealed ? "scale-y-100 opacity-100" : "scale-y-0 opacity-0"
+                }`}
+              >
+                {bars}
+              </div>
+            )}
+            {slider}
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
           {field("min")}

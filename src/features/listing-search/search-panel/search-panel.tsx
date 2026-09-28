@@ -609,9 +609,14 @@ export function SearchPanel({
               ) : (
                 <span />
               )}
-              {hasDraftCriteria && section !== "search" && !filterView?.reset && (
+              {/* Rendres alltid og skjules med `invisible`: at «Nullstill» dukker
+                  opp når et filter settes, skal ikke endre høyden på toppen og
+                  skyve innholdet — og slideren under fingeren — nedover. */}
+              {section !== "search" && !filterView?.reset && (
                 <button
                   type="button"
+                  aria-hidden={!hasDraftCriteria}
+                  tabIndex={hasDraftCriteria ? undefined : -1}
                   onClick={() => {
                     void hapticImpact("light");
                     setDraft((previous) => ({
@@ -625,7 +630,7 @@ export function SearchPanel({
                       attributes: {},
                     }));
                   }}
-                  className="native-touch-target flex shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className={`native-touch-target flex shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground ${hasDraftCriteria ? "" : "invisible"}`}
                 >
                   <RotateCcw className="size-3.5" />
                   Nullstill

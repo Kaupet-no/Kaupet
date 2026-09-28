@@ -442,6 +442,7 @@ export function SearchFilterSections({
             includeFree={v.includeFree}
             bounds={priceBounds}
             prices={priceSample}
+            revealHistogramOnDrag={overviewOpen}
             onChange={(patch) => setV((previous) => ({ ...previous, ...patch }))}
           />
         </section>
@@ -1128,6 +1129,7 @@ function NativePriceFields({
   includeFree,
   bounds,
   prices,
+  revealHistogramOnDrag = false,
   onChange,
 }: {
   min: number | null;
@@ -1135,6 +1137,8 @@ function NativePriceFields({
   includeFree: boolean;
   bounds: RangeBounds;
   prices?: number[];
+  /** I filterlisten vises fordelingen først når slideren tas i bruk. */
+  revealHistogramOnDrag?: boolean;
   onChange: (patch: { min?: number | null; max?: number | null; includeFree?: boolean }) => void;
 }) {
   const scaledBounds = prices?.length
@@ -1157,6 +1161,7 @@ function NativePriceFields({
         label="Pris"
         variant="sheet"
         histogram={histogram}
+        revealHistogramOnDrag={revealHistogramOnDrag}
         bounds={scaledBounds}
         inputMax={bounds.max}
         value={{ min: min ?? undefined, max: onlyFree ? undefined : (max ?? undefined) }}

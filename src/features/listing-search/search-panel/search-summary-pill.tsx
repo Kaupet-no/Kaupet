@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from "react";
 import { Search as SearchIcon, SlidersHorizontal, Waypoints, X } from "lucide-react";
 import { hapticImpact } from "@/lib/haptics";
 
@@ -16,6 +17,8 @@ type Props = {
    * søkeord som ble tolket til kategori («sykkel») forsvinner da ikke
    * sporløst, og X fjerner avgrensningen. */
   categoryToken?: { label: string; onRemove: () => void };
+  /** Forslag som vises under feltet mens det har fokus. */
+  suggestions?: ReactNode;
 };
 
 /** Kompakt native søkefelt med separate regel- og filterhandlinger. */
@@ -28,10 +31,12 @@ export function SearchSummaryPill({
   onOpenRules,
   onOpenFilters,
   categoryToken,
+  suggestions,
 }: Props) {
+  const [focused, setFocused] = useState(false);
   const filterText = `${filterCount} ${filterCount === 1 ? "filter" : "filtre"}`;
   return (
-    <div className="flex min-h-12 w-full items-center rounded-full border border-border bg-card shadow-sm">
+    <div className="relative flex min-h-12 w-full items-center rounded-full border border-border bg-card shadow-sm">
       <form
         role="search"
         onSubmit={(e) => {
@@ -65,11 +70,14 @@ export function SearchSummaryPill({
           enterKeyHint="search"
           value={q}
           onChange={(e) => onQChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={categoryToken ? `Søk i ${categoryToken.label}` : "Søk i annonser"}
           aria-label="Søk i annonser"
           className="native-touch-target min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
         />
       </form>
+      {focused && suggestions}
       {onOpenRules && (
         <button
           type="button"

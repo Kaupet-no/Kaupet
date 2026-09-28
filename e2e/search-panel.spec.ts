@@ -96,7 +96,7 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await page.goto(`/annonser?forcenative&q=${filterFixture.query}&sort=new`);
   await page.waitForLoadState("networkidle");
 
-  const filterButton = page.getByRole("button", { name: /Filtrer/ });
+  const filterButton = page.getByRole("button", { name: /Alle filtre/ });
   await expectNativeTouchTarget(filterButton);
   await filterButton.click();
 

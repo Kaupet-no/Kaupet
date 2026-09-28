@@ -55,6 +55,13 @@ import { CategoryBreadcrumb } from "@/components/category-hero";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
 import { breadcrumbPath, resolveHeroCategory } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
+import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
+import { criteriaToValue } from "@/components/advanced-search-value";
+
+/** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
+function blurActiveElement() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -255,11 +262,11 @@ function BrowsePage() {
     search.qMode === "any" || search.extraGroups.some((group) => group.terms.length > 0);
   const ordinaryFilterCount = Math.max(0, activeFilterCount - advancedSearchCount);
   const { data: vehicleBrands } = useAllVehicleBrands();
-  const submitQuery = () => {
+  const submitQuery = (text = qDraft) => {
     void hapticImpact("medium");
     void submitSearch({
       applied: appliedSearch,
-      query: qDraft,
+      query: text,
       categories: categories ?? [],
       vehicleBrands: vehicleBrands ?? [],
       allFilters: allFilters ?? [],
@@ -496,7 +503,42 @@ function BrowsePage() {
                     setIgnoredInterpretations(new Set());
                     setQDraft(q);
                   }}
-                  onSubmitQ={submitQuery}
+                  onSubmitQ={() => submitQuery()}
+                  suggestions={
+                    <SearchSuggestionsLayer
+                      q={qDraft}
+                      categories={categories ?? []}
+                      currentCategorySlugs={effectiveCategories}
+                      onSubmitQuery={(text) => {
+                        blurActiveElement();
+                        setQDraft(text);
+                        submitQuery(text);
+                      }}
+                      onPickCategory={(category) => {
+                        blurActiveElement();
+                        const needle = category.name_nb.toLocaleLowerCase();
+                        const nextQ = qDraft.toLocaleLowerCase().trim() === needle ? "" : qDraft;
+                        setQDraft(nextQ);
+                        updateSearch({ category: "", categories: [category.slug], q: nextQ });
+                      }}
+                      onPickSavedSearch={(saved) => {
+                        blurActiveElement();
+                        void submitSearch({
+                          applied: {
+                            value: criteriaToValue(saved.criteria),
+                            attributes: saved.criteria.attributes ?? {},
+                          },
+                          categories: categories ?? [],
+                          vehicleBrands: vehicleBrands ?? [],
+                          allFilters: allFilters ?? [],
+                          commit: (next) => {
+                            setQDraft(next.q);
+                            navigate({ search: next });
+                          },
+                        });
+                      }}
+                    />
+                  }
                   categoryToken={
                     categoryTokenLabel
                       ? {
@@ -515,7 +557,7 @@ function BrowsePage() {
                       setIgnoredInterpretations(new Set());
                       setQDraft(q);
                     }}
-                    onSubmitQ={submitQuery}
+                    onSubmitQ={() => submitQuery()}
                     qMode={search.qMode}
                     onQModeChange={(m) => updateSearch({ qMode: m })}
                     showQMode={isDesktop}

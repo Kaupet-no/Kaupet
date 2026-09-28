@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronDown, LayoutGrid, MapPin, Search as SearchIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, ChevronRight, History, MapPin, Search as SearchIcon } from "lucide-react";
 
 import { ListingCard } from "@/components/listing-card";
 import { usePopularListings } from "@/features/landing/use-popular-listings";
@@ -10,7 +11,21 @@ import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
-import { saveSearchToHistory } from "@/features/listing-search/search-panel/search-history";
+import {
+  saveRecentCategory,
+  saveSearchToHistory,
+} from "@/features/listing-search/search-panel/search-history";
+import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
+import { criteriaToValue } from "@/components/advanced-search-value";
+import { CategoryIcon } from "@/lib/category-icons";
+import type { Category } from "@/lib/categories";
+import { readLastSearchContext } from "@/lib/last-search-context";
+import {
+  listSavedSearches,
+  listUnreadCountsBySearch,
+  type SavedSearch,
+} from "@/lib/saved-searches";
+import { useAuth } from "@/hooks/use-auth";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
@@ -48,7 +63,11 @@ export function AppLanding({
   // lokasjon følger med til /annonser.
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const query = qDraft.trim();
+    blurActiveElement();
+    runSearch(qDraft);
+  };
+  const runSearch = (text: string) => {
+    const query = text.trim();
     saveSearchToHistory(query);
     void submitSearch({
       query,
@@ -68,68 +87,40 @@ export function AppLanding({
     : "Hele Norge";
 
   // `popular` er `undefined` mens spørringen laster og `[]` når katalogen
-  // faktisk er tom. Uten det skillet ble tom katalog vist som tre pulserende
-  // skjelettkort som aldri gikk over — altså en lastetilstand uten slutt,
-  // som er nøyaktig det en bruker møter rett etter lansering. Web gjør dette
-  // riktig fra før, se PopularCarousel. Er det ingenting under folden,
-  // skjules både seksjonen og chevronen som inviterer til å scrolle dit.
-  // `popular` er også `undefined` når spørringen FEILER — en feil er ikke en
-  // lastetilstand heller, og skal tilby et forsøk på nytt i stedet for å
-  // pulsere i det uendelige.
+  // faktisk er tom, og også `undefined` når spørringen feiler — en feil skal
+  // tilby et nytt forsøk, ikke pulsere i det uendelige.
   const isLoadingPopular = popular === undefined && !popularIsError;
   const hasListings = !!popular && popular.length > 0;
   const hasSectionBelow = isLoadingPopular || hasListings || popularIsError;
 
-  // Telefon: heroen står klistret mens annonsene scroller opp over den, og
-  // fader ut i takt med scrollen — helt borte i det annonsene når bunnen av
-  // innholdet (logo, søk, piller). Opasiteten skrives rett på DOM-noden for å
-  // slippe en React-render per scroll-event. Nettbrett har ingen
-  // fullskjerm-hero, og beholder vanlig flyt.
-  const heroRef = useRef<HTMLElement>(null);
-  const heroContentRef = useRef<HTMLDivElement>(null);
-  const stickyHero = !isTablet && hasSectionBelow;
-  useEffect(() => {
-    const hero = heroRef.current;
-    const content = heroContentRef.current;
-    if (!stickyHero || !hero || !content) return;
-    const update = () => {
-      const fadeDistance = Math.max(
-        1,
-        hero.offsetHeight - (content.offsetTop + content.offsetHeight),
-      );
-      const opacity = Math.max(0, 1 - window.scrollY / fadeDistance);
-      hero.style.opacity = String(opacity);
-      // Usynlig hero skal heller ikke kunne fokuseres eller leses opp.
-      hero.style.visibility = opacity === 0 ? "hidden" : "";
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      hero.style.opacity = "";
-      hero.style.visibility = "";
-    };
-  }, [stickyHero]);
-
-  const pillClass =
-    "native-touch-target inline-flex max-w-full items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition active:opacity-80";
+  const mainCategories = categories.filter((category) => category.parent_id == null);
+  const goToCategory = (category: Category) => {
+    saveRecentCategory(category.slug);
+    navigate({ to: "/annonser", search: { q: "", category: category.slug, sort: "new" } });
+  };
+  const runSavedSearch = (saved: SavedSearch) =>
+    void submitSearch({
+      applied: {
+        value: criteriaToValue(saved.criteria),
+        attributes: saved.criteria.attributes ?? {},
+      },
+      categories,
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (search) => navigate({ to: "/annonser", search }),
+    });
+  const [searchFocused, setSearchFocused] = useState(false);
 
   return (
     <div className="pb-3">
-      {/* Hero er en egen first-screen-seksjon: logo, søk og piller sentreres
-          vertikalt i ledig rom over bunnnavigasjonen, og "Populært
-          nå"/"Nye annonser" starter under folden. Brukeren skal scrolle for
-          å se annonser — det er en bevisst prioritering av søk foran
-          annonsekarusellen på forsiden. */}
+      {/* Søk, kategorier og «fortsett der du slapp» først, og de første
+          annonsekortene innen første skjermbilde (UI-guiden § Visuell rytme). */}
       <section
-        ref={heroRef}
-        className={`flex flex-col items-center justify-center px-5 pb-4 pt-safe density-task ${
-          isTablet ? "max-w-xl mx-auto" : "min-h-[calc(100dvh-var(--app-bottom-nav-h))]"
-        } ${stickyHero ? "sticky top-0" : ""}`}
+        className={`flex flex-col items-center px-5 pb-2 pt-safe density-task ${
+          isTablet ? "mx-auto max-w-xl" : ""
+        }`}
       >
-        <div ref={heroContentRef} className="flex w-full flex-col items-center gap-3">
+        <div className="flex w-full flex-col items-center gap-3 pt-4">
           <AppHeroLogo />
           <h1 className="text-center font-display text-xl tracking-tight">
             Hva leter du etter i dag?
@@ -146,6 +137,8 @@ export function AppLanding({
                 enterKeyHint="search"
                 value={qDraft}
                 onChange={(e) => setQDraft(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
                 aria-label="Søk i annonser"
                 className="w-full bg-transparent text-base outline-none [&::-webkit-search-cancel-button]:hidden"
               />
@@ -153,66 +146,91 @@ export function AppLanding({
                 <span className="pointer-events-none absolute inset-0 flex items-center">
                   <AnimatedSearchPlaceholder
                     words={searchExamples}
-                    paused={false}
+                    paused={searchFocused}
                     className="text-base text-muted-foreground"
                   />
                 </span>
               )}
             </div>
+            {searchFocused && (
+              <SearchSuggestionsLayer
+                q={qDraft}
+                categories={categories}
+                onSubmitQuery={(text) => {
+                  blurActiveElement();
+                  setQDraft(text);
+                  runSearch(text);
+                }}
+                onPickCategory={(category) => {
+                  blurActiveElement();
+                  goToCategory(category);
+                }}
+                onPickSavedSearch={(saved) => {
+                  blurActiveElement();
+                  runSavedSearch(saved);
+                }}
+              />
+            )}
           </form>
-
-          {/* Lokasjon og kategorier veier likt — begge er inngangsvalg til
-            samme søkepanel, ikke en primær og en sekundær handling. Kaupet-
-            kode er en sjelden, gjenkjennende handling (ikke oppdagende) og
-            skal derfor ikke konkurrere visuelt med disse to. */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => openPanel("location")}
-              aria-label={`Velg lokasjon: ${locationLabel}`}
-              className={`${pillClass} ${
-                hasLocation
-                  ? "border-primary/40 bg-primary/5 text-foreground"
-                  : "border-border bg-card text-muted-foreground"
-              }`}
-            >
-              <MapPin className="size-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{locationLabel}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openPanel("categories")}
-              aria-label="Alle kategorier"
-              className={`${pillClass} border-border bg-card text-muted-foreground`}
-            >
-              <LayoutGrid className="size-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">Alle kategorier</span>
-            </button>
-          </div>
-
-          <KaupetCodeDialog
-            trigger={
-              <button
-                type="button"
-                className="native-touch-target text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-              >
-                Har du en Kaupet-kode?
-              </button>
-            }
-          />
         </div>
 
-        {stickyHero && (
-          <ChevronDown
-            className="mt-1 size-5 animate-bounce text-muted-foreground"
-            aria-hidden="true"
-          />
-        )}
+        {/* Sted først: et lagret sted gjelder hvert søk herfra og skal synes.
+            Deretter hovedkategoriene som en vannrett rad, som går rett til
+            resultater med kategorien valgt. */}
+        <div
+          role="group"
+          aria-label="Kategorier"
+          className="-mx-5 mt-4 flex w-[calc(100%+2.5rem)] gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <button
+            type="button"
+            onClick={() => openPanel("location")}
+            aria-label={`Velg lokasjon: ${locationLabel}`}
+            className="native-touch-target flex w-16 shrink-0 flex-col items-center gap-1.5 text-center"
+          >
+            <span
+              className={`flex size-14 items-center justify-center rounded-2xl ${
+                hasLocation ? "bg-primary text-primary-foreground" : "bg-muted text-primary"
+              }`}
+            >
+              <MapPin className="size-6" aria-hidden="true" />
+            </span>
+            <span className="line-clamp-2 text-xs leading-tight">
+              {hasLocation ? savedLocation.label || "Valgt sted" : "Hele Norge"}
+            </span>
+          </button>
+          {mainCategories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => goToCategory(category)}
+              className="native-touch-target flex w-16 shrink-0 flex-col items-center gap-1.5 text-center"
+            >
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-primary">
+                <CategoryIcon iconName={category.icon} className="size-6" aria-hidden="true" />
+              </span>
+              <span className="line-clamp-2 text-xs leading-tight">{category.name_nb}</span>
+            </button>
+          ))}
+        </div>
+
+        <ResumeSearch onPickSavedSearch={runSavedSearch} />
+
+        <KaupetCodeDialog
+          trigger={
+            <button
+              type="button"
+              className="native-touch-target mt-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+            >
+              Har du en Kaupet-kode?
+            </button>
+          }
+        />
       </section>
 
       {hasSectionBelow && (
         <section
-          className={`relative z-10 bg-background px-5 ${isTablet ? "mt-2" : "pt-4"}`}
+          className={`bg-background px-5 ${isTablet ? "mt-2" : "pt-2"}`}
           aria-labelledby="popular-heading"
         >
           <div className="mb-3 flex items-center justify-between">
@@ -243,17 +261,7 @@ export function AppLanding({
                   <ListingCard key={listing.id} listing={listing} />
                 ))}
               </div>
-              {/* På telefon lander knappens midtpunkt midt i nederste
-                  tredjedel av synlig flate når siden er scrollet til bunns:
-                  avstanden under midtpunktet er 1/6 av (skjerm − bunnnav),
-                  minus halve knapphøyden (h-12 = 3rem) og
-                  ytre pb-3. Fungerer fordi
-                  fullskjerm-heroen alltid gjør siden høyere enn skjermen. */}
-              <div
-                className={`flex justify-center pt-6 ${
-                  isTablet ? "" : "pb-[calc((100dvh_-_var(--app-bottom-nav-h))/6_-_2.25rem)]"
-                }`}
-              >
+              <div className="flex justify-center pb-4 pt-6">
                 <Button asChild variant="outline" className="h-12 rounded-full px-6">
                   <Link to="/annonser">Vis alle annonser</Link>
                 </Button>
@@ -271,5 +279,88 @@ export function AppLanding({
 
       <NewListingDialog open={adPickerOpen} onOpenChange={onAdPickerOpenChange} />
     </div>
+  );
+}
+
+/** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
+function blurActiveElement() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
+
+/**
+ * «Fortsett der du slapp»: lagrede søk med nye treff for innloggede, ellers
+ * siste søk i denne økten. Den raskeste veien tilbake til et søk brukeren
+ * allerede har bygget, i stedet for å starte på nytt fra et tomt felt.
+ */
+function ResumeSearch({ onPickSavedSearch }: { onPickSavedSearch: (saved: SavedSearch) => void }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  // Samme nøkler som /mine-sok og søkepanelet, så cachen deles.
+  const { data: savedSearches } = useQuery({
+    queryKey: ["saved-searches"],
+    queryFn: listSavedSearches,
+    enabled: !!user,
+  });
+  const { data: unreadCounts } = useQuery({
+    queryKey: ["saved-search-unread-counts"],
+    queryFn: listUnreadCountsBySearch,
+    enabled: !!user,
+  });
+  // sessionStorage finnes bare i nettleseren; forsiden rendres på klienten.
+  // Et søk uten kriterier («annonser») er ikke noe å fortsette på.
+  const [lastSearch] = useState(() => {
+    const context = readLastSearchContext();
+    return context && context.label !== "annonser" ? context : null;
+  });
+  const saved = user ? (savedSearches ?? []).slice(0, 2) : [];
+  if (saved.length === 0 && !lastSearch) return null;
+
+  const rowClass =
+    "native-touch-target flex min-h-14 w-full items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2.5 text-left";
+  return (
+    <section aria-labelledby="resume-heading" className="mt-5 w-full max-w-xl">
+      <h2 id="resume-heading" className="mb-2 font-display text-base tracking-tight">
+        Fortsett der du slapp
+      </h2>
+      <div className="flex flex-col gap-2">
+        {saved.length > 0
+          ? saved.map((search) => {
+              const unread = unreadCounts instanceof Map ? (unreadCounts.get(search.id) ?? 0) : 0;
+              return (
+                <button
+                  key={search.id}
+                  type="button"
+                  onClick={() => onPickSavedSearch(search)}
+                  className={rowClass}
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
+                    <Bell className="size-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{search.name}</span>
+                  {unread > 0 && (
+                    <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-brand-foreground">
+                      {unread > 99 ? "99+" : unread} nye
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          : lastSearch && (
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/annonser", search: lastSearch.search })}
+                className={rowClass}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
+                  <History className="size-4" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  Tilbake til {lastSearch.label}
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
+            )}
+      </div>
+    </section>
   );
 }

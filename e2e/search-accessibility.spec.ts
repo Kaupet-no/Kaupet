@@ -36,7 +36,7 @@ test("native søkepanel viser tilgjengelig live-handling", async ({ page }) => {
   await page.goto("/annonser?forcenative");
   await waitForHydration(page);
 
-  await page.getByRole("button", { name: /Filtrer/ }).click();
+  await page.getByRole("button", { name: /Alle filtre/ }).click();
   const applyButton = page.getByTestId("search-filter-apply-button");
   await expect(applyButton).toBeVisible();
   await expect(applyButton).toHaveText(/Vis \d+ annonser?/);

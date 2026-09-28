@@ -49,6 +49,10 @@ vi.mock("@/components/animated-search-placeholder", () => ({
 }));
 vi.mock("@/components/app-hero-logo", () => ({ AppHeroLogo: () => null }));
 vi.mock("@/components/kaupet-code-dialog", () => ({ KaupetCodeDialog: () => null }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
+vi.mock("@/features/listing-search/search-suggestions-layer", () => ({
+  SearchSuggestionsLayer: () => <div>forslag</div>,
+}));
 
 beforeEach(() => {
   openPanel.mockReset();
@@ -62,13 +66,25 @@ afterEach(() => {
 });
 
 describe("AppLanding", () => {
-  it("åpner lokasjon og kategorier gjennom søkepanelet", () => {
+  it("åpner lokasjon gjennom søkepanelet som første valg i kategoriraden", () => {
     render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
 
+    const row = screen.getByRole("group", { name: "Kategorier" });
     fireEvent.click(screen.getByRole("button", { name: "Velg lokasjon: Hele Norge" }));
-    fireEvent.click(screen.getByRole("button", { name: "Alle kategorier" }));
 
-    expect(openPanel.mock.calls).toEqual([["location"], ["categories"]]);
+    expect(row.firstElementChild?.getAttribute("aria-label")).toBe("Velg lokasjon: Hele Norge");
+    expect(openPanel.mock.calls).toEqual([["location"]]);
+  });
+
+  it("viser forslag bare mens søkefeltet har fokus", () => {
+    render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+    const input = screen.getByRole("searchbox", { name: "Søk i annonser" });
+
+    expect(screen.queryByText("forslag")).toBeNull();
+    fireEvent.focus(input);
+    expect(screen.getByText("forslag")).toBeTruthy();
+    fireEvent.blur(input);
+    expect(screen.queryByText("forslag")).toBeNull();
   });
 
   it("søker direkte fra søkefeltet uten å åpne panelet", () => {

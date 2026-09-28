@@ -20,6 +20,20 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output;
 }
 
+// iPadOS' WKWebView sends a desktop "Macintosh" user agent by default, so a
+// stored UA can't be told apart from a real Mac later (parseUserAgent in
+// notifications-section.tsx only sees this stored string, not the live
+// navigator). iPads keep `maxTouchPoints > 1`; real Macs don't. Patch the UA
+// at capture time so it reads as iPad, matching parseUserAgent's existing
+// /iPhone|iPad/ check.
+export function capturedUserAgent(): string {
+  const ua = navigator.userAgent;
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) {
+    return ua.replace("Macintosh", "iPad");
+  }
+  return ua;
+}
+
 function isAllowedEnvironment(): boolean {
   if (typeof window === "undefined") return false;
   if (window.self !== window.top) return false; // no iframe
@@ -70,7 +84,7 @@ export async function subscribe(): Promise<void> {
       endpoint: subscription.endpoint,
       p256dh: json.keys?.p256dh ?? "",
       auth: json.keys?.auth ?? "",
-      user_agent: navigator.userAgent.slice(0, 255),
+      user_agent: capturedUserAgent().slice(0, 255),
     },
   });
 }

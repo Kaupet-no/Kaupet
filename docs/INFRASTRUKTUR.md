@@ -55,8 +55,8 @@ Merknader:
   Cloudflare.
 - `test.kaupet.no`: `src/components/test-env-gate.tsx` stenger hele siden for
   alle utenom demobrukere og administratorer når appen kjører på dette
-  domenet. Om domenet faktisk er i bruk, og hvilken Worker det peker på, står
-  **ikke i repoet**.
+  domenet. Domenet er et custom domain på produksjons-Workeren `kaupet-no`
+  (produksjonsdatabasen, ikke staging), og har ingen Access-policy.
 - `.env` sier ikke selv hvilket Supabase-prosjekt den peker på. Sjekk
   prosjektref-en i `SUPABASE_URL` før noe som skriver (se STAGING.md).
 
@@ -98,7 +98,9 @@ for registrering og passordtilbakestilling (dashbordinnstilling, se STAGING.md).
 ### Access
 
 `staging.kaupet.no` ligger bak Cloudflare Access (engangskode på e-post,
-policy «Kaupet team»). Se STAGING.md.
+policy «Kaupet team»). Se STAGING.md. Unntak: `staging.kaupet.no/api/public`
+har en egen Access-app med Bypass, slik at pg_net og webhooks når Workeren
+(se § 5).
 
 ## 4. Supabase
 
@@ -143,9 +145,55 @@ Tidspunktene er UTC (standard for `pg_cron`).
 
 **URL-er:** hver dispatch-funksjon leser URL-en fra `app_settings`
 (`image_jobs_url`, `r2_cleanup_url`, `push_dispatch_url`,
-`api_key_expiry_url`) og faller tilbake til `https://kaupet.no/...`. I
-staging må disse radene derfor peke på `staging.kaupet.no`, ellers kaller
-staging-databasen produksjonen. Verdiene står **ikke i repoet**.
+`api_key_expiry_url`). Det finnes **ingen fallback**
+(`20260928130000_app_settings_url_uten_fallback.sql`). Mangler URL eller
+hemmelighet, postes det ikke: push-triggerne (via `dispatch_push()`) skriver
+en rad til `push_dispatch_failures`, og cron-funksjonene gir `RAISE WARNING`.
+Alle miljø, **også produksjonen**, må derfor ha radene satt til sitt eget
+domene. Radene settes manuelt i hvert miljø med SQL (ingen migrasjon eller
+seed gjør det), og verdiene står **ikke i repoet**. Lokale stacker og
+CI-stacker har ingen rader og poster derfor aldri.
+
+Før 2026-09-28 falt funksjonene tilbake til `https://kaupet.no/...`. Det
+gjorde at alle lokale stacker og CI-stacker postet push-kall til
+produksjonen (175 avviste 401-kall på én uke i Workerens logger, `pg_net`
+fra GitHub Actions-IP-er). Staging hadde i tillegg `push_dispatch_url` satt
+til `test.kaupet.no`, som er et custom domain på **produksjons-Workeren**
+`kaupet-no`.
+
+**Cloudflare Access:** pg_net har ingen Access-legitimasjon. `staging.kaupet.no/api/public`
+har derfor en egen Access-app med en Bypass-policy (endepunktene er beskyttet
+av de delte hemmelighetene under). Uten den følger pg_net 302-en til Access
+sin innloggingsside og lagrer den som **HTTP 200**, så `cron.job_run_details`
+og `net._http_response` ser grønne ut selv om ingenting når Workeren.
+
+**Feilsøking** (i SQL-editoren for riktig prosjekt, se STAGING.md for refs):
+
+```sql
+-- Hvilke rader er satt (skriv aldri ut hemmelighetene)
+SELECT key, CASE WHEN key LIKE '%\_url' THEN value END AS url
+FROM public.app_settings ORDER BY key;
+-- Svar fra de siste ~6 timene (pg_net rydder eldre)
+SELECT created, status_code, headers->>'content-type', left(content, 80)
+FROM net._http_response ORDER BY created DESC LIMIT 20;
+-- Push som ikke ble sendt
+SELECT kind, error, created_at FROM public.push_dispatch_failures
+ORDER BY created_at DESC LIMIT 20;
+```
+
+Et `text/html`-svar med «Cloudflare Access» i innholdet betyr at Access
+stopper kallet. Et 401 betyr at hemmeligheten i `app_settings` ikke matcher
+Worker-secreten.
+
+**Status 2026-09-28** (verdiene kan ha endret seg siden):
+
+| Rad / secret                                         | Staging                                     | Produksjon                     |
+| ---------------------------------------------------- | ------------------------------------------- | ------------------------------ |
+| `push_dispatch_url` / `_secret`                      | Satt (URL rettet fra `test.kaupet.no`)      | Satt                           |
+| `r2_cleanup_url` / `_secret`                         | Satt                                        | Satt (URL lagt inn 2026-09-28) |
+| `image_jobs_url` / `_secret`                         | Mangler                                     | Kun URL                        |
+| `api_key_expiry_url` / `_secret`                     | Mangler                                     | Kun URL                        |
+| Worker: `IMAGE_JOBS_SECRET`, `API_KEY_EXPIRY_SECRET` | Mangler (GitHub Environment-secret mangler) | Mangler                        |
 
 **Delte hemmeligheter** — samme verdi må ligge både som Worker-secret og som
 `app_settings`-rad:
@@ -237,12 +285,10 @@ I tillegg: `codeql.yml` (sikkerhetsskanning), og lokale hooks via
 
 ## 10. Ikke i repoet
 
-Dette må slås opp i de respektive dashbordene, og bør få en eier og et
-sted her når det er avklart:
+Dette må slås opp i de respektive dashbordene:
 
 - DNS og domeneregistrar for `kaupet.no` og underdomenene.
-- Hvem som eier og har administratortilgang til Cloudflare, Supabase,
+- Administratortilgang til Cloudflare, Supabase,
   Firebase, Apple Developer, Google Play Console, Vipps, Resend og Mistral.
 - Supabase-planer, backup og point-in-time recovery.
 - Verdiene i `app_settings` i hvert miljø.
-- Om `test.kaupet.no` er i bruk.

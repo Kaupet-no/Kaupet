@@ -29,6 +29,7 @@ export function ListingComposerShell({
   firstStep,
   contentClassName,
   preview,
+  previewLabel = "Slik ser kjøperen annonsen",
   previewSection,
   strength,
 }: {
@@ -67,6 +68,8 @@ export function ListingComposerShell({
    * «Forhåndsvis» i stegraden som et panel fra høyre under det — rammen og
    * et skjema på 36 rem får ikke plass side om side smalere enn det. */
   preview?: ReactNode;
+  /** Overskrift over forhåndsvisningen — Ønskes kjøpt leses av selgere, ikke kjøpere. */
+  previewLabel?: string;
   /** Delen av annonsesiden steget redigerer (`data-preview-section`) —
    * telefonrammen scroller dit når steget byttes. */
   previewSection?: string;
@@ -282,7 +285,7 @@ export function ListingComposerShell({
                   >
                     <SheetHeader>
                       <SheetTitle className="text-sm font-medium text-muted-foreground">
-                        Slik ser kjøperen annonsen
+                        {previewLabel}
                       </SheetTitle>
                     </SheetHeader>
                     <PhoneFrame className="mx-auto min-h-0 w-full max-w-[20rem] flex-1">
@@ -379,7 +382,7 @@ export function ListingComposerShell({
             data-composer-preview-dock
             className="sticky top-[calc(var(--site-header-h)+7rem)] mt-8 hidden space-y-2 dock:block"
           >
-            <p className="text-center text-xs text-muted-foreground">Slik ser kjøperen annonsen</p>
+            <p className="text-center text-xs text-muted-foreground">{previewLabel}</p>
             <PhoneFrame
               ref={previewFrameRef}
               className="h-[min(46rem,calc(100dvh-var(--site-header-h)-14rem))]"

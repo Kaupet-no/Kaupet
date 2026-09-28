@@ -18,8 +18,8 @@ test("kjøpsønskets startflate holder visuell kontrakt", async ({ page }, testI
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page, !testInfo.project.name.endsWith("web"));
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
-  await composerPage(page, "category").waitFor();
-  await page.getByTestId("category-tile").first().waitFor();
+  // Flyten starter med tittelen (kategoriforslaget bygger på den).
+  await composerPage(page, "title").waitFor();
   await page.evaluate(() => document.fonts.ready);
 
   await expect(page).toHaveScreenshot("want-listing-category.png", {

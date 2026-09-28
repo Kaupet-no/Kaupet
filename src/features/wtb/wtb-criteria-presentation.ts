@@ -39,6 +39,17 @@ export function wtbCriteriaSummary(filters: CategoryFilter[], value: WtbAttribut
       return `${label}: ${criterionSummary(filter, value[filter.key])}`;
     });
   const freetext = value[WTB_FREETEXT_KEY];
-  if (typeof freetext === "string" && freetext.trim()) summaries.push(`Fritekstsøk: ${freetext}`);
+  if (typeof freetext === "string" && freetext.trim()) summaries.push(`Nøkkelord: ${freetext}`);
   return summaries.join(" · ") || "Ingen begrensninger";
+}
+
+/** "Oslo (0150) · innen 50 km" — tom streng når kjøpsønsket ikke har område. */
+export function wtbLocationLabel(location: {
+  postal_code: string | null | undefined;
+  city: string | null | undefined;
+  radius_km: number | null | undefined;
+}) {
+  if (!location.postal_code) return "";
+  const place = location.city ? `${location.city} (${location.postal_code})` : location.postal_code;
+  return location.radius_km ? `${place} · innen ${location.radius_km} km` : place;
 }

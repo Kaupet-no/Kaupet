@@ -2662,14 +2662,19 @@ export type Database = {
         Row: {
           attributes: Json
           category_id: string | null
+          city: string | null
           created_at: string
           description: string | null
           draft_expiry_notified_at: string | null
           expires_at: string
           id: string
+          lat: number | null
+          lng: number | null
           max_price_nok: number | null
           notify_matches: boolean
+          postal_code: string | null
           published_at: string | null
+          radius_km: number | null
           search_vector: unknown
           status: string
           subtitle: string | null
@@ -2680,14 +2685,19 @@ export type Database = {
         Insert: {
           attributes?: Json
           category_id?: string | null
+          city?: string | null
           created_at?: string
           description?: string | null
           draft_expiry_notified_at?: string | null
           expires_at?: string
           id?: string
+          lat?: number | null
+          lng?: number | null
           max_price_nok?: number | null
           notify_matches?: boolean
+          postal_code?: string | null
           published_at?: string | null
+          radius_km?: number | null
           search_vector?: unknown
           status?: string
           subtitle?: string | null
@@ -2698,14 +2708,19 @@ export type Database = {
         Update: {
           attributes?: Json
           category_id?: string | null
+          city?: string | null
           created_at?: string
           description?: string | null
           draft_expiry_notified_at?: string | null
           expires_at?: string
           id?: string
+          lat?: number | null
+          lng?: number | null
           max_price_nok?: number | null
           notify_matches?: boolean
+          postal_code?: string | null
           published_at?: string | null
+          radius_km?: number | null
           search_vector?: unknown
           status?: string
           subtitle?: string | null
@@ -3265,22 +3280,31 @@ export type Database = {
       compute_wtb_matches: {
         Args: {
           _attributes: Json
+          _can_ship?: boolean
           _category_id: string
           _description: string
           _is_free: boolean
+          _lat?: number
+          _lng?: number
           _price_nok: number
           _title: string
         }
         Returns: {
           attributes: Json
           category_id: string | null
+          city: string | null
           created_at: string
           description: string | null
           draft_expiry_notified_at: string | null
           expires_at: string
           id: string
+          lat: number | null
+          lng: number | null
           max_price_nok: number | null
           notify_matches: boolean
+          postal_code: string | null
+          published_at: string | null
+          radius_km: number | null
           search_vector: unknown
           status: string
           subtitle: string | null
@@ -3466,6 +3490,18 @@ export type Database = {
           favorite_count: number
           total_views: number
         }[]
+      }
+      listings_matching_wtb: {
+        Args: {
+          _attributes: Json
+          _category_id: string
+          _lat: number
+          _limit?: number
+          _lng: number
+          _max_price_nok: number
+          _radius_km: number
+        }
+        Returns: { id: string; total_count: number }[]
       }
       listings_search_term_match: {
         Args: { search_vector: unknown; term: string; title: string }
@@ -3821,6 +3857,24 @@ export type Database = {
           id: string
           total_count: number
         }[]
+      }
+      wtb_criteria_match_listing: {
+        Args: {
+          _attributes: Json
+          _can_ship: boolean
+          _description: string
+          _is_free: boolean
+          _lat: number
+          _lng: number
+          _price_nok: number
+          _title: string
+          _w_attributes: Json
+          _w_lat: number
+          _w_lng: number
+          _w_max_price_nok: number
+          _w_radius_km: number
+        }
+        Returns: boolean
       }
       wtb_match_count: {
         Args: {

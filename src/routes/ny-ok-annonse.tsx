@@ -1,32 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
-import {
-  createFileRoute,
-  type ErrorComponentProps,
-  Link,
-  useBlocker,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, useBlocker, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showErrorToast } from "@/lib/toast";
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lucide-react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useIsDemo } from "@/hooks/use-user-roles";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
-import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
+import { lookupPostalCode } from "@/lib/geocode";
 import { CATEGORY_SUGGESTION_LOADING_MESSAGE } from "@/features/listing-creation/use-category-suggestion-loading-message";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
-import { isWtbRangeValue, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
+import {
+  isWtbRangeValue,
+  WTB_FREETEXT_KEY,
+  type WtbAttributeMap,
+} from "@/features/wtb/wtb-criteria-types";
+import { wtbCriteriaSummary, wtbLocationLabel } from "@/features/wtb/wtb-criteria-presentation";
+import { WtbListingPreview, type WtbPreviewSection } from "@/features/wtb/wtb-listing-preview";
+import {
+  WtbExistingMatchesBanner,
+  WtbExistingMatchesList,
+} from "@/features/wtb/wtb-existing-matches";
+import { useWtbExistingMatches } from "@/features/wtb/use-wtb-existing-matches";
 import {
   categoryBreadcrumb,
+  effectiveFiltersForCategory,
   vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
@@ -34,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatErrorMessage } from "@/lib/errors";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
@@ -44,12 +50,16 @@ import {
   type ComposerNavigationResult,
 } from "@/features/listing-creation/composer-navigation";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
+import { NewListingError } from "@/features/listing-creation/new-listing-error";
+import { useTitleCategorySuggestion } from "@/features/listing-creation/use-title-category-suggestion";
+import { useVehicleTitleCategoryHint } from "@/features/listing-creation/use-vehicle-title-category-hint";
 import { useAuth } from "@/hooks/use-auth";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
 import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 export const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
@@ -68,6 +78,12 @@ export const wtbSchema = z.object({
         .max(10_000_000, "Prisen er for høy"),
     ])
     .optional(),
+  postal_code: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
+    .optional()
+    .or(z.literal("")),
 });
 
 type WtbForm = z.infer<typeof wtbSchema>;
@@ -89,33 +105,8 @@ export const Route = createFileRoute("/ny-ok-annonse")({
     ],
   }),
   component: NewWtbPage,
-  errorComponent: NewWtbError,
+  errorComponent: NewListingError,
 });
-
-function NewWtbError({ error, reset }: ErrorComponentProps) {
-  const router = useRouter();
-  return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <AlertCircle className="mx-auto size-10 text-destructive" aria-hidden />
-      <h1 className="mt-4 font-display text-2xl">Noe gikk galt</h1>
-      <p className="mt-2 text-muted-foreground">{formatErrorMessage(error, "Ukjent feil")}</p>
-      <div className="mt-6 flex justify-center gap-3">
-        <Button
-          variant="outline"
-          onClick={() => {
-            void router.invalidate();
-            reset();
-          }}
-        >
-          Prøv igjen
-        </Button>
-        <Button asChild>
-          <Link to="/mine-annonser">Mine annonser</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function FieldValid({ show }: { show: boolean }) {
   if (!show) return null;
@@ -131,34 +122,46 @@ function capitalizeWord(value: unknown): string | null {
 }
 
 type WtbStep = "category" | "category-confirm" | "title" | "attributes" | "details" | "review";
-const WEB_STEPS: WtbStep[] = ["category", "attributes", "details", "review"];
-const NATIVE_STEPS: WtbStep[] = ["category", "title", "attributes", "details", "review"];
-const STEP_META: Record<WtbStep, { title: string; help: string }> = {
-  category: {
-    title: "Hva leter du etter?",
-    help: "Velg kategorien som passer best.",
-  },
-  "category-confirm": {
-    title: "Bekreft kategori",
-    help: "Vi har foreslått en kategori basert på tittelen din.",
-  },
-  title: {
-    title: "Gi kjøpsønsket en tittel",
-    help: "Beskriv kort hva du leter etter.",
-  },
-  attributes: {
-    title: "Hva er viktig for deg?",
-    help: "Legg bare til begrensninger som faktisk betyr noe.",
-  },
-  details: {
-    title: "Siste detaljer",
-    help: "Gjør kjøpsønsket tydelig før du publiserer.",
-  },
-  review: {
-    title: "Se over",
-    help: "Kontroller opplysningene og velg om du vil varsles om treff.",
-  },
-};
+// Tittelen får sitt eget steg før kategorien: kategoriforslaget bygger på
+// den, og kategoristeget spør da bare om å bekrefte forslaget.
+const BASE_STEPS: WtbStep[] = ["title", "category", "attributes", "details", "review"];
+
+function stepMeta(step: WtbStep): { title: string; help: string } {
+  switch (step) {
+    case "category":
+      return { title: "Velg kategori", help: "Kategorien avgjør hvilke annonser som gir treff." };
+    case "category-confirm":
+      return {
+        title: "Bekreft kategori",
+        help: "Vi har foreslått en kategori basert på tittelen din.",
+      };
+    case "title":
+      return { title: "Hva leter du etter?", help: "Beskriv kort hva du leter etter." };
+    case "attributes":
+      return {
+        title: "Hva er viktig for deg?",
+        help: "Legg bare til krav som faktisk betyr noe — Kaupet bruker dem til å finne treff.",
+      };
+    case "details":
+      return {
+        title: "Siste detaljer",
+        help: "Pris, område og beskrivelse gjør det lettere for selgere å se om de har det du leter etter.",
+      };
+    case "review":
+      return {
+        title: "Se over",
+        help: "Slik ser selgerne kjøpsønsket ditt. Trykk på en del for å endre den.",
+      };
+  }
+}
+
+const RADIUS_OPTIONS: { value: number | null; label: string }[] = [
+  { value: 10, label: "10 km" },
+  { value: 25, label: "25 km" },
+  { value: 50, label: "50 km" },
+  { value: 100, label: "100 km" },
+  { value: null, label: "Hele landet" },
+];
 
 function NewWtbPage() {
   const native = useIsNative();
@@ -171,21 +174,17 @@ function NewWtbPage() {
   const [skipCategoryStep] = useState(() => !!titleParam?.trim());
   // True once the user has resolved the category-confirm step (suggestion
   // click, manual pick, or "fortsett uten kategori") — removes
-  // "category-confirm" from `steps` for the rest of the session, mirroring
-  // ny-annonse.tsx's categoryConfirmed: the page it occupied just disappears,
-  // so "Neste" never lands on it twice and "Tilbake" from "review" goes
-  // straight to "details" instead of back into it.
+  // "category-confirm" from `steps` for the rest of the session, so "Neste"
+  // never lands on it twice. See confirmCategory for where the wizard
+  // continues afterwards.
   const [categoryConfirmed, setCategoryConfirmed] = useState(false);
+  const baseSteps = BASE_STEPS;
   const steps = useMemo(() => {
-    const base = native ? NATIVE_STEPS : WEB_STEPS;
-    if (!skipCategoryStep || categoryConfirmed) return base;
+    if (!skipCategoryStep || categoryConfirmed) return baseSteps;
     // "attributes" flyttes ut sammen med "category" og settes inn igjen rett
     // etter category-confirm: kriteriefeltene er utledet fra kategorien, så
-    // før den er valgt hadde steget ingenting å vise. Det ga et helt tomt
-    // "Hva er viktig for deg?" som førstesteg hver gang wizarden ble åpnet
-    // fra tittel-landingen, og feltene dukket først opp hvis brukeren gikk
-    // tilbake etter å ha valgt kategori.
-    const withoutCategory = base.filter(
+    // før den er valgt hadde steget ingenting å vise.
+    const withoutCategory = baseSteps.filter(
       (s) => s !== "category" && s !== "title" && s !== "attributes",
     );
     const detailsIdx = withoutCategory.indexOf("details");
@@ -196,10 +195,11 @@ function NewWtbPage() {
       "attributes" as const,
       ...withoutCategory.slice(insertAt),
     ];
-  }, [native, skipCategoryStep, categoryConfirmed]);
+  }, [baseSteps, skipCategoryStep, categoryConfirmed]);
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
-  const [notifyOnMatch, setNotifyOnMatch] = useState(false);
+  // Varsling er hele poenget med et kjøpsønske — på som standard.
+  const [notifyOnMatch, setNotifyOnMatch] = useState(true);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -212,15 +212,15 @@ function NewWtbPage() {
   const bypassNavigationBlockerRef = useRef(false);
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
-  const [categorySuggestions, setCategorySuggestions] = useState<
-    { category_id: string; name_nb: string }[]
-  >([]);
-  const [categorySuggestionLoading, setCategorySuggestionLoading] = useState(false);
   const [categoryConfirmShowPicker, setCategoryConfirmShowPicker] = useState(false);
-  const suggestionFiredImmediatelyRef = useRef(false);
-  const categoryLoadingMessage = CATEGORY_SUGGESTION_LOADING_MESSAGE;
+  const [postalLookup, setPostalLookup] = useState<{
+    postalCode: string;
+    result: Awaited<ReturnType<typeof lookupPostalCode>>;
+  } | null>(null);
+  const [radiusKm, setRadiusKm] = useState<number | null>(50);
 
   const step = steps[stepIndex];
+  const meta = stepMeta(step);
 
   const { data: allCategories = [] } = useCategories();
   const { data: isDemo = false } = useIsDemo();
@@ -235,6 +235,10 @@ function NewWtbPage() {
     for (const c of categories) m.set(c.id, c);
     return m;
   }, [categories]);
+  const bilOgMcCategoryId = useMemo(
+    () => allCategories.find((c) => c.slug === "bil-og-mc" && !c.parent_id)?.id ?? null,
+    [allCategories],
+  );
 
   const {
     register,
@@ -242,7 +246,7 @@ function NewWtbPage() {
     trigger,
     control,
     setValue,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, dirtyFields, isSubmitted },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
@@ -251,14 +255,54 @@ function NewWtbPage() {
       description: "",
       category_id: null,
       max_price_nok: "",
+      postal_code: "",
     },
   });
-  const [categoryId, title, description, maxPriceNok] = useWatch({
+  const [categoryId, title, description, maxPriceNok, postalCode] = useWatch({
     control,
-    name: ["category_id", "title", "description", "max_price_nok"],
+    name: ["category_id", "title", "description", "max_price_nok", "postal_code"],
   });
   const titleLength = title.length;
+  // Tittelfeltet autofokuseres, så «onTouched» alene ville vist feilen så
+  // snart fokus forsvinner fra et felt brukeren ikke har rørt. Vis den først
+  // når noe er skrevet, eller når brukeren har prøvd å gå videre/publisere.
+  const titleError =
+    errors.title && (dirtyFields.title || validationAttempt > 0 || isSubmitted)
+      ? errors.title
+      : undefined;
   const descriptionLength = (description ?? "").length;
+  const validPostalCode = /^\d{4}$/.test(postalCode ?? "") ? postalCode! : "";
+  const maxPriceNumber =
+    typeof maxPriceNok === "number"
+      ? maxPriceNok
+      : typeof maxPriceNok === "string" && /^\d+$/.test(maxPriceNok.trim())
+        ? Number(maxPriceNok)
+        : null;
+
+  // Postnummer → sted og postnummerets sentrum. Ikke GPS: området er et
+  // grovt kriterium, og koordinatene er offentlige på kjøpsønsket. Oppslaget
+  // lagres sammen med postnummeret det gjelder, så et utdatert svar aldri
+  // vises for et nytt postnummer.
+  useEffect(() => {
+    if (!validPostalCode) return;
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      const r = await lookupPostalCode(validPostalCode);
+      if (!cancelled) setPostalLookup({ postalCode: validPostalCode, result: r });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [validPostalCode]);
+  const currentLookup = postalLookup?.postalCode === validPostalCode ? postalLookup : null;
+  const city = currentLookup?.result?.city || null;
+  const lookupResult = currentLookup?.result ?? null;
+  const coords = useMemo(
+    () => (lookupResult ? { lat: lookupResult.lat, lng: lookupResult.lng } : null),
+    [lookupResult],
+  );
+  const postalLookupFailed = !!currentLookup && !currentLookup.result;
 
   const draftFields = useMemo(
     () => ({
@@ -269,8 +313,25 @@ function NewWtbPage() {
       notify_matches: notifyOnMatch,
       attributes,
       checked_keys: checkedKeys,
+      postal_code: postalCode ?? "",
+      city,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
+      radius_km: radiusKm,
     }),
-    [title, description, categoryId, maxPriceNok, notifyOnMatch, attributes, checkedKeys],
+    [
+      title,
+      description,
+      categoryId,
+      maxPriceNok,
+      notifyOnMatch,
+      attributes,
+      checkedKeys,
+      postalCode,
+      city,
+      coords,
+      radiusKm,
+    ],
   );
   const {
     draftId,
@@ -320,26 +381,55 @@ function NewWtbPage() {
 
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
-  useEffect(() => {
-    if (categoryId || title.trim().length < 5) return;
-    const fireImmediately = skipCategoryStep && !suggestionFiredImmediatelyRef.current;
-    if (fireImmediately) suggestionFiredImmediatelyRef.current = true;
-    // Synchronous so the category-confirm step's skeleton shows immediately,
-    // not one tick late (mirrors use-listing-title-hints.ts's same toggle).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCategorySuggestionLoading(true);
-    const timeout = window.setTimeout(
-      () => {
-        void prefetchCategorySuggestion(title.trim())
-          .then((result) => setCategorySuggestions(result.suggestions))
-          .catch(() => setCategorySuggestions([]))
-          .finally(() => setCategorySuggestionLoading(false));
+  // Samme motor som salgsflyten: stemmevektet tittel → kategori, med
+  // kjøretøymerke/-karosseri som reserve når stemmene ikke gir noe.
+  const clientCategoryHint = useVehicleTitleCategoryHint({
+    title,
+    allFilters,
+    categories: allCategories,
+    categoriesById,
+    bilOgMcCategoryId,
+  });
+  // Finner verken stemmene eller kjøretøyhintet noe, spør vi Mistral — men
+  // først når brukeren står på kategoristeget, ikke mens tittelen skrives.
+  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+  const { categorySuggestions, categorySuggestionPending } = useTitleCategorySuggestion({
+    title,
+    muted: !!categoryId,
+    clientCategoryHint,
+    aiFallback: {
+      enabled: turnstileEnabled && (step === "category" || step === "category-confirm"),
+      getToken: async () => {
+        // Uten token innen rimelig tid viser vi heller velgeren enn å vente.
+        const token = await Promise.race([
+          turnstileRef.current?.getResponsePromise() ?? Promise.resolve(null),
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8_000)),
+        ]).catch(() => null);
+        turnstileRef.current?.reset();
+        return token;
       },
-      fireImmediately ? 0 : 400,
-    );
-    return () => window.clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryId, title]);
+    },
+  });
+
+  const criteriaSummary = wtbCriteriaSummary(
+    effectiveFiltersForCategory(categoryId ?? null, allFilters ?? [], categoriesById),
+    attributes,
+  );
+  const locationLabel = wtbLocationLabel({
+    postal_code: validPostalCode,
+    city,
+    radius_km: coords ? radiusKm : null,
+  });
+
+  const { data: existingMatches } = useWtbExistingMatches({
+    categoryId: categoryId ?? null,
+    maxPriceNok: maxPriceNumber,
+    attributes,
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
+    radiusKm: coords ? radiusKm : null,
+  });
 
   const shouldBlockNav = !published && (title.trim().length > 0 || stepIndex > 0);
   const blocker = useBlocker({
@@ -362,6 +452,11 @@ function NewWtbPage() {
           max_price_nok: typeof values.max_price_nok === "number" ? values.max_price_nok : null,
           notify_matches: notifyOnMatch,
           attributes,
+          postal_code: values.postal_code || null,
+          city,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+          radius_km: radiusKm,
         },
       });
       return result.id;
@@ -379,18 +474,31 @@ function NewWtbPage() {
     },
   });
 
-  function goNext() {
+  function goToStep(index: number) {
     setValidationError(null);
-    setStepIndex((i) =>
+    setStepIndex(index);
+    window.scrollTo({ top: 0 });
+  }
+
+  function goNext() {
+    goToStep(
       composerForwardStep(
-        Math.min(i + 1, steps.length - 1),
+        Math.min(stepIndex + 1, steps.length - 1),
         steps.length - 1,
         returnToReviewRef.current,
       ),
     );
     returnToReviewRef.current = false;
-    window.scrollTo({ top: 0 });
   }
+
+  const titleStep: WtbStep = "title";
+
+  const detailsFields: (keyof WtbForm)[] = [
+    "description",
+    "max_price_nok",
+    "postal_code",
+    ...(vehicleGroup && !native ? (["title"] as const) : []),
+  ];
 
   async function attemptNext(): Promise<ComposerNavigationResult> {
     if (step === "review") return "busy";
@@ -398,12 +506,10 @@ function NewWtbPage() {
     forwardBusyRef.current = true;
     try {
       const valid =
-        step === "title"
+        step === titleStep
           ? await trigger("title", { shouldFocus: true })
           : step === "details"
-            ? await trigger(native ? ["description", "max_price_nok"] : undefined, {
-                shouldFocus: true,
-              })
+            ? await trigger(detailsFields, { shouldFocus: true })
             : true;
       if (!valid) {
         setValidationError("Rett feltene som er markert før du fortsetter.");
@@ -416,6 +522,22 @@ function NewWtbPage() {
       forwardBusyRef.current = false;
     }
   }
+
+  /** Kategoristeget: tittelen er allerede validert på forrige steg. */
+  function chooseCategory(id: string | null) {
+    setValue("category_id", id, { shouldValidate: true });
+    goNext();
+  }
+
+  /** Avslutter category-confirm. Steglisten blir den vanlige igjen, så vi
+   * setter eksplisitt kurs mot kriteriene — indeksen fra den forkortede
+   * listen peker på et annet steg i den fulle. */
+  function confirmCategory(id: string | null) {
+    if (id) setValue("category_id", id, { shouldValidate: true });
+    setCategoryConfirmed(true);
+    goToStep(baseSteps.indexOf("attributes"));
+  }
+
   function goBack() {
     // Mirrors the hidden Tilbake/Neste on category-confirm — single function
     // behind the footer button, the shell's header arrow, the native swipe
@@ -427,6 +549,23 @@ function NewWtbPage() {
     setStepIndex((i) => Math.max(i - 1, 0));
   }
   useComposerHistoryBack(stepIndex === 0, goBack);
+
+  function editSection(section: WtbPreviewSection) {
+    const target: WtbStep =
+      section === "title"
+        ? vehicleGroup && !native
+          ? "details"
+          : titleStep
+        : section === "category"
+          ? "category"
+          : section === "criteria"
+            ? "attributes"
+            : "details";
+    const index = steps.indexOf(target);
+    if (index === -1) return;
+    returnToReviewRef.current = true;
+    goToStep(index);
+  }
 
   // Brukt av GuestPublishSheet: samme redirect-flyt som ble kalt direkte før
   // arket erstattet det umiddelbare navigasjonshoppet.
@@ -441,11 +580,11 @@ function NewWtbPage() {
 
   function handleInvalid(fields: FieldErrors<WtbForm>) {
     const targetStep = fields.title
-      ? steps.indexOf(native ? "title" : "category")
-      : fields.description || fields.max_price_nok
+      ? steps.indexOf(vehicleGroup && !native ? "details" : titleStep)
+      : fields.description || fields.max_price_nok || fields.postal_code
         ? steps.indexOf("details")
         : stepIndex;
-    setStepIndex(targetStep);
+    setStepIndex(targetStep === -1 ? stepIndex : targetStep);
     setValidationError("Rett feltene som er markert før du fortsetter.");
   }
 
@@ -466,6 +605,8 @@ function NewWtbPage() {
         ? restoredMaxPrice
         : "",
     );
+    setValue("postal_code", restorableDraft.postal_code ?? "");
+    if (restorableDraft.radius_km !== undefined) setRadiusKm(restorableDraft.radius_km);
     setNotifyOnMatch(restorableDraft.notify_matches);
     setAttributes(restorableDraft.attributes);
     setCheckedKeys(restorableDraft.checked_keys);
@@ -506,6 +647,13 @@ function NewWtbPage() {
           </div>
         )}
 
+        {existingMatches && (
+          <WtbExistingMatchesList
+            count={existingMatches.count}
+            listings={existingMatches.listings}
+          />
+        )}
+
         <div className="flex w-full flex-col gap-2">
           <Button
             onClick={() =>
@@ -522,7 +670,86 @@ function NewWtbPage() {
     );
   }
 
+  const preview = (
+    <WtbListingPreview
+      title={title}
+      categoryLabel={categoryLabel}
+      criteriaSummary={criteriaSummary}
+      description={description ?? ""}
+      maxPriceNok={maxPriceNumber}
+      locationLabel={locationLabel}
+    />
+  );
+
+  /** Kategorivalget på både "category" og "category-confirm": forslaget fra
+   * tittelen som et ja/nei-spørsmål når vi har et, ellers (eller etter «Nei»)
+   * kategorivelgeren. */
+  const onChoose = (id: string | null) =>
+    step === "category-confirm" ? confirmCategory(id) : chooseCategory(id);
+  const categoryChoice = (
+    <section className="space-y-3">
+      {categoryConfirmShowPicker ||
+      (categorySuggestions.length === 0 && !categorySuggestionPending) ? (
+        <>
+          <Label>Velg kategori</Label>
+          <CategoryPicker
+            inline
+            open={false}
+            onOpenChange={() => {}}
+            categories={categories}
+            selectedId={categoryId ?? ""}
+            onSelect={(id) => onChoose(id)}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="min-h-12"
+            onClick={() => onChoose(null)}
+          >
+            Jeg er usikker – fortsett uten kategori
+          </Button>
+        </>
+      ) : categorySuggestions.length === 0 ? (
+        <div className="space-y-4 py-6 text-center" role="status" aria-live="polite" aria-busy>
+          <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
+          <p className="text-sm text-muted-foreground">{CATEGORY_SUGGESTION_LOADING_MESSAGE}</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCategoryConfirmShowPicker(true)}
+          >
+            Velg kategori selv
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4 py-4 text-center">
+          <p className="text-lg font-semibold">
+            {categorySuggestions.length > 1
+              ? `Er kjøpsønsket i kategori ${categorySuggestions.map((s) => s.name_nb).join(" eller ")}?`
+              : `Kjøpsønsket blir opprettet i kategori ${categoryBreadcrumb(categorySuggestions[0].category_id, categoriesById) || categorySuggestions[0].name_nb}. Er det riktig?`}
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {categorySuggestions.map((s) => (
+              <Button key={s.category_id} type="button" onClick={() => onChoose(s.category_id)}>
+                {categorySuggestions.length > 1 ? s.name_nb : "Ja"}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCategoryConfirmShowPicker(true)}
+            >
+              Nei, velg selv
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+
   const isCategoryConfirmStep = step === "category-confirm";
+  const nextStep = steps[stepIndex + 1];
   const footer = (
     <>
       {!native && stepIndex > 0 && !isCategoryConfirmStep && (
@@ -534,19 +761,13 @@ function NewWtbPage() {
         <Button
           type="button"
           onClick={() => void attemptNext()}
-          disabled={!native && step === "attributes" && !vehicleGroup && !title.trim()}
-          aria-describedby={
-            !native && step === "attributes" && !vehicleGroup && !title.trim()
-              ? "wtb-continue-requirement"
-              : undefined
-          }
           className={
             native
               ? "min-h-12 min-w-24 rounded-xl px-3 text-base"
               : "w-full h-14 text-base lg:h-11 lg:w-auto lg:text-sm"
           }
         >
-          {native ? "Fortsett" : `Neste: ${STEP_META[steps[stepIndex + 1]].title}`}{" "}
+          {native || !nextStep ? "Fortsett" : `Neste: ${stepMeta(nextStep).title}`}{" "}
           <ChevronRight className="size-4" aria-hidden />
         </Button>
       ) : (
@@ -578,12 +799,48 @@ function NewWtbPage() {
     </>
   );
 
+  const titleField = (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label htmlFor="title">
+          Tittel <span className="text-destructive">*</span>
+        </Label>
+        <span className="text-xs text-muted-foreground">{titleLength}/120</span>
+      </div>
+      <Input
+        id="title"
+        placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
+        autoFocus
+        aria-invalid={!!titleError}
+        aria-describedby={titleError ? "title-error" : undefined}
+        {...register("title", {
+          // Som før: bare native-kortet regnes som manuell tittel; på web kan
+          // kjøretøytittelen fortsatt fylles ut fra årsmodell/merke/modell.
+          onChange: native ? () => setTitleManualOverride(true) : undefined,
+        })}
+      />
+      {titleError && (
+        <p id="title-error" className="text-sm text-destructive">
+          {titleError.message}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <>
+      {turnstileEnabled && (
+        // Usynlig; tokenet brukes bare til KI-kategoriforslaget.
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+          options={{ appearance: "interaction-only", action: "kaupet" }}
+        />
+      )}
       <ListingComposerShell
         title="Ønskes kjøpt"
         pageKey={step}
-        pageTitle={STEP_META[step].title}
+        pageTitle={meta.title}
         native={native}
         backLabel={stepIndex === 0 ? "Avbryt" : "Tilbake"}
         onBack={
@@ -629,21 +886,34 @@ function NewWtbPage() {
           <ComposerStepIndicator
             current={stepIndex + 1}
             total={steps.length}
-            label={STEP_META[step].title}
-            stepLabels={steps.map((s) => STEP_META[s].title)}
-            onSelectStep={(target) => {
-              setStepIndex(target - 1);
-              window.scrollTo({ top: 0 });
-            }}
+            label={meta.title}
+            stepLabels={steps.map((s) => stepMeta(s).title)}
+            onSelectStep={(target) => goToStep(target - 1)}
           />
         }
         status={
           isSaving ? (
-            <p className="mt-1 text-right text-xs text-muted-foreground">Lagrer utkast …</p>
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-1 text-right text-xs text-muted-foreground"
+            >
+              Lagrer utkast …
+            </p>
           ) : draftSaveError ? (
-            <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
+            <p
+              role="alert"
+              aria-live="assertive"
+              className="mt-1 text-right text-xs text-destructive"
+            >
+              Utkast ble ikke lagret
+            </p>
           ) : lastSaved ? (
-            <p className="mt-1 text-right text-xs text-muted-foreground">
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-1 text-right text-xs text-muted-foreground"
+            >
               Utkast lagret kl.{" "}
               {lastSaved.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
             </p>
@@ -654,183 +924,27 @@ function NewWtbPage() {
         footer={footer}
         firstStep={stepIndex === 0}
         contentClassName="flex flex-col gap-6"
+        // På Se over er hovedkolonnen allerede kjøpsønsket — ingen dobbel visning.
+        preview={step !== "review" ? preview : undefined}
+        previewLabel="Slik ser selgerne kjøpsønsket"
+        previewSection={
+          step === "attributes" ? "criteria" : step === "details" ? "details" : "title"
+        }
       >
         <NativeComposerDeck
           enabled={native}
           onBack={stepIndex === 0 || isCategoryConfirmStep ? undefined : goBack}
           onForward={attemptNext}
         >
-          <p className="text-sm text-muted-foreground">{STEP_META[step].help}</p>
+          <p className="text-sm text-muted-foreground">{meta.help}</p>
           {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
           slik at verken Enter i input-felter eller knappe-bytte i footeren kan utløse den. */}
-          {step === "category" && (
-            <section className="space-y-3">
-              {!native && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="title">Kort beskrivelse</Label>
-                    <span className="text-xs text-muted-foreground">{titleLength}/120</span>
-                  </div>
-                  <Input
-                    id="title"
-                    placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
-                    autoFocus
-                    aria-invalid={!!errors.title}
-                    aria-describedby={errors.title ? "title-error" : undefined}
-                    {...register("title")}
-                  />
-                  {errors.title && (
-                    <p id="title-error" className="text-sm text-destructive">
-                      {errors.title.message}
-                    </p>
-                  )}
-                </div>
-              )}
-              {!native && !categoryId && categorySuggestions.length > 0 && (
-                <div className="space-y-2">
-                  {categorySuggestions.map((s) => (
-                    <button
-                      key={s.category_id}
-                      type="button"
-                      className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
-                      onClick={() => {
-                        setValue("category_id", s.category_id, { shouldValidate: true });
-                        setCategorySuggestions([]);
-                      }}
-                    >
-                      <span>
-                        <span className="block text-sm text-muted-foreground">
-                          Foreslått kategori
-                        </span>
-                        <span className="font-medium">{s.name_nb}</span>
-                      </span>
-                      <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
-                    </button>
-                  ))}
-                </div>
-              )}
-              <Label>Velg kategori</Label>
-              <CategoryPicker
-                inline
-                open={false}
-                onOpenChange={() => {}}
-                categories={categories}
-                selectedId={categoryId ?? ""}
-                onSelect={(id) => {
-                  setValue("category_id", id, { shouldValidate: true });
-                  goNext();
-                }}
-              />
-              <Button type="button" size="sm" variant="ghost" className="min-h-12" onClick={goNext}>
-                Jeg er usikker – fortsett uten kategori
-              </Button>
-            </section>
-          )}
+          {step === "title" && <section>{titleField}</section>}
 
-          {step === "category-confirm" && (
-            <section className="space-y-3">
-              {categoryConfirmShowPicker ||
-              (categorySuggestions.length === 0 && !categorySuggestionLoading) ? (
-                <>
-                  <Label>Velg kategori</Label>
-                  <CategoryPicker
-                    inline
-                    open={false}
-                    onOpenChange={() => {}}
-                    categories={categories}
-                    selectedId={categoryId ?? ""}
-                    onSelect={(id) => {
-                      setValue("category_id", id, { shouldValidate: true });
-                      setCategoryConfirmed(true);
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-12"
-                    onClick={() => setCategoryConfirmed(true)}
-                  >
-                    Jeg er usikker – fortsett uten kategori
-                  </Button>
-                </>
-              ) : categorySuggestionLoading || categorySuggestions.length === 0 ? (
-                <div className="space-y-4 py-6 text-center">
-                  <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
-                  <p className="text-sm text-muted-foreground">{categoryLoadingMessage}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCategoryConfirmShowPicker(true)}
-                  >
-                    Velg kategori selv
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4 py-4 text-center">
-                  <p className="text-lg font-semibold">
-                    {categorySuggestions.length > 1
-                      ? `Er denne annonsen i kategori ${categorySuggestions.map((s) => s.name_nb).join(" eller ")}?`
-                      : `Denne annonsen blir opprettet i kategori ${categorySuggestions[0].name_nb}. Er det riktig?`}
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {categorySuggestions.map((s) => (
-                      <Button
-                        key={s.category_id}
-                        type="button"
-                        onClick={() => {
-                          setValue("category_id", s.category_id, { shouldValidate: true });
-                          setCategorySuggestions([]);
-                          setCategoryConfirmed(true);
-                        }}
-                      >
-                        {s.name_nb}
-                      </Button>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setCategoryConfirmShowPicker(true)}
-                    >
-                      Nei
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
-
-          {step === "title" && (
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="title">
-                  Tittel <span className="text-destructive">*</span>
-                </Label>
-                <span className="text-xs text-muted-foreground">{titleLength}/120</span>
-              </div>
-              <Input
-                id="title"
-                placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
-                autoFocus
-                aria-invalid={!!errors.title}
-                aria-describedby={errors.title ? "title-error" : undefined}
-                {...register("title", { onChange: () => setTitleManualOverride(true) })}
-              />
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive">
-                  {errors.title.message}
-                </p>
-              )}
-            </section>
-          )}
+          {(step === "category" || step === "category-confirm") && categoryChoice}
 
           {step === "attributes" && (
-            <section className="space-y-2">
-              {!native && !vehicleGroup && !title.trim() && (
-                <p id="wtb-continue-requirement" className="text-sm text-destructive">
-                  Legg inn en kort beskrivelse på første steg før du fortsetter.
-                </p>
-              )}
+            <section className="space-y-4">
               {categoryLabel && (
                 <p className="text-sm text-muted-foreground">
                   Kategori: <span className="font-medium text-foreground">{categoryLabel}</span>
@@ -845,6 +959,35 @@ function NewWtbPage() {
                 onCheckedKeysChange={setCheckedKeys}
                 native={native}
               />
+              <div className="space-y-2">
+                <Label htmlFor="wtb-keywords">
+                  Nøkkelord for treff{" "}
+                  <span className="font-normal text-muted-foreground">(valgfritt)</span>
+                </Label>
+                <p id="wtb-keywords-help" className="text-xs text-muted-foreground">
+                  Da får du bare treff på annonser der ordet står i tittelen eller beskrivelsen,
+                  f.eks. en utstyrskode. Vises ikke i annonsen.
+                </p>
+                <Input
+                  id="wtb-keywords"
+                  aria-describedby="wtb-keywords-help"
+                  placeholder="f.eks. utstyrskode"
+                  value={
+                    typeof attributes[WTB_FREETEXT_KEY] === "string"
+                      ? attributes[WTB_FREETEXT_KEY]
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setAttributes((prev) => {
+                      const next = { ...prev };
+                      if (e.target.value) next[WTB_FREETEXT_KEY] = e.target.value;
+                      else delete next[WTB_FREETEXT_KEY];
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <WtbExistingMatchesBanner count={existingMatches?.count} />
             </section>
           )}
 
@@ -885,14 +1028,14 @@ function NewWtbPage() {
                       id="title"
                       placeholder="f.eks. 2019 BMW 320d"
                       autoFocus
-                      aria-invalid={!!errors.title}
-                      aria-describedby={errors.title ? "title-error" : undefined}
+                      aria-invalid={!!titleError}
+                      aria-describedby={titleError ? "title-error" : undefined}
                       {...register("title")}
                     />
                   )}
-                  {errors.title && (
+                  {titleError && (
                     <p id="title-error" className="text-sm text-destructive">
-                      {errors.title.message}
+                      {titleError.message}
                     </p>
                   )}
                 </section>
@@ -924,29 +1067,6 @@ function NewWtbPage() {
               </section>
 
               <section className="space-y-2">
-                <Label htmlFor="wtb-freetext">
-                  Fritekstsøk <span className="font-normal text-muted-foreground">(valgfritt)</span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Brukes til å matche annonsen din mot søk fra selgere, f.eks. en utstyrskode. Vises
-                  ikke i annonsen.
-                </p>
-                <Input
-                  id="wtb-freetext"
-                  placeholder="Utstyrskode eller annen relevant informasjon"
-                  value={typeof attributes.__freetext === "string" ? attributes.__freetext : ""}
-                  onChange={(e) =>
-                    setAttributes((prev) => {
-                      const next = { ...prev };
-                      if (e.target.value) next.__freetext = e.target.value;
-                      else delete next.__freetext;
-                      return next;
-                    })
-                  }
-                />
-              </section>
-
-              <section className="space-y-2">
                 <Label htmlFor="max_price">
                   Maks pris du vil betale{" "}
                   <span className="font-normal text-muted-foreground">(valgfritt)</span>
@@ -969,11 +1089,88 @@ function NewWtbPage() {
                   </p>
                 )}
               </section>
+
+              <section className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="postal_code">
+                    Område <span className="font-normal text-muted-foreground">(valgfritt)</span>
+                  </Label>
+                  <p id="postal-code-help" className="text-xs text-muted-foreground">
+                    Postnummeret du vil hente i nærheten av. Annonser som kan sendes, matcher
+                    uansett avstand.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="postal_code"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="Postnummer"
+                      className="w-36"
+                      aria-invalid={!!errors.postal_code}
+                      aria-describedby={
+                        errors.postal_code
+                          ? "postal-code-error postal-code-help"
+                          : "postal-code-help"
+                      }
+                      {...register("postal_code")}
+                    />
+                    {city && <p className="text-sm text-muted-foreground">{city}</p>}
+                  </div>
+                  {errors.postal_code && (
+                    <p id="postal-code-error" className="text-sm text-destructive">
+                      {errors.postal_code.message}
+                    </p>
+                  )}
+                  {postalLookupFailed && (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      Fant ikke sted for dette postnummeret. Sjekk at det stemmer.
+                    </p>
+                  )}
+                </div>
+                {coords && (
+                  <div className="space-y-2">
+                    <Label id="wtb-radius-label">Avstand</Label>
+                    <RadioGroup
+                      aria-labelledby="wtb-radius-label"
+                      value={radiusKm == null ? "all" : String(radiusKm)}
+                      onValueChange={(v) => setRadiusKm(v === "all" ? null : Number(v))}
+                      className="flex flex-wrap gap-2"
+                    >
+                      {RADIUS_OPTIONS.map((option) => {
+                        const value = option.value == null ? "all" : String(option.value);
+                        return (
+                          <Label
+                            key={value}
+                            htmlFor={`wtb-radius-${value}`}
+                            className="native-touch-target flex min-h-12 cursor-pointer items-center gap-2 rounded-md border border-border px-3 font-normal has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                          >
+                            <RadioGroupItem id={`wtb-radius-${value}`} value={value} />
+                            {option.label}
+                          </Label>
+                        );
+                      })}
+                    </RadioGroup>
+                  </div>
+                )}
+              </section>
+              <WtbExistingMatchesBanner count={existingMatches?.count} />
             </>
           )}
 
           {step === "review" && (
             <div className="space-y-6">
+              <div className="rounded-xl border border-border bg-card">
+                <WtbListingPreview
+                  title={title}
+                  categoryLabel={categoryLabel}
+                  criteriaSummary={criteriaSummary}
+                  description={description ?? ""}
+                  maxPriceNok={maxPriceNumber}
+                  locationLabel={locationLabel}
+                  onEdit={editSection}
+                />
+              </div>
+              <WtbExistingMatchesBanner count={existingMatches?.count} />
               <label
                 htmlFor="notify-on-match"
                 aria-label="Varsle meg om matchende annonser"

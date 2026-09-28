@@ -27,7 +27,7 @@ import {
   effectiveFiltersForCategory,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { wtbCriteriaSummary } from "@/features/wtb/wtb-criteria-presentation";
+import { wtbCriteriaSummary, wtbLocationLabel } from "@/features/wtb/wtb-criteria-presentation";
 import { EditableField } from "@/features/listing-edit/editable-field";
 import { EditableRegion } from "@/features/listing-edit/editable-region";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ function WtbListingPage() {
       const { data, error } = await supabase
         .from("wtb_listings")
         .select(
-          "id, user_id, title, description, category_id, max_price_nok, attributes, status, published_at, updated_at",
+          "id, user_id, title, description, category_id, max_price_nok, attributes, status, published_at, updated_at, postal_code, city, radius_km",
         )
         .eq("id", id)
         .single();
@@ -170,6 +170,7 @@ function WtbListingPage() {
     categoriesById,
   );
   const criteriaSummary = wtbCriteriaSummary(criteriaFilters, attributes);
+  const locationLabel = wtbLocationLabel(listing);
 
   return (
     <WtbEditContext.Provider value={editContext ?? null}>
@@ -344,6 +345,13 @@ function WtbListingPage() {
               onSave={(v) => saveField({ group: "max_price", max_price_nok: v })}
             />
           </section>
+
+          {locationLabel && (
+            <section className="space-y-2">
+              <span className="text-sm font-medium text-muted-foreground">Område</span>
+              <p>{locationLabel}</p>
+            </section>
+          )}
         </div>
 
         {!isOwner && (

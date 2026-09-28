@@ -29,8 +29,8 @@ function categoryCandidates(categories: CategoryRow[], title: string) {
     return current;
   }
 
-  // Keep every leaf available: Mistral Small 4 has enough context for the
-  // complete category list, and lexical pruning can hide the correct answer.
+  // Keep every leaf available: the model has enough context for the complete
+  // category list, and lexical pruning can hide the correct answer.
   return roots.flatMap((root) =>
     leaves
       .filter((leaf) => rootOf(leaf).id === root.id)
@@ -48,11 +48,15 @@ function categoryCandidates(categories: CategoryRow[], title: string) {
 
 /**
  * AI fallback for `suggestCategoryForTitle` (category-suggestion.functions.ts),
- * used only when the vote-based RPC has no confident match. Prompts Mistral
- * Small 4 to pick one or two category slugs from the full leaf list, then
+ * used only when the vote-based RPC has no confident match. Prompts
+ * TITLE_MODEL to pick one or two category slugs from the full leaf list, then
  * validates the answer(s) against real categories before returning them.
  * Returns null if nothing validated, otherwise 1-2 candidates.
  */
+// Ministral 3 3B: Mistrals rimeligste modell — en tittel mot en fast
+// kandidatliste med JSON-skjema trenger ikke mer.
+const TITLE_MODEL = "ministral-3b-2512";
+
 export async function suggestCategoryForTitleAi(input: unknown) {
   const { title } = inputSchema.parse(input);
 
@@ -105,10 +109,9 @@ ${examplesBlock}Annonsetittel: "${truncatedTitle}"`;
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "mistral-small-2603",
+        model: TITLE_MODEL,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 32,
-        reasoning_effort: "none",
         temperature: 0,
         response_format: {
           type: "json_schema",

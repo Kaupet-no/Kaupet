@@ -117,7 +117,9 @@ Fotoforslaget (`suggestListingFromPhotosAi`, både `identify` og `attributes`)
 bruker nå **Ministral 3 14B** (`ministral-14b-2512`) i stedet for Mistral
 Small 4 (`mistral-small-2603`). Samme leverandør, samme EU-endepunkt og samme
 DPA — kun modellnavnet i kallet er endret. Tekstforslaget
-(`suggestCategoryForTitleAi`) står fortsatt på Small 4.
+(`suggestCategoryForTitleAi`) bruker fra 28. september 2026 **Ministral 3 3B**
+(`ministral-3b-2512`), Mistrals rimeligste modell, som reserve i ønskes
+kjøpt-flyten når intern kategorimatching ikke finner noe.
 
 Målt med `bun scripts/eval-photo-identify.ts` (11 tydelige bilder, 480 px,
 hele kategoritreet). Priser fra `mistral.ai/pricing/api` per 2026-09-25, kostnad

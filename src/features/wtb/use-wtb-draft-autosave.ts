@@ -18,6 +18,12 @@ export type WtbDraftData = {
   notify_matches: boolean;
   attributes: WtbAttributeMap;
   checked_keys: string[];
+  /** Valgfritt område. Mangler i utkast lagret før feltet fantes. */
+  postal_code?: string;
+  city?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  radius_km?: number | null;
 };
 
 function loadRestorableDraft(): WtbDraftData | null {
@@ -83,6 +89,11 @@ export function useWtbDraftAutosave(
             notify_matches: server.notify_matches ?? false,
             attributes,
             checked_keys: Object.keys(attributes).filter((key) => key !== "__freetext"),
+            postal_code: server.postal_code ?? "",
+            city: server.city,
+            lat: server.lat,
+            lng: server.lng,
+            radius_km: server.radius_km,
           });
         })
         .catch(() => {
@@ -194,6 +205,14 @@ export function useWtbDraftAutosave(
             max_price_nok: maxPriceNok,
             notify_matches: currentFields.notify_matches,
             attributes: currentFields.attributes,
+            // Et halvskrevet postnummer ville fått serveren til å avvise hele utkastet.
+            postal_code: /^\d{4}$/.test(currentFields.postal_code ?? "")
+              ? currentFields.postal_code
+              : null,
+            city: currentFields.city ?? null,
+            lat: currentFields.lat ?? null,
+            lng: currentFields.lng ?? null,
+            radius_km: currentFields.radius_km ?? null,
           },
         });
         setDraftId(result.id);

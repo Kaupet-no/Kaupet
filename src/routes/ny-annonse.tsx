@@ -32,9 +32,7 @@ import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lo
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { usePhotoSuggestion } from "@/features/listing-creation/use-photo-suggestion";
-import { suggestVehicleCategoryForTitle } from "@/lib/search-category-match";
-import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useVehicleTitleCategoryHint } from "@/features/listing-creation/use-vehicle-title-category-hint";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
@@ -437,48 +435,16 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
-  // Fanger opp kjøretøytitler `suggest_category_for_title` (RPC-en bak
-  // useListingTitleHints) bommer på: den matcher kun mot historiske
-  // annonser og kategorinavn, så en tittel med bare merke/modell/karosseri
-  // ("Volvo V70 stasjonsvogn") gir ingen treff siden ingen kategori heter
-  // "Volvo". Gjenbruker søkets eksisterende merke-/attributtmatching
-  // (search-category-match.ts) som allerede løser akkurat dette for
-  // søkefeltet på /annonser — se suggestVehicleCategoryForTitle. Debounces
-  // på samme 400 ms som RPC-en for å unngå å flimre et annet forslag mens
-  // brukeren fortsatt skriver.
-  //
   // Hentet opp hit (foran baseFieldGroupKeys) fordi showCategoryConfirm
   // under trenger å vite om AI-forslaget er kjøretøy/båt før resten av
   // flyten regnes ut — se suggestionNeedsCategoryConfirm.
-  const debouncedTitleForVehicleHint = useDebouncedValue(title.trim(), 400);
-  const { data: vehicleBrands } = useAllVehicleBrands();
-  // Samme react-query-cache-oppføring som useVehicleLookupFlow (kalt lenger
-  // ned på denne siden) allerede henter via useAllVehicleModels — ingen
-  // ekstra nettverkskall her.
-  const { data: vehicleModels } = useAllVehicleModels();
-  const clientCategoryHint = useMemo(
-    () =>
-      debouncedTitleForVehicleHint.length >= 5
-        ? suggestVehicleCategoryForTitle({
-            title: debouncedTitleForVehicleHint,
-            vehicleBrands: vehicleBrands ?? [],
-            vehicleModels: vehicleModels ?? [],
-            allFilters: allFilters ?? [],
-            categories: categories ?? [],
-            categoriesById,
-            bilOgMcCategoryId,
-          })
-        : null,
-    [
-      debouncedTitleForVehicleHint,
-      vehicleBrands,
-      vehicleModels,
-      allFilters,
-      categories,
-      categoriesById,
-      bilOgMcCategoryId,
-    ],
-  );
+  const clientCategoryHint = useVehicleTitleCategoryHint({
+    title,
+    allFilters,
+    categories,
+    categoriesById,
+    bilOgMcCategoryId,
+  });
 
   const {
     categorySuggestions,

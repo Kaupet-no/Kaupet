@@ -32,15 +32,10 @@ Streamable HTTP, se docs/PROFF-API.md sin MCP-seksjon) for AI-agenter/LLM-
 klienter — tynne verktøy-innpakninger (`src/features/listing-api/mcp-tools.ts`)
 rundt de samme funksjonene REST-et bruker.
 
-Eksterne tredjepartstjenester (kalt kun server-side, se § 3):
-
-- Vipps/MobilePay for betaling (promoteringer).
-- Cloudflare Turnstile for bot-beskyttelse ved annonsepublisering.
-- Cloudflare R2 (S3-kompatibelt API) for bildelagring; autorisasjon håndheves
-  av serverfunksjoner, ikke bucket-policyer.
-- Statens Vegvesen (Datautlevering) for kjøretøyoppslag.
-- Mistral API (Mistral Small 4) for AI-basert kategoriforslag, som fallback
-  når vote-basert forslag mangler treffsikker historikk.
+Eksterne tredjepartstjenester kalles kun server-side (se § 3). Miljøer,
+Cloudflare-oppsett, planlagte jobber, eksterne tjenester, hemmeligheter og
+CI/CD er beskrevet i [INFRASTRUKTUR.md](INFRASTRUKTUR.md) — oppdater den i
+samme commit når infrastrukturen endres.
 
 ## 2. Avhengighetsretning
 
@@ -205,4 +200,5 @@ Ikke opprett ADR for vanlig komponentarbeid eller små refaktoreringer.
 - Er rollback mulig, og må migrasjon/appkode deployes i to steg?
 - Skjer nye eksterne API-kall kun server-side, med nøkler i secrets/Worker-
   secrets — ikke i `VITE_*` eller committet i klartekst?
-- Introduserer endringen en ny ekstern avhengighet? Vurder en ADR (§ 10).
+- Introduserer endringen en ny ekstern avhengighet? Vurder en ADR (§ 10), og
+  oppdater [INFRASTRUKTUR.md](INFRASTRUKTUR.md).

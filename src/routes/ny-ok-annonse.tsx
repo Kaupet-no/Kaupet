@@ -246,7 +246,7 @@ function NewWtbPage() {
     trigger,
     control,
     setValue,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, dirtyFields, isSubmitted },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
@@ -263,6 +263,13 @@ function NewWtbPage() {
     name: ["category_id", "title", "description", "max_price_nok", "postal_code"],
   });
   const titleLength = title.length;
+  // Tittelfeltet autofokuseres, så «onTouched» alene ville vist feilen så
+  // snart fokus forsvinner fra et felt brukeren ikke har rørt. Vis den først
+  // når noe er skrevet, eller når brukeren har prøvd å gå videre/publisere.
+  const titleError =
+    errors.title && (dirtyFields.title || validationAttempt > 0 || isSubmitted)
+      ? errors.title
+      : undefined;
   const descriptionLength = (description ?? "").length;
   const validPostalCode = /^\d{4}$/.test(postalCode ?? "") ? postalCode! : "";
   const maxPriceNumber =
@@ -804,17 +811,17 @@ function NewWtbPage() {
         id="title"
         placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
         autoFocus
-        aria-invalid={!!errors.title}
-        aria-describedby={errors.title ? "title-error" : undefined}
+        aria-invalid={!!titleError}
+        aria-describedby={titleError ? "title-error" : undefined}
         {...register("title", {
           // Som før: bare native-kortet regnes som manuell tittel; på web kan
           // kjøretøytittelen fortsatt fylles ut fra årsmodell/merke/modell.
           onChange: native ? () => setTitleManualOverride(true) : undefined,
         })}
       />
-      {errors.title && (
+      {titleError && (
         <p id="title-error" className="text-sm text-destructive">
-          {errors.title.message}
+          {titleError.message}
         </p>
       )}
     </div>
@@ -1021,14 +1028,14 @@ function NewWtbPage() {
                       id="title"
                       placeholder="f.eks. 2019 BMW 320d"
                       autoFocus
-                      aria-invalid={!!errors.title}
-                      aria-describedby={errors.title ? "title-error" : undefined}
+                      aria-invalid={!!titleError}
+                      aria-describedby={titleError ? "title-error" : undefined}
                       {...register("title")}
                     />
                   )}
-                  {errors.title && (
+                  {titleError && (
                     <p id="title-error" className="text-sm text-destructive">
-                      {errors.title.message}
+                      {titleError.message}
                     </p>
                   )}
                 </section>

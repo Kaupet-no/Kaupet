@@ -179,6 +179,23 @@ for fritekstsøk; filterikonet åpner en oversikt over valgt tilstand. En
 detaljkontroll åpnes på egen flate. Ikke legg søketreff, flere dropdown-lister,
 checkboksmatriser eller flere slidere i oversikten samtidig.
 
+### Resultatflaten på telefon
+
+- Søkefeltet er et ekte input. Mens det har fokus vises forslag
+  (`SearchSuggestionsLayer`): kategorien først, så fritekst og annonser; tomt
+  felt viser lagrede søk med nye treff og nylige søk. Samme lag brukes på
+  forsiden.
+- En valgt kategori står som en brikke med X i søkefeltet, ikke som brødsmule.
+- Under feltet står brikkeraden (`SearchFilterChipRow`): Filtre, Sortering,
+  Pris, Sted, Tilstand og inntil tre av kategoriens hovedfiltre. Hver brikke
+  åpner søkepanelet rett på sitt filter (`openPanel(section, q, key)`), i halv
+  høyde når filteret får plass. En aktiv brikke er fylt og viser verdien.
+  Ikke legg egne filter- eller regelknapper i søkefeltet ved siden av.
+- Antall treff, «Lagre søk» og visningsvalget (ikonknapp) står på én linje.
+- Kartet åpnes fra en sentrert «Kart»-pille og lukkes med «Liste» på samme
+  sted. På telefon viser kartet prislapper, og valgt lapp gir et annonsekort
+  nederst i stedet for en popup.
+
 ### Filterlisten på telefon
 
 Filterarket over resultatene er én liste uten faner. Faner passer desktopens

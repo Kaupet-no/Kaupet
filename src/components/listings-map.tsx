@@ -91,6 +91,38 @@ type Props = {
   className?: string;
 };
 
+const priceText = (l: MapListing) =>
+  l.is_free || l.price_nok === 0
+    ? "Gratis"
+    : l.price_nok == null
+      ? "–"
+      : l.price_nok >= 1_000_000
+        ? `${(l.price_nok / 1_000_000).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} mill`
+        : l.price_nok.toLocaleString("nb-NO");
+
+/** Prislapp i stedet for prikk på telefon: prisen er det kjøperen sammenligner
+ * i kartet, og lappen er et større treffområde enn en 20 px prikk. */
+function makePricePin(l: MapListing, opts: { hovered: boolean; active: boolean }) {
+  const on = opts.hovered || opts.active;
+  return L.divIcon({
+    className: "kpt-price-pin",
+    html: `<div style="
+      transform:translate(-50%,-50%);
+      display:inline-flex;
+      white-space:nowrap;
+      padding:4px 9px;
+      border-radius:9999px;
+      font:600 12px/1.2 var(--font-sans);
+      font-variant-numeric:tabular-nums;
+      background:${on ? "var(--primary)" : "var(--card)"};
+      color:${on ? "var(--primary-foreground)" : "var(--foreground)"};
+      box-shadow:0 2px 8px hsl(0 0% 0% / 0.28);
+    ">${priceText(l)}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
 function makeLocationPin(_l: MapListing, opts: { hovered: boolean; active: boolean }) {
   const scale = opts.hovered || opts.active ? 1.25 : 1;
   const z = opts.active ? 1000 : opts.hovered ? 900 : 1;
@@ -266,6 +298,7 @@ export function ListingsMap({
   const initial = isValidMapCoordinate(center) ? center : NORWAY_CENTER;
   const mapCenter = isValidMapCoordinate(center) ? center : null;
   const validListings = listings.filter(isValidMapCoordinate);
+  const activeListing = activeId ? validListings.find((l) => l.id === activeId) : undefined;
   const [previewRadiusKm, setPreviewRadiusKm] = useState(radiusKm);
   const [radiusManuallySet, setRadiusManuallySet] = useState(false);
   const [isSliderInteracting, setIsSliderInteracting] = useState(false);
@@ -415,9 +448,13 @@ export function ListingsMap({
             active={activeId === l.id}
             onHover={onMarkerHover}
             onSelect={onMarkerSelect}
+            priceLabel={compactTouchControls}
           />
         ))}
       </MapContainer>
+      {compactTouchControls && activeListing && (
+        <SelectedListingCard listing={activeListing} onClose={() => onMarkerSelect?.(null)} />
+      )}
       {!compactTouchControls && (
         <div className="absolute left-3 top-3 z-[400]">
           <div
@@ -531,7 +568,7 @@ export function ListingsMap({
             type="button"
             variant="secondary"
             size="icon"
-            className="absolute left-4 top-4 z-[400] size-12 rounded-full shadow-md"
+            className="absolute left-4 top-[calc(var(--safe-top)+1rem)] z-[400] size-12 rounded-full shadow-md"
             aria-label="Sted og radius"
             onClick={() => setLocationSheetOpen(true)}
           >
@@ -576,7 +613,11 @@ export function ListingsMap({
         <Button
           type="button"
           size="native"
-          className="absolute inset-x-4 bottom-4 z-[400] shadow-lg"
+          className={
+            compactTouchControls
+              ? "absolute left-1/2 top-[calc(var(--safe-top)+4.5rem)] z-[400] -translate-x-1/2 rounded-full px-5 shadow-lg"
+              : "absolute inset-x-4 bottom-4 z-[400] shadow-lg"
+          }
           disabled={viewportApplying}
           onClick={applyPendingViewport}
         >
@@ -593,16 +634,19 @@ function PriceMarker({
   active,
   onHover,
   onSelect,
+  priceLabel = false,
 }: {
   listing: MapListing;
   hovered: boolean;
   active: boolean;
   onHover?: (id: string | null) => void;
   onSelect?: (id: string | null) => void;
+  /** Prislapp og valgt-kort i stedet for prikk og popup (telefon). */
+  priceLabel?: boolean;
 }) {
   const icon = useMemo(
-    () => makeLocationPin(listing, { hovered, active }),
-    [listing, hovered, active],
+    () => (priceLabel ? makePricePin : makeLocationPin)(listing, { hovered, active }),
+    [listing, hovered, active, priceLabel],
   );
   return (
     <Marker
@@ -616,9 +660,11 @@ function PriceMarker({
         popupclose: () => onSelect?.(null),
       }}
     >
-      <Popup closeButton={false} minWidth={220} maxWidth={240}>
-        <PopupCard listing={listing} />
-      </Popup>
+      {!priceLabel && (
+        <Popup closeButton={false} minWidth={220} maxWidth={240}>
+          <PopupCard listing={listing} />
+        </Popup>
+      )}
     </Marker>
   );
 }
@@ -648,6 +694,51 @@ function PopupCard({ listing }: { listing: MapListing }) {
       >
         Se annonse →
       </Link>
+    </div>
+  );
+}
+
+/** Kortet for valgt prislapp, nederst i kartet på telefon (over «Liste»). */
+function SelectedListingCard({ listing, onClose }: { listing: MapListing; onClose: () => void }) {
+  const imgUrl = listing.cover_path
+    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
+    : null;
+  return (
+    <div className="absolute inset-x-3 bottom-[calc(max(1rem,var(--safe-bottom))+4rem)] z-[500] flex items-center gap-3 rounded-2xl border border-border bg-card p-2 pr-1 shadow-lg">
+      <Link
+        to="/$kaupetCode"
+        params={{ kaupetCode: listing.kaupet_code }}
+        state={{ fromSearch: true } as never}
+        className="flex min-w-0 flex-1 items-center gap-3"
+      >
+        <span className="size-20 shrink-0 overflow-hidden rounded-xl bg-muted">
+          {imgUrl ? (
+            <img src={imgUrl} alt="" className="size-full object-cover" />
+          ) : (
+            <span className="flex size-full items-center justify-center text-2xs text-muted-foreground">
+              Ingen bilde
+            </span>
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</span>
+          <span className="mt-1 block font-display text-lg text-primary">
+            {priceText(listing) === "Gratis" || priceText(listing) === "–"
+              ? priceText(listing)
+              : `${priceText(listing)} kr`}
+          </span>
+        </span>
+      </Link>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="native-touch-target shrink-0 self-start"
+        aria-label="Lukk annonsekortet"
+        onClick={onClose}
+      >
+        <X className="size-4" />
+      </Button>
     </div>
   );
 }

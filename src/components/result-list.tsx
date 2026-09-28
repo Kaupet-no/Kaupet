@@ -8,6 +8,7 @@ import {
   Map as MapIcon,
   SearchX,
   X,
+  List,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly } from "@tanstack/react-router";
@@ -572,26 +573,25 @@ export function ResultList({
         <>
           <FullscreenOverlay open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
             <FullscreenOverlayContent title="Kart over søkeresultater" edgeToEdge>
-              <div className="flex h-full flex-col bg-background">
-                <div className="pt-safe flex shrink-0 items-center justify-between border-b border-border px-4 pb-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Kart</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {mapListings.length} mulige treff
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="native-touch-target"
-                    onClick={() => setMobileMapOpen(false)}
-                    aria-label="Lukk kart"
-                  >
-                    <X className="size-5" />
-                  </Button>
-                </div>
-                <div className="min-h-0 flex-1">{mobileMapOpen ? renderMap() : null}</div>
+              {/* Kartet går kant til kant; samme søk som listen, bare en
+                  annen visning. «Liste»-pillen står der «Kart»-pillen stod. */}
+              <div className="relative h-full bg-background">
+                {mobileMapOpen ? renderMap() : null}
+                <p
+                  className="pointer-events-none absolute right-4 top-[calc(var(--safe-top)+1rem)] z-[450] rounded-full bg-card px-3 py-1.5 text-xs font-medium shadow-md"
+                  role="status"
+                >
+                  {mapListings.length} {mapListings.length === 1 ? "annonse" : "annonser"} i kartet
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => setMobileMapOpen(false)}
+                  aria-label="Lukk kart og vis liste"
+                  className="absolute bottom-[max(1rem,var(--safe-bottom))] left-1/2 z-[450] h-12 -translate-x-1/2 gap-2 rounded-full bg-foreground px-5 text-background shadow-lg hover:bg-foreground/90"
+                >
+                  <List className="size-4" aria-hidden />
+                  Liste
+                </Button>
               </div>
             </FullscreenOverlayContent>
           </FullscreenOverlay>
@@ -601,20 +601,13 @@ export function ResultList({
               void hapticImpact("medium");
               setMobileMapOpen(true);
             }}
-            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition active:scale-95"
+            className="native-touch-target fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] left-1/2 z-50 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background shadow-lg transition active:scale-95"
             aria-label={
               mapListings.length > 0 ? `Vis kart, ${mapListings.length} treff` : "Vis kart"
             }
           >
-            <MapIcon className="size-6" />
-            {mapListings.length > 0 && (
-              <span
-                className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-brand text-2xs font-bold text-brand-foreground"
-                aria-hidden="true"
-              >
-                {mapListings.length > 99 ? "99+" : mapListings.length}
-              </span>
-            )}
+            <MapIcon className="size-4" aria-hidden />
+            Kart
           </button>
         </>
       )}

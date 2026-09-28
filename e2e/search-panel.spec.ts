@@ -31,11 +31,19 @@ test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
   await page.goto("/?forcenative=1");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
-  await page.getByRole("button", { name: "Søk", exact: true }).last().click();
-  await expect(page).toHaveURL(/\/\?forcenative=1/);
-  await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).toBeVisible();
-  await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toBeVisible();
+  // Søk-fanen er et sted: den går til resultatsiden, ikke en skuff over forsiden.
+  const searchTab = page.getByRole("button", { name: "Søk", exact: true }).last();
+  await searchTab.click();
+  await expect(page).toHaveURL(/\/annonser/);
+  await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).not.toBeVisible();
+  const searchbox = page.getByRole("searchbox", { name: "Søk i annonser" });
+  await expect(searchbox).toBeVisible();
+  await expect(searchTab).toHaveAttribute("aria-current", "page");
   await expect(page.locator("html")).toHaveClass(/native/);
+
+  // Nytt trykk på aktiv fane øverst på siden setter fokus i søkefeltet.
+  await searchTab.click();
+  await expect(searchbox).toBeFocused();
 });
 test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { MessagesButton } from "@/components/messages-button";
 import logoIcon from "@/assets/brand/icon-only-green-letter.png";
-import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { readLastSearchContext, searchTabAction } from "@/lib/last-search-context";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -30,7 +30,6 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
-  const { open: searchOpen, startSearch } = useSearchPanel();
   const native = isNative();
   // Nettbrett: sidestilt navigasjon i stedet for den flytende bunnpillen
   // (fase 10). Samme rutedefinisjoner og samme tilstand — kun presentasjonen
@@ -51,7 +50,19 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
   const isOnHome = pathname === "/";
-  const isOnSearch = searchOpen || isActive("/annonser");
+  const isOnSearch = isActive("/annonser");
+  const onSearchTab = () => {
+    void hapticImpact("light");
+    const action = searchTabAction(isOnSearch, window.scrollY);
+    if (action === "scroll-top") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (action === "focus") {
+      // Fokus settes i selve trykket: WKWebView åpner bare tastaturet da.
+      document.querySelector<HTMLInputElement>('main input[name="q"]')?.focus();
+    } else {
+      navigate({ to: "/annonser", search: readLastSearchContext()?.search ?? {} });
+    }
+  };
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
 
@@ -116,16 +127,12 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           </span>
         </Link>
 
-        {/* Søk er en primær handling og er tilgjengelig uten konto. Fanen
-            starter alltid et nytt søk — et eksisterende søk spisses på
-            /annonser, ikke herfra. */}
+        {/* Søk er et sted, ikke en skuff: fanen går til /annonser med siste
+            søk i behold. Et nytt søk startes med X i feltet eller «Nullstill». */}
         <div className={itemClass}>
           <button
             type="button"
-            onClick={() => {
-              void hapticImpact("light");
-              startSearch();
-            }}
+            onClick={onSearchTab}
             className={`flex h-12 w-12 items-center justify-center rounded-full ${
               isOnSearch ? "text-primary" : "text-muted-foreground"
             }`}

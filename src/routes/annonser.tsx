@@ -16,7 +16,7 @@ import { useSearchPanel } from "@/features/listing-search/search-panel/search-pa
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
 import { SearchFilterChipRow } from "@/features/listing-search/search-panel/search-filter-chip-row";
 import { saveLastSearchContext } from "@/lib/last-search-context";
-import { summarizeCriteria } from "@/lib/saved-searches";
+import { summarizeCriteria, type SavedSearch } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
@@ -53,9 +53,10 @@ import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryBreadcrumb } from "@/components/category-hero";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
-import { breadcrumbPath, resolveHeroCategory } from "@/lib/categories";
+import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
+import { SearchStart } from "@/features/listing-search/search-start";
 import { criteriaToValue } from "@/components/advanced-search-value";
 
 /** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
@@ -276,6 +277,38 @@ function BrowsePage() {
       },
     });
   };
+  // Valg fra forslagslaget og Søk-fanens startflate.
+  const pickQuery = (text: string) => {
+    blurActiveElement();
+    setQDraft(text);
+    submitQuery(text);
+  };
+  const pickCategory = (category: Category) => {
+    blurActiveElement();
+    const needle = category.name_nb.toLocaleLowerCase();
+    const nextQ = qDraft.toLocaleLowerCase().trim() === needle ? "" : qDraft;
+    setQDraft(nextQ);
+    updateSearch({ category: "", categories: [category.slug], q: nextQ });
+  };
+  const pickSavedSearch = (saved: SavedSearch) => {
+    blurActiveElement();
+    void submitSearch({
+      applied: {
+        value: criteriaToValue(saved.criteria),
+        attributes: saved.criteria.attributes ?? {},
+      },
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (next) => {
+        setQDraft(next.q);
+        navigate({ search: next });
+      },
+    });
+  };
+  // Uten kriterier er dette Søk-fanens startflate på native.
+  const showSearchStart =
+    isNative && !search.q && effectiveCategories.length === 0 && activeFilterCount === 0;
   const rawCategoryMatch = useMemo(() => {
     const m =
       matchCategoryPhrase(qDraft, categories ?? []) ??
@@ -509,34 +542,9 @@ function BrowsePage() {
                       q={qDraft}
                       categories={categories ?? []}
                       currentCategorySlugs={effectiveCategories}
-                      onSubmitQuery={(text) => {
-                        blurActiveElement();
-                        setQDraft(text);
-                        submitQuery(text);
-                      }}
-                      onPickCategory={(category) => {
-                        blurActiveElement();
-                        const needle = category.name_nb.toLocaleLowerCase();
-                        const nextQ = qDraft.toLocaleLowerCase().trim() === needle ? "" : qDraft;
-                        setQDraft(nextQ);
-                        updateSearch({ category: "", categories: [category.slug], q: nextQ });
-                      }}
-                      onPickSavedSearch={(saved) => {
-                        blurActiveElement();
-                        void submitSearch({
-                          applied: {
-                            value: criteriaToValue(saved.criteria),
-                            attributes: saved.criteria.attributes ?? {},
-                          },
-                          categories: categories ?? [],
-                          vehicleBrands: vehicleBrands ?? [],
-                          allFilters: allFilters ?? [],
-                          commit: (next) => {
-                            setQDraft(next.q);
-                            navigate({ search: next });
-                          },
-                        });
-                      }}
+                      onSubmitQuery={pickQuery}
+                      onPickCategory={pickCategory}
+                      onPickSavedSearch={pickSavedSearch}
                     />
                   }
                   categoryToken={
@@ -699,6 +707,15 @@ function BrowsePage() {
             defaultName={summarizeCriteria(currentCriteria)}
             criteria={currentCriteria}
             onSaved={() => setSaveSearchOpen(false)}
+          />
+        )}
+
+        {showSearchStart && (
+          <SearchStart
+            categories={categories ?? []}
+            onSubmitQuery={pickQuery}
+            onPickCategory={pickCategory}
+            onPickSavedSearch={pickSavedSearch}
           />
         )}
 

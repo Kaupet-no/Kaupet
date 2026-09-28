@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, ChevronRight, History, MapPin, Search as SearchIcon } from "lucide-react";
+import { ChevronRight, History, MapPin, Search as SearchIcon } from "lucide-react";
 
 import { ListingCard } from "@/components/listing-card";
 import { usePopularListings } from "@/features/landing/use-popular-listings";
@@ -20,12 +19,12 @@ import { criteriaToValue } from "@/components/advanced-search-value";
 import { CategoryIcon } from "@/lib/category-icons";
 import type { Category } from "@/lib/categories";
 import { readLastSearchContext } from "@/lib/last-search-context";
+import type { SavedSearch } from "@/lib/saved-searches";
+import { SavedSearchRow } from "@/features/listing-search/search-start";
 import {
-  listSavedSearches,
-  listUnreadCountsBySearch,
-  type SavedSearch,
-} from "@/lib/saved-searches";
-import { useAuth } from "@/hooks/use-auth";
+  searchStartRowClass,
+  useSavedSearchesWithUnread,
+} from "@/features/listing-search/use-saved-searches-with-unread";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
@@ -239,7 +238,7 @@ export function AppLanding({
             </h2>
             <button
               type="button"
-              onClick={() => openPanel("query")}
+              onClick={() => navigate({ to: "/annonser", search: { q: "", sort: "new" } })}
               className="native-touch-target px-2 text-xs text-primary"
             >
               Se alle →
@@ -293,30 +292,16 @@ function blurActiveElement() {
  * allerede har bygget, i stedet for å starte på nytt fra et tomt felt.
  */
 function ResumeSearch({ onPickSavedSearch }: { onPickSavedSearch: (saved: SavedSearch) => void }) {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  // Samme nøkler som /mine-sok og søkepanelet, så cachen deles.
-  const { data: savedSearches } = useQuery({
-    queryKey: ["saved-searches"],
-    queryFn: listSavedSearches,
-    enabled: !!user,
-  });
-  const { data: unreadCounts } = useQuery({
-    queryKey: ["saved-search-unread-counts"],
-    queryFn: listUnreadCountsBySearch,
-    enabled: !!user,
-  });
+  const saved = useSavedSearchesWithUnread(2);
   // sessionStorage finnes bare i nettleseren; forsiden rendres på klienten.
   // Et søk uten kriterier («annonser») er ikke noe å fortsette på.
   const [lastSearch] = useState(() => {
     const context = readLastSearchContext();
     return context && context.label !== "annonser" ? context : null;
   });
-  const saved = user ? (savedSearches ?? []).slice(0, 2) : [];
   if (saved.length === 0 && !lastSearch) return null;
 
-  const rowClass =
-    "native-touch-target flex min-h-14 w-full items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2.5 text-left";
   return (
     <section aria-labelledby="resume-heading" className="mt-5 w-full max-w-xl">
       <h2 id="resume-heading" className="mb-2 font-display text-base tracking-tight">
@@ -324,32 +309,19 @@ function ResumeSearch({ onPickSavedSearch }: { onPickSavedSearch: (saved: SavedS
       </h2>
       <div className="flex flex-col gap-2">
         {saved.length > 0
-          ? saved.map((search) => {
-              const unread = unreadCounts instanceof Map ? (unreadCounts.get(search.id) ?? 0) : 0;
-              return (
-                <button
-                  key={search.id}
-                  type="button"
-                  onClick={() => onPickSavedSearch(search)}
-                  className={rowClass}
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
-                    <Bell className="size-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{search.name}</span>
-                  {unread > 0 && (
-                    <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-brand-foreground">
-                      {unread > 99 ? "99+" : unread} nye
-                    </span>
-                  )}
-                </button>
-              );
-            })
+          ? saved.map(({ saved: search, unread }) => (
+              <SavedSearchRow
+                key={search.id}
+                saved={search}
+                unread={unread}
+                onPick={onPickSavedSearch}
+              />
+            ))
           : lastSearch && (
               <button
                 type="button"
                 onClick={() => navigate({ to: "/annonser", search: lastSearch.search })}
-                className={rowClass}
+                className={searchStartRowClass}
               >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
                   <History className="size-4" aria-hidden="true" />

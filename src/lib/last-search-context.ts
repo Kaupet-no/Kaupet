@@ -29,3 +29,14 @@ export function readLastSearchContext(): LastSearchContext | null {
     return null;
   }
 }
+
+/** Hva et trykk på Søk-fanen gjør. Fra en annen fane: gå til siste søk. På
+ * søket: første trykk ruller til toppen, neste setter fokus i søkefeltet —
+ * vanlig iOS-atferd for et trykk på aktiv fane. */
+export function searchTabAction(
+  onSearchPage: boolean,
+  scrollY: number,
+): "navigate" | "scroll-top" | "focus" {
+  if (!onSearchPage) return "navigate";
+  return scrollY > 8 ? "scroll-top" : "focus";
+}

@@ -186,6 +186,24 @@ Fargene som brukes matcher merkevaren på `kaupet.no`:
 
 ---
 
+## Versjonering
+
+Markedsføringsversjonen (`1.0.0`, `1.0.1`, …) har én kilde: feltet
+`"version"` i `package.json`.
+
+- **Android**: `android/app/build.gradle` leser `versionName` fra
+  `package.json` via `JsonSlurper` ved hver build. `.github/workflows/ci.yml`
+  (jobben `android-release`) leser samme felt med `jq` for release-navnet.
+  `versionCode` er separat og overstyres i CI med `GITHUB_RUN_NUMBER`.
+- **iOS**: `MARKETING_VERSION` i `ios/App/App.xcodeproj/project.pbxproj` må
+  oppdateres manuelt (4 steder, ett per build-konfigurasjon/target) til
+  samme verdi som `package.json`. Xcode viser og lar deg redigere dette
+  under target `App` → General → Version. `CURRENT_PROJECT_VERSION`
+  (build-nummeret) settes/overstyres av CI, ikke her.
+
+Ved versjonsbump: oppdater `package.json` og de 4
+`MARKETING_VERSION`-linjene i pbxproj i samme commit.
+
 ## Vanlige feil
 
 **Android: `SDK location not found`**

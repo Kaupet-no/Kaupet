@@ -1,5 +1,6 @@
 {
   "name": "kaupet",
+  "version": "1.0.0",
   "packageManager": "bun@1.3.14",
   "private": true,
   "sideEffects": false,

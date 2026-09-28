@@ -2,8 +2,12 @@ package no.kaupet.app;
 
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.CookieManager;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
@@ -100,8 +104,11 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public void onPageCommitVisible(WebView view, String url) {
                     super.onPageCommitVisible(view, url);
+                    // Noe har malt — serveren svarte, eller errorPath tok over.
+                    handler.removeCallbacks(loadTimeout);
                     if (isLocalShellPage(url)) {
                         injectShellTheme(view);
+                        injectAppUrl(view);
                     }
                     if (!isBridgeOrigin(url)) {
                         hideSplash();
@@ -110,6 +117,66 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         );
+
+        handler.postDelayed(loadTimeout, OFFLINE_AFTER_MS);
+        connectivity = getSystemService(ConnectivityManager.class);
+        connectivity.registerDefaultNetworkCallback(networkCallback);
+    }
+
+    @Override
+    public void onDestroy() {
+        connectivity.unregisterNetworkCallback(networkCallback);
+        handler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
+    // Offline-siden (errorPath) vises av Capacitor kun når lastingen FEILER —
+    // en forbindelse som bare henger kan ta minutter før WebView gir opp, og
+    // et nettbrudd midt i bruk gir i dag bare en toast. Uten kontakt i over
+    // 7 s viser vi den selv: ved kaldstart hvis ingenting har malt, og midt
+    // i bruk hvis enheten har stått uten nett. To separate Runnables, så
+    // nett som kommer tilbake ikke avbryter vakten for en hengende lasting.
+    // ponytail: «uten nett» er enhetens nett, ikke om kaupet.no svarer — en
+    // server som henger midt i bruk fanges ikke. Legg til en ping-sjekk
+    // hvis det blir et reelt problem.
+    // ponytail: kjører også i bakgrunnen — appen kan vende tilbake til
+    // offline-siden. «Prøv igjen» / online-hendelsen tar brukeren tilbake.
+    private static final long OFFLINE_AFTER_MS = 7000;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable loadTimeout = this::showOfflinePage;
+    private final Runnable offlineTimeout = this::showOfflinePage;
+    private ConnectivityManager connectivity;
+    private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
+        @Override
+        public void onAvailable(Network network) {
+            handler.removeCallbacks(offlineTimeout);
+        }
+
+        @Override
+        public void onLost(Network network) {
+            handler.removeCallbacks(offlineTimeout);
+            handler.postDelayed(offlineTimeout, OFFLINE_AFTER_MS);
+        }
+    };
+
+    private void showOfflinePage() {
+        WebView view = getBridge().getWebView();
+        String errorUrl = getBridge().getErrorUrl();
+        String current = view.getUrl();
+        // Allerede på en lokal shell-side (offline-siden selv, eller
+        // staging-velgeren) — der er ingen app-tilstand å redde.
+        if (errorUrl == null || (current != null && isLocalShellPage(current))) {
+            return;
+        }
+        view.stopLoading();
+        view.loadUrl(errorUrl);
+    }
+
+    // offline.html kjenner ikke app-URL-en (produksjon, staging eller et
+    // lagret dev-mål), og location.reload() der laster bare offline-siden på
+    // nytt. «Prøv igjen» navigerer hit i stedet.
+    private void injectAppUrl(WebView view) {
+        view.evaluateJavascript("window.__kaupetAppUrl = " + JSONObject.quote(getBridge().getAppUrl()) + ";", null);
     }
 
     // Sesjonen ligger i en informasjonskapsel (se

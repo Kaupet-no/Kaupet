@@ -453,8 +453,15 @@
           retryStatus.textContent = "Prøver å koble til Kaupet på nytt.";
           // Kort forsinkelse så nettleseren rekker å male den nye teksten og
           // kunngjøre statusen for skjermlesere før navigasjonen skjer.
+          // Siden serveres fra appens lokale origin, så reload() laster bare
+          // offline-siden igjen. App-URL-en injiseres nativt (MainActivity /
+          // AppDelegate.swift); reload() er kun reserve i nettleser.
           window.setTimeout(function () {
-            window.location.reload();
+            if (window.__kaupetAppUrl) {
+              window.location.replace(window.__kaupetAppUrl);
+            } else {
+              window.location.reload();
+            }
           }, 100);
         }
 

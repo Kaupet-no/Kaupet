@@ -108,13 +108,13 @@ test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testI
 
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page);
-  await page.getByLabel("Tittel").fill("E2E ønsker filterfixture");
+  await page.getByLabel("Tittel").fill("E2E ønsker treffsjekk");
   await chooseCategory(page, TEST_CATEGORY_NAME);
   await composerPage(page, "attributes").waitFor();
 
-  // Nøkkelordet avgrenser til de tre faste annonsene, så andre tester som
-  // publiserer i samme kategori ikke påvirker tallene.
-  await page.getByLabel("Nøkkelord for treff (valgfritt)").fill("e2efilterfixture");
+  // Ord fra beskrivelsen til de tre faste annonsene, uten treff i søket som
+  // core.visual.spec.ts tar skjermbilde av.
+  await page.getByLabel("Nøkkelord for treff (valgfritt)").fill("E2E-filterfixture");
   await expect(
     page.getByText("3 annonser til salgs matcher allerede det du leter etter."),
   ).toBeVisible();

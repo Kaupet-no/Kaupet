@@ -5,7 +5,7 @@
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>nb</string>
 	<key>CFBundleDisplayName</key>
         <string>Kaupet</string>
 	<key>CFBundleExecutable</key>
@@ -45,11 +45,11 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Kaupet bruker posisjonen din for å vise annonser i nærheten.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Kaupet bruker posisjonen din for å vise annonser i nærheten.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Kaupet bruker kameraet ditt for å ta bilder til annonsene dine.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Kaupet trenger tilgang til bildebiblioteket for å legge til bilder i annonsene dine.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

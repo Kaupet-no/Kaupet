@@ -30,7 +30,7 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
-  const { open: searchOpen, openPanel } = useSearchPanel();
+  const { open: searchOpen, startSearch } = useSearchPanel();
   const native = isNative();
   // Nettbrett: sidestilt navigasjon i stedet for den flytende bunnpillen
   // (fase 10). Samme rutedefinisjoner og samme tilstand — kun presentasjonen
@@ -116,13 +116,15 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           </span>
         </Link>
 
-        {/* Søk er en primær handling og er tilgjengelig uten konto. */}
+        {/* Søk er en primær handling og er tilgjengelig uten konto. Fanen
+            starter alltid et nytt søk — et eksisterende søk spisses på
+            /annonser, ikke herfra. */}
         <div className={itemClass}>
           <button
             type="button"
             onClick={() => {
               void hapticImpact("light");
-              openPanel("query");
+              startSearch();
             }}
             className={`flex h-12 w-12 items-center justify-center rounded-full ${
               isOnSearch ? "text-primary" : "text-muted-foreground"
@@ -222,7 +224,14 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
           {authLoading ? (
             <AuthPendingButton label="Konto" className="h-12 w-12 text-muted-foreground" />
           ) : user ? (
-            <UserAvatarButton userId={user.id} email={user.email ?? null} isActive={isOnMeg} />
+            // Etiketten ligger inni knappen: tidligere traff bare den 48 px
+            // store avataren, og trykk på «Meg»-teksten gikk tapt.
+            <UserAvatarButton
+              userId={user.id}
+              email={user.email ?? null}
+              isActive={isOnMeg}
+              className="flex w-full flex-col items-center gap-0.5"
+            />
           ) : (
             <Link
               to="/auth"
@@ -234,14 +243,14 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
               <LogIn className="size-6" />
             </Link>
           )}
-          <span
-            className={`native-nav-label ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
-          >
-            {/* Hardt mellomrom, ikke tom streng: etiketten skal reservere
-                linjehøyden sin, ellers blir kolonnen lavere enn naboene og
-                FAB-en flytter seg i de ~100 ms tilstanden varer. */}
-            {authLoading ? "\u00A0" : user ? "Meg" : "Logg inn"}
-          </span>
+          {(authLoading || !user) && (
+            <span className="native-nav-label text-muted-foreground">
+              {/* Hardt mellomrom, ikke tom streng: etiketten skal reservere
+                  linjehøyden sin, ellers blir kolonnen lavere enn naboene og
+                  FAB-en flytter seg i de ~100 ms tilstanden varer. */}
+              {authLoading ? "\u00A0" : "Logg inn"}
+            </span>
+          )}
         </div>
       </div>
 
@@ -294,10 +303,12 @@ export function UserAvatarButton({
   userId,
   email,
   isActive,
+  className,
 }: {
   userId: string;
   email: string | null;
   isActive?: boolean;
+  className?: string;
 }) {
   const navigate = useNavigate();
   // Meg-fanen er den eneste inngangen til varsler i den native
@@ -329,22 +340,30 @@ export function UserAvatarButton({
         void hapticImpact("light");
         void navigate({ to: "/meg" });
       }}
-      className="relative flex h-12 w-12 items-center justify-center"
+      className={className}
     >
-      <Avatar className="size-8">
-        {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
-        <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-          {initials(profile?.display_name, email ?? "")}
-        </AvatarFallback>
-      </Avatar>
-      {unreadCount > 0 && (
-        <span
-          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
-          aria-hidden="true"
-        >
-          {unreadCount > 9 ? "9+" : unreadCount}
-        </span>
-      )}
+      <span className="relative flex h-12 w-12 items-center justify-center">
+        <Avatar className="size-8">
+          {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
+          <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+            {initials(profile?.display_name, email ?? "")}
+          </AvatarFallback>
+        </Avatar>
+        {unreadCount > 0 && (
+          <span
+            className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
+            aria-hidden="true"
+          >
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </span>
+      <span
+        className={`native-nav-label ${isActive ? "font-medium text-primary" : "text-muted-foreground"}`}
+        aria-hidden="true"
+      >
+        Meg
+      </span>
     </button>
   );
 }

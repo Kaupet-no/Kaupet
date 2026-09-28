@@ -41,7 +41,7 @@ export async function goToNewListing(page: Page, title?: string) {
 
 export async function goToNewWantListing(page: Page, native = false) {
   await page.goto(`/ny-ok-annonse${native ? "?forcenative=1" : ""}`);
-  // The "Kort beskrivelse" input is present in the pre-hydration SSR markup,
+  // The "Tittel" input is present in the pre-hydration SSR markup,
   // so a fill() right after goto() can land before React attaches its
   // listeners — the value (and the following click) is then silently lost
   // once hydration commits and re-renders from still-empty form state.

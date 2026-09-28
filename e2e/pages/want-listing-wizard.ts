@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { composerPage } from "./listing-wizard";
 
 export async function startWantWithoutCategory(page: Page, title: string) {
-  await page.getByLabel("Kort beskrivelse").fill(title);
+  await page.getByLabel("Tittel").fill(title);
   await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
   await composerPage(page, "attributes").waitFor();
 }

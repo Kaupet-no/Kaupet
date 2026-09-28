@@ -3,7 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 
-import { composerPage, goBackToStep, goToNewWantListing, login } from "./pages/listing-wizard";
+import {
+  chooseCategory,
+  composerPage,
+  goBackToStep,
+  goToNewWantListing,
+  login,
+} from "./pages/listing-wizard";
 import {
   advanceWantStep,
   publishWantAndExpectSuccess,
@@ -16,6 +22,11 @@ const { users } = JSON.parse(
     "utf-8",
   ),
 ) as { users: Record<string, { email: string; password: string }> };
+
+// Samme skjulte testkategori som publish-listing.spec.ts, der global-setup.ts
+// har lagt tre faste annonser med «e2efilterfixture» i tittelen (gratis, 100
+// og 200 kr).
+const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
 test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, testInfo) => {
   const credentials = users[testInfo.project.name];
@@ -30,20 +41,25 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("1500");
   await advanceWantStep(page, "review");
 
-  // Oppsummeringen med «Endre» per rad ble fjernet i ui-gjennomgangen (W9);
-  // stegtelleren er nå veien tilbake til et tidligere steg (W7/W8).
-  await goBackToStep(page, "Siste detaljer");
+  // Se over viser kjøpsønsket slik selgerne ser det; hver del tar deg til
+  // steget der den fylles ut, og Neste går rett tilbake hit.
+  await expect(page.getByText(/^1\s500 kr$/)).toBeVisible();
+  await page.getByRole("button", { name: /Endre maks pris/ }).click();
   await composerPage(page, "details").waitFor();
-  // Oppsummeringen som viste «Maks 1 200 kr» ble fjernet sammen med resten av
-  // ComposerReview (W9), og beløpet vises ikke lenger noe sted i flyten. At
-  // feltet holder den nye verdien er det som gjenstår å bekrefte her — altså
-  // at stegmenyen faktisk tok oss til riktig steg og at redigeringen satt.
   const maxPrice = page.getByLabel("Maks pris du vil betale (valgfritt)");
   await maxPrice.fill("1200");
-  await expect(maxPrice).toHaveValue("1200");
+  await advanceWantStep(page, "review");
+  await expect(page.getByText(/^1\s200 kr$/)).toBeVisible();
+
+  // Stegtelleren er fortsatt veien tilbake til et vilkårlig tidligere steg (W7/W8).
+  await goBackToStep(page, "Siste detaljer");
+  await composerPage(page, "details").waitFor();
   await advanceWantStep(page, "review");
 
-  await page.getByRole("checkbox", { name: "Varsle meg om matchende annonser" }).click();
+  // Varsling er på som standard.
+  await expect(
+    page.getByRole("checkbox", { name: "Varsle meg om matchende annonser" }),
+  ).toBeChecked();
   await publishWantAndExpectSuccess(page);
 });
 
@@ -53,18 +69,16 @@ test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, test
 
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page);
-  await page.getByLabel("Kort beskrivelse").fill("Midlertidig tittel");
+  // Uten tittel stopper flyten på samme side som tittelfeltet, med årsaken
+  // både ved feltet og i feiloppsummeringen — ikke først på neste steg.
+  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
+  await expect(composerPage(page, "category")).toBeVisible();
+  await expect(page.getByText("Rett feltene som er markert før du fortsetter.")).toBeVisible();
+  await expect(page.getByText("Tittelen må være minst 3 tegn")).toBeVisible();
+
+  await page.getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
   await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
   await composerPage(page, "attributes").waitFor();
-  await page.getByRole("button", { name: "Tilbake" }).click();
-  await composerPage(page, "category").waitFor();
-  await page.getByLabel("Kort beskrivelse").fill("");
-  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
-  await composerPage(page, "attributes").waitFor();
-  await expect(
-    page.getByText("Legg inn en kort beskrivelse på første steg før du fortsetter."),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: /^(Fortsett|Neste:)/ })).toBeDisabled();
 });
 
 test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, testInfo) => {
@@ -73,16 +87,47 @@ test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, t
 
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page, true);
-  await expect(page.getByLabel("Kort beskrivelse")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
+  // Tittelen først — kategoriforslaget bygger på den.
   await composerPage(page, "title").waitFor();
   await page.getByRole("button", { name: "Fortsett" }).click();
   await expect(page.getByText("Rett feltene som er markert før du fortsetter.")).toBeVisible();
   await expect(composerPage(page, "title")).toBeVisible();
 
   await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
-  await advanceWantStep(page, "attributes");
+  await advanceWantStep(page, "category");
+  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
+  await composerPage(page, "attributes").waitFor();
   await advanceWantStep(page, "details");
   await advanceWantStep(page, "review");
+});
+
+test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testInfo) => {
+  const credentials = users[testInfo.project.name];
+  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
+
+  await login(page, credentials.email, credentials.password);
+  await goToNewWantListing(page);
+  await page.getByLabel("Tittel").fill("E2E ønsker filterfixture");
+  await chooseCategory(page, TEST_CATEGORY_NAME);
+  await composerPage(page, "attributes").waitFor();
+
+  // Nøkkelordet avgrenser til de tre faste annonsene, så andre tester som
+  // publiserer i samme kategori ikke påvirker tallene.
+  await page.getByLabel("Nøkkelord for treff (valgfritt)").fill("e2efilterfixture");
+  await expect(
+    page.getByText("3 annonser til salgs matcher allerede det du leter etter."),
+  ).toBeVisible();
+
+  await advanceWantStep(page, "details");
+  await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("150");
+  await expect(
+    page.getByText("2 annonser til salgs matcher allerede det du leter etter."),
+  ).toBeVisible();
+
+  await advanceWantStep(page, "review");
+  await publishWantAndExpectSuccess(page);
+  await expect(page.getByRole("heading", { name: "2 annonser matcher allerede" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /e2efilterfixture rimelig/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /e2efilterfixture dyrere/ })).toHaveCount(0);
 });

@@ -10,6 +10,14 @@ import { ResultList } from "./result-list";
 
 afterEach(cleanup);
 
+// cmdk (NativeChoiceSheet) observerer listehøyden; jsdom har ingen ResizeObserver.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as typeof ResizeObserver;
+Element.prototype.scrollIntoView = vi.fn();
+
 vi.mock("@/components/featured-listings-section", () => ({
   FeaturedListingsSection: () => null,
 }));
@@ -114,5 +122,19 @@ describe("ResultList – nullresultat uten filtre (F8)", () => {
     const button = getByRole("button", { name: "Gå til Sofa" });
     fireEvent.click(button);
     expect(onApply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ResultList – visningsvalg på native", () => {
+  it("tilbyr Kort og Bilder i tillegg til Fliser og Liste, og bytter visning", async () => {
+    const { getByRole, findByRole } = render(
+      <ResultList {...baseProps} isNative q="" effectiveCategories={[]} resetFilters={vi.fn()} />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "Fliser" }));
+    for (const name of ["Fliser", "Liste", "Kort"]) await findByRole("option", { name });
+    fireEvent.click(await findByRole("option", { name: "Bilder" }));
+
+    expect(getByRole("button", { name: "Bilder" })).toBeTruthy();
   });
 });

@@ -251,14 +251,15 @@ export function ResultList({
                 open={viewModeOpen}
                 onOpenChange={setViewModeOpen}
                 title="Visning"
-                options={[
-                  { value: "grid", label: "Fliser" },
-                  { value: "list", label: "Liste" },
-                ]}
-                value={[viewMode === "grid" || viewMode === "list" ? viewMode : "grid"]}
+                options={(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map(
+                  (mode) => ({ value: mode, label: VIEW_MODE_META[mode].label }),
+                )}
+                value={[viewMode]}
                 onChange={(next) => {
                   const mode = next[0];
-                  if (mode === "grid" || mode === "list") changeViewMode(mode);
+                  if (mode && mode in VIEW_MODE_META) {
+                    changeViewMode(mode as keyof typeof VIEW_MODE_META);
+                  }
                   setViewModeOpen(false);
                 }}
               />

@@ -48,8 +48,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Android 13+ gallery access -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- Android 12 and below -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Ingen READ_MEDIA_IMAGES/READ_EXTERNAL_STORAGE: bildevalg fra galleri
+         bruker systemets bildevelger (Photo Picker), som ikke krever
+         lagringstillatelse. Play-policy for Photo and Video Permissions
+         krever at vi ikke ber om mer enn appen trenger. -->
 </manifest>

@@ -3,7 +3,22 @@ import { expect, type Page } from "@playwright/test";
 import { composerPage } from "./listing-wizard";
 
 export async function startWantWithoutCategory(page: Page, title: string) {
-  await page.getByLabel("Tittel").fill(title);
+  await composerPage(page, "title").getByLabel("Tittel").fill(title);
+  await advanceWantStep(page, "category");
+  await skipWantCategory(page);
+}
+
+/** Kategoristeget viser enten et forslag fra tittelen (ja/nei) eller velgeren,
+ * avhengig av hva forslagsmotoren finner — «Nei, velg selv» fører til velgeren. */
+export async function openWantCategoryPicker(page: Page) {
+  const reject = page.getByRole("button", { name: "Nei, velg selv" });
+  const search = page.getByTestId("category-search-input");
+  await reject.or(search).first().waitFor();
+  if (await reject.isVisible()) await reject.click();
+}
+
+export async function skipWantCategory(page: Page) {
+  await openWantCategoryPicker(page);
   await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
   await composerPage(page, "attributes").waitFor();
 }

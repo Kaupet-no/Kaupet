@@ -28,7 +28,8 @@ export function useTitleCategorySuggestion(params: {
 }) {
   const { title, muted, clientCategoryHint } = params;
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
-  const debouncedTitle = useDebouncedValue((title ?? "").trim(), 400);
+  const trimmedTitle = (title ?? "").trim();
+  const debouncedTitle = useDebouncedValue(trimmedTitle, 400);
 
   const suggestionsMuted = muted || suggestionDismissed;
   const {
@@ -63,6 +64,12 @@ export function useTitleCategorySuggestion(params: {
   return {
     categorySuggestions,
     categorySuggestionLoading: !suggestionsMuted && categorySuggestionLoading,
+    /** Som `categorySuggestionLoading`, men også sann mens tittelen venter på
+     * debounce — for et steg som åpnes rett etter at tittelen er skrevet og
+     * ellers ville blinket «ingen forslag» før spørringen i det hele tatt starter. */
+    categorySuggestionPending:
+      !suggestionsMuted &&
+      (categorySuggestionLoading || (trimmedTitle.length >= 5 && trimmedTitle !== debouncedTitle)),
     setSuggestionDismissed,
   };
 }

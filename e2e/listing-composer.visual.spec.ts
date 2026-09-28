@@ -16,17 +16,10 @@ test("kjøpsønskets startflate holder visuell kontrakt", async ({ page }, testI
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
   await login(page, credentials.email, credentials.password);
-  const native = !testInfo.project.name.endsWith("web");
-  await goToNewWantListing(page, native);
+  await goToNewWantListing(page, !testInfo.project.name.endsWith("web"));
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
-  // Native starter med tittelkortet (kategoriforslaget bygger på tittelen);
-  // web har tittel og kategori på samme side.
-  if (native) {
-    await composerPage(page, "title").waitFor();
-  } else {
-    await composerPage(page, "category").waitFor();
-    await page.getByTestId("category-tile").first().waitFor();
-  }
+  // Flyten starter med tittelen (kategoriforslaget bygger på den).
+  await composerPage(page, "title").waitFor();
   await page.evaluate(() => document.fonts.ready);
 
   await expect(page).toHaveScreenshot("want-listing-category.png", {

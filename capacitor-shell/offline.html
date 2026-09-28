@@ -251,6 +251,11 @@
         padding: 0 12px;
         padding-bottom: max(0.5rem, var(--safe-bottom));
         pointer-events: none;
+        transition: transform 0.3s ease;
+      }
+      /* Spillet bruker hele skjermen — ballen skal ikke sprette bak baren. */
+      .game-active .bottom-nav {
+        transform: translateY(100%);
       }
       .bottom-nav__bar {
         pointer-events: auto;
@@ -582,6 +587,7 @@
           document.getElementById("timer-display").textContent = "00:00:00";
 
           active = false;
+          document.body.classList.remove("game-active");
           gameStartTime = 0;
           gameEndTime = 0;
           lastTs = 0;
@@ -657,6 +663,7 @@
           dot.classList.add("wordmark__dot--hidden");
           document.querySelector(".wordmark__tld").classList.add("wordmark__tld--tipping");
           active = true;
+          document.body.classList.add("game-active");
           gameStartTime = performance.now();
           initChars();
           rafId = requestAnimationFrame(tick);

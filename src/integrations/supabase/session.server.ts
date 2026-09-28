@@ -45,9 +45,7 @@ function createSupabaseServerClient() {
             // IKKE httpOnly: nettleserklienten (`client.ts`) må kunne lese
             // sesjonen for de direkte Supabase-kallene (spørringer, RPC,
             // storage og realtime-abonnementet på meldinger). En HttpOnly-
-            // kapsel ville gjort nettleseren utlogget. Avviket fra
-            // HttpOnly-kravet er dokumentert i
-            // `docs/decisions/2026-09-17-sesjon-i-informasjonskapsler.md`.
+            // kapsel ville gjort nettleseren utlogget.
             httpOnly: false,
             secure: getRequestProtocol() === "https",
           });

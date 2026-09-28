@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PublishedListingDialog } from "./published-listing-dialog";
@@ -23,15 +24,18 @@ vi.mock("@/hooks/use-listing-preview", () => ({
 }));
 
 function renderDialog(handlers: { onPromote?: () => void; onClose?: () => void } = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return render(
-    <PublishedListingDialog
-      listingId="listing-1"
-      open
-      onOpenChange={vi.fn()}
-      onView={vi.fn()}
-      onPromote={handlers.onPromote ?? vi.fn()}
-      onClose={handlers.onClose ?? vi.fn()}
-    />,
+    <QueryClientProvider client={client}>
+      <PublishedListingDialog
+        listingId="listing-1"
+        open
+        onOpenChange={vi.fn()}
+        onView={vi.fn()}
+        onPromote={handlers.onPromote ?? vi.fn()}
+        onClose={handlers.onClose ?? vi.fn()}
+      />
+    </QueryClientProvider>,
   );
 }
 

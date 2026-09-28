@@ -2292,18 +2292,21 @@ export type Database = {
           category_suggestion_ai_enabled: boolean
           default_search_examples: string[]
           id: boolean
+          native_promotion_enabled: boolean
           updated_at: string
         }
         Insert: {
           category_suggestion_ai_enabled?: boolean
           default_search_examples?: string[]
           id?: boolean
+          native_promotion_enabled?: boolean
           updated_at?: string
         }
         Update: {
           category_suggestion_ai_enabled?: boolean
           default_search_examples?: string[]
           id?: boolean
+          native_promotion_enabled?: boolean
           updated_at?: string
         }
         Relationships: []

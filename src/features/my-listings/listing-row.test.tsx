@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { cleanup, render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ListingRow, type Row } from "./listing-row";
 
@@ -13,6 +14,11 @@ vi.mock("@/lib/storage", () => ({
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
 }));
+
+function renderWithClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const row: Row = {
   id: "1",
@@ -37,7 +43,7 @@ const noop = () => {};
 
 describe("ListingRow", () => {
   it("shows the promote action for every user, not just demo/admin roles", () => {
-    const { getAllByText } = render(
+    const { getAllByText } = renderWithClient(
       <ListingRow
         row={row}
         isVehicle={false}

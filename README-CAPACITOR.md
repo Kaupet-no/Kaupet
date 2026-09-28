@@ -204,6 +204,62 @@ Markedsføringsversjonen (`1.0.0`, `1.0.1`, …) har én kilde: feltet
 Ved versjonsbump: oppdater `package.json` og de 4
 `MARKETING_VERSION`-linjene i pbxproj i samme commit.
 
+---
+
+## Publisering til butikkene
+
+`.github/workflows/release-native.yml` bygger produksjonsversjoner og laster
+dem opp til Google Play (internal track) og TestFlight. Trigges kun manuelt
+(`workflow_dispatch`, med input `platform: android|ios|both`) eller ved å
+pushe et tag som matcher `v*` — aldri på vanlige push/PR-er.
+
+### Påkrevde secrets
+
+Alle hemmelighetene under må ligge i GitHub-miljøet **`production`**
+(Settings → Environments → production → Environment secrets). Mangler noen
+av dem feiler jobben umiddelbart med en tydelig norsk feilmelding som lister
+de manglende navnene, i stedet for å bygge et usignert eller halvferdig
+resultat.
+
+**Android:**
+
+| Secret                             | Innhold                                                           |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `ANDROID_GOOGLE_SERVICES_JSON`     | Produksjons-`google-services.json` fra Firebase Console           |
+| `ANDROID_UPLOAD_KEYSTORE_BASE64`   | Upload-keystoren (`.jks`), base64-kodet (`base64 -i key.jks`)     |
+| `ANDROID_UPLOAD_KEYSTORE_PASSWORD` | Passord for keystoren                                             |
+| `ANDROID_UPLOAD_KEY_ALIAS`         | Alias for signeringsnøkkelen i keystoren                          |
+| `ANDROID_UPLOAD_KEY_PASSWORD`      | Passord for selve nøkkelen                                        |
+| `PLAY_SERVICE_ACCOUNT_JSON`        | Google Play service-account-nøkkelen (JSON) med tilgang til appen |
+
+**iOS:**
+
+| Secret                          | Innhold                                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `IOS_GOOGLE_SERVICE_INFO_PLIST` | Produksjons-`GoogleService-Info.plist` fra Firebase Console                                               |
+| `APP_STORE_CONNECT_KEY_ID`      | Key ID for App Store Connect API-nøkkelen                                                                 |
+| `APP_STORE_CONNECT_ISSUER_ID`   | Issuer ID for samme nøkkel                                                                                |
+| `APP_STORE_CONNECT_KEY_P8`      | Selve `.p8`-nøkkelinnholdet (App Store Connect → Users and Access → Integrations → App Store Connect API) |
+| `APPLE_TEAM_ID`                 | Apple Developer Team ID (10 tegn)                                                                         |
+
+### Førstegangsoppsett (må gjøres manuelt, kun én gang)
+
+- **Google Play**: appen (`no.kaupet.app`) og dens **første** release må
+  opprettes manuelt i Play Console — Play sin API tillater ikke at en helt ny
+  app får sin første release fra CI. Etter at én release finnes (selv som
+  intern testrelease), kan denne workflowen laste opp AAB-er til `internal`
+  track med status `draft` (du fullfører og ruller ut release i Console).
+- **App Store Connect**: opprett app-posten med bundle-ID `no.kaupet.app`
+  under din Apple-utviklerkonto før første kjøring — `-allowProvisioningUpdates`
+  håndterer signering automatisk, men appen må finnes i App Store Connect
+  for at opplasting til TestFlight skal lykkes.
+
+### Slik trigges en utgivelse
+
+- Manuelt: Actions → «Release native apps» → Run workflow → velg `platform`.
+- Automatisk: push et tag som matcher `v*` (f.eks. `v1.2.0`) — bygger begge
+  plattformer.
+
 ## Vanlige feil
 
 **Android: `SDK location not found`**

@@ -35,6 +35,9 @@ export type WtbListing = {
   category_id: string | null;
   max_price_nok: number | null;
   notify_matches: boolean;
+  postal_code: string | null;
+  city: string | null;
+  radius_km: number | null;
   status: "draft" | "active" | "fulfilled" | "expired" | "archived";
   created_at: string;
   updated_at: string;
@@ -46,7 +49,37 @@ export type WtbListingWithProfile = WtbListing & {
   categories: { name_nb: string; slug: string } | null;
 };
 
-const wtbInputSchema = z.object({
+/** Valgfritt område: postnummerets sentrum + radius (se migrasjon
+ * 20260928120000_wtb_location_and_reverse_matching.sql). Uten radius er det
+ * bare informasjon til selgerne, ikke et treffkriterium. */
+const wtbLocationSchema = z.object({
+  postal_code: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
+    .nullable()
+    .optional(),
+  city: z.string().trim().max(100).nullable().optional(),
+  lat: z.number().min(-90).max(90).nullable().optional(),
+  lng: z.number().min(-180).max(180).nullable().optional(),
+  radius_km: z.number().int().min(1).max(2000).nullable().optional(),
+});
+
+function locationFields(data: z.infer<typeof wtbLocationSchema>) {
+  const postalCode = data.postal_code || null;
+  // Koordinater og radius henger på postnummeret: uten postnummer finnes
+  // ikke noe område, uansett hva klienten sendte med.
+  const hasCoords = !!postalCode && data.lat != null && data.lng != null;
+  return {
+    postal_code: postalCode,
+    city: postalCode ? data.city || null : null,
+    lat: hasCoords ? data.lat! : null,
+    lng: hasCoords ? data.lng! : null,
+    radius_km: hasCoords ? (data.radius_km ?? null) : null,
+  };
+}
+
+const wtbInputSchema = wtbLocationSchema.extend({
   draftId: z.string().uuid().optional(),
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
   subtitle: z.string().trim().max(80, "Maks 80 tegn").nullable().optional(),
@@ -73,6 +106,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
       max_price_nok: data.max_price_nok ?? null,
       notify_matches: data.notify_matches ?? false,
       attributes: data.attributes ?? {},
+      ...locationFields(data),
     };
 
     if (data.draftId) {
@@ -136,6 +170,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       max_price_nok: data.max_price_nok ?? null,
       notify_matches: data.notify_matches ?? false,
       attributes: data.attributes ?? {},
+      ...locationFields(data),
     };
 
     if (data.id) {
@@ -183,7 +218,7 @@ export const getLatestWtbDraft = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("wtb_listings")
       .select(
-        "id, title, description, category_id, max_price_nok, notify_matches, attributes, updated_at",
+        "id, title, description, category_id, max_price_nok, notify_matches, attributes, postal_code, city, lat, lng, radius_km, updated_at",
       )
       .eq("user_id", context.userId)
       .eq("status", "draft")
@@ -212,7 +247,7 @@ export const discardWtbDraft = createServerFn({ method: "POST" })
     }
   });
 
-const wtbUpdateSchema = z.object({
+const wtbUpdateSchema = wtbLocationSchema.extend({
   id: z.string().uuid(),
   title: z
     .string()
@@ -243,6 +278,7 @@ export const updateWtbListing = createServerFn({ method: "POST" })
       ...(data.max_price_nok !== undefined && { max_price_nok: data.max_price_nok }),
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       ...(data.status !== undefined && { status: data.status }),
+      ...(data.postal_code !== undefined && locationFields(data)),
     };
 
     const { error } = await supabaseAdmin
@@ -403,6 +439,66 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
     if (error || !rows?.[0]) return { count: 0, maxPrice: null };
 
     return { count: rows[0].match_count ?? 0, maxPrice: rows[0].max_price ?? null };
+  });
+
+export type WtbExistingMatch = {
+  id: string;
+  title: string;
+  price_nok: number | null;
+  is_free: boolean;
+  city: string | null;
+};
+
+/** Omvendt retning av matchWtbListingsForListing: aktive annonser som
+ * allerede oppfyller et kjøpsønske brukeren fortsatt fyller ut (eller nettopp
+ * publiserte). Samme sammenligning som treffvarslene via
+ * listings_matching_wtb → wtb_criteria_match_listing. Krever kategori — uten
+ * den ville alle annonser matchet. */
+export const matchListingsForWtb = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    wtbLocationSchema
+      .pick({ lat: true, lng: true, radius_km: true })
+      .extend({
+        category_id: z.string().uuid(),
+        max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+        attributes: wtbAttributesSchema.optional(),
+        limit: z.number().int().min(0).max(20).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }): Promise<{ count: number; listings: WtbExistingMatch[] }> => {
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("match-listings-for-wtb", 60, 300);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: page, error } = await supabaseAdmin.rpc("listings_matching_wtb", {
+      _category_id: data.category_id,
+      _max_price_nok: data.max_price_nok ?? null,
+      _attributes: data.attributes ?? {},
+      _lat: data.lat ?? null,
+      _lng: data.lng ?? null,
+      _radius_km: data.radius_km ?? null,
+      _limit: data.limit ?? 5,
+    } as never);
+    if (error) {
+      throw await toClientError("database", error);
+    }
+    const matches = (page ?? []) as { id: string; total_count: number }[];
+    if (matches.length === 0) return { count: 0, listings: [] };
+
+    const ids = matches.map((m) => m.id);
+    const { data: rows, error: rowsError } = await supabaseAdmin
+      .from("listings")
+      .select("id, title, price_nok, is_free, city")
+      .in("id", ids);
+    if (rowsError) {
+      throw await toClientError("database", rowsError);
+    }
+    const byId = new Map((rows ?? []).map((row) => [row.id, row]));
+    return {
+      count: Number(matches[0].total_count),
+      listings: ids.map((id) => byId.get(id)).filter((row) => row !== undefined),
+    };
   });
 
 /** Varsel om at en ny/endret annonse matcher kriteriene i en av brukerens

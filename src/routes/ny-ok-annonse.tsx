@@ -59,6 +59,7 @@ import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
 import { GuestPublishSheet } from "@/features/listing-creation/guest-publish-sheet";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 export const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
@@ -382,10 +383,26 @@ function NewWtbPage() {
     categoriesById,
     bilOgMcCategoryId,
   });
+  // Finner verken stemmene eller kjøretøyhintet noe, spør vi Mistral — men
+  // først når brukeren står på kategoristeget, ikke mens tittelen skrives.
+  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const { categorySuggestions, categorySuggestionPending } = useTitleCategorySuggestion({
     title,
     muted: !!categoryId,
     clientCategoryHint,
+    aiFallback: {
+      enabled: turnstileEnabled && (step === "category" || step === "category-confirm"),
+      getToken: async () => {
+        // Uten token innen rimelig tid viser vi heller velgeren enn å vente.
+        const token = await Promise.race([
+          turnstileRef.current?.getResponsePromise() ?? Promise.resolve(null),
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8_000)),
+        ]).catch(() => null);
+        turnstileRef.current?.reset();
+        return token;
+      },
+    },
   });
 
   const criteriaSummary = wtbCriteriaSummary(
@@ -805,6 +822,14 @@ function NewWtbPage() {
 
   return (
     <>
+      {turnstileEnabled && (
+        // Usynlig; tokenet brukes bare til KI-kategoriforslaget.
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+          options={{ appearance: "interaction-only", action: "kaupet" }}
+        />
+      )}
       <ListingComposerShell
         title="Ønskes kjøpt"
         pageKey={step}

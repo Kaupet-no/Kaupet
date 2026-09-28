@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
+import {
+  prefetchCategorySuggestion,
+  suggestCategoryForTitleWithAi,
+} from "@/lib/category-suggestion.functions";
 
 export type CategorySuggestion = {
   category_id: string;
@@ -25,8 +28,12 @@ export function useTitleCategorySuggestion(params: {
    * RPC comes back empty. This hook stays vertical-agnostic: it only merges
    * in whatever the caller already resolved. */
   clientCategoryHint?: CategorySuggestion | null;
+  /** Sender tittelen til Mistral (suggestCategoryForTitleWithAi) når
+   * stemmene og `clientCategoryHint` ikke fant noe. `enabled` styrer når —
+   * f.eks. bare på kategoristeget, så det ikke går et kall per tastetrykk. */
+  aiFallback?: { enabled: boolean; getToken: () => Promise<string | null> };
 }) {
-  const { title, muted, clientCategoryHint } = params;
+  const { title, muted, clientCategoryHint, aiFallback } = params;
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const trimmedTitle = (title ?? "").trim();
   const debouncedTitle = useDebouncedValue(trimmedTitle, 400);
@@ -53,13 +60,37 @@ export function useTitleCategorySuggestion(params: {
   // alltid forrang når de faktisk finner noe (f.eks. "sofa"-treffet mot
   // kategorinavnet), og brukes kun når RPC-en kommer tilbake tom (f.eks.
   // «Volvo V70 stasjonsvogn», der verken stemmer eller kategorinavn treffer).
-  const categorySuggestions = suggestionsMuted
+  const localSuggestions = suggestionsMuted
     ? []
     : rpcSuggestions.length > 0
       ? rpcSuggestions
       : categorySuggestionReady && clientCategoryHint
         ? [clientCategoryHint]
         : [];
+
+  const localSettledEmpty =
+    categorySuggestionReady &&
+    !categorySuggestionLoading &&
+    debouncedTitle === trimmedTitle &&
+    localSuggestions.length === 0;
+  const { data: aiSuggestions = [], isFetching: aiLoading } = useQuery({
+    queryKey: ["category-suggestion-ai", debouncedTitle],
+    enabled: !!aiFallback?.enabled && !suggestionsMuted && localSettledEmpty,
+    staleTime: Infinity,
+    retry: false,
+    queryFn: async (): Promise<CategorySuggestion[]> => {
+      const turnstileToken = await aiFallback!.getToken();
+      if (!turnstileToken) return [];
+      const result = await suggestCategoryForTitleWithAi({
+        data: { title: debouncedTitle, turnstileToken },
+      });
+      return result.suggestions;
+    },
+  });
+  const categorySuggestions =
+    !aiFallback?.enabled || !localSettledEmpty || suggestionsMuted
+      ? localSuggestions
+      : aiSuggestions;
 
   return {
     categorySuggestions,
@@ -69,7 +100,9 @@ export function useTitleCategorySuggestion(params: {
      * ellers ville blinket «ingen forslag» før spørringen i det hele tatt starter. */
     categorySuggestionPending:
       !suggestionsMuted &&
-      (categorySuggestionLoading || (trimmedTitle.length >= 5 && trimmedTitle !== debouncedTitle)),
+      (categorySuggestionLoading ||
+        (!!aiFallback?.enabled && aiLoading) ||
+        (trimmedTitle.length >= 5 && trimmedTitle !== debouncedTitle)),
     setSuggestionDismissed,
   };
 }

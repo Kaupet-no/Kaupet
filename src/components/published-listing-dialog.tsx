@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { generateBrandedQrDataUrl, QR_SIZE } from "@/lib/qr";
 import { isNative, shareContent } from "@/lib/native";
+import { useNativePromotionAllowed } from "@/hooks/use-native-promotion-allowed";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
@@ -39,6 +40,7 @@ export function PublishedListingDialog({
   const [codeCopied, setCodeCopied] = useState(false);
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
+  const promotionAllowed = useNativePromotionAllowed();
 
   const { listing, imgUrl } = useListingPreview(listingId, open);
   const url = listing?.kaupet_code ? `https://kaupet.no/${listing.kaupet_code}` : null;
@@ -182,9 +184,11 @@ export function PublishedListingDialog({
           <Button variant="secondary" onClick={onView} className="w-full">
             <Eye className="size-4" /> Se annonsen
           </Button>
-          <Button variant="outline" onClick={onPromote} className="w-full">
-            <Sparkles className="size-4" /> Kjøp promotering
-          </Button>
+          {promotionAllowed && (
+            <Button variant="outline" onClick={onPromote} className="w-full">
+              <Sparkles className="size-4" /> Kjøp promotering
+            </Button>
+          )}
         </div>
       </ResponsiveOverlayContent>
       {listing?.kaupet_code && (

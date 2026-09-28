@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import { useNativePromotionAllowed } from "@/hooks/use-native-promotion-allowed";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,7 @@ export function OwnerStatsPanel({
   hasPrice: boolean;
 }) {
   const queryClient = useQueryClient();
+  const promotionAllowed = useNativePromotionAllowed();
   const [showPublishWarning, setShowPublishWarning] = useState(false);
   const turnstileEnabled = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
@@ -166,14 +168,16 @@ export function OwnerStatsPanel({
             <Check className="size-4" /> Annonse fremhevet
           </Button>
         ) : (
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-2 w-full gap-2"
-            onClick={() => onPromoteOpenChange(true)}
-          >
-            Fremhev annonse
-          </Button>
+          promotionAllowed && (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 w-full gap-2"
+              onClick={() => onPromoteOpenChange(true)}
+            >
+              Fremhev annonse
+            </Button>
+          )
         ))}
       <PromoteListingDialog
         listingId={listingId}

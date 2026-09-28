@@ -1,4 +1,13 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+// versionName er felles med iOS' MARKETING_VERSION og hentes fra
+// package.json ("version") slik at appversjonen kun bumpes ett sted
+// (i tillegg til MARKETING_VERSION i ios/App/App.xcodeproj/project.pbxproj,
+// se README-CAPACITOR.md § Versjonering).
+def packageJson = new JsonSlurper().parse(rootProject.file("../package.json"))
+def appVersionName = packageJson.version
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
@@ -19,7 +28,7 @@ android {
         // bygg uten env-variabelen faller tilbake til 1.
         def resolvedVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
         versionCode resolvedVersionCode
-        versionName "0.2"
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

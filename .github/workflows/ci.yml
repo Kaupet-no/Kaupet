@@ -374,9 +374,8 @@ jobs:
 
       - name: Les app-versjon
         id: app_version
-        working-directory: android/app
         run: |
-          name=$(grep -oP 'versionName\s+"\K[^"]+' build.gradle)
+          name=$(jq -r .version package.json)
           echo "full=$name.$(printf '%03d' "$GITHUB_RUN_NUMBER")" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 

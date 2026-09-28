@@ -15,6 +15,7 @@ import {
 
 import { signListingImageUrls } from "@/lib/storage";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useNativePromotionAllowed } from "@/hooks/use-native-promotion-allowed";
 import { hapticImpact } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
@@ -111,6 +112,7 @@ export function ListingRow({
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const native = useIsNative();
+  const promotionAllowed = useNativePromotionAllowed();
 
   const imgUrl = row.cover_path ? signListingImageUrls([row.cover_path])[row.cover_path] : null;
 
@@ -255,7 +257,7 @@ export function ListingRow({
               </DropdownMenuItem>
               {row.status === "active" && (
                 <>
-                  {!activePromotion && (
+                  {!activePromotion && promotionAllowed && (
                     <DropdownMenuItem onClick={onPromote}>Fremhev annonse</DropdownMenuItem>
                   )}
                   <DropdownMenuItem
@@ -360,9 +362,11 @@ export function ListingRow({
                   <Check className="size-4" /> Annonse fremhevet
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                  Fremhev annonse
-                </Button>
+                promotionAllowed && (
+                  <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                    Fremhev annonse
+                  </Button>
+                )
               )}
               <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
                 <CheckCircle2 className="size-4" /> Marker som solgt

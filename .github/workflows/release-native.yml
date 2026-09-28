@@ -1,0 +1,295 @@
+name: Release native apps
+
+# Bevisst separat fra ci.yml: dette er produksjonsutgivelser til butikkene,
+# ikke noe som skal kjøre på hver PR/push. Trigges KUN manuelt eller på et
+# versjons-tag — aldri på normale pushes/PR-er.
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Hvilken plattform skal bygges og publiseres?"
+        type: choice
+        options: [android, ios, both]
+        default: both
+  push:
+    tags: ["v*"]
+
+# Minste standard for et offentlig repo; jobber som trenger mer eskalerer selv.
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android → Google Play (internal)
+    # Tag-push bygger alltid begge plattformer. workflow_dispatch respekterer input.
+    if: github.event_name == 'push' || contains(fromJSON('["android", "both"]'), inputs.platform)
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Signeringskontoene finnes ikke ennå. Feil raskt og tydelig her i
+      # stedet for at gradlew/opplastingssteget lenger nede feiler kryptisk
+      # eller — verre — hopper stille over signering/opplasting.
+      - name: Sjekk at nødvendige hemmeligheter er satt
+        env:
+          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          missing=()
+          [ -z "$ANDROID_GOOGLE_SERVICES_JSON" ] && missing+=("ANDROID_GOOGLE_SERVICES_JSON")
+          [ -z "$ANDROID_UPLOAD_KEYSTORE_BASE64" ] && missing+=("ANDROID_UPLOAD_KEYSTORE_BASE64")
+          [ -z "$ANDROID_UPLOAD_KEYSTORE_PASSWORD" ] && missing+=("ANDROID_UPLOAD_KEYSTORE_PASSWORD")
+          [ -z "$ANDROID_UPLOAD_KEY_ALIAS" ] && missing+=("ANDROID_UPLOAD_KEY_ALIAS")
+          [ -z "$ANDROID_UPLOAD_KEY_PASSWORD" ] && missing+=("ANDROID_UPLOAD_KEY_PASSWORD")
+          [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ] && missing+=("PLAY_SERVICE_ACCOUNT_JSON")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Følgende hemmeligheter mangler i GitHub-miljøet «production» og må opprettes før Android kan publiseres til Google Play:" >&2
+            printf '  - %s\n' "${missing[@]}" >&2
+            echo "Se README-CAPACITOR.md § Publisering til butikkene for hva hver av dem skal inneholde." >&2
+            exit 1
+          fi
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Skriv google-services.json
+        working-directory: android/app
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+
+      - name: Sync Android project (production)
+        run: bunx cap sync android
+        env:
+          CAPACITOR_ENV: production
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Skriv upload-keystore fra secret
+        working-directory: android
+        run: |
+          echo "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 -d > app/upload-keystore.jks
+          cat > keystore.properties <<EOF
+          storeFile=app/upload-keystore.jks
+          storePassword=$ANDROID_UPLOAD_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_UPLOAD_KEY_ALIAS
+          keyPassword=$ANDROID_UPLOAD_KEY_PASSWORD
+          EOF
+        env:
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+
+      - name: Build production AAB
+        working-directory: android
+        # Samme prinsipp som versionCode i ci.yml (native-android), men med
+        # en fast +10000-offset: run_number for DENNE workflowen starter på
+        # nytt fra 1 og er uavhengig av ci.yml sin telling. Uten offset ville
+        # en versjon publisert herfra kunne trenge et LAVERE versionCode enn
+        # et debug-bygg fra ci.yml har brukt — Play/Android tillater aldri
+        # et synkende versionCode. +10000 gir god margin under Plays
+        # maksgrense på 2 100 000 000. (GitHub Actions-uttrykk støtter ikke
+        # aritmetikk, så regnestykket gjøres i shell.)
+        run: ANDROID_VERSION_CODE=$((GITHUB_RUN_NUMBER + 10000)) ./gradlew bundleProductionRelease
+
+      - name: Rydd opp keystore-filer
+        if: always()
+        working-directory: android
+        run: rm -f app/upload-keystore.jks keystore.properties
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-production-aab
+          path: android/app/build/outputs/bundle/productionRelease/app-production-release.aab
+          retention-days: 30
+
+      # r0adkll/upload-google-play fremfor en hjemmesnekret curl-mot-Play-API:
+      # opplasting av en AAB til Play krever en signert JWT-utveksling mot
+      # Google sitt OAuth-endepunkt og en flertrinns Edits-API (opprette edit,
+      # laste opp bundle, tildele track, committe edit). Det er nettopp den
+      # typen boilerplate noen linjer shell ikke dekker uten å i praksis
+      # gjenimplementere en Google API-klient, så en veletablert, pinnet
+      # action er enklere her.
+      - name: Last opp til Google Play (internal, draft)
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: no.kaupet.app
+          releaseFiles: android/app/build/outputs/bundle/productionRelease/app-production-release.aab
+          track: internal
+          # draft: Play krever at appens aller første release opprettes manuelt
+          # i Console (se README-CAPACITOR.md § Publisering til butikkene).
+          # Før det er gjort finnes ingen release-linje CI kan committe til,
+          # og et forsøk på "completed" ville feile opplastingen.
+          status: draft
+
+  ios:
+    name: iOS → TestFlight
+    if: github.event_name == 'push' || contains(fromJSON('["ios", "both"]'), inputs.platform)
+    runs-on: macos-15
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Sjekk at nødvendige hemmeligheter er satt
+        env:
+          IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=()
+          [ -z "$IOS_GOOGLE_SERVICE_INFO_PLIST" ] && missing+=("IOS_GOOGLE_SERVICE_INFO_PLIST")
+          [ -z "$APP_STORE_CONNECT_KEY_ID" ] && missing+=("APP_STORE_CONNECT_KEY_ID")
+          [ -z "$APP_STORE_CONNECT_ISSUER_ID" ] && missing+=("APP_STORE_CONNECT_ISSUER_ID")
+          [ -z "$APP_STORE_CONNECT_KEY_P8" ] && missing+=("APP_STORE_CONNECT_KEY_P8")
+          [ -z "$APPLE_TEAM_ID" ] && missing+=("APPLE_TEAM_ID")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Følgende hemmeligheter mangler i GitHub-miljøet «production» og må opprettes før iOS kan publiseres til TestFlight:" >&2
+            printf '  - %s\n' "${missing[@]}" >&2
+            echo "Se README-CAPACITOR.md § Publisering til butikkene for hva hver av dem skal inneholde." >&2
+            exit 1
+          fi
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ios/App/App/GoogleService-Info.plist er miljøspesifikk og gitignoret
+      # (se README-CAPACITOR.md § Native push-varsler) — samme mønster som
+      # google-services.json for Android.
+      - name: Skriv GoogleService-Info.plist
+        working-directory: ios/App/App
+        run: printf '%s' "$IOS_GOOGLE_SERVICE_INFO_PLIST" > GoogleService-Info.plist
+        env:
+          IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}
+
+      - name: Sync iOS project (production)
+        run: bunx cap sync ios
+        env:
+          CAPACITOR_ENV: production
+
+      # README-CAPACITOR.md § Versjonering: MARKETING_VERSION i pbxproj må
+      # bumpes manuelt sammen med package.json sin "version". Et avvik her
+      # betyr at forrige versjonsbump glemte pbxproj-halvparten — bygg videre
+      # ville publisert feil markedsføringsversjon til App Store.
+      - name: Sjekk at MARKETING_VERSION matcher package.json
+        run: |
+          expected=$(node -p "require('./package.json').version")
+          mismatched=$(grep -c "MARKETING_VERSION = $expected;" ios/App/App.xcodeproj/project.pbxproj || true)
+          total=$(grep -c "MARKETING_VERSION = " ios/App/App.xcodeproj/project.pbxproj || true)
+          if [ "$mismatched" != "$total" ] || [ "$total" -eq 0 ]; then
+            echo "MARKETING_VERSION i ios/App/App.xcodeproj/project.pbxproj matcher ikke package.json sin versjon ($expected)." >&2
+            echo "Oppdater alle MARKETING_VERSION-linjene i pbxproj til $expected (README-CAPACITOR.md § Versjonering)." >&2
+            exit 1
+          fi
+
+      - name: Skriv App Store Connect API-nøkkel
+        working-directory: ios
+        run: printf '%s' "$APP_STORE_CONNECT_KEY_P8" > AuthKey.p8
+        env:
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+
+      - name: Skriv ExportOptions.plist
+        working-directory: ios
+        run: |
+          cat > ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Arkiver (xcodebuild archive)
+        working-directory: ios/App
+        # Samme +10000-offset og begrunnelse som Android sin
+        # ANDROID_VERSION_CODE over — se den jobben. (GitHub Actions-uttrykk
+        # støtter ikke aritmetikk, så regnestykket gjøres i shell.)
+        run: |
+          IOS_BUILD_NUMBER=$((GITHUB_RUN_NUMBER + 10000))
+          xcodebuild archive \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$GITHUB_WORKSPACE/ios/AuthKey.p8" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER"
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Med automatisk signering setter Xcode aps-environment i det arkiverte
+      # binæret ut fra distribusjonsprofilen den velger (produksjon), ikke ut
+      # fra den committede App.entitlements (som statisk sier "development"
+      # for lokale debug-bygg). Denne sjekken bekrefter at det faktisk skjedde
+      # — uten den kunne en feilkonfigurert profil sende push-varsler til feil
+      # APNs-miljø uten at noe i bygget feilet synlig.
+      - name: Sjekk at arkivet har aps-environment=production
+        run: |
+          app_path="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          entitlements=$(codesign -d --entitlements :- "$app_path" 2>/dev/null)
+          if ! echo "$entitlements" | grep -q "<key>aps-environment</key>"; then
+            echo "Fant ingen aps-environment-entitlement i det arkiverte bygget." >&2
+            exit 1
+          fi
+          if ! echo "$entitlements" | grep -A1 "<key>aps-environment</key>" | grep -q "production"; then
+            echo "aps-environment er ikke 'production' i det arkiverte bygget — feil provisioning-profil valgt." >&2
+            echo "$entitlements" >&2
+            exit 1
+          fi
+
+      - name: Eksporter og last opp til TestFlight
+        working-directory: ios/App
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$GITHUB_WORKSPACE/ios/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$GITHUB_WORKSPACE/ios/AuthKey.p8" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+      - name: Rydd opp API-nøkkelfil
+        if: always()
+        run: rm -f ios/AuthKey.p8

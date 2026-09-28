@@ -29,34 +29,7 @@ import {
   updateNotificationPreferences,
 } from "@/lib/push.functions";
 import { formatErrorMessage } from "@/lib/errors";
-
-function parseUserAgent(ua: string | null, platform: string): string {
-  if (!ua) return platform === "android" ? "Android-appen" : "Ukjent nettleser";
-  if (platform === "android") return "Android-appen";
-  const browser = /Edg\//.test(ua)
-    ? "Edge"
-    : /OPR\//.test(ua)
-      ? "Opera"
-      : /Chrome\//.test(ua)
-        ? "Chrome"
-        : /Firefox\//.test(ua)
-          ? "Firefox"
-          : /Safari\//.test(ua)
-            ? "Safari"
-            : "Nettleser";
-  const os = /Windows/.test(ua)
-    ? "Windows"
-    : /Macintosh/.test(ua)
-      ? "Mac"
-      : /Linux/.test(ua)
-        ? "Linux"
-        : /Android/.test(ua)
-          ? "Android"
-          : /iPhone|iPad/.test(ua)
-            ? "iOS"
-            : null;
-  return os ? `${browser} på ${os}` : browser;
-}
+import { parseUserAgent } from "@/lib/device-label";
 
 function formatRelativeTime(iso: string | null): string {
   if (!iso) return "Aldri";
@@ -258,13 +231,13 @@ export function NotificationsSection() {
           ) : (
             <ul className="divide-y divide-border">
               {devices.map((device) => {
-                const isThisDevice =
-                  device.platform === "android"
-                    ? endpoint !== null && device.fcm_token === endpoint
-                    : endpoint !== null && device.endpoint === endpoint;
+                const isNativeDevice = device.platform === "android" || device.platform === "ios";
+                const isThisDevice = isNativeDevice
+                  ? endpoint !== null && device.fcm_token === endpoint
+                  : endpoint !== null && device.endpoint === endpoint;
                 return (
                   <li key={device.id} className="flex items-center gap-3 py-3">
-                    {device.platform === "android" ? (
+                    {isNativeDevice ? (
                       <Smartphone className="size-5 shrink-0 text-muted-foreground" />
                     ) : (
                       <Monitor className="size-5 shrink-0 text-muted-foreground" />

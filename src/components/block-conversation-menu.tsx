@@ -24,6 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { createBlock, deleteBlock, listMyBlocks, type BlockRow } from "@/lib/blocks.functions";
+import { submitUserReport } from "@/lib/admin-moderation.functions";
+import { ReportDialog, USER_REPORT_REASONS } from "@/components/report-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 
 type Props = {
@@ -39,6 +41,7 @@ export function BlockConversationMenu({ targetUserId, conversationId, targetName
   const listFn = useServerFn(listMyBlocks);
   const createFn = useServerFn(createBlock);
   const deleteFn = useServerFn(deleteBlock);
+  const reportFn = useServerFn(submitUserReport);
 
   const { data: blocks } = useQuery({
     queryKey: ["my-blocks"],
@@ -57,6 +60,9 @@ export function BlockConversationMenu({ targetUserId, conversationId, targetName
   })();
 
   const [confirm, setConfirm] = useState<null | "all" | "conversation">(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportComment, setReportComment] = useState("");
 
   const blockMut = useMutation({
     mutationFn: async (scope: "all" | "conversation") =>
@@ -84,22 +90,69 @@ export function BlockConversationMenu({ targetUserId, conversationId, targetName
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve blokkeringen")),
   });
 
+  const reportMut = useMutation({
+    mutationFn: () =>
+      reportFn({
+        data: {
+          reportedUserId: targetUserId,
+          reason: reportReason,
+          comment: reportComment || undefined,
+        },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Rapporten er sendt inn");
+      setReportOpen(false);
+      setReportReason("");
+      setReportComment("");
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke sende inn rapporten")),
+  });
+
+  const reportDialog = (
+    <ReportDialog
+      open={reportOpen}
+      onOpenChange={setReportOpen}
+      title="Rapporter bruker"
+      description="Fortell oss hvorfor du rapporterer denne brukeren."
+      reasons={USER_REPORT_REASONS}
+      reason={reportReason}
+      onReasonChange={setReportReason}
+      comment={reportComment}
+      onCommentChange={setReportComment}
+      onSubmit={() => reportMut.mutate()}
+      pending={reportMut.isPending}
+    />
+  );
+
   if (active) {
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="gap-2"
-        onClick={() => unblockMut.mutate(active.row.id)}
-        disabled={unblockMut.isPending}
-      >
-        {unblockMut.isPending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <ShieldOff className="size-4" />
-        )}
-        Opphev blokkering
-      </Button>
+      <>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+            onClick={() => unblockMut.mutate(active.row.id)}
+            disabled={unblockMut.isPending}
+          >
+            {unblockMut.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ShieldOff className="size-4" />
+            )}
+            Opphev blokkering
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => setReportOpen(true)}
+          >
+            Rapporter bruker
+          </Button>
+        </div>
+        {reportDialog}
+      </>
     );
   }
 
@@ -123,8 +176,12 @@ export function BlockConversationMenu({ targetUserId, conversationId, targetName
           >
             Blokker brukeren helt
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setReportOpen(true)}>Rapporter bruker</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {reportDialog}
 
       <AlertDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>

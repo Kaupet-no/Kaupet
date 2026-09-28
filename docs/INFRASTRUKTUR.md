@@ -268,7 +268,8 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 | `deploy`          | Push til `main`: bygger og deployer `kaupet-no`                                                          |
 | `android-release` | Push: legger Android-preview-bygg under GitHub Releases                                                  |
 
-I tillegg: `codeql.yml` (sikkerhetsskanning), og lokale hooks via
+I tillegg: `codeql.yml` (sikkerhetsskanning), `.github/workflows/release-native.yml`
+(produksjonsutgivelser til butikkene, se § 9), og lokale hooks via
 `lefthook.yml` (lint før commit, typecheck før push).
 
 ## 9. Native apper
@@ -279,8 +280,14 @@ I tillegg: `codeql.yml` (sikkerhetsskanning), og lokale hooks via
 - Push: Firebase (`google-services.json` / `GoogleService-Info.plist`).
   Android-filene kommer fra GitHub-secretene `ANDROID_GOOGLE_SERVICES_JSON` og
   `ANDROID_GOOGLE_SERVICES_STAGING_JSON` i CI.
-- Distribusjon: App Store og Google Play. Utviklerkontoer, signering og
-  opplasting til butikkene er **ikke i repoet**.
+- Distribusjon: App Store og Google Play. `.github/workflows/release-native.yml`
+  bygger produksjonsbygg og laster dem opp til Google Play (internal track)
+  og TestFlight — trigges kun via `workflow_dispatch` eller et `v*`-tag, aldri
+  på vanlige push/PR-er. Krever signeringssecrets i GitHub-miljøet
+  `production` (se README-CAPACITOR.md § Publisering til butikkene); uten dem
+  feiler jobben raskt med en tydelig feilmelding i stedet for å bygge
+  usignerte/uferdige artefakter. Appens første release i hver butikk må
+  fortsatt opprettes manuelt (dokumentert samme sted).
 - App Links (`assetlinks.json`) er bevisst utsatt.
 
 ## 10. Ikke i repoet

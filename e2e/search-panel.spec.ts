@@ -45,13 +45,13 @@ test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }
   await page.goto("/?forcenative=1");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
-  await page.getByRole("button", { name: "Åpne søk i annonser" }).click();
+  // Forsiden har et ekte søkefelt: Enter sender søket rett til /annonser.
   const input = page.getByRole("searchbox", { name: "Søk i annonser" });
   await input.fill("sykkel");
-  await page.getByRole("button", { name: "Søk etter «sykkel»" }).click();
+  await input.press("Enter");
 
   await expect(page).toHaveURL(/\/annonser\?.*q=sykkel/);
-  await expect(page.getByRole("button", { name: /sykkel/ })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toHaveValue("sykkel");
 });
 test("søker i nytt kartområde uten å endre URL før eksplisitt handling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

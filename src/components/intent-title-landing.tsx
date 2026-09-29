@@ -42,9 +42,7 @@ export function IntentTitleLanding({
   return (
     <div className="flex flex-col gap-6 pt-2 sm:gap-7 sm:pt-0">
       <header className="text-left">
-        <h2 className="font-display text-4xl leading-[1.04] tracking-tight sm:text-5xl">
-          Hva vil du opprette?
-        </h2>
+        <h2 className="font-display text-2xl leading-tight tracking-tight">Hva vil du opprette?</h2>
       </header>
       <IntentOptions onNavigate={onNavigate} defaultIntent={defaultIntent} />
     </div>

@@ -5627,6 +5627,8 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
   let locationId: string;
   let listingId: string;
   let categoryId: string;
+  let imageJobId: string;
+  let apiKeyId: string;
   const importId = crypto.randomUUID();
 
   beforeAll(async () => {
@@ -5716,6 +5718,35 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
       .single();
     if (listingError) throw listingError;
     listingId = listing.id;
+    const { data: imageJob, error: imageJobError } = await admin
+      .from("listing_image_jobs")
+      .insert({
+        organization_id: organizationId,
+        listing_id: listingId,
+        source_url: `https://example.com/rls-${suffix}.jpg`,
+        internal_error: "intern driftsdiagnostikk",
+      })
+      .select("id")
+      .single();
+    if (imageJobError) throw imageJobError;
+    imageJobId = imageJob.id;
+    const { data: apiKey, error: apiKeyError } = await admin
+      .from("organization_api_keys")
+      .insert({
+        organization_id: organizationId,
+        created_by: ownerId,
+        acting_user_id: ownerId,
+        default_location_id: locationId,
+        name: "RLS testnøkkel",
+        key_prefix: "kpt_live_test",
+        key_hash: createHash("sha256").update(`rls-${suffix}`).digest("hex"),
+        scopes: ["listings:read"],
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .select("id")
+      .single();
+    if (apiKeyError) throw apiKeyError;
+    apiKeyId = apiKey.id;
     const { error: addressError } = await admin.from("listing_visiting_addresses").insert({
       listing_id: listingId,
       address_line: "Testgata 1",
@@ -5727,10 +5758,103 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
 
   afterAll(async () => {
     if (!canRun) return;
+    await admin.from("listing_image_jobs").delete().eq("id", imageJobId);
+    await admin.from("organization_api_keys").delete().eq("id", apiKeyId);
     await admin.from("organizations").delete().eq("id", organizationId);
     await admin.from("r2_delete_queue").delete().like("prefix", `${organizationId}/%`);
     await admin.from("r2_delete_queue").delete().eq("prefix", `${listingId}/`);
     await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  // DB-01/DB-02: reelle SELECT/INSERT/UPDATE/DELETE mot RLS og kolonne-grants.
+  it("lar aktive medlemmer se bildekøen, men skjuler internfeil og all klientskriving", async () => {
+    const clients = [
+      await signInWithRetry(emails.owner),
+      await signInWithRetry(emails.member),
+      await signInWithRetry(emails.outsider),
+      createClient(URL!, ANON_KEY!),
+    ];
+    for (const [index, client] of clients.entries()) {
+      const read = await client.from("listing_image_jobs").select("id").eq("id", imageJobId);
+      if (index < 2) {
+        expect(read.error).toBeNull();
+        expect(read.data).toHaveLength(1);
+      } else {
+        expect(read.data ?? []).toHaveLength(0);
+      }
+      const secret = await client
+        .from("listing_image_jobs")
+        .select("internal_error")
+        .eq("id", imageJobId);
+      expect(secret.error).not.toBeNull();
+      const insert = await client.from("listing_image_jobs").insert({
+        organization_id: organizationId,
+        listing_id: listingId,
+        source_url: `https://example.com/forbidden-${index}-${suffix}.jpg`,
+      });
+      expect(insert.error).not.toBeNull();
+      const update = await client
+        .from("listing_image_jobs")
+        .update({ status: "done" })
+        .eq("id", imageJobId);
+      expect(update.error).not.toBeNull();
+      const deletion = await client.from("listing_image_jobs").delete().eq("id", imageJobId);
+      expect(deletion.error).not.toBeNull();
+    }
+    const row = await admin
+      .from("listing_image_jobs")
+      .select("status")
+      .eq("id", imageJobId)
+      .single();
+    expect(row.data?.status).toBe("pending");
+  });
+
+  it("lar bare superbruker se API-nøkkelmetadata, aldri hash eller klientskriving", async () => {
+    const clients = [
+      await signInWithRetry(emails.owner),
+      await signInWithRetry(emails.member),
+      await signInWithRetry(emails.outsider),
+      createClient(URL!, ANON_KEY!),
+    ];
+    for (const [index, client] of clients.entries()) {
+      const read = await client.from("organization_api_keys").select("id").eq("id", apiKeyId);
+      if (index === 0) {
+        expect(read.error).toBeNull();
+        expect(read.data).toHaveLength(1);
+      } else {
+        expect(read.data ?? []).toHaveLength(0);
+      }
+      const secret = await client
+        .from("organization_api_keys")
+        .select("key_hash")
+        .eq("id", apiKeyId);
+      expect(secret.error).not.toBeNull();
+      const insert = await client.from("organization_api_keys").insert({
+        organization_id: organizationId,
+        created_by: userIds[0],
+        acting_user_id: userIds[0],
+        default_location_id: locationId,
+        name: "Ulovlig nøkkel",
+        key_prefix: "kpt_live_no",
+        key_hash: createHash("sha256").update(`forbidden-${index}-${suffix}`).digest("hex"),
+        scopes: ["listings:read"],
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      });
+      expect(insert.error).not.toBeNull();
+      const update = await client
+        .from("organization_api_keys")
+        .update({ name: "Endret" })
+        .eq("id", apiKeyId);
+      expect(update.error).not.toBeNull();
+      const deletion = await client.from("organization_api_keys").delete().eq("id", apiKeyId);
+      expect(deletion.error).not.toBeNull();
+    }
+    const row = await admin
+      .from("organization_api_keys")
+      .select("name")
+      .eq("id", apiKeyId)
+      .single();
+    expect(row.data?.name).toBe("RLS testnøkkel");
   });
 
   it("viser private billing/fakturadata bare til superbruker og adresse offentlig når flagget er satt", async () => {

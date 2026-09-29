@@ -869,15 +869,14 @@ gjennomføringsrekkefølge for agenter.
 
 | #   | Gap                                                                                                                 | Caser                        | Innsats |
 | --- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
-| 1   | RLS-case mangler for `listing_image_jobs` og `organization_api_keys`; `check:rls-coverage` stopper nye gap          | DB-01, DB-02                 | M       |
-| 2   | Serverfunksjoner mangler systematisk autorisasjons-/valideringstest                                                 | ADM-03, SEC-06, SEC-07       | L       |
-| 3   | Vipps har tester for konkurrerende checkout og webhook-retry, men mangler samtidige webhook-kall og full avstemming | PAY-05, PAY-07, PAY-08       | M       |
-| 4   | Ingen automatisert IDOR-/hemmelighetssonde                                                                          | SEC-02, SEC-08               | M       |
-| 5   | Ingen målte Web Vitals; kun bundle-budsjett                                                                         | PERF-02, PERF-03             | M       |
-| 6   | A11y dekket av én semantisk E2E-spec; mangler feltnivå-assertions                                                   | A11Y-02, A11Y-03, A11Y-04    | M       |
-| 7   | Dekningsterskel på 9 % gir svakt regresjonsvern                                                                     | § 9 ratchet                  | L       |
-| 8   | Ingen testdekning av varselutsending og dedupe                                                                      | NOTIF-03, NOTIF-06, NOTIF-07 | M       |
-| 9   | Polish-sjekklisten er ikke knyttet til PR-malen                                                                     | § 11.17                      | S       |
+| 1   | Serverfunksjoner mangler systematisk autorisasjons-/valideringstest                                                 | ADM-03, SEC-06, SEC-07       | L       |
+| 2   | Vipps har tester for konkurrerende checkout og webhook-retry, men mangler samtidige webhook-kall og full avstemming | PAY-05, PAY-07, PAY-08       | M       |
+| 3   | Ingen automatisert IDOR-/hemmelighetssonde                                                                          | SEC-02, SEC-08               | M       |
+| 4   | Ingen målte Web Vitals; kun bundle-budsjett                                                                         | PERF-02, PERF-03             | M       |
+| 5   | A11y dekket av én semantisk E2E-spec; mangler feltnivå-assertions                                                   | A11Y-02, A11Y-03, A11Y-04    | M       |
+| 6   | Dekningsterskel på 9 % gir svakt regresjonsvern                                                                     | § 9 ratchet                  | L       |
+| 7   | Ingen testdekning av varselutsending og dedupe                                                                      | NOTIF-03, NOTIF-06, NOTIF-07 | M       |
+| 8   | Polish-sjekklisten er ikke knyttet til PR-malen                                                                     | § 11.17                      | S       |
 
 ## 15. Oppgavemal for tildeling til AI-agent
 

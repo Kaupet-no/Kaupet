@@ -262,7 +262,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
 
       const now = new Date();
       const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
-      const { error: uerr } = await supabaseAdmin
+      const { data: updated, error: uerr } = await supabaseAdmin
         .from("listing_promotions")
         .update({
           status: "active",
@@ -271,11 +271,23 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           vipps_psp_reference: payment.pspReference ?? null,
         })
         .eq("id", promo.id)
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .select("status, expires_at")
+        .maybeSingle();
       if (uerr) {
         throw await toClientError("database", uerr);
       }
-      return { status: "active" as const, expires_at: expires.toISOString() };
+      if (updated) return { status: updated.status, expires_at: updated.expires_at };
+
+      // The webhook may have changed this row after our initial read.
+      const { data: current, error: currentErr } = await supabaseAdmin
+        .from("listing_promotions")
+        .select("status, expires_at")
+        .eq("id", promo.id)
+        .maybeSingle();
+      if (currentErr) throw await toClientError("database", currentErr);
+      if (!current) throw new Error("Fant ikke fremheving");
+      return { status: current.status, expires_at: current.expires_at };
     }
 
     if (

@@ -35,7 +35,7 @@ import {
   priceScaleMax,
   type PriceQuickRange,
 } from "@/lib/price-histogram";
-import { conditionOptionsFor, type AdvancedSearchValue } from "@/components/advanced-search-value";
+import { conditionOptionsFor, type AdvancedSearchValue } from "@/lib/advanced-search-value";
 import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";

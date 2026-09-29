@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { submitSearch } from "./submit-search";
 
 vi.mock("./use-search-synonym-matches", async (importOriginal) => {

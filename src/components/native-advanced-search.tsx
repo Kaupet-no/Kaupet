@@ -3,7 +3,7 @@ import { ArrowLeft, RotateCcw, Save, Search as SearchIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
+import type { AdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { LocationValue } from "@/components/location-filter";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";

@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, ExternalLink } from "lucide-react";
 
 import { ListingCard } from "@/components/listing-card";
-import type { ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resolveBrandColors } from "@/lib/brand-color";

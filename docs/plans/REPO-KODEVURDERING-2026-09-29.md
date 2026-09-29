@@ -2,15 +2,18 @@
 
 ## Implementeringsstatus
 
-| Oppgave          | Status       | Merknad                                                                                                         |
-| ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
-| K01 + Q01        | Ferdig       | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
-| K02              | Ferdig       | `3677c47b`: delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.        |
-| K03              | Ferdig       | Felles mapping av popularitets-RPC-er; 15 relevante tester, typecheck og lint bestått.                          |
-| K04–K07, Q02–Q03 | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                            |
-| K08              | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
+| Oppgave               | Status       | Merknad                                                                                                         |
+| --------------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
+| K01 + Q01             | Ferdig       | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
+| K02                   | Ferdig       | `3677c47b`: delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.        |
+| K03                   | Ferdig       | `a40a0d1d`: felles mapping av popularitets-RPC-er; 15 relevante tester, typecheck og lint bestått.              |
+| K06                   | Ferdig       | Delte kort- og søkeverdikontrakter ligger i `src/lib`; 1 208 tester og typecheck bestått.                       |
+| K04–K05, K07, Q02–Q03 | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                            |
+| K08                   | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
 
 **Nytt funn under K01:** Historikksidens «dra for å oppdatere» brukte den gamle `notifications-history`-nøkkelen etter konsolidering. Det ble rettet før validering ved å bruke samme nøkkelbygger som historikkspørringen. Ingen gamle nøkkelreferanser gjenstår i `src/`.
+
+**Verifisering under K06:** Full lint stopper på formattering i `src/components/intent-title-landing.tsx`, en eksisterende, urelatert arbeidskopiendring. ESLint på 39 K06-filer besto. Den urelaterte filen er ikke endret eller tatt med i K06.
 
 ## Formål og omfang
 

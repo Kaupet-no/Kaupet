@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 
 import type { SearchPanelResultsContext } from "./search-panel";
 import { searchDraftMatchesApplied } from "./search-panel-utils";

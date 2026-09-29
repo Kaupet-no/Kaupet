@@ -13,7 +13,8 @@ import {
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { ListingCardExpanded } from "@/components/listing-card-expanded";
 import { ListingCardImages } from "@/components/listing-card-images";
 import { Button } from "@/components/ui/button";

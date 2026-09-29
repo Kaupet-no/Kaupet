@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { getFeaturedListings } from "@/lib/promotions.functions";
 
 type Props = {

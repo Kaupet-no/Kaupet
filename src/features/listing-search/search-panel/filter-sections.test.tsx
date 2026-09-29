@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { CategoryFilter } from "@/lib/category-filters";
 import { groupFilterRows } from "./filter-rows";
 import { SearchFilterSections } from "./filter-sections";

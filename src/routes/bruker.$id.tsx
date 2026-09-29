@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRating } from "@/components/star-rating";
 
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { AdminUserActions } from "@/components/admin/suspend-user-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";

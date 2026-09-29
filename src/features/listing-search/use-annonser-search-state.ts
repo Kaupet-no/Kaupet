@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { z } from "zod";
 import { hapticNotification } from "@/lib/haptics";
-import { valueToCriteria } from "@/components/advanced-search-value";
+import { valueToCriteria } from "@/lib/advanced-search-value";
 import type { LocationValue } from "@/components/location-filter";
 import {
   searchSchema,

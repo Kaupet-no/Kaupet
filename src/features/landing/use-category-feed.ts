@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { toListingCardData, toPopularListingCardData } from "@/lib/listing-card-data";
 
 const PAGE_SIZE = 12;

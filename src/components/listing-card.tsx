@@ -7,24 +7,7 @@ import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
 import { FavoriteButton } from "@/components/favorite-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PART_FITMENT_SCOPE_KEY, PART_FITMENT_VEHICLE_IDS_KEY } from "@/lib/category-filters";
-
-export type ListingCardData = {
-  id: string;
-  kaupet_code: string;
-  title: string;
-  subtitle?: string | null;
-  price_nok: number | null;
-  is_free: boolean;
-  city: string | null;
-  created_at: string;
-  cover_path: string | null;
-  total_views?: number;
-  views_last_week?: number;
-  mileage_km?: number | null;
-  engine_hours?: number | null;
-  category_slug?: string | null;
-  attributes?: Record<string, unknown> | null;
-};
+import type { ListingCardData } from "@/lib/listing-card-data";
 function partFitmentLabel(attributes: Record<string, unknown> | null | undefined): string | null {
   const scope = attributes?.[PART_FITMENT_SCOPE_KEY];
   if (scope === "universal") return "Universal del";

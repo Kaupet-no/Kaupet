@@ -35,7 +35,7 @@ import { useCategoryFeed, type CategoryFeedSort } from "@/features/landing/use-c
 import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { submitSearch } from "@/features/listing-search/submit-search";
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useAllVehicleBrands, allVehicleBrandsQueryOptions } from "@/lib/vehicle/vehicle-brands";
 import { categoriesQueryOptions } from "@/hooks/use-categories";
 

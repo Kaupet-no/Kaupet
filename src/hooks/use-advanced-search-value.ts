@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
+import type { AdvancedSearchValue } from "@/lib/advanced-search-value";
 
 /**
  * Shared draft-state lifecycle for the advanced-search panel (native

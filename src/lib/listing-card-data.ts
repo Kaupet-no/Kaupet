@@ -1,5 +1,22 @@
-import type { ListingCardData } from "@/components/listing-card";
 import type { Database } from "@/integrations/supabase/types";
+
+export type ListingCardData = {
+  id: string;
+  kaupet_code: string;
+  title: string;
+  subtitle?: string | null;
+  price_nok: number | null;
+  is_free: boolean;
+  city: string | null;
+  created_at: string;
+  cover_path: string | null;
+  total_views?: number;
+  views_last_week?: number;
+  mileage_km?: number | null;
+  engine_hours?: number | null;
+  category_slug?: string | null;
+  attributes?: Record<string, unknown> | null;
+};
 
 export type PopularListingRow =
   Database["public"]["Functions"]["popular_listings_last_week"]["Returns"][number];

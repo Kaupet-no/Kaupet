@@ -28,7 +28,7 @@ import {
   defaultAdvancedSearchValue,
   valueToCriteria,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+} from "@/lib/advanced-search-value";
 import { buildTree, findCategorySuggestion, type Category } from "@/lib/categories";
 import { CategoryIcon } from "@/lib/category-icons";
 import type { LocationValue } from "@/components/location-filter";

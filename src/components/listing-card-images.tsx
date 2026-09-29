@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
 import { memo, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
-import type { ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { useListingCardGallery } from "@/hooks/use-listing-card-gallery";

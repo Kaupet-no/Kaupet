@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { z } from "zod";
-import type { ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import type { MapListing } from "@/components/listings-map";
 import { resolveCategoryIds, type Category, type CatTree } from "@/lib/categories";
 import type { CategoryFilter } from "@/lib/category-filters";

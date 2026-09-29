@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
+import type { AdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 
 export const stringArray = z.preprocess((v) => {

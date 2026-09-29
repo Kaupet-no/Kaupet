@@ -18,7 +18,7 @@ import {
   saveSearchToHistory,
 } from "@/features/listing-search/search-panel/search-history";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
-import { criteriaToValue } from "@/components/advanced-search-value";
+import { criteriaToValue } from "@/lib/advanced-search-value";
 import { CategoryIcon } from "@/lib/category-icons";
 import type { Category } from "@/lib/categories";
 import { readLastSearchContext } from "@/lib/last-search-context";
@@ -29,7 +29,7 @@ import {
   useSavedSearchesWithUnread,
 } from "@/features/listing-search/use-saved-searches-with-unread";
 import { submitSearch } from "@/features/listing-search/submit-search";
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/hooks/use-category-filters";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";

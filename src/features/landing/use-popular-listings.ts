@@ -8,14 +8,19 @@ import type { ListingCardData } from "@/components/listing-card";
  * WebLanding previously shared one `["popular-listings-last-week"]` cache
  * entry while requesting different row counts (10 vs 8), so whichever
  * request resolved first silently capped the other at its own limit.
+ *
+ * `enabled` lar kallestedet utsette selve hentingen: native-forsiden skal være
+ * rolig ved appstart og henter først når brukeren faktisk scroller (se
+ * AppLanding), mens web-forsiden henter som før.
  */
-export function usePopularListings(limit = 8) {
+export function usePopularListings(limit = 8, enabled = true) {
   const {
     data: popular,
     isError: popularIsError,
     refetch: refetchPopular,
   } = useQuery({
     queryKey: ["popular-listings-last-week", limit],
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("popular_listings_last_week", {
         _limit: limit,

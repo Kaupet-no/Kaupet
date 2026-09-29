@@ -311,8 +311,14 @@ text-primary`, og metadata under tittelen; ikke vis selgerinterne
   Kaupet». Ikke bruk en generell trygghetsbadge.
 - Kategoriens farge er en lokal aksent på valgt ikon eller overskrift. Den skal
   ikke fargelegge hele heroen eller resultatflaten.
-- Nativeforsiden skal vise søk og første troverdige annonsekort innen første
-  skjermbilde. Behold luft, men ikke bruk hero-høyde som dekorasjon.
+- Nativeforsiden eies av Kaupet-logoen og søkefeltet, midt på det første
+  skjermbildet — rolig, med lite som konkurrerer om oppmerksomheten. Kategorier
+  og populære annonser kommer under skjermbildet, og populære annonser hentes
+  først når brukeren scroller. Heroen står i ro mens innholdet scroller opp bak
+  den og tones rolig ut — målt slik at den er helt borte før annet innhold kommer
+  over den, så aldri to elementer synes overlappet — og søkefeltet holdes fullt
+  synlig mens det er i fokus eller tastaturet er oppe. Behold luft, men ikke
+  bruk hero-høyde som dekorasjon.
 
 ## Skjemavalidering
 

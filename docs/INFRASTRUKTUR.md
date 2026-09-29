@@ -195,6 +195,19 @@ Worker-secreten.
 | `api_key_expiry_url` / `_secret`                     | Mangler                                     | Kun URL                        |
 | Worker: `IMAGE_JOBS_SECRET`, `API_KEY_EXPIRY_SECRET` | Mangler (GitHub Environment-secret mangler) | Mangler                        |
 
+**Bildejobber, kontroll 2026-09-29:** `IMAGE_JOBS_SECRET` er satt på begge
+Workerne med samme verdi, lagret kryptert i `secrets/cloudflare.env`.
+Staging-prosjektet `zpazmwzhvylptptygzlw` har både `image_jobs_url`
+(`https://staging.kaupet.no/api/public/images/process`) og matchende
+`image_jobs_secret`. Et autentisert kall mot staging-endepunktet svarte 200
+med `claimed: 0` da køen var tom. Produksjonsprosjektet
+`efuexbrxdvjznrvoqbsd` har korrekt `image_jobs_url`
+(`https://kaupet.no/api/public/images/process`) og en `image_jobs_secret`
+som matcher den krypterte kilden. Dette ble kontrollert lesende etter at
+raden ble satt; produksjonsendepunktet ble ikke testet. GitHub
+Environment-secret `IMAGE_JOBS_SECRET` er satt fra samme krypterte verdi i
+både `staging` og `production`, og begge navnene er bekreftet i GitHub.
+
 **Delte hemmeligheter** — samme verdi må ligge både som Worker-secret og som
 `app_settings`-rad:
 

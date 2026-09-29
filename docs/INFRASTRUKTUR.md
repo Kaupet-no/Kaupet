@@ -270,16 +270,16 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 Én workflow, `.github/workflows/ci.yml`, kjører på pull request og push mot
 `main` og `staging`:
 
-| Jobb              | Gjør                                                                                                     |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `verify`          | Formatering, grensesjekker, lint, typecheck, enhetstester med dekningskrav, bygg og røyktest i `workerd` |
-| `rls`             | RLS-tester mot en midlertidig lokal Supabase-stack                                                       |
-| `native-android`  | Android-enhetstester og debug-APK                                                                        |
-| `e2e`             | Playwright mot egen lokal stack. Gater **ikke** deploy                                                   |
-| `staging-gate`    | På PR mot `main`: krever vellykket staging-deploy av samme innhold                                       |
-| `deploy-staging`  | Push til `staging`: bygger og deployer `kaupet-no-staging`                                               |
-| `deploy`          | Push til `main`: bygger og deployer `kaupet-no`                                                          |
-| `android-release` | Push: legger Android-preview-bygg under GitHub Releases                                                  |
+| Jobb              | Gjør                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `verify`          | Formatering, grensesjekker, RLS-tabellinventar, lint, typecheck, enhetstester med dekningskrav, bygg og røyktest i `workerd` |
+| `rls`             | RLS-tester mot en midlertidig lokal Supabase-stack                                                                           |
+| `native-android`  | Android-enhetstester og debug-APK                                                                                            |
+| `e2e`             | Playwright mot egen lokal stack. Gater **ikke** deploy                                                                       |
+| `staging-gate`    | På PR mot `main`: krever vellykket staging-deploy av samme innhold                                                           |
+| `deploy-staging`  | Push til `staging`: bygger og deployer `kaupet-no-staging`                                                                   |
+| `deploy`          | Push til `main`: bygger og deployer `kaupet-no`                                                                              |
+| `android-release` | Push: legger Android-preview-bygg under GitHub Releases                                                                      |
 
 I tillegg: `codeql.yml` (sikkerhetsskanning), `.github/workflows/release-native.yml`
 (produksjonsutgivelser til butikkene, se § 9), og lokale hooks via

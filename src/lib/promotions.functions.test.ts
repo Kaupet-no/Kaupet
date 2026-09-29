@@ -162,4 +162,23 @@ describe("createPromotionCheckout", () => {
       }),
     ).resolves.toMatchObject({ promotion_id: promotionId });
   });
+
+  it("starter ikke Vipps-betaling når et konkurrerende forsøk vinner databaseinnsettingen", async () => {
+    state.getVippsMode.mockReturnValue("production");
+    setup([]);
+    const promotionsQuery = state.supabaseAdmin.from("listing_promotions");
+    const conflict = { data: null, error: { code: "23505", message: "unique constraint" } };
+    promotionsQuery.insert
+      .mockReturnValueOnce(query({ data: { id: promotionId }, error: null }))
+      .mockReturnValueOnce(query(conflict));
+
+    await expect(
+      createPromotionCheckout({ data: { listing_id: listingId, duration_days: 7 } }),
+    ).resolves.toMatchObject({ promotion_id: promotionId });
+    await expect(
+      createPromotionCheckout({ data: { listing_id: listingId, duration_days: 7 } }),
+    ).rejects.toThrow("Finnes allerede.");
+    expect(promotionsQuery.insert).toHaveBeenCalledTimes(2);
+    expect(state.createVippsPayment).toHaveBeenCalledOnce();
+  });
 });

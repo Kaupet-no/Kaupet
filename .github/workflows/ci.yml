@@ -32,6 +32,9 @@ jobs:
       - name: Server/client boundary
         run: bun run check:server-boundary
 
+      - name: RLS table inventory
+        run: bun run check:rls-coverage
+
       - name: Safe-area boundary
         run: bun run check:safe-area
 

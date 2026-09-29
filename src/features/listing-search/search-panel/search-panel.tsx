@@ -903,7 +903,7 @@ export function SearchPanel({
               onClick={() => close()}
             />
             <Drawer.Content
-              className={`fixed inset-x-0 bottom-0 z-[9999] flex h-full max-h-[97%] flex-col rounded-t-2xl border-t border-border bg-background outline-none ${
+              className={`fixed inset-x-0 bottom-0 z-[9999] flex h-full max-h-[97%] flex-col border-t border-border bg-background outline-none ${
                 isTablet ? "mx-auto w-full max-w-2xl border-x" : ""
               }`}
               aria-describedby={undefined}

@@ -400,7 +400,7 @@ export function AppLanding({
       </div>
 
       {/* Reserverer hele første skjermbilde til heroen. */}
-      <div aria-hidden="true" className="h-[calc(100dvh-var(--app-bottom-nav-h))]" />
+      <div aria-hidden="true" className="h-dvh" />
 
       {/* Innholdet scroller opp over heroen; uigjennomsiktig bakgrunn og
           høyere z-index holder det alltid over den uttonede heroen. */}

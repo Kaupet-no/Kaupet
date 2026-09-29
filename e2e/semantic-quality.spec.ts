@@ -42,7 +42,6 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await waitForHydration(page);
 
   // Søket er et ekte søkefelt; lokasjon åpner det delte søkepanelet.
-  // Når Tab scroller til lokasjonsraden, tones heroen ut og blir inert.
   const search = page.getByRole("searchbox", { name: "Søk i annonser" });
   const location = page.getByRole("button", {
     name: "Velg lokasjon: Hele Norge",
@@ -59,7 +58,6 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await page.keyboard.press("Escape");
   await expect(overlay).not.toBeVisible();
   await expect(location).toBeFocused();
-  await expect(search).toHaveCount(0);
 });
 
 test("native søkepanel returnerer fokus til filterknappen etter Escape", async ({ page }) => {

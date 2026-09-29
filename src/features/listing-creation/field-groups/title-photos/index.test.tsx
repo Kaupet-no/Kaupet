@@ -103,6 +103,22 @@ describe("PhotosGroup", () => {
     expect(screen.getByText(/Legg til minst ett bilde først/)).toBeTruthy();
   });
 
+  it("ber om Cloudflare-verifisering uten å kalle det en bildefeil", () => {
+    render(
+      <PhotosGroup
+        images={[image]}
+        setImages={vi.fn()}
+        uploadProgress={null}
+        noImageConfirmPending={false}
+        {...noopPhotoSuggestionProps}
+        photoSuggestionEnabled
+        photoSuggestionStatus="verification-required"
+      />,
+    );
+    expect(screen.getByText(/Bekreft Cloudflare-sjekken/).getAttribute("role")).toBe("status");
+    expect(screen.queryByText(/Vi fikk dessverre ikke til å analysere bildene/)).toBeNull();
+  });
+
   it("fyller en tom tittel direkte med forslaget fra bildene", () => {
     const setValue = vi.fn();
     const dismissPhotoTitleSuggestion = vi.fn();

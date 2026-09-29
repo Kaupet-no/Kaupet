@@ -1,0 +1,78 @@
+// @vitest-environment jsdom
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { usePhotoSuggestion } from "./use-photo-suggestion";
+
+const { suggestListingFromPhotos } = vi.hoisted(() => ({ suggestListingFromPhotos: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({ useQuery: () => ({ data: { enabled: true } }) }));
+vi.mock("@/lib/category-suggestion.functions", () => ({
+  getPhotoSuggestionAvailability: vi.fn(),
+  suggestListingFromPhotos,
+}));
+vi.mock("@/lib/photo-suggestion-images", () => ({
+  preparePhotoSuggestionImages: () => Promise.resolve(["prepared"]),
+}));
+
+const image = {
+  id: "photo-1",
+  file: new File(["x"], "photo.jpg", { type: "image/jpeg" }),
+  thumbFile: new File(["x"], "thumb.jpg", { type: "image/jpeg" }),
+  previewUrl: "blob:photo",
+};
+
+beforeEach(() => {
+  vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "test-site-key");
+  suggestListingFromPhotos.mockResolvedValue({ status: "unavailable" });
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.clearAllMocks();
+});
+
+describe("usePhotoSuggestion", () => {
+  it("venter på avkrysning før bildeforespørselen sendes", async () => {
+    let resolveToken!: (token: string) => void;
+    const token = new Promise<string>((resolve) => {
+      resolveToken = resolve;
+    });
+    const { result } = renderHook(() => usePhotoSuggestion({ images: [image], title: "Stol" }));
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => token,
+      reset: vi.fn(),
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+
+    await act(async () => {
+      void result.current.analyzePhotos();
+      result.current.onBeforeInteractive();
+    });
+    expect(suggestListingFromPhotos).not.toHaveBeenCalled();
+    expect(result.current.verificationNeeded).toBe(true);
+    expect(result.current.status).toBe("verifying");
+
+    await act(async () => resolveToken("verified-token"));
+    await waitFor(() =>
+      expect(suggestListingFromPhotos).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ turnstileToken: "verified-token" }),
+        }),
+      ),
+    );
+  });
+
+  it("viser verifiseringsfeil når Cloudflare ikke gir token", async () => {
+    const { result } = renderHook(() => usePhotoSuggestion({ images: [image], title: "Stol" }));
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => Promise.reject(new Error("Timeout")),
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+
+    await act(async () => result.current.analyzePhotos());
+    expect(result.current.status).toBe("verification-required");
+    expect(result.current.verificationNeeded).toBe(true);
+    expect(suggestListingFromPhotos).not.toHaveBeenCalled();
+
+    act(() => result.current.onSuccess());
+    expect(result.current.status).toBe("idle");
+    expect(result.current.verificationNeeded).toBe(false);
+  });
+});

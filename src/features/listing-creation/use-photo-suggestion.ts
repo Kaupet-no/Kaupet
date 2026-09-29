@@ -16,7 +16,8 @@ export type PhotoCategorySuggestion = {
   parent_name_nb: string | null;
 };
 
-type PhotoSuggestionStatus = "idle" | "analyzing" | "ok" | "unavailable";
+type PhotoSuggestionStatus =
+  "idle" | "analyzing" | "verifying" | "verification-required" | "ok" | "unavailable";
 
 /**
  * Client-side state machine for the photo-assisted category/attribute
@@ -56,6 +57,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
   const [categorySuggestions, setCategorySuggestions] = useState<PhotoCategorySuggestion[]>([]);
   const [titleSuggestion, setTitleSuggestion] = useState<string | null>(null);
   const [attributeSuggestionLoading, setAttributeSuggestionLoading] = useState(false);
+  const [verificationNeeded, setVerificationNeeded] = useState(false);
 
   // Derived-state-on-prop-change (React's own pattern — state, not a ref, so
   // it's safe to read/write during render): reset everything tied to the
@@ -72,6 +74,20 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     setTitleSuggestion(null);
   }
 
+  async function getVerifiedToken() {
+    try {
+      const token = await turnstileRef.current?.getResponsePromise();
+      if (token) {
+        setVerificationNeeded(false);
+        return token;
+      }
+    } catch {
+      // Cloudflare may still be waiting for the user's checkbox.
+    }
+    setVerificationNeeded(true);
+    return null;
+  }
+
   // Trykket på knappen er samtykket: hjelpeteksten under den forklarer KI-
   // bruken og lenker til personvernerklæringen.
   async function analyzePhotos() {
@@ -82,11 +98,16 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
         images.map((image) => image.file),
         "identify",
       );
-      const token = await turnstileRef.current?.getResponsePromise();
-      if (prepared.length === 0 || !token) {
+      if (prepared.length === 0) {
         setStatus("unavailable");
         return;
       }
+      const token = await getVerifiedToken();
+      if (!token) {
+        setStatus("verification-required");
+        return;
+      }
+      setStatus("analyzing");
       const result = await suggestListingFromPhotos({
         data: {
           operation: "identify",
@@ -127,8 +148,9 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
         images.map((image) => image.file),
         "attributes",
       );
-      const token = await turnstileRef.current?.getResponsePromise();
-      if (prepared.length === 0 || !token) return [];
+      if (prepared.length === 0) return [];
+      const token = await getVerifiedToken();
+      if (!token) return [];
       const result = await suggestListingFromPhotos({
         data: { operation: "attributes", images: prepared, categorySlug, turnstileToken: token },
       });
@@ -147,6 +169,15 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     enabled,
     turnstileEnabled,
     turnstileRef,
+    verificationNeeded,
+    onBeforeInteractive: () => {
+      setVerificationNeeded(true);
+      setStatus((current) => (current === "analyzing" ? "verifying" : current));
+    },
+    onSuccess: () => {
+      setVerificationNeeded(false);
+      setStatus((current) => (current === "verification-required" ? "idle" : current));
+    },
     status,
     analyzePhotos,
     categorySuggestions,

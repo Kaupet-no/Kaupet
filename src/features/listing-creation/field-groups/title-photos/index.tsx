@@ -181,7 +181,11 @@ export function PhotosGroup({
               data-testid="photo-suggestion-button"
               className="native-touch-target h-12 w-full gap-2 rounded-xl border-brand/40 text-brand-text hover:text-brand-text"
               onClick={analyzePhotos}
-              disabled={images.length === 0 || photoSuggestionStatus === "analyzing"}
+              disabled={
+                images.length === 0 ||
+                photoSuggestionStatus === "analyzing" ||
+                photoSuggestionStatus === "verifying"
+              }
               aria-describedby="photo-suggestion-help"
             >
               <Sparkles className="size-4 shrink-0" aria-hidden />
@@ -204,6 +208,12 @@ export function PhotosGroup({
           {photoSuggestionStatus === "analyzing" && (
             <p role="status" className="text-sm text-muted-foreground">
               Analyserer bildene …
+            </p>
+          )}
+          {(photoSuggestionStatus === "verifying" ||
+            photoSuggestionStatus === "verification-required") && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Bekreft Cloudflare-sjekken for å analysere bildene.
             </p>
           )}
           {photoSuggestionStatus === "unavailable" && (

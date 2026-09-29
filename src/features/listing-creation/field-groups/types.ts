@@ -243,7 +243,8 @@ export type WizardSharedProps = {
   // usePhotoSuggestion() instance shared by the photos and category-
   // attributes steps — see use-photo-suggestion.ts.
   photoSuggestionEnabled: boolean;
-  photoSuggestionStatus: "idle" | "analyzing" | "ok" | "unavailable";
+  photoSuggestionStatus:
+    "idle" | "analyzing" | "verifying" | "verification-required" | "ok" | "unavailable";
   analyzePhotos: () => void;
   /** 0-2 candidates from the photo `identify` call, same shape as
    * `categorySuggestions` — merged into the category-attributes chip ahead

@@ -475,6 +475,25 @@ function NewListingPage() {
   // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
   // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
   const photoSuggestion = usePhotoSuggestion({ images, title });
+  const photoChallengeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (
+      !photoSuggestion.verificationNeeded ||
+      (photoSuggestion.status !== "analyzing" &&
+        photoSuggestion.status !== "verifying" &&
+        photoSuggestion.status !== "verification-required" &&
+        !photoSuggestion.attributeSuggestionLoading)
+    )
+      return;
+    const frame = requestAnimationFrame(() =>
+      photoChallengeRef.current?.scrollIntoView({ block: "center" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [
+    photoSuggestion.verificationNeeded,
+    photoSuggestion.status,
+    photoSuggestion.attributeSuggestionLoading,
+  ]);
 
   // category-confirm holdes bare for forslag som gir en annen flyt enn
   // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
@@ -1894,19 +1913,28 @@ function NewListingPage() {
       )}
     </>
   );
+  const photoChallenge = photoSuggestion.enabled ? (
+    <div ref={photoChallengeRef} className="mx-auto mt-4 w-fit max-w-full">
+      {photoSuggestion.verificationNeeded && (
+        <p role="status" className="mb-2 text-sm text-foreground">
+          Bekreft Cloudflare-sjekken før vi henter KI-forslag.
+        </p>
+      )}
+      <Turnstile
+        // eslint-disable-next-line react-hooks/refs -- passing the ref to Turnstile, not reading its value
+        ref={photoSuggestion.turnstileRef}
+        siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+        options={{ appearance: "interaction-only", action: "kaupet" }}
+        // eslint-disable-next-line react-hooks/refs -- callback is invoked by Turnstile after render
+        onBeforeInteractive={photoSuggestion.onBeforeInteractive}
+        // eslint-disable-next-line react-hooks/refs -- callback is invoked by Turnstile after render
+        onSuccess={photoSuggestion.onSuccess}
+      />
+    </div>
+  ) : undefined;
 
   return (
     <>
-      {photoSuggestion.enabled && (
-        // Usynlig, montert på veiviser-nivå (ikke i et enkeltsteg) siden
-        // samme token må dekke både bildestegets identify-kall og et senere
-        // attributes-kall fra "Om tingen" — se use-photo-suggestion.ts.
-        <Turnstile
-          ref={photoSuggestion.turnstileRef}
-          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-          options={{ appearance: "interaction-only", action: "kaupet" }}
-        />
-      )}
       <form onSubmit={submitComposer} onKeyDown={blockImplicitSubmit}>
         <ListingComposerShell
           title={title}
@@ -2039,6 +2067,7 @@ function NewListingPage() {
           errorSummary={validationError}
           validationAttempt={validationAttempt}
           footer={composerFooter}
+          challenge={photoChallenge}
           firstStep={isFirst}
           // På Se over-steget er hovedkolonnen allerede annonsen (N1), og
           // annonsestyrken vises inline øverst i ReviewPublishGroup — der

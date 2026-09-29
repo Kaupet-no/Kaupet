@@ -99,6 +99,29 @@ describe("ListingComposerShell", () => {
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
   });
 
+  it("holder Turnstile-utfordringen i rulleområdet og Neste i footeren", () => {
+    const { container } = render(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="photos"
+        pageTitle="Bilder"
+        native
+        onCancel={vi.fn()}
+        footer={<button type="button">Neste</button>}
+        challenge={<div role="group" aria-label="Cloudflare-verifisering" />}
+        firstStep={false}
+      >
+        Bilder
+      </ListingComposerShell>,
+    );
+    const scroll = container.querySelector('[data-composer-scroll="true"]');
+    const footer = container.querySelector('[data-composer-footer="native"]');
+    expect(scroll?.contains(screen.getByRole("group", { name: "Cloudflare-verifisering" }))).toBe(
+      true,
+    );
+    expect(footer?.contains(screen.getByRole("button", { name: "Neste" }))).toBe(true);
+  });
+
   it("gir ett lett valgsignal når native-kortet skifter", () => {
     const { rerender } = renderShell();
     rerender(

@@ -25,6 +25,7 @@ export function ListingComposerShell({
   errorSummary,
   validationAttempt = 0,
   children,
+  challenge,
   footer,
   firstStep,
   contentClassName,
@@ -60,6 +61,7 @@ export function ListingComposerShell({
   errorSummary?: string | null;
   validationAttempt?: number;
   children: ReactNode;
+  challenge?: ReactNode;
   footer: ReactNode;
   firstStep: boolean;
   contentClassName?: string;
@@ -341,6 +343,7 @@ export function ListingComposerShell({
               {pageTitle}
             </h2>
             {children}
+            {challenge}
           </div>
 
           <div

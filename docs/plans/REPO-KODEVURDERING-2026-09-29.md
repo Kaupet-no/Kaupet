@@ -2,16 +2,17 @@
 
 ## Implementeringsstatus
 
-| Oppgave      | Status       | Merknad                                                                                                         |
-| ------------ | ------------ | --------------------------------------------------------------------------------------------------------------- |
-| K01 + Q01    | Ferdig       | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
-| K02          | Ferdig       | `3677c47b`: delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.        |
-| K03          | Ferdig       | `a40a0d1d`: felles mapping av popularitets-RPC-er; 15 relevante tester, typecheck og lint bestått.              |
-| K06          | Ferdig       | `f5a699f1`: delte kort- og søkeverdikontrakter ligger i `src/lib`; 1 208 tester og typecheck bestått.           |
-| K05          | Vurdert      | `920f96bd`: ingen kodeendring; delte seksjoner dekker ikke webdialogens søkeordeditor.                          |
-| K04          | Vurdert      | Ingen kodeendring: felles statusblokk er for liten til å bære en ny hook og delt type.                          |
-| K07, Q02–Q03 | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                            |
-| K08          | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
+| Oppgave   | Status       | Merknad                                                                                                         |
+| --------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
+| K01 + Q01 | Ferdig       | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
+| K02       | Ferdig       | `3677c47b`: delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.        |
+| K03       | Ferdig       | `a40a0d1d`: felles mapping av popularitets-RPC-er; 15 relevante tester, typecheck og lint bestått.              |
+| K06       | Ferdig       | `f5a699f1`: delte kort- og søkeverdikontrakter ligger i `src/lib`; 1 208 tester og typecheck bestått.           |
+| K05       | Vurdert      | `920f96bd`: ingen kodeendring; delte seksjoner dekker ikke webdialogens søkeordeditor.                          |
+| K04       | Vurdert      | `0553211e`: ingen kodeendring; felles statusblokk er for liten til å bære en ny hook og delt type.              |
+| K07       | Vurdert      | Ingen kodeendring: ulike radnøkler, tidsfelt og handlinger gjør et felles UI konfigurasjonstungt.               |
+| Q02–Q03   | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                            |
+| K08       | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
 
 **Nytt funn under K01:** Historikksidens «dra for å oppdatere» brukte den gamle `notifications-history`-nøkkelen etter konsolidering. Det ble rettet før validering ved å bruke samme nøkkelbygger som historikkspørringen. Ingen gamle nøkkelreferanser gjenstår i `src/`.
 
@@ -20,6 +21,8 @@
 **K05-beslutning:** [AdvancedSearchSheet](../../src/components/advanced-search-sheet.tsx#L121) har egen søkeordeditor med Enter/knapp og chips, mens [SearchFilterSections](../../src/features/listing-search/search-panel/filter-sections.tsx#L587) bare håndterer ordmodus og ekstraregler. [Mine søk](../../src/routes/_authenticated/mine-sok.tsx#L399) lagrer først etter eksplisitt handling; native bruker allerede de delte seksjonene. Å bytte webdialogens felt til resultatseksjonene ville kreve separat søkeordeditor og særtilpasning av pris, kategori og fokus. Behold dagens løsning til en faktisk redesign av «Mine søk» gjør kontrakten lik.
 
 **K04-beslutning:** [Salgshooken](../../src/features/listing-edit/use-listing-edit-mutations.ts#L23) og [ønskehooken](../../src/features/wtb/use-wtb-edit-mutations.ts#L16) gjentar om lag tolv linjer med feltstatus og 1,8 sekunders reset-timer. En ny hook, import og delt statuskontrakt ville neppe redusere samlet kode. Lagringskall og query keys er ulike. Timerne lever høyst 1,8 sekunder etter en eventuell avmontering; ingen vedvarende lekkasje eller konkret feil er påvist. Revurder bare hvis flere faktiske kallesteder får samme statuslivsløp.
+
+**K07-beslutning:** [Utestenginger](../../src/components/admin/moderasjon/bans-tab.tsx#L33) er per bruker og viser opprettelsesdato, mens [suspensjoner](../../src/components/admin/moderasjon/suspensions-tab.tsx#L33) kan ha flere rader per bruker og viser utløpstid. RPC, query keys, handlinger og bekreftelsestekster er ulike. En felles tabell ville kreve mer konfigurasjon enn den fjerner kode. Behold de to tydelige flatene.
 
 ## Formål og omfang
 

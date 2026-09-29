@@ -10,8 +10,9 @@
 | K06       | Ferdig       | `f5a699f1`: delte kort- og søkeverdikontrakter ligger i `src/lib`; 1 208 tester og typecheck bestått.           |
 | K05       | Vurdert      | `920f96bd`: ingen kodeendring; delte seksjoner dekker ikke webdialogens søkeordeditor.                          |
 | K04       | Vurdert      | `0553211e`: ingen kodeendring; felles statusblokk er for liten til å bære en ny hook og delt type.              |
-| K07       | Vurdert      | Ingen kodeendring: ulike radnøkler, tidsfelt og handlinger gjør et felles UI konfigurasjonstungt.               |
-| Q02–Q03   | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                            |
+| K07       | Vurdert      | `bfef4248`: ingen kodeendring; ulike radnøkler, tidsfelt og handlinger gjør felles UI konfigurasjonstungt.      |
+| Q02       | Ferdig       | Terskler 36/31/31/38 %; målt 36,91/31,23/31,41/38,07 %. Full dekningssuite og typecheck bestått.                |
+| Q03       | Ikke startet | Vurderes etter Q02.                                                                                             |
 | K08       | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
 
 **Nytt funn under K01:** Historikksidens «dra for å oppdatere» brukte den gamle `notifications-history`-nøkkelen etter konsolidering. Det ble rettet før validering ved å bruke samme nøkkelbygger som historikkspørringen. Ingen gamle nøkkelreferanser gjenstår i `src/`.
@@ -23,6 +24,8 @@
 **K04-beslutning:** [Salgshooken](../../src/features/listing-edit/use-listing-edit-mutations.ts#L23) og [ønskehooken](../../src/features/wtb/use-wtb-edit-mutations.ts#L16) gjentar om lag tolv linjer med feltstatus og 1,8 sekunders reset-timer. En ny hook, import og delt statuskontrakt ville neppe redusere samlet kode. Lagringskall og query keys er ulike. Timerne lever høyst 1,8 sekunder etter en eventuell avmontering; ingen vedvarende lekkasje eller konkret feil er påvist. Revurder bare hvis flere faktiske kallesteder får samme statuslivsløp.
 
 **K07-beslutning:** [Utestenginger](../../src/components/admin/moderasjon/bans-tab.tsx#L33) er per bruker og viser opprettelsesdato, mens [suspensjoner](../../src/components/admin/moderasjon/suspensions-tab.tsx#L33) kan ha flere rader per bruker og viser utløpstid. RPC, query keys, handlinger og bekreftelsestekster er ulike. En felles tabell ville kreve mer konfigurasjon enn den fjerner kode. Behold de to tydelige flatene.
+
+**Nytt funn under Q02:** `docs/TESTSTRATEGI.md` oppga fortsatt de gamle tersklene 9/6/5/9 %, mens konfigurasjonen før endringen var 31/26/26/32 %. Strategiens tall er nå oppdatert samtidig med ratcheten. Kommentaren i `vitest.config.ts` pekte dessuten til en foreldet plan og viser nå til teststrategiens § 9.
 
 ## Formål og omfang
 

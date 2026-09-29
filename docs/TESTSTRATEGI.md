@@ -210,7 +210,7 @@ Foreslått testnivå for regresjonsvern: unit|component|rls|e2e
 ```
 
 **Dekningsratchet.** Terskelen i `vitest.config.ts` står i dag på
-statements 9 / branches 6 / functions 5 / lines 9. Den er et _gulv_, ikke et
+statements 36 / branches 31 / functions 31 / lines 38. Den er et _gulv_, ikke et
 mål. Ratchet-regel: når en modul får ny testdekning, hev terskelen til
 nærmeste hele prosent under målt verdi i samme PR. Terskelen skal aldri
 senkes; en senking krever eksplisitt godkjenning fra testleder i PR-teksten.

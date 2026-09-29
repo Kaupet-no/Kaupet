@@ -52,6 +52,7 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryBreadcrumb } from "@/components/category-hero";
+import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
 import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
@@ -448,12 +449,19 @@ function BrowsePage() {
     });
   }, [hero, attrValues, allFilters, categoryTree]);
 
-  const { selectHeroCategory } = useHeroCategoryActions({
-    hero,
+  const { selectHeroCategory, toggleChildCategory, isChildActive } = useHeroCategoryActions({
     categoryTree,
     effectiveCategories,
     updateSearch,
   });
+
+  // Underkategoriene til det valgte hero-nivået — brikkene native brukeren
+  // får tilbudt etter å ha valgt en hovedkategori, slik at valget kan
+  // snevres inn videre uten å åpne filterpanelet.
+  const heroSubcategories = useMemo(
+    () => (hero ? (categoryTree.childrenByParent.get(hero.selected.id) ?? []) : []),
+    [hero, categoryTree],
+  );
 
   useEffect(() => {
     if (!mounted) return;
@@ -717,6 +725,41 @@ function BrowsePage() {
             onPickCategory={pickCategory}
             onPickSavedSearch={pickSavedSearch}
           />
+        )}
+
+        {/* Native: når en hovedkategori er valgt (fra startflaten eller
+            kategoriforslag), treffer SearchStart-betingelsen over ikke lenger
+            — i stedet får brukeren brikker for hero-nivåets underkategorier,
+            slik at valget kan snevres inn videre uten filterpanelet. */}
+        {isNative && hero && heroSubcategories.length > 0 && (
+          <section className="mt-4" aria-labelledby="annonser-subcategories-heading">
+            <h2
+              id="annonser-subcategories-heading"
+              className="mb-2 font-display text-base tracking-tight"
+            >
+              Underkategorier
+            </h2>
+            <ScrollArrowRow>
+              {heroSubcategories.map((category) => {
+                const active = isChildActive(hero.selected, category);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleChildCategory(hero.selected, category)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {category.name_nb}
+                  </button>
+                );
+              })}
+            </ScrollArrowRow>
+          </section>
         )}
 
         {/* Desktop: filtrene står permanent til venstre for treffene i stedet

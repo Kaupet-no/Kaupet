@@ -60,4 +60,15 @@ describe("anvendt søkestate", () => {
 
     expect(readAppliedSearchState(writeAppliedSearchState(applied))).toEqual(applied);
   });
+
+  // Forsiden (native) navigerer til /annonser med bare `category`-parameteren
+  // (se goToCategory i app-landing.tsx), mens valg på /annonser selv setter
+  // `categories`-listen. Underkategoribrikkeraden drives av effectiveCategories,
+  // så hvis denne fletingen ryker, forsvinner brikkene bare for forsiden-veien.
+  it("fletter en enslig category-parameter (forsiden-navigering) inn i category-listen", () => {
+    const applied = readAppliedSearchState(
+      searchSchema.parse({ q: "", category: "elektronikk", sort: "new" }),
+    );
+    expect(applied.value.categories).toEqual(["elektronikk"]);
+  });
 });

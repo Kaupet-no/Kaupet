@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   processed: false,
   promotionStatus: "pending",
   getVippsPayment: vi.fn(),
+  captureVippsPayment: vi.fn(),
   updatePromotion: vi.fn(),
 }));
 
@@ -13,6 +14,7 @@ vi.mock("@/lib/vipps.server", () => ({
   getVippsWebhookEventId: (payload: { pspReference?: string }) => payload.pspReference,
   isFreshVippsWebhookDate: () => true,
   getVippsPayment: state.getVippsPayment,
+  captureVippsPayment: state.captureVippsPayment,
 }));
 
 vi.mock("@/integrations/supabase/client.server", () => ({
@@ -82,6 +84,7 @@ beforeEach(() => {
   state.processed = false;
   state.promotionStatus = "pending";
   state.getVippsPayment.mockReset().mockResolvedValue({ state: "CAPTURED" });
+  state.captureVippsPayment.mockReset().mockResolvedValue(undefined);
   state.updatePromotion.mockReset().mockImplementation(() => ({
     eq: () => ({
       eq: async () => {
@@ -98,5 +101,18 @@ describe("Vipps-webhook", () => {
     expect((await post()).status).toBe(200);
     expect(state.getVippsPayment).toHaveBeenCalledOnce();
     expect(state.updatePromotion).toHaveBeenCalledOnce();
+  });
+
+  it("PAY-08: capturer autorisert betaling med stabil nøkkel og gjentar ikke ved webhook-retry", async () => {
+    state.getVippsPayment.mockResolvedValue({ state: "AUTHORIZED" });
+    expect((await post()).status).toBe(200);
+    expect((await post()).status).toBe(200);
+    expect(state.captureVippsPayment).toHaveBeenCalledExactlyOnceWith(
+      "payment-1",
+      10,
+      "capture-promo-1",
+      "test.kaupet.no",
+      "test",
+    );
   });
 });

@@ -2,11 +2,12 @@
 
 ## Implementeringsstatus
 
-| Oppgave          | Status       | Merknad                                                                                             |
-| ---------------- | ------------ | --------------------------------------------------------------------------------------------------- |
-| K01 + Q01        | Ferdig       | Felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
-| K02–K07, Q02–Q03 | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                |
-| K08              | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                      |
+| Oppgave          | Status       | Merknad                                                                                                         |
+| ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
+| K01 + Q01        | Ferdig       | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
+| K02              | Ferdig       | Delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.                    |
+| K03–K07, Q02–Q03 | Ikke startet | Tas sekvensielt etter validering av forrige oppgave.                                                            |
+| K08              | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
 
 **Nytt funn under K01:** Historikksidens «dra for å oppdatere» brukte den gamle `notifications-history`-nøkkelen etter konsolidering. Det ble rettet før validering ved å bruke samme nøkkelbygger som historikkspørringen. Ingen gamle nøkkelreferanser gjenstår i `src/`.
 

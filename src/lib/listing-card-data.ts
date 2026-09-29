@@ -1,4 +1,28 @@
 import type { ListingCardData } from "@/components/listing-card";
+import type { Database } from "@/integrations/supabase/types";
+
+export type PopularListingRow =
+  Database["public"]["Functions"]["popular_listings_last_week"]["Returns"][number];
+
+/** Maps either popularity RPC result to the shared listing-card shape. */
+export function toPopularListingCardData(row: PopularListingRow): ListingCardData {
+  return {
+    id: row.listing_id,
+    kaupet_code: row.kaupet_code,
+    title: row.title,
+    subtitle: row.subtitle,
+    price_nok: row.price_nok,
+    is_free: row.is_free,
+    city: row.city,
+    created_at: row.created_at,
+    cover_path: row.cover_path,
+    total_views: Number(row.total_views ?? 0),
+    views_last_week: Number(row.views_last_week ?? 0),
+    mileage_km: row.mileage_km != null ? Number(row.mileage_km) : null,
+    category_slug: row.category_slug,
+    attributes: row.attributes as Record<string, unknown> | null,
+  };
+}
 
 /** Shape returned by a Supabase `listings` select with the standard
  * `listing_images(storage_path, sort_order), attributes, categories(slug)`

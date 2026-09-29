@@ -2,18 +2,18 @@
 
 ## Implementeringsstatus
 
-| Oppgave   | Status       | Merknad                                                                                                         |
-| --------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
-| K01 + Q01 | Ferdig       | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
-| K02       | Ferdig       | `3677c47b`: delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.        |
-| K03       | Ferdig       | `a40a0d1d`: felles mapping av popularitets-RPC-er; 15 relevante tester, typecheck og lint bestått.              |
-| K06       | Ferdig       | `f5a699f1`: delte kort- og søkeverdikontrakter ligger i `src/lib`; 1 208 tester og typecheck bestått.           |
-| K05       | Vurdert      | `920f96bd`: ingen kodeendring; delte seksjoner dekker ikke webdialogens søkeordeditor.                          |
-| K04       | Vurdert      | `0553211e`: ingen kodeendring; felles statusblokk er for liten til å bære en ny hook og delt type.              |
-| K07       | Vurdert      | `bfef4248`: ingen kodeendring; ulike radnøkler, tidsfelt og handlinger gjør felles UI konfigurasjonstungt.      |
-| Q02       | Ferdig       | Terskler 36/31/31/38 %; målt 36,91/31,23/31,41/38,07 %. Full dekningssuite og typecheck bestått.                |
-| Q03       | Ikke startet | Vurderes etter Q02.                                                                                             |
-| K08       | Utsatt       | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
+| Oppgave   | Status  | Merknad                                                                                                         |
+| --------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| K01 + Q01 | Ferdig  | `ea9d56aa`: felles varseldata/handlinger og query-invalidering; 5 målrettede tester, typecheck og lint bestått. |
+| K02       | Ferdig  | `3677c47b`: delt lazy-lasting og fallback i resultatkort; 9 relevante tester, typecheck og lint bestått.        |
+| K03       | Ferdig  | `a40a0d1d`: felles mapping av popularitets-RPC-er; 15 relevante tester, typecheck og lint bestått.              |
+| K06       | Ferdig  | `f5a699f1`: delte kort- og søkeverdikontrakter ligger i `src/lib`; 1 208 tester og typecheck bestått.           |
+| K05       | Vurdert | `920f96bd`: ingen kodeendring; delte seksjoner dekker ikke webdialogens søkeordeditor.                          |
+| K04       | Vurdert | `0553211e`: ingen kodeendring; felles statusblokk er for liten til å bære en ny hook og delt type.              |
+| K07       | Vurdert | `bfef4248`: ingen kodeendring; ulike radnøkler, tidsfelt og handlinger gjør felles UI konfigurasjonstungt.      |
+| Q02       | Ferdig  | `f68df332`: terskler 36/31/31/38 %; målt 36,91/31,23/31,41/38,07 %. Dekningssuite og typecheck bestått.         |
+| Q03       | Senere  | Ingen kodeendring nå: del bare ved en konkret funksjonsendring med en ny reell konsument.                       |
+| K08       | Utsatt  | Avhenger av faktisk utrulling og utløp av eldre lokale utkast.                                                  |
 
 **Nytt funn under K01:** Historikksidens «dra for å oppdatere» brukte den gamle `notifications-history`-nøkkelen etter konsolidering. Det ble rettet før validering ved å bruke samme nøkkelbygger som historikkspørringen. Ingen gamle nøkkelreferanser gjenstår i `src/`.
 
@@ -26,6 +26,8 @@
 **K07-beslutning:** [Utestenginger](../../src/components/admin/moderasjon/bans-tab.tsx#L33) er per bruker og viser opprettelsesdato, mens [suspensjoner](../../src/components/admin/moderasjon/suspensions-tab.tsx#L33) kan ha flere rader per bruker og viser utløpstid. RPC, query keys, handlinger og bekreftelsestekster er ulike. En felles tabell ville kreve mer konfigurasjon enn den fjerner kode. Behold de to tydelige flatene.
 
 **Nytt funn under Q02:** `docs/TESTSTRATEGI.md` oppga fortsatt de gamle tersklene 9/6/5/9 %, mens konfigurasjonen før endringen var 31/26/26/32 %. Strategiens tall er nå oppdatert samtidig med ratcheten. Kommentaren i `vitest.config.ts` pekte dessuten til en foreldet plan og viser nå til teststrategiens § 9.
+
+**Q03-beslutning:** De store filene [ny-annonse.tsx](../../src/routes/ny-annonse.tsx#L1), [listing-detail-view.tsx](../../src/components/listing-detail/listing-detail-view.tsx#L1) og [filter-sections.tsx](../../src/features/listing-search/search-panel/filter-sections.tsx#L1) har ingen påvist blokk som blir enklere ved isolert flytting nå. `SearchFilterSections` brukes allerede i flere flater, og stedvelgeren er allerede delt. Ta opp uttrekk ved en konkret funksjonsendring som gir minst to reelle konsumenter av samme kontrakt, i tråd med arkitekturguiden § 2.
 
 ## Formål og omfang
 

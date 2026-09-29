@@ -252,7 +252,7 @@ jobs:
 
   deploy:
     name: Deploy to Cloudflare Workers
-    needs: [verify, rls, native-android]
+    needs: [verify, rls, native-android, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
@@ -408,9 +408,7 @@ jobs:
     # PR sier bare at testene var grønne mot PR-ens base. Fem tester lå røde på
     # staging i dagevis før noen oppdaget det (se #275).
     #
-    # Merk at verken `deploy` eller `deploy-staging` har `needs: e2e`, så dette
-    # gater ikke utrulling — det gjør bruddet synlig i kjøringen. Skal E2E
-    # faktisk stoppe en staging-deploy, må e2e legges til i deploy-staging.
+    # Både staging og produksjon venter på E2E før utrulling.
     name: E2E
     needs: [verify, rls, native-android]
     runs-on: ubuntu-latest
@@ -470,7 +468,8 @@ jobs:
           git fetch origin staging
           ok=false
           elapsed=0
-          timeout=720
+          # Staging-deployen venter også på E2E, som starter etter RLS og Android.
+          timeout=1800
           interval=20
 
           while [ "$elapsed" -lt "$timeout" ]; do
@@ -544,7 +543,7 @@ jobs:
 
   deploy-staging:
     name: Deploy to Cloudflare Workers (staging)
-    needs: [verify, rls, native-android]
+    needs: [verify, rls, native-android, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging

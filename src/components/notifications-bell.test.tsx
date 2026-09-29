@@ -21,11 +21,13 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/hooks/use-is-native", () => ({ useIsNative: () => false }));
 vi.mock("@/hooks/use-unread", () => ({ useUnreadSystemMessagesCount: () => unreadSystem }));
-vi.mock("@/lib/saved-searches", () => ({
-  listNotifications: async () => [],
-  listPriceDrops: async () => [],
+vi.mock("@/lib/notifications", () => ({
+  listEnrichedNotifications: async () => ({ items: [], hasMore: false }),
+  markAllNotificationsRead: vi.fn(),
+  markNotificationItemRead: vi.fn(),
+  deleteNotificationItem: vi.fn(),
+  invalidateNotificationQueries: vi.fn(),
 }));
-vi.mock("@/lib/wtb-listings.functions", () => ({ listWtbMatchNotifications: async () => [] }));
 vi.mock("@/integrations/supabase/client", () => {
   const channel = { on: () => channel, subscribe: () => channel };
   return { supabase: { channel: () => channel, removeChannel: vi.fn() } };

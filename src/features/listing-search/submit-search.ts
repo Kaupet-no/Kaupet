@@ -1,4 +1,4 @@
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
 import { resolveTextToFilters, type InterpretedCriterion } from "./resolve-text-to-filters";

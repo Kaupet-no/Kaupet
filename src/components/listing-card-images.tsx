@@ -1,13 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
-import type { ListingCardData } from "@/components/listing-card";
-import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
-import { useListingGalleryImages } from "@/hooks/use-listing-gallery-images";
-import { signListingImageUrls } from "@/lib/storage";
+import { useListingCardGallery } from "@/hooks/use-listing-card-gallery";
 
 type Props = {
   listing: ListingCardData;
@@ -30,36 +28,10 @@ export const ListingCardImages = memo(function ListingCardImages({
   knownFavorite,
   favoriteStateReady,
 }: Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
-
-  useEffect(() => {
-    if (!rootRef.current) return;
-    const el = rootRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "300px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const { images, imgUrls, isLoading } = useListingGalleryImages(listing.id, inView);
-
-  const originalUrl = listing.cover_path
-    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
-    : null;
-  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
-    coverImageUrl ?? null,
-    originalUrl,
-  );
+  const { rootRef, images, imgUrls, isLoading, effectiveImageUrl, handleImageError } =
+    useListingCardGallery(listing.id, listing.cover_path, coverImageUrl);
 
   const overlay = (
     <div

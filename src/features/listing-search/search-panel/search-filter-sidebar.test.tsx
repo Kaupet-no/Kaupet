@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { priceBoundsForMax } from "@/lib/filter-range-bounds";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
 vi.mock("@/components/ui/native-sheet", () => ({

@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { ListingCardData } from "@/components/listing-card";
-import { toListingCardData } from "@/lib/listing-card-data";
+import type { ListingCardData } from "@/lib/listing-card-data";
+import { toListingCardData, toPopularListingCardData } from "@/lib/listing-card-data";
 
 const PAGE_SIZE = 12;
 
@@ -31,22 +31,7 @@ export function useCategoryFeed({ categoryIds, sort }: UseCategoryFeedArgs) {
           _offset: pageParam,
         });
         if (error) throw error;
-        const rows = (data ?? []).map<ListingCardData>((l) => ({
-          id: l.listing_id,
-          kaupet_code: l.kaupet_code,
-          title: l.title,
-          subtitle: l.subtitle,
-          price_nok: l.price_nok,
-          is_free: l.is_free,
-          city: l.city,
-          created_at: l.created_at,
-          cover_path: l.cover_path,
-          total_views: Number(l.total_views ?? 0),
-          views_last_week: Number(l.views_last_week ?? 0),
-          mileage_km: l.mileage_km != null ? Number(l.mileage_km) : null,
-          category_slug: l.category_slug,
-          attributes: l.attributes as Record<string, unknown> | null,
-        }));
+        const rows = (data ?? []).map(toPopularListingCardData);
         return { rows, nextOffset: rows.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null };
       }
 

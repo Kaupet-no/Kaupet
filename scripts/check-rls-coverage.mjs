@@ -19,6 +19,7 @@ const rlsTests = readFileSync("src/lib/rls.integration.test.ts", "utf8");
 const referenced = new Set(
   [...rlsTests.matchAll(/\.from\(\s*["']([a-z][a-z0-9_]*)["']\s*\)/g)].map((match) => match[1]),
 );
+// Existing gaps stay visible. New tables must get an RLS case before CI passes.
 const knownGaps = new Set();
 const missing = [...tables].filter((name) => !referenced.has(name)).sort();
 const newGaps = missing.filter((name) => !knownGaps.has(name));

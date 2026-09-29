@@ -22,110 +22,23 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import {
-  listNotifications,
-  listPriceDrops,
+  deleteNotificationItem,
+  invalidateNotificationQueries,
+  listEnrichedNotifications,
   markAllNotificationsRead,
-  markAllPriceDropsRead,
-  markNotificationRead,
-  markPriceDropRead,
-  deleteNotification,
-  deletePriceDrop,
-  type SavedSearchNotification,
-  type PriceDropNotification,
-} from "@/lib/saved-searches";
-import {
-  listWtbMatchNotifications,
-  markAllWtbMatchNotificationsRead,
-  markWtbMatchNotificationRead,
-  deleteWtbMatchNotification,
-  type WtbMatchNotification,
-} from "@/lib/wtb-listings.functions";
-
-type SearchItem = SavedSearchNotification & {
-  kind: "search";
-  listing_title: string | null;
-  listing_code: string | null;
-  search_name: string | null;
-};
-type PriceDropItem = PriceDropNotification & {
-  kind: "price_drop";
-  listing_title: string | null;
-  listing_code: string | null;
-};
-type WtbMatchItem = WtbMatchNotification & {
-  kind: "wtb_match";
-  listing_title: string | null;
-  listing_code: string | null;
-  wtb_title: string | null;
-};
-type Item = SearchItem | PriceDropItem | WtbMatchItem;
+  markNotificationItemRead,
+  type NotificationItem,
+} from "@/lib/notifications";
 
 export function NotificationsBell() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const invalidateNotifications = useCallback(() => {
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-    qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-  }, [qc]);
+  const invalidateNotifications = useCallback(() => invalidateNotificationQueries(qc), [qc]);
 
   const { data, refetch } = useQuery({
-    queryKey: ["notifications", user?.id],
+    queryKey: ["notifications", user?.id, "preview"],
     enabled: !!user,
-    queryFn: async (): Promise<Item[]> => {
-      const [notifs, drops, wtbMatches] = await Promise.all([
-        listNotifications(30),
-        listPriceDrops(30),
-        listWtbMatchNotifications(30),
-      ]);
-      const listingIds = Array.from(
-        new Set([
-          ...notifs.map((n) => n.listing_id),
-          ...drops.map((d) => d.listing_id),
-          ...wtbMatches.map((m) => m.listing_id),
-        ]),
-      );
-      const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
-      const wtbListingIds = Array.from(new Set(wtbMatches.map((m) => m.wtb_listing_id)));
-      const [listingsRes, searchesRes, wtbListingsRes] = await Promise.all([
-        listingIds.length
-          ? supabase.from("listings").select("id, title, kaupet_code").in("id", listingIds)
-          : Promise.resolve({ data: [] as { id: string; title: string; kaupet_code: string }[] }),
-        searchIds.length
-          ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
-          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-        wtbListingIds.length
-          ? supabase.from("wtb_listings").select("id, title").in("id", wtbListingIds)
-          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
-      ]);
-      const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l]));
-      const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
-      const wtbListingMap = new Map((wtbListingsRes.data ?? []).map((w) => [w.id, w.title]));
-
-      const searchItems: SearchItem[] = notifs.map((n) => ({
-        ...n,
-        kind: "search",
-        listing_title: listingMap.get(n.listing_id)?.title ?? null,
-        listing_code: listingMap.get(n.listing_id)?.kaupet_code ?? null,
-        search_name: searchMap.get(n.saved_search_id) ?? null,
-      }));
-      const dropItems: PriceDropItem[] = drops.map((d) => ({
-        ...d,
-        kind: "price_drop",
-        listing_title: listingMap.get(d.listing_id)?.title ?? null,
-        listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
-      }));
-      const wtbMatchItems: WtbMatchItem[] = wtbMatches.map((m) => ({
-        ...m,
-        kind: "wtb_match",
-        listing_title: listingMap.get(m.listing_id)?.title ?? null,
-        listing_code: listingMap.get(m.listing_id)?.kaupet_code ?? null,
-        wtb_title: wtbListingMap.get(m.wtb_listing_id) ?? null,
-      }));
-
-      return [...searchItems, ...dropItems, ...wtbMatchItems].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-    },
+    queryFn: async (): Promise<NotificationItem[]> => (await listEnrichedNotifications(30)).items,
     refetchInterval: 60_000,
   });
 
@@ -215,26 +128,18 @@ export function NotificationsBell() {
   const badgeCount = unread + unreadSystem;
 
   const handleMarkAllRead = async () => {
-    await Promise.all([
-      markAllNotificationsRead(),
-      markAllPriceDropsRead(),
-      markAllWtbMatchNotificationsRead(),
-    ]);
+    await markAllNotificationsRead();
     invalidateNotifications();
   };
 
-  const handleClick = async (n: Item) => {
+  const handleClick = async (n: NotificationItem) => {
     if (n.read_at) return;
-    if (n.kind === "search") await markNotificationRead(n.id);
-    else if (n.kind === "price_drop") await markPriceDropRead(n.id);
-    else await markWtbMatchNotificationRead(n.id);
+    await markNotificationItemRead(n);
     invalidateNotifications();
   };
 
-  const handleDelete = async (n: Item) => {
-    if (n.kind === "search") await deleteNotification(n.id);
-    else if (n.kind === "price_drop") await deletePriceDrop(n.id);
-    else await deleteWtbMatchNotification(n.id);
+  const handleDelete = async (n: NotificationItem) => {
+    await deleteNotificationItem(n);
     invalidateNotifications();
   };
 

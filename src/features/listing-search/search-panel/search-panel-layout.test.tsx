@@ -3,7 +3,7 @@ import { type HTMLAttributes, type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { SearchPanel } from "./search-panel";

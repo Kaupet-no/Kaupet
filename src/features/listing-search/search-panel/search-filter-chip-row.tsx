@@ -3,7 +3,7 @@ import { ArrowUpDown, SlidersHorizontal } from "lucide-react";
 
 import { FilterChip } from "@/components/filter-chip";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
-import { conditionOptionsFor } from "@/components/advanced-search-value";
+import { conditionOptionsFor } from "@/lib/advanced-search-value";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import {
   searchFilterDependencyMet,

@@ -1,10 +1,16 @@
 import type { AttributeFilterValue } from "@/lib/category-filters";
-import type { LocationValue } from "@/components/location-filter";
 import type { SortValue } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
 import type { SearchCriteria } from "@/lib/saved-searches";
 import { VEHICLE_CONDITIONS_BY_SLUG } from "@/lib/constants";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
+
+export type LocationValue = {
+  lat: number | null;
+  lng: number | null;
+  radius: number;
+  label?: string;
+};
 
 /** Root category slug for Bil og MC, which only lets a listing belong to one
  * subcategory at a time — unlike other categories, where an ad can carry

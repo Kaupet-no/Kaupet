@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ListingCard, type ListingCardData } from "./listing-card";
+import { ListingCard } from "./listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { ListingCardExpanded } from "./listing-card-expanded";
 
 vi.mock("@tanstack/react-router", () => ({

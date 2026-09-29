@@ -58,7 +58,7 @@ import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/catego
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
 import { SearchStart } from "@/features/listing-search/search-start";
-import { criteriaToValue } from "@/components/advanced-search-value";
+import { criteriaToValue } from "@/lib/advanced-search-value";
 
 /** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
 function blurActiveElement() {

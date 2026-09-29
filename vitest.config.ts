@@ -26,13 +26,12 @@ export default defineConfig({
         "src/routeTree.gen.ts",
         "src/components/ui/**",
       ],
-      // Starting point measured against the current codebase — ratchet up as
-      // routes/components gain coverage (see Fase 3, punkt 9 i code-assessment-planen).
+      // Hev tersklene etter målt dekning, se docs/TESTSTRATEGI.md § 9.
       thresholds: {
-        statements: 31,
-        branches: 26,
-        functions: 26,
-        lines: 32,
+        statements: 36,
+        branches: 31,
+        functions: 31,
+        lines: 38,
       },
     },
   },

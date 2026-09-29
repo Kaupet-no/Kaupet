@@ -57,7 +57,7 @@ import {
   criteriaToValue,
   valueToCriteria,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+} from "@/lib/advanced-search-value";
 import {
   deleteSavedSearch,
   listSavedSearches,

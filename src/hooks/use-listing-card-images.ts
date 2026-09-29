@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 
 /** Kort-thumbnail-URL per annonse. Eldre annonser mangler en faktisk

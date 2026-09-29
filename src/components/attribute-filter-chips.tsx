@@ -24,7 +24,7 @@ import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { PartVehicleSearchField } from "@/components/part-fitment-fields";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { RangeFilterField } from "@/components/range-filter-field";
-import { CONDITIONS } from "@/components/advanced-search-value";
+import { CONDITIONS } from "@/lib/advanced-search-value";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 import {

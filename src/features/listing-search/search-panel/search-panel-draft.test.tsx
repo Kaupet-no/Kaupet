@@ -3,8 +3,8 @@ import type { HTMLAttributes, ReactNode, SetStateAction } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import type { AdvancedSearchValue } from "@/lib/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { SearchPanel } from "./search-panel";
 

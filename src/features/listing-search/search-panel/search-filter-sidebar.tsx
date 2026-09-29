@@ -9,7 +9,7 @@ import {
   conditionOptionsFor,
   defaultAdvancedSearchValue,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+} from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 import { priceBoundsForMax } from "@/lib/filter-range-bounds";

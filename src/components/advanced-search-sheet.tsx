@@ -37,7 +37,7 @@ import {
   BIL_OG_MC_SLUG,
   conditionOptionsFor,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+} from "@/lib/advanced-search-value";
 
 type Props = {
   open: boolean;

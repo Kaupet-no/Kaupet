@@ -27,7 +27,7 @@ import { BedriftsvilkarContent } from "@/components/legal/bedriftsvilkar-content
 import { PersonvernContent } from "@/components/legal/personvern-content";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
-import { passwordSchema } from "@/lib/auth-schemas";
+import { emailSchema, passwordSchema } from "@/lib/auth-schemas";
 import { authConfirmationRedirect, postAuthDestination, safeReturnTo } from "@/lib/auth-return";
 
 const TERMS_VERSION = "2.0";
@@ -50,15 +50,9 @@ export const Route = createFileRoute("/auth")({
 
 type AuthMode = "signin" | "signup" | "reset" | "resend" | "confirm";
 
-const emailField = z
-  .string()
-  .trim()
-  .min(1, "Fyll inn e-postadressen din")
-  .email("Skriv inn en gyldig e-postadresse");
-
 const signInSchema = z.object({
   displayName: z.string().optional(),
-  email: emailField,
+  email: emailSchema,
   // Only checks presence here — the account may have been created back when
   // a shorter password was allowed, so this must never reject a legitimate
   // existing password. Actual correctness is checked server-side.

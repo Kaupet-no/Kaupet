@@ -13,10 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatErrorMessage } from "@/lib/errors";
 import { DeleteAccountSection } from "@/components/profil/delete-account-section";
-import { passwordSchema as sharedPasswordSchema } from "@/lib/auth-schemas";
+import {
+  emailSchema as sharedEmailSchema,
+  passwordSchema as sharedPasswordSchema,
+} from "@/lib/auth-schemas";
 
 const emailSchema = z.object({
-  email: z.string().trim().email("Ugyldig e-postadresse"),
+  email: sharedEmailSchema,
 });
 type EmailForm = z.infer<typeof emailSchema>;
 

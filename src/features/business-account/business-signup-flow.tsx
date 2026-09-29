@@ -15,7 +15,7 @@ import {
   isValidOrganizationNumber,
   normalizeOrganizationNumber,
 } from "@/lib/organization-number";
-import { passwordSchema } from "@/lib/auth-schemas";
+import { emailSchema, passwordSchema } from "@/lib/auth-schemas";
 import { passwordStrength } from "@/lib/password-strength";
 import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast } from "@/lib/toast";
@@ -43,7 +43,7 @@ const profileSchema = z.object({
     .trim()
     .min(2, "Skriv inn navnet ditt (minst 2 tegn).")
     .max(80, "Maks 80 tegn."),
-  email: z.string().trim().email("Skriv inn en gyldig e-postadresse."),
+  email: emailSchema,
   password: passwordSchema,
   acceptedTerms: z.boolean().refine((value) => value, {
     message: "Du må godta vilkårene for bedrifter og personvernerklæringen.",

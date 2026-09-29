@@ -32,6 +32,7 @@ import {
   type OrganizationMemberPermissions,
 } from "@/lib/business.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { emailSchema } from "@/lib/auth-schemas";
 import { formatErrorMessage } from "@/lib/errors";
 type Category = { id: string; name_nb: string; parent_id: string | null };
 
@@ -365,8 +366,8 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
     mutationFn: () => {
       setErrorMessage(null);
       if (name.trim().length < 2) throw new Error("Navnet må være minst 2 tegn.");
-      if (!/^\S+@\S+\.\S+$/u.test(email.trim()))
-        throw new Error("Skriv inn en gyldig e-postadresse.");
+      const parsedEmail = emailSchema.safeParse(email);
+      if (!parsedEmail.success) throw new Error(parsedEmail.error.issues[0].message);
       const next = normalizeMemberPermissions(permissions);
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");

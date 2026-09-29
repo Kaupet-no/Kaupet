@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppLanding } from "./app-landing";
+import { heroFadeDistances } from "@/components/hero-fade-distances";
 
 const openPanel = vi.fn();
 const navigate = vi.fn();
@@ -32,6 +33,12 @@ vi.mock("@tanstack/react-query", () => ({
 const fadeMocks = vi.hoisted(() => ({ opacity: 1 }));
 vi.mock("@/hooks/use-scroll-fade-opacity", () => ({
   useScrollFadeOpacity: () => fadeMocks.opacity,
+}));
+// Logoen scroller av via useScrollPinnedOffset; offseten styres herfra
+// (app-landing eier bare kombinasjonen av festing, fade, fokus og tastatur).
+const pinMocks = vi.hoisted(() => ({ offset: 0 }));
+vi.mock("@/hooks/use-scroll-pinned-offset", () => ({
+  useScrollPinnedOffset: () => pinMocks.offset,
 }));
 vi.mock("@/hooks/use-keyboard-visible", () => ({
   useKeyboardVisible: () => false,
@@ -72,6 +79,7 @@ beforeEach(() => {
   submitSearch.mockReset();
   queryMocks.calls = [];
   fadeMocks.opacity = 1;
+  pinMocks.offset = 0;
 });
 afterEach(() => {
   cleanup();
@@ -93,22 +101,30 @@ describe("AppLanding", () => {
   it("åpner lokasjon gjennom søkepanelet som første valg i kategoriraden", () => {
     render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
 
-    const row = screen.getByRole("group", { name: "Kategorier" });
+    // Kategorivelgeren ligger i heroen under søkefeltet — det finnes bare én.
+    const rail = screen.getByRole("group", { name: "Kategorier" });
     fireEvent.click(screen.getByRole("button", { name: "Velg lokasjon: Hele Norge" }));
 
-    expect(row.firstElementChild?.getAttribute("aria-label")).toBe("Velg lokasjon: Hele Norge");
+    expect(rail.firstElementChild?.getAttribute("aria-label")).toBe("Velg lokasjon: Hele Norge");
     expect(openPanel.mock.calls).toEqual([["location"]]);
   });
 
   it("viser forslag bare mens søkefeltet har fokus", () => {
     render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
     const input = screen.getByRole("searchbox", { name: "Søk i annonser" });
+    const hero = screen.getByTestId("home-hero");
+    expect(hero.className).toContain("z-0");
 
     expect(screen.queryByText("forslag")).toBeNull();
     fireEvent.focus(input);
     expect(screen.getByText("forslag")).toBeTruthy();
+    // Forslagsvinduet ligger i heroen: mens det er åpent må heroen ligge
+    // over innholdet (z-10), ellers kan et annonsekort ved delvis scroll
+    // dekke vinduet. Bunnnaven (z-50) ligger fortsatt øverst.
+    expect(hero.className).toContain("z-20");
     fireEvent.blur(input);
     expect(screen.queryByText("forslag")).toBeNull();
+    expect(hero.className).toContain("z-0");
   });
 
   it("søker direkte fra søkefeltet uten å åpne panelet", () => {
@@ -154,28 +170,123 @@ describe("AppLanding", () => {
     expect(lastPopularCall()?.enabled).toBe(true);
   });
 
-  it("toner ut heroen med scroll, men holder søkefeltet fullt synlig mens det er i fokus", () => {
+  it("toner ut søk og kategorivelger med scroll, mens logoen fester til den scroller av", () => {
     const view = render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
     const hero = screen.getByTestId("home-hero");
-    expect(hero.getAttribute("style")).toContain("opacity: 1");
+    const logo = screen.getByTestId("home-hero-logo");
+    const searchPart = screen.getByTestId("home-hero-search");
+    const rail = screen.getByTestId("home-category-rail");
+    expect(searchPart.getAttribute("style")).toContain("opacity: 1");
+    expect(rail.getAttribute("style")).toContain("opacity: 1");
+    // Logoen fader ikke: den står fast (translateY 0) til den scroller av.
+    expect(logo.getAttribute("style")).toContain("translateY(0px)");
+    expect(logo.getAttribute("style")).not.toContain("opacity");
     expect(hero.hasAttribute("inert")).toBe(false);
+    expect(searchPart.hasAttribute("inert")).toBe(false);
 
+    // Søk og velger følger scrollen (i nettleseren med hver sin målte
+    // fade-lengde; mocken her leverer én felles verdi).
     fadeMocks.opacity = 0.4;
     view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
-    expect(hero.getAttribute("style")).toContain("opacity: 0.4");
+    expect(searchPart.getAttribute("style")).toContain("opacity: 0.4");
+    expect(rail.getAttribute("style")).toContain("opacity: 0.4");
+    expect(logo.getAttribute("style")).toContain("translateY(0px)");
 
     // Fokus i søkefeltet overstyrer fade-en: feltet skal aldri tones ut
-    // mens brukeren skriver og tastaturet er oppe.
+    // mens brukeren skriver og tastaturet er oppe. Logo og kategorivelger
+    // følger fortsatt scrollen.
     const input = screen.getByRole("searchbox", { name: "Søk i annonser" });
     fireEvent.focus(input);
     view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
-    expect(hero.getAttribute("style")).toContain("opacity: 1");
+    expect(searchPart.getAttribute("style")).toContain("opacity: 1");
+    expect(rail.getAttribute("style")).toContain("opacity: 0.4");
 
-    // Helt uttonet hero er usynlig, utenfor tab-rekkefølgen og uten pekere.
+    // Logoen scroller av etter festepunktet, i egen takt — uansett fade.
+    pinMocks.offset = -120;
+    view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+    expect(logo.getAttribute("style")).toContain("translateY(-120px)");
+
+    // Er søk og velger uttonet, men logoen fortsatt hjemme, holdes heroen
+    // åpen — logoen er fremdeles synlig og operabelig. Det helt skjulte
+    // søkefeltet er derimot ikke aktivt: ingen pekere, fokus eller rolle.
     fireEvent.blur(input);
     fadeMocks.opacity = 0;
+    pinMocks.offset = 0;
+    view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+    expect(hero.hasAttribute("aria-hidden")).toBe(false);
+    expect(hero.hasAttribute("inert")).toBe(false);
+    expect(rail.getAttribute("style")).toContain("pointer-events: none");
+    expect(searchPart.getAttribute("style")).toContain("pointer-events: none");
+    expect(searchPart.hasAttribute("inert")).toBe(true);
+    expect(searchPart.hasAttribute("aria-hidden")).toBe(true);
+
+    // Først når også logoen er scrollet ut av syne, er hele heroen skjult.
+    pinMocks.offset = -900;
     view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
     expect(hero.hasAttribute("aria-hidden")).toBe(true);
     expect(hero.hasAttribute("inert")).toBe(true);
+    expect(searchPart.getAttribute("style")).toContain("opacity: 0");
+    expect(rail.getAttribute("style")).toContain("opacity: 0");
+  });
+
+  it("viser heroens kategorivelger fullt ved swipe, og toner tilbake etter 3 s inaktivitet", () => {
+    vi.useFakeTimers();
+    try {
+      const view = render(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+      const hero = screen.getByTestId("home-hero");
+      const rail = screen.getByTestId("home-category-rail");
+
+      fadeMocks.opacity = 0.3;
+      view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+      expect(rail.getAttribute("style")).toContain("opacity: 0.3");
+
+      // Sveip (peker ned → opp) i heroens kategorivelger: full synlighet og
+      // pekere, uansett hvor langt siden er scrollet.
+      fireEvent.pointerDown(rail);
+      fireEvent.pointerUp(rail);
+      view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+      expect(rail.getAttribute("style")).toContain("opacity: 1");
+      expect(rail.getAttribute("style")).toContain("pointer-events: auto");
+      expect(hero.hasAttribute("inert")).toBe(false);
+
+      // Vertikal sidescroll er ny aktivitet et annet sted: velgeren går med
+      // en gang tilbake til scroll-faden, slik at den forsvinner fortest.
+      act(() => {
+        window.dispatchEvent(new Event("scroll"));
+      });
+      view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+      expect(rail.getAttribute("style")).toContain("opacity: 0.3");
+
+      // Uten sidescroll gjør 3 s uten nye sveip det samme.
+      fireEvent.pointerDown(rail);
+      fireEvent.pointerUp(rail);
+      view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+      expect(rail.getAttribute("style")).toContain("opacity: 1");
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      view.rerender(<AppLanding adPickerOpen={false} onAdPickerOpenChange={vi.fn()} />);
+      expect(rail.getAttribute("style")).toContain("opacity: 0.3");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gir kategorivelgeren kortest fade-lengde, deretter søkefeltet", () => {
+    // Kategorivelgeren ligger nederst i heroen og møter innholdet først.
+    const distances = heroFadeDistances({ search: 359, rail: 487 }, 700);
+    expect(distances.rail).toBeLessThan(distances.search);
+    // Hver del er helt uttonet 48 px før innholdet når den.
+    expect(distances.rail).toBe(700 - 487 - 48);
+    expect(distances.search).toBe(700 - 359 - 48);
+  });
+
+  it("holder en skikkelig fade-lengde på lave skjermer, med rekkefølgen i behold", () => {
+    // Smalt rom til innholdet (lav skjerm): målt lengde er bitteliten, så
+    // per-dels-minimumene slår inn — og velgeren fader fremdeles først.
+    const distances = heroFadeDistances({ search: 600, rail: 620 }, 630);
+    expect(distances.rail).toBe(140);
+    expect(distances.search).toBe(260);
+    expect(distances.rail).toBeLessThan(distances.search);
   });
 });

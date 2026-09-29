@@ -311,14 +311,25 @@ text-primary`, og metadata under tittelen; ikke vis selgerinterne
   Kaupet». Ikke bruk en generell trygghetsbadge.
 - Kategoriens farge er en lokal aksent på valgt ikon eller overskrift. Den skal
   ikke fargelegge hele heroen eller resultatflaten.
-- Nativeforsiden eies av Kaupet-logoen og søkefeltet, midt på det første
-  skjermbildet — rolig, med lite som konkurrerer om oppmerksomheten. Kategorier
-  og populære annonser kommer under skjermbildet, og populære annonser hentes
-  først når brukeren scroller. Heroen står i ro mens innholdet scroller opp bak
-  den og tones rolig ut — målt slik at den er helt borte før annet innhold kommer
-  over den, så aldri to elementer synes overlappet — og søkefeltet holdes fullt
-  synlig mens det er i fokus eller tastaturet er oppe. Behold luft, men ikke
-  bruk hero-høyde som dekorasjon.
+- Nativeforsiden eies av Kaupet-logoen, søkefeltet og kategorivelgeren rett
+  under søkefeltet, midt på det første skjermbildet og litt forskjøvet
+  oppover — rolig, med lite som konkurrerer om oppmerksomheten. Populære
+  annonser kommer under skjermbildet, og populære annonser hentes først når
+  brukeren scroller. Heroen står i ro mens innholdet scroller opp bak den;
+  søkefeltet og kategorivelgeren tones ut med hver sin målte fade-lengde,
+  slik at kategorivelgeren forsvinner først og deretter søkefeltet — ingen
+  del er synlig når innholdet kommer over den. Logoen tones ikke ut: den
+  står fast til «Populært nå»-seksjonen er ca midt på skjermen, og scroller
+  deretter oppover i lavere tempo enn siden (parallaks) — men holder følge
+  med innholdets hastighet idet det nærmer seg, slik at innholdet alltid
+  scroller forbi under den, og tilbake til hjem-posisjonen ved scroll i
+  motsatt retning. Søkefeltet holdes fullt synlig mens det er i
+  fokus eller tastaturet er oppe, og swiping i kategorivelgeren viser den
+  fullt igjen i tre sekunder — eller til brukeren scroller siden — før den
+  går tilbake til den scroll-avhengige faden. Mens søkeforslagene er åpne,
+  ligger heroen over innholdet (men under bunnnaven), slik at
+  forslagsvinduet aldri dekkes av annonsekort som har scrollet opp ved
+  siden av. Behold luft, men ikke bruk hero-høyde som dekorasjon.
 
 ## Skjemavalidering
 

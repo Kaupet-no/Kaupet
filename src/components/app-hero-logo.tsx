@@ -2,8 +2,9 @@ import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 
 /**
  * Large centered wordmark in the home flow. Hidden while the keyboard is up so
- * the focused search field and its suggestions own the screen; the hero
- * wrapper in app-landing.tsx owns the scroll fade for the whole hero.
+ * the focused search field and its suggestions own the screen; the logo
+ * wrapper in app-landing.tsx owns the pin-and-scroll-away movement of the
+ * logo itself.
  */
 export function AppHeroLogo() {
   const keyboardVisible = useKeyboardVisible();

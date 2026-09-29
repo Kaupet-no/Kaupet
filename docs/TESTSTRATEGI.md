@@ -415,19 +415,19 @@ tilgang til implementasjonen.
 
 ### 11.1 Autentisering og konto
 
-| ID      | Nivå | P   | Tittel                                                      | Forventet resultat                                                                                                    |
-| ------- | ---- | --- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| AUTH-01 | U    | P0  | Passordstyrke-regler (`password-strength.ts`)               | Grenseverdier for lengde/kompleksitet gir riktig styrkenivå; tom streng gir laveste nivå uten unntak                  |
-| AUTH-02 | U    | P0  | Auth-skjemavalidering (`auth-schemas.ts`)                   | Ugyldig e-post, for kort passord og manglende felt gir feltspesifikke feil, ikke generisk feil                        |
-| AUTH-03 | U    | P0  | `auth-return.ts` returnerer bare til interne stier          | Absolutte eksterne URL-er, `//evil.no` og `javascript:` avvises → open redirect umulig                                |
-| AUTH-04 | U    | P1  | `pending-auth-intent.ts` lagrer og henter intensjon én gang | `take…` tømmer lageret; utløpt/ugyldig payload gir `null` uten kast                                                   |
-| AUTH-05 | E    | P0  | Innlogging og redirect tilbake til opprinnelig side         | Bruker som klikket «favoritt» anonymt havner tilbake på samme annonse, med handlingen fullført                        |
-| AUTH-06 | E    | P0  | Beskyttede ruter krever sesjon                              | Anonym på `/mine-annonser`, `/meldinger`, `/ny-annonse` sendes til auth, ikke til feilside                            |
-| AUTH-07 | E    | P1  | Passordtilbakestilling                                      | Ugyldig/utløpt token gir forklarende melding, ikke stack trace; gyldig token setter nytt passord og logger inn        |
-| AUTH-08 | R    | P0  | Utestengt bruker (`user_bans`)                              | Kan ikke opprette annonse, melding eller anmeldelse; eksisterende data er fortsatt skjult/vist etter policy           |
-| AUTH-09 | R    | P0  | Suspendert bruker (`user_suspensions`)                      | Skrivetilgang blokkert i suspensjonsperioden, gjenopprettes automatisk etter utløp                                    |
-| AUTH-10 | E+R  | P1  | Kontosletting (`account_deletions`)                         | Sletting fjerner/anonymiserer eierdata etter policy; samtalepartner ser konsistent tilstand, ikke ødelagte referanser |
-| AUTH-11 | M    | P1  | Sesjonsutløp midt i en flyt                                 | Bruker mister ikke utfylte data; blir bedt om å logge inn og returneres til samme sted                                |
+| ID      | Nivå | P   | Tittel                                                      | Forventet resultat                                                                                                                                            |
+| ------- | ---- | --- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-01 | U    | P0  | Passordstyrke-regler (`password-strength.ts`)               | Grenseverdier for lengde/kompleksitet gir riktig styrkenivå; tom streng gir laveste nivå uten unntak                                                          |
+| AUTH-02 | U    | P0  | Auth-skjemavalidering (`auth-schemas.ts`)                   | `emailSchema`: tom → «Fyll inn e-postadressen din», ugyldig → «Skriv inn en gyldig e-postadresse»; `passwordSchema`: 9 tegn → «Minst 10 tegn», 10 tegn godtas |
+| AUTH-03 | U    | P0  | `auth-return.ts` returnerer bare til interne stier          | Absolutte eksterne URL-er, `//evil.no` og `javascript:` avvises → open redirect umulig                                                                        |
+| AUTH-04 | U    | P1  | `pending-auth-intent.ts` lagrer og henter intensjon én gang | `take…` tømmer lageret; utløpt/ugyldig payload gir `null` uten kast                                                                                           |
+| AUTH-05 | E    | P0  | Innlogging og redirect tilbake til opprinnelig side         | Bruker som klikket «favoritt» anonymt havner tilbake på samme annonse, med handlingen fullført                                                                |
+| AUTH-06 | E    | P0  | Beskyttede ruter krever sesjon                              | Anonym på `/mine-annonser`, `/meldinger`, `/ny-annonse` sendes til auth, ikke til feilside                                                                    |
+| AUTH-07 | E    | P1  | Passordtilbakestilling                                      | Ugyldig/utløpt token gir forklarende melding, ikke stack trace; gyldig token setter nytt passord og logger inn                                                |
+| AUTH-08 | R    | P0  | Utestengt bruker (`user_bans`)                              | Kan ikke opprette annonse, melding eller anmeldelse; eksisterende data er fortsatt skjult/vist etter policy                                                   |
+| AUTH-09 | R    | P0  | Suspendert bruker (`user_suspensions`)                      | Skrivetilgang blokkert i suspensjonsperioden, gjenopprettes automatisk etter utløp                                                                            |
+| AUTH-10 | E+R  | P1  | Kontosletting (`account_deletions`)                         | Sletting fjerner/anonymiserer eierdata etter policy; samtalepartner ser konsistent tilstand, ikke ødelagte referanser                                         |
+| AUTH-11 | M    | P1  | Sesjonsutløp midt i en flyt                                 | Bruker mister ikke utfylte data; blir bedt om å logge inn og returneres til samme sted                                                                        |
 
 #### 11.1.1 Bedriftskontoer, Proff og prøveperiode — R1/R4
 

@@ -36,7 +36,8 @@ const { users } = JSON.parse(
 const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
 test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
-  const credentials = users[testInfo.project.name];
+  const credentials =
+    users[testInfo.project.name === "desktop-web" ? "desktop-publish" : testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
   const { email, password } = credentials;
   await login(page, email, password);

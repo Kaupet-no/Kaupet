@@ -142,10 +142,8 @@ export function hasValid360MagicBytes(bytes: Uint8Array, mime: string): boolean 
   return false;
 }
 
-function extFrom360Mime(mime: string): string {
-  if (mime === "image/jpeg") return "jpg";
-  if (mime === "image/png") return "png";
-  return "webp";
+function extFrom360Mime(mime: (typeof ALLOWED_360_MIME)[number]): string {
+  return mime === "image/jpeg" ? "jpg" : mime === "image/png" ? "png" : "webp";
 }
 
 // Mobilklienten som scanner QR-koden har ingen innlogget Supabase-sesjon, så
@@ -194,8 +192,7 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
     if (!hasValid360MagicBytes(bytes, data.contentType)) {
       throw new Error("Bildefilen samsvarer ikke med oppgitt format");
     }
-    const ext = extFrom360Mime(data.contentType);
-    const path = `${listingId}/${data.frameOrder}.${ext}`;
+    const path = `${listingId}/${data.frameOrder}.${extFrom360Mime(data.contentType)}`;
 
     const { data: previousFrame, error: previousError } = await supabaseAdmin
       .from("listing_360_frames")

@@ -30,6 +30,7 @@ export async function assertUserNotRateLimited(
   bucket: string,
   limit: number,
   windowSeconds: number,
+  message = "For mange forespørsler. Prøv igjen senere.",
 ): Promise<void> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: allowed, error } = await supabaseAdmin.rpc("check_user_rate_limit", {
@@ -41,5 +42,5 @@ export async function assertUserNotRateLimited(
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!allowed) throw new ClientError("For mange forespørsler. Prøv igjen senere.", 429);
+  if (!allowed) throw new ClientError(message, 429);
 }

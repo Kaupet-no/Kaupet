@@ -61,4 +61,13 @@ describe("pathFromPublicImageUrl", () => {
     vi.stubEnv("R2_PUBLIC_BASE_URL", "");
     expect(pathFromPublicImageUrl("https://bilder.kaupet.no/annonser/1/bilde.jpg")).toBeNull();
   });
+
+  it.each([
+    "https://bilder.kaupet.no/annonser/1/bilde.jpg?download=1",
+    "https://bilder.kaupet.no/annonser/1/bilde.jpg#fragment",
+    "https://bilder.kaupet.no.evil/annonser/1/bilde.jpg",
+    "https://bilder.kaupet.no/annonser%2f1/bilde.jpg",
+  ])("avviser URL som ikke er en ren sti under basen: %s", (url) => {
+    expect(pathFromPublicImageUrl(url)).toBeNull();
+  });
 });

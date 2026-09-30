@@ -96,6 +96,12 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
       .delete()
       .eq("listing_id", data.listingId);
     if (error) {
+      if (
+        error.code === "23514" &&
+        error.message === "Salget kan ikke angres etter at vurderinger er gitt"
+      ) {
+        throw new Error("Salget kan ikke angres etter at vurderinger er gitt");
+      }
       throw await toClientError("database", error);
     }
     return { ok: true };

@@ -5,6 +5,14 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabase } from "@/integrations/supabase/client";
 import { attributesSchema } from "@/lib/category-filters";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
+
+const WTB_CREATE_LIMIT_MESSAGE =
+  "Du har opprettet for mange ønskes kjøpt-annonser den siste timen. Prøv igjen senere.";
+
+async function assertWtbCreationAllowed(userId: string) {
+  await assertUserNotRateLimited(userId, "wtb_creation", 10, 3600, WTB_CREATE_LIMIT_MESSAGE);
+}
 
 /** WTB criteria value shapes (see src/features/wtb/wtb-criteria-types.ts):
  * multi-value selects (string[]), from–to ranges ({min,max}), earliest-date
@@ -124,17 +132,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
       return { id: row.id as string };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("wtb_listings")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", oneHourAgo);
-    if ((count ?? 0) >= 10) {
-      throw new Error(
-        "Du har opprettet for mange ønskes kjøpt-annonser den siste timen. Prøv igjen senere.",
-      );
-    }
+    await assertWtbCreationAllowed(userId);
 
     const { data: row, error } = await supabaseAdmin
       .from("wtb_listings")
@@ -191,14 +189,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       return { id: row.id as string };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("wtb_listings")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", context.userId)
-      .eq("status", "draft")
-      .gte("created_at", oneHourAgo);
-    if ((count ?? 0) >= 10) throw new Error("For mange utkast. Prøv igjen senere.");
+    await assertWtbCreationAllowed(context.userId);
 
     const { data: row, error } = await supabaseAdmin
       .from("wtb_listings")

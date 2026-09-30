@@ -8,6 +8,7 @@ import { normalizePhone } from "@/lib/phone";
 import { PROFF_TERMS, type ProffTerm } from "@/features/business-account/plans";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { describeSafeError } from "@/lib/safe-error";
 
 type AdminClient = SupabaseClient<Database>;
 
@@ -1331,6 +1332,6 @@ async function notifyProffOrder(
     });
   } catch (cause) {
     // The order is stored; a failed notification must not fail the customer's request.
-    console.error("Failed to send Proff order notification", cause);
+    console.error("Failed to send Proff order notification", describeSafeError(cause));
   }
 }

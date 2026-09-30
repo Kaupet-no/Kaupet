@@ -68,9 +68,13 @@ Merknader:
   `main`, `assets`, `compatibility_date` og `nodejs_compat` ved bygg, og
   `CLOUDFLARE_WORKER_NAME` overstyrer navnet for staging (se `vite.config.ts`).
 - Bindinger: `IMAGES` (Cloudflare Images), brukt av
-  `src/lib/image-compression.server.ts` til å komprimere bilder hentet
-  serverside (Excel-, API- og MCP-synk). Bindingen finnes bare i
-  Worker-kjøretiden, ikke i dev eller vitest.
+  `src/lib/image-compression.server.ts` kun for serverimporterte bilder
+  (API/MCP/Excel). Vanlige bildeopplastinger og 360-opptak bruker
+  klientkomprimering før R2-opplasting og kaller ikke Images, av kostnadshensyn.
+  Serveren håndhever fortsatt tilgang, størrelse, filsignatur og kvoter.
+  JPEG XL-støtte i Images er ikke forutsatt. `bun run dev` emulerer bindingen
+  lokalt med Wrangler og `scripts/wrangler.images-dev.jsonc` for importflyten;
+  produksjonsbygget beholder Workers-bindingen fra `wrangler.jsonc`.
 - Logger: `wrangler tail --name <worker>`. Feil kastet i serverfunksjoner
   logges via `src/start.ts`.
 - Custom domains kobles i Cloudflare-dashbordet (**ikke i repoet**).
@@ -86,6 +90,25 @@ Tilgang styres av serverfunksjonene, ikke av bucket-policyer. Sletting går
 via en kø i databasen (`r2_delete_queue`) som tømmes av jobben
 `r2-cleanup-hourly` (se § 5). Produksjonsbucketenes navn står i GitHub
 Environment `production` som `vars` (**ikke i repoet**).
+
+Standard opplastinger fra innloggede brukere (annonsebilder og miniatyrbilder,
+avatarer, organisasjonslogoer/kontaktbilder og meldingsvedlegg) bruker en
+atomisk databasekvote per bruker: maksimalt 500 objekter og 512 MiB til sammen
+i et 24-timers vindu, med en ekstra grense på 60 forespørsler per minutt.
+Kvoten reserveres etter tilgangskontroll og filsignaturkontroll, før objektet
+sendes til R2; den belaster de faktiske opplastingsbytene. En mislykket
+R2-skriving refunderes ikke. Filen må være maksimalt 5 MiB. Serveren bevarer
+innsendt format og gjør ingen betalt transformasjon i disse flytene.
+Kjøretøyenes 360-opplasting har en egen tokenbasert kvote og grense på 2 MiB.
+Filsignaturkontroll beviser ikke at hele bildet er gyldig; dekoding og fjerning
+av metadata håndheves ikke på serveren for direkte opplastinger.
+
+Den eksisterende `r2-cleanup-hourly`-jobben sletter også standardopplastinger
+fra `standard_upload_objects` når de er eldre enn 24 timer og ikke lenger er
+referert i metadata. En ny registrering av et eksisterende `ready`-objekt
+starter 24-timersfristen på nytt. Den sletter bare registrerte nøkler; eldre
+R2-objekter uten registerrad skannes ikke. Slettefeil blir stående for retry
+og manuell oppfølging etter 10 forsøk.
 
 ### Turnstile
 
@@ -110,6 +133,12 @@ har en egen Access-app med Bypass, slik at pg_net og webhooks når Workeren
   Supabase sin GitHub-integrasjon ved push — **ikke** av en jobb i
   `.github/workflows/`. Kjør aldri `supabase db push` manuelt mot et lenket
   prosjekt.
+- Klientrollene `anon` og `authenticated` beholder nødvendige DML-rettigheter
+  for RLS, men skal ikke ha tabellprivilegiene `TRUNCATE`, `REFERENCES`,
+  `TRIGGER` eller (fra PostgreSQL 17) `MAINTAIN`. Migrasjonen setter defaults
+  for objekter opprettet av migrasjonsrollen `postgres`; objekter opprettet av
+  andre roller via dashboard eller utenfor migrasjonene følger fortsatt deres
+  egne default privileges og må kontrolleres separat.
 - Auth-innstillinger (passordkrav, HIBP, captcha, redirect-URL-er, SMTP via
   Resend) ligger i dashbordet, se STAGING.md og EPOST.md.
 - Sesjonen ligger i informasjonskapsler (`@supabase/ssr`). Nettleserklienten
@@ -121,6 +150,16 @@ har en egen Access-app med Bypass, slik at pg_net og webhooks når Workeren
   `category_suggestion_ai_enabled`.
 - `app_settings` holder URL-er og delte hemmeligheter for databasejobbene
   (§ 5).
+
+Proff-integrasjoner har også atomiske dagskvoter per organisasjon: 1 000 nye
+annonser og 2 000 nye bildejobber per UTC-døgn. Telleren økes bare ved faktisk
+innsetting; oppdateringer, duplikater og omorganisering av eksisterende bilder
+bruker ikke kvote, og sletting refunderer den ikke. Én ledger-rad per
+organisasjon nullstilles ved første innsetting etter UTC-midnatt. Ved innføring
+seedes dagens telling fra annonser, bildejobber og vellykkede importlogger som
+fortsatt finnes; eldre slettinger og importlogger som senere ble skrevet om
+kan ikke gjenopprettes. Migrasjonen må være anvendt før appkode som leser
+`organization_daily_quotas` tas i bruk.
 
 ## 5. Planlagte jobber og webhooks
 
@@ -208,6 +247,15 @@ raden ble satt; produksjonsendepunktet ble ikke testet. GitHub
 Environment-secret `IMAGE_JOBS_SECRET` er satt fra samme krypterte verdi i
 både `staging` og `production`, og begge navnene er bekreftet i GitHub.
 
+Bildejobbens kildehenting krever `EXTERNAL_IMAGE_ALLOWED_HOSTS` på Workeren
+før funksjonen rulles ut i et miljø. Verdien er en kommaseparert liste med
+eksakte ASCII/Punycode-vertsnavn for kilder Kaupet-operatøren har gjennomgått
+og stoler på; wildcards, IP-adresser og ikke-standard porter støttes ikke.
+Kall og omdirigeringer begrenses til HTTPS og disse vertene. Operatøren må
+selv stole på DNS-oppsettet og kildevertene; applikasjonen gjør ingen
+DNS-pinning eller DNS-forhåndskontroll. Manglende eller ugyldig policy gir
+retry uten utgående kall. Sett samme policy lokalt i `.env` for bildejobber.
+
 **Delte hemmeligheter** — samme verdi må ligge både som Worker-secret og som
 `app_settings`-rad:
 
@@ -238,6 +286,11 @@ Alle kalles kun fra serveren, med nøkler som Worker-secrets.
 | Nominatim (OpenStreetMap)        | Geokoding og omvendt geokoding                                                             | Ingen nøkkel                                                                                           | `src/lib/geocode.ts`                       |
 | Kartverket                       | Kartfliser (`cache.kartverket.no`)                                                         | Ingen nøkkel                                                                                           | CSP i `src/lib/security-headers.ts`        |
 | Cloudflare Turnstile             | Bot-beskyttelse                                                                            | `VITE_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                      | `src/lib/turnstile.server.ts`              |
+
+Web Push-endepunkter godtas bare fra Google FCM, Mozilla Autopush, Apple Push
+og Windows Push (`fcm.googleapis.com`, `updates.push.services.mozilla.com`,
+`*.push.apple.com`, `*.notify.windows.com`). Hver bruker kan ha maksimalt 20
+push-enheter; fjern en gammel enhet i varselinnstillingene før en ny legges til.
 
 Personopplysninger som sendes til tredjeparter står i
 [PERSONVERN-BEHANDLINGSPROTOKOLL.md](PERSONVERN-BEHANDLINGSPROTOKOLL.md).

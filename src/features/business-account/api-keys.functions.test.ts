@@ -75,7 +75,9 @@ function makeQueryChain(result: { data: unknown; error: unknown }) {
 function mockFrom(options: {
   membership?: Record<string, unknown> | null;
   keys?: Record<string, unknown>[];
-  counts?: Partial<Record<"organization_listing_imports" | "listing_image_jobs", number>>;
+  quota?: Record<string, unknown> | null;
+  quotaError?: unknown;
+  counts?: Partial<Record<"listing_image_jobs", number>>;
 }) {
   const membership =
     options.membership === undefined
@@ -89,12 +91,14 @@ function mockFrom(options: {
     if (table === "organization_api_keys") {
       return makeQueryChain({ data: options.keys ?? [], error: null });
     }
-    if (table === "organization_listing_imports" || table === "listing_image_jobs") {
+    if (table === "organization_daily_quotas") {
+      return makeQueryChain({ data: options.quota ?? null, error: options.quotaError ?? null });
+    }
+    if (table === "listing_image_jobs") {
       return makeQueryChain({
         data: null,
         error: null,
-        count:
-          options.counts?.[table as "organization_listing_imports" | "listing_image_jobs"] ?? 0,
+        count: options.counts?.listing_image_jobs ?? 0,
       } as never);
     }
     return makeQueryChain({ data: null, error: null });
@@ -279,12 +283,34 @@ describe("getIntegrationUsage", () => {
   });
 
   it("returns limits from the shared configuration module", async () => {
-    mockFrom({ keys: [{ id: keyId }] });
+    mockFrom({
+      keys: [{ id: keyId }],
+      quota: {
+        usage_date: new Date().toISOString().slice(0, 10),
+        new_listings: 12,
+        new_images: 34,
+      },
+    });
     const usage = await getIntegrationUsage();
     expect(usage.limits.apiKey.readPerHour).toBeGreaterThan(0);
     expect(usage.keys).toHaveLength(1);
     expect(peekApiRateLimit).toHaveBeenCalledWith(keyId, "read");
     expect(peekApiRateLimit).toHaveBeenCalledWith(keyId, "write");
     expect(peekApiRateLimit).toHaveBeenCalledWith(keyId, "batch");
+    expect(usage.organization).toMatchObject({ newListingsToday: 12, newImagesToday: 34 });
+    expect(supabaseAdmin.from).toHaveBeenCalledWith("organization_daily_quotas");
+  });
+
+  it("does not report zero usage when the authoritative quota read fails", async () => {
+    mockFrom({ quotaError: new Error("database unavailable") });
+    await expect(getIntegrationUsage()).rejects.toThrow("Noe gikk galt. Prøv igjen senere.");
+  });
+
+  it("reports zero daily usage after the UTC day changes", async () => {
+    mockFrom({
+      quota: { usage_date: "2000-01-01", new_listings: 12, new_images: 34 },
+    });
+    const usage = await getIntegrationUsage();
+    expect(usage.organization).toMatchObject({ newListingsToday: 0, newImagesToday: 0 });
   });
 });

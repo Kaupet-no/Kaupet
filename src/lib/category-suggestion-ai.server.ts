@@ -6,7 +6,9 @@ import {
 } from "@/lib/category-filters";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { containsImageMetadata } from "@/lib/image-metadata";
+import { cancelResponseBody } from "@/lib/http-bounded.server";
 import { z } from "zod";
+import { describeSafeError } from "@/lib/safe-error";
 
 const inputSchema = z.object({ title: z.string().min(3).max(200) });
 
@@ -137,7 +139,7 @@ ${examplesBlock}Annonsetittel: "${truncatedTitle}"`;
       signal: AbortSignal.timeout(2_000),
     });
   } catch (error) {
-    console.error("[category-suggestion-ai] Mistral request failed", error);
+    console.error("[category-suggestion-ai] Mistral request failed", describeSafeError(error));
     return null;
   }
 
@@ -216,7 +218,11 @@ const PHOTO_UNAVAILABLE = {
 };
 /** Every silent fallback logs why, so `wrangler tail` shows which gate fired. */
 function photoUnavailable(reason: string, detail?: unknown) {
-  console.warn("[photo-ai] unavailable:", reason, ...(detail === undefined ? [] : [detail]));
+  console.warn(
+    "[photo-ai] unavailable:",
+    reason,
+    ...(detail === undefined ? [] : [describeSafeError(detail)]),
+  );
   return PHOTO_UNAVAILABLE;
 }
 type PhotoSuggestionInput = {
@@ -505,10 +511,8 @@ Tillatte felt: ${filters
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
-      return photoUnavailable(
-        `Mistral HTTP ${response.status}`,
-        (await response.text().catch(() => "")).slice(0, 300),
-      );
+      cancelResponseBody(response);
+      return photoUnavailable("mistral_http_error", { status: response.status });
     }
     const result = (await response.json()) as {
       choices?: Array<{ message?: { content?: string | null } }>;
@@ -531,7 +535,7 @@ Tillatte felt: ${filters
             categories: suggestions,
             ...(output.title ? { title: output.title } : {}),
           }
-        : photoUnavailable("no known category in Mistral response", output.categories);
+        : photoUnavailable("no known category in Mistral response");
     }
     const output = z
       .object({
@@ -553,9 +557,6 @@ Tillatte felt: ${filters
       ? { status: "pending" as const, source: "photo-ai" as const, attributes }
       : photoUnavailable("no allowed attributes in Mistral response");
   } catch (error) {
-    return photoUnavailable(
-      "Mistral request threw",
-      error instanceof Error ? error.name + ": " + error.message : error,
-    );
+    return photoUnavailable("Mistral request threw", error);
   }
 }

@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { formatNok } from "@/lib/format";
+import { isValidWebPushSubscription } from "@/lib/web-push-validation";
+import { describeSafeError } from "@/lib/safe-error";
 
 // The endpoint is invoked by an internal Postgres trigger via pg_net, which
 // sends a shared secret in the X-Push-Dispatch-Secret header (see the
@@ -63,14 +65,20 @@ async function dispatchPush(params: {
   const { data: subs } = await supabaseAdmin
     .from("push_subscriptions")
     .select("id, platform, endpoint, p256dh, auth, fcm_token")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .order("last_used_at", { ascending: false })
+    .limit(20);
 
   if (!subs || subs.length === 0) return;
 
-  const webSubs = subs.filter(
+  const webRows = subs.filter(
     (s): s is typeof s & { endpoint: string; p256dh: string; auth: string } =>
       s.platform === "web" && !!s.endpoint && !!s.p256dh && !!s.auth,
   );
+  const webChecks = await Promise.all(
+    webRows.map(async (s) => ({ subscription: s, valid: await isValidWebPushSubscription(s) })),
+  );
+  const webSubs = webChecks.filter(({ valid }) => valid).map(({ subscription }) => subscription);
   const fcmSubs = subs.filter(
     (s): s is typeof s & { fcm_token: string } =>
       (s.platform === "android" || s.platform === "ios") && !!s.fcm_token,
@@ -111,35 +119,47 @@ async function dispatchPush(params: {
   webpush.setVapidDetails(subject, publicKey, privateKey);
 
   const notificationPayload = JSON.stringify({ title, body, url, tag });
+  const { cancelResponseBody, withHttpDeadline } = await import("@/lib/http-bounded.server");
 
   await Promise.allSettled(
     webSubs.map(async (s) => {
       try {
-        await webpush.sendNotification(
-          {
-            endpoint: s.endpoint,
-            keys: { p256dh: s.p256dh, auth: s.auth },
-          },
-          notificationPayload,
-        );
+        const result = await withHttpDeadline(15_000, async (signal) => {
+          const details = webpush.generateRequestDetails(
+            {
+              endpoint: s.endpoint,
+              keys: { p256dh: s.p256dh, auth: s.auth },
+            },
+            notificationPayload,
+          );
+          const response = await fetch(details.endpoint, {
+            method: details.method,
+            headers: details.headers,
+            body: details.body ? Uint8Array.from(details.body) : null,
+            redirect: "manual",
+            signal,
+          });
+          const statusCode = response.status;
+          cancelResponseBody(response);
+          return { statusCode, ok: response.ok };
+        });
+        if (!result.ok) {
+          if (result.statusCode === 404 || result.statusCode === 410) {
+            await supabaseAdmin.from("push_subscriptions").delete().eq("id", s.id);
+          } else {
+            console.error("Web push error", {
+              subscriptionId: s.id,
+              statusCode: result.statusCode,
+            });
+          }
+          return;
+        }
         await supabaseAdmin
           .from("push_subscriptions")
           .update({ last_used_at: new Date().toISOString() })
           .eq("id", s.id);
-      } catch (err: unknown) {
-        const statusCode =
-          typeof err === "object" && err && "statusCode" in err
-            ? (err as { statusCode: number }).statusCode
-            : undefined;
-        if (statusCode === 404 || statusCode === 410) {
-          await supabaseAdmin.from("push_subscriptions").delete().eq("id", s.id);
-        } else {
-          const body =
-            typeof err === "object" && err && "body" in err
-              ? (err as { body: unknown }).body
-              : undefined;
-          console.error("Web push error", { subscriptionId: s.id, statusCode, body, err });
-        }
+      } catch {
+        console.error("Web push error", { subscriptionId: s.id });
       }
     }),
   );
@@ -163,7 +183,7 @@ async function dispatchEmail(params: {
   try {
     await sendNotificationEmail({ to, type, subject: title, body, url });
   } catch (err) {
-    console.error("Email dispatch error", err);
+    console.error("Email dispatch error", describeSafeError(err));
   }
 }
 

@@ -14,6 +14,7 @@ import { normalizeSlugForMatch } from "@/lib/slug";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
+import { describeSafeError } from "@/lib/safe-error";
 
 export const Route = createFileRoute("/$kaupetCode_/$sub")({
   // Every two-segment address matches this route, valid category or not.
@@ -134,7 +135,7 @@ function SubcategoryPage() {
 
 function SubcategoryErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
-  console.error(error);
+  console.error("[subcategory route] error", describeSafeError(error));
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Kunne ikke laste kategorien</h1>

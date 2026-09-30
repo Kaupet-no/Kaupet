@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRating } from "@/components/star-rating";
+import { describeSafeError } from "@/lib/safe-error";
 
 import { ListingCard } from "@/components/listing-card";
 import type { ListingCardData } from "@/lib/listing-card-data";
@@ -46,7 +47,7 @@ export const Route = createFileRoute("/bruker/$id")({
   pendingMs: 200,
   pendingMinMs: 300,
   errorComponent: ({ error }) => {
-    console.error(error);
+    console.error("[profile route] error", describeSafeError(error));
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         <h1 className="font-display text-2xl">Kunne ikke laste brukerprofilen</h1>

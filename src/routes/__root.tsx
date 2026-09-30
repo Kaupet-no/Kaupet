@@ -12,6 +12,7 @@ import {
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { describeSafeError } from "@/lib/safe-error";
 import interVariableFontUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import { SiteHeader } from "@/components/site-header";
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
@@ -84,7 +85,7 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
-  console.error(error);
+  console.error("[root route] error", describeSafeError(error));
   const router = useRouter();
 
   return (

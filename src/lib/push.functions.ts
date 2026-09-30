@@ -3,11 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isSupportedWebPushEndpoint, isValidWebPushKeys } from "@/lib/web-push-validation";
 
 const SaveSchema = z.discriminatedUnion("platform", [
   z.object({
     platform: z.literal("web"),
-    endpoint: z.string().url().min(1).max(2048),
+    endpoint: z.string().url().min(1).max(2048).refine(isSupportedWebPushEndpoint),
     p256dh: z.string().min(1).max(255),
     auth: z.string().min(1).max(255),
     user_agent: z.string().max(255).optional().nullable(),
@@ -30,11 +31,14 @@ export const savePushSubscription = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (data.platform === "web") {
+      if (!(await isValidWebPushKeys(data.p256dh, data.auth))) {
+        throw new Error("Ugyldig push-abonnement");
+      }
       const { error } = await supabase.from("push_subscriptions").upsert(
         {
           user_id: userId,
           platform: "web",
-          endpoint: data.endpoint,
+          endpoint: new URL(data.endpoint).href,
           p256dh: data.p256dh,
           auth: data.auth,
           user_agent: data.user_agent ?? null,

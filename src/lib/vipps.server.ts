@@ -6,6 +6,7 @@
  */
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { isTestHost } from "./env";
+import { describeSafeError } from "@/lib/safe-error";
 
 /** Vipps retries are accepted by event id; only unseen events need freshness. */
 export const VIPPS_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
@@ -328,7 +329,7 @@ export async function getVippsWebhookSecret(host?: string | null): Promise<strin
       .maybeSingle();
     if (data?.secret) return data.secret;
   } catch (e) {
-    console.error("[vipps] could not read webhook secret from DB", e);
+    console.error("[vipps] could not read webhook secret from DB", describeSafeError(e));
   }
   return env.webhookSecret;
 }

@@ -1,11 +1,12 @@
-// Captures the original Error out-of-band so server.ts can recover the stack
-// when h3 has already swallowed the throw into a generic 500 Response.
+import { describeSafeError } from "@/lib/safe-error";
+
+// Captures only a sanitized descriptor when h3 swallows a throw into a 500.
 
 let lastCapturedError: { error: unknown; at: number } | undefined;
 const TTL_MS = 5_000;
 
 function record(error: unknown) {
-  lastCapturedError = { error, at: Date.now() };
+  lastCapturedError = { error: describeSafeError(error), at: Date.now() };
 }
 
 if (typeof globalThis.addEventListener === "function") {

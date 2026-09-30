@@ -18,6 +18,7 @@ import {
   type CategoryNode,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
 import {
   effectiveFlowForCategory,
   type CategoryFlowRow,
@@ -29,7 +30,10 @@ import {
 } from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const MAX_LISTINGS_PER_HOUR = 5;
+const LISTING_CREATE_LIMIT_MESSAGE =
+  "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.";
+const LISTING_PUBLISH_LIMIT_MESSAGE =
+  "Du har publisert for mange annonser den siste timen. Prøv igjen senere.";
 
 type ListingOwnership = {
   seller_id: string;
@@ -131,6 +135,19 @@ async function resolveListingOwnership(
     }
     if (!assignment) throw new ClientError("Du har ikke tilgang til denne lokasjonen.", 403);
   }
+  const { data: allowed, error: permissionError } = await supabaseAdmin.rpc(
+    "can_create_organization_listing",
+    {
+      _organization_id: membership.organization_id,
+      _location_id: requestedLocationId,
+      _category_id: categoryId,
+      _user_id: userId,
+    },
+  );
+  if (permissionError) {
+    throw await toClientError("database", permissionError);
+  }
+  if (!allowed) throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
   return {
     seller_id: userId,
     organization_id: membership.organization_id,
@@ -194,20 +211,8 @@ async function authorizeListingMutation(
   return listing;
 }
 
-async function assertUnderHourlyListingLimit(
-  supabaseAdmin: SupabaseClient,
-  userId: string,
-  errorMessage: string,
-) {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count } = await supabaseAdmin
-    .from("listings")
-    .select("id", { count: "exact", head: true })
-    .eq("seller_id", userId)
-    .gte("created_at", oneHourAgo);
-  if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
-    throw new ClientError(errorMessage, 429);
-  }
+async function assertListingCreationAllowed(userId: string, message: string) {
+  await assertUserNotRateLimited(userId, "listing_creation", 5, 3600, message);
 }
 
 function validatePartFitment(
@@ -449,11 +454,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ownership.organization_id,
       ownership.organization_location_id,
     );
-    await assertUnderHourlyListingLimit(
-      supabaseAdmin,
-      userId,
-      "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.",
-    );
+    await assertListingCreationAllowed(userId, LISTING_CREATE_LIMIT_MESSAGE);
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
@@ -648,11 +649,7 @@ export const createListing = createServerFn({ method: "POST" })
       ownership.organization_id,
       ownership.organization_location_id,
     );
-    await assertUnderHourlyListingLimit(
-      supabaseAdmin,
-      userId,
-      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
-    );
+    await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
@@ -696,11 +693,9 @@ export const republishListing = createServerFn({ method: "POST" })
       throw new Error("Annonsen kan ikke publiseres på nytt fra denne statusen.");
     }
     await validateExistingListingForPublish(supabaseAdmin, listing);
-    await assertUnderHourlyListingLimit(
-      supabaseAdmin,
-      userId,
-      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
-    );
+    if (listing.status !== "draft") {
+      await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
+    }
 
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();

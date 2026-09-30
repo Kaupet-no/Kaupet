@@ -4,8 +4,11 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
 
 const MAX_LOOKUPS_PER_HOUR = 20;
+const LOOKUP_LIMIT_MESSAGE =
+  "For mange kjøretøyoppslag den siste timen. Fyll inn kjøretøyopplysningene manuelt i mellomtiden.";
 
 export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -37,28 +40,18 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { lookupVehicle, formatRetryClockNorway } =
-      await import("@/lib/vehicle/vehicle-lookup.server");
+    const { lookupVehicle } = await import("@/lib/vehicle/vehicle-lookup.server");
     const { matchVehicleBrandAndModel } =
       await import("@/lib/vehicle/vehicle-brand-match.functions");
     const { userId } = context;
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: recentLookups, count } = await supabaseAdmin
-      .from("vehicle_lookup_log")
-      .select("created_at", { count: "exact" })
-      .eq("user_id", userId)
-      .gte("created_at", oneHourAgo)
-      .order("created_at", { ascending: true });
-    if ((count ?? 0) >= MAX_LOOKUPS_PER_HOUR) {
-      const oldest = recentLookups?.[0]?.created_at;
-      const retryAt = oldest
-        ? new Date(new Date(oldest).getTime() + 60 * 60 * 1000)
-        : new Date(Date.now() + 60 * 60 * 1000);
-      throw new Error(
-        `For mange kjøretøyoppslag den siste timen. Prøv igjen ${formatRetryClockNorway(retryAt)}, eller fyll inn kjøretøyopplysningene manuelt i mellomtiden.`,
-      );
-    }
+    await assertUserNotRateLimited(
+      userId,
+      "vehicle_lookup",
+      MAX_LOOKUPS_PER_HOUR,
+      3600,
+      LOOKUP_LIMIT_MESSAGE,
+    );
 
     const result = await lookupVehicle(data.registrationNumber);
     const classification = classifyVehicleCategory(

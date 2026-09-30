@@ -326,35 +326,46 @@ jobs:
       # production Worker must never retain staging's service-role credential.
       - name: Set staging-sync read secrets on the production Worker
         run: |
-          echo "${{ vars.STAGING_SUPABASE_URL }}" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
-          echo "${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
+          printf '%s' "$STAGING_SUPABASE_URL" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
+          printf '%s' "$STAGING_SUPABASE_PUBLISHABLE_KEY" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
         env:
+          STAGING_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set R2 secrets on the production Worker
         run: |
-          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
-          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
-          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
-          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
-          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
-          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
-          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
+          printf '%s' "$R2_ACCOUNT_ID" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
+          printf '%s' "$R2_ACCESS_KEY_ID" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
+          printf '%s' "$R2_SECRET_ACCESS_KEY" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
+          printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
+          printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
+          printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
+          printf '%s' "$R2_CLEANUP_SECRET" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
           # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
           # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
-          if [ -n "${{ secrets.IMAGE_JOBS_SECRET }}" ]; then
-            echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no
+          if [ -n "$IMAGE_JOBS_SECRET" ]; then
+            printf '%s' "$IMAGE_JOBS_SECRET" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no
           else
             echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
           fi
           # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
-          if [ -n "${{ secrets.API_KEY_EXPIRY_SECRET }}" ]; then
-            echo "${{ secrets.API_KEY_EXPIRY_SECRET }}" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no
+          if [ -n "$API_KEY_EXPIRY_SECRET" ]; then
+            printf '%s' "$API_KEY_EXPIRY_SECRET" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no
           else
             echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
           fi
         env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
+          R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
+          IMAGE_JOBS_SECRET: ${{ secrets.IMAGE_JOBS_SECRET }}
+          API_KEY_EXPIRY_SECRET: ${{ secrets.API_KEY_EXPIRY_SECRET }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -616,26 +627,35 @@ jobs:
 
       - name: Set R2 secrets on the staging Worker
         run: |
-          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
-          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no-staging
-          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no-staging
-          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
-          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
-          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
-          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
+          printf '%s' "$R2_ACCOUNT_ID" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
+          printf '%s' "$R2_ACCESS_KEY_ID" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no-staging
+          printf '%s' "$R2_SECRET_ACCESS_KEY" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no-staging
+          printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
+          printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
+          printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
+          printf '%s' "$R2_CLEANUP_SECRET" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
           # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
           # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
-          if [ -n "${{ secrets.IMAGE_JOBS_SECRET }}" ]; then
-            echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no-staging
+          if [ -n "$IMAGE_JOBS_SECRET" ]; then
+            printf '%s' "$IMAGE_JOBS_SECRET" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no-staging
           else
             echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
           fi
           # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
-          if [ -n "${{ secrets.API_KEY_EXPIRY_SECRET }}" ]; then
-            echo "${{ secrets.API_KEY_EXPIRY_SECRET }}" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no-staging
+          if [ -n "$API_KEY_EXPIRY_SECRET" ]; then
+            printf '%s' "$API_KEY_EXPIRY_SECRET" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no-staging
           else
             echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
           fi
         env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
+          R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
+          IMAGE_JOBS_SECRET: ${{ secrets.IMAGE_JOBS_SECRET }}
+          API_KEY_EXPIRY_SECRET: ${{ secrets.API_KEY_EXPIRY_SECRET }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

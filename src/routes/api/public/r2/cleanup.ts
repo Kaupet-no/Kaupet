@@ -29,14 +29,10 @@ const BATCH_SIZE = 100;
 // oppdater begge steder samtidig.
 const MAX_ATTEMPTS = 10;
 
-// deletePrefix gjør ett listObjectKeys-kall pluss ett deleteObject-kall per
-// nøkkel. Et annonseprefiks kan romme ~76 objekter (20 bilder + thumbnails +
-// 36 360-frames), så en full BATCH_SIZE-batch kan i verste fall koste
-// tusenvis av fetch-kall i én request — Cloudflare Workers tillater maks
-// 1000 subrequests per request, og kjøringen ryker når taket nås. Vi sjekker
-// budsjettet FØR hvert prefiks, så det siste prefikset som får starte kan i
-// verste fall dra budsjettet opp til ~500 + 76 ≈ 576 objekter/subrequests —
-// fremdeles godt under taket.
+// Exact uploads use up to 100 DELETEs first. Legacy prefixes then share a
+// 500-object budget; listObjectKeys sends max-keys and leaves partial queue
+// rows for the next run. Even with 100 prefix listings, this stays below 700
+// R2 subrequests per Worker request.
 const MAX_OBJECTS_PER_RUN = 500;
 
 // Fem feil på rad er nesten aldri N enkeltrader med ugyldig prefiks — det er
@@ -56,7 +52,7 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
         // Dynamisk import av samme grunn som supabaseAdmin under: en statisk
         // import av en .server-modul i src/routes drar den inn i
         // klientgrafen (se scripts/check-server-boundary.mjs).
-        const { deletePrefix } = await import("@/lib/r2.server");
+        const { deleteObject, deletePrefix, PrefixDeleteError } = await import("@/lib/r2.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: rows, error } = await supabaseAdmin
@@ -68,36 +64,77 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
         if (error) return new Response("Kunne ikke lese slettekøen", { status: 500 });
 
         let deletedObjects = 0;
+        let objectOperations = 0;
         let failed = 0;
         let consecutiveFailures = 0;
         let stopped: "budget" | "failures" | null = null;
 
+        // Claim exact standard-upload keys first so a busy legacy prefix
+        // queue cannot starve them. The SQL claim locks and checks references.
+        const { data: tracked, error: claimError } = await supabaseAdmin.rpc(
+          "claim_orphan_standard_uploads",
+          { _limit: BATCH_SIZE },
+        );
+        if (claimError)
+          return new Response("Kunne ikke hente foreldreløse opplastinger", { status: 500 });
+        for (const row of tracked ?? []) {
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            stopped = "failures";
+            break;
+          }
+          objectOperations += 1;
+          try {
+            await deleteObject(row.bucket as "BILDER" | "VEDLEGG", row.object_key);
+            deletedObjects += 1;
+            const { error } = await supabaseAdmin.rpc("finish_orphan_standard_upload", {
+              _id: row.id,
+              _deleted: true,
+            });
+            if (error) throw error;
+            consecutiveFailures = 0;
+          } catch (cause) {
+            failed += 1;
+            consecutiveFailures += 1;
+            await supabaseAdmin.rpc("finish_orphan_standard_upload", {
+              _id: row.id,
+              _deleted: false,
+              _error: cause instanceof Error ? cause.message : String(cause),
+            });
+          }
+        }
+
         for (const row of rows ?? []) {
-          // Budsjettet er brukt opp — resten av batchen står urørt til neste
-          // kjøring, med attempts uendret. De ble aldri forsøkt.
-          if (deletedObjects >= MAX_OBJECTS_PER_RUN) {
+          if (objectOperations >= MAX_OBJECTS_PER_RUN) {
             stopped = "budget";
+            break;
+          }
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            stopped = "failures";
             break;
           }
 
           try {
-            deletedObjects += await deletePrefix(
+            const budget = MAX_OBJECTS_PER_RUN - objectOperations;
+            const deleted = await deletePrefix(
               row.bucket as Parameters<typeof deletePrefix>[0],
               row.prefix,
+              budget,
             );
-            await supabaseAdmin.from("r2_delete_queue").delete().eq("id", row.id);
+            objectOperations += deleted;
+            deletedObjects += deleted;
             consecutiveFailures = 0;
+            if (deleted === budget) {
+              stopped = "budget";
+              break;
+            }
+            await supabaseAdmin.from("r2_delete_queue").delete().eq("id", row.id);
           } catch (cause) {
-            // Raden blir stående og forsøkes på nytt ved neste kjøring — et
-            // objekt som ikke blir slettet er et personvernavvik, ikke noe
-            // vi kan svelge. Når MAX_ATTEMPTS er nådd faller den ut av
-            // spørringen over, men den slettes IKKE: den blir liggende med
-            // last_error intakt som et synlig personvernavvik til manuell
-            // oppfølging, siden køen er revisjonssporet for GDPR-dokumentasjonen.
+            if (cause instanceof PrefixDeleteError) {
+              objectOperations += cause.attemptedObjects;
+              deletedObjects += cause.deletedObjects;
+            }
             failed += 1;
             consecutiveFailures += 1;
-            // Kun cron-jobben skriver her, én kjøring om gangen, så
-            // attempts+1 trenger ingen atomisk inkrementering.
             await supabaseAdmin
               .from("r2_delete_queue")
               .update({
@@ -105,10 +142,6 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
                 last_error: cause instanceof Error ? cause.message : String(cause),
               })
               .eq("id", row.id);
-
-            // Kretsbryter: så mange feil på rad skyldes nesten sikkert
-            // kjøringen selv, ikke radene. Stopp før vi brenner opp
-            // attempts-budsjettet til resten av friske rader.
             if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
               stopped = "failures";
               break;
@@ -116,7 +149,12 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
           }
         }
 
-        return Response.json({ prefixes: rows?.length ?? 0, deletedObjects, failed, stopped });
+        return Response.json({
+          prefixes: (rows?.length ?? 0) + (tracked?.length ?? 0),
+          deletedObjects,
+          failed,
+          stopped,
+        });
       },
     },
   },

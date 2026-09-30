@@ -1,6 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { mapApiBodyToRow } from "./listing-api.server";
+const { supabaseAdmin, actorFromApiKey } = vi.hoisted(() => ({
+  supabaseAdmin: { from: vi.fn(), rpc: vi.fn() },
+  actorFromApiKey: vi.fn(),
+}));
+
+vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin }));
+vi.mock("@/features/listing-bulk-import/listing-sync.server", () => ({ actorFromApiKey }));
+
+import { ListingApiError, mapApiBodyToRow, replaceListingImagesApi } from "./listing-api.server";
+
+beforeEach(() => {
+  supabaseAdmin.from.mockReset();
+  supabaseAdmin.rpc.mockReset();
+  actorFromApiKey.mockReset().mockResolvedValue({ organizationId: "org-1" });
+});
 
 describe("mapApiBodyToRow", () => {
   it("mapper de engelske JSON-feltnavnene til BulkImportRow", () => {
@@ -60,5 +74,37 @@ describe("mapApiBodyToRow", () => {
     expect(row.externalId).toBe("SKU-3");
     expect(row.category).toBe("");
     expect(Number.isNaN(row.priceNok)).toBe(true);
+  });
+});
+
+describe("replaceListingImagesApi quota errors", () => {
+  it("maps only the stable database quota error to the public validation response", async () => {
+    const query: Record<string, ReturnType<typeof vi.fn>> = {};
+    for (const method of ["select", "eq"]) query[method] = vi.fn(() => query);
+    query.maybeSingle = vi.fn().mockResolvedValue({ data: { id: "listing-1" }, error: null });
+    supabaseAdmin.from.mockReturnValue(query);
+    supabaseAdmin.rpc.mockResolvedValue({
+      data: null,
+      error: { message: "organization_new_images_daily_quota_exceeded" },
+    });
+
+    await expect(
+      replaceListingImagesApi({
+        auth: {
+          keyId: "key-1",
+          organizationId: "org-1",
+          actingUserId: "user-1",
+          defaultLocationId: "location-1",
+          scopes: ["listings:write"],
+        },
+        externalRef: "sku-1",
+        body: { urls: ["https://example.com/a.jpg"] },
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "validation_error",
+      field: "images",
+      isApiBusinessError: true,
+    } satisfies Partial<ListingApiError>);
   });
 });

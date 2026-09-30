@@ -9,8 +9,19 @@
 // the Web Crypto API (`crypto.subtle`) instead, which Workers does support,
 // and talks to the FCM v1 REST API directly.
 
+import {
+  cancelResponseBody,
+  HttpDeadlineError,
+  readResponseBytes,
+  withHttpDeadline,
+} from "@/lib/http-bounded.server";
+import { describeSafeError } from "@/lib/safe-error";
+
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+const HTTP_TIMEOUT_MS = 15_000;
+const MAX_OAUTH_RESPONSE_BYTES = 64 * 1024;
+const MAX_FCM_RESPONSE_BYTES = 16 * 1024;
 
 type ServiceAccount = {
   project_id: string;
@@ -72,20 +83,38 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
   );
   const jwt = `${signingInput}.${base64url(signature)}`;
 
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
-    }),
+  return withHttpDeadline(HTTP_TIMEOUT_MS, async (signal) => {
+    const res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+      redirect: "manual",
+      signal,
+    });
+    if (!res.ok) {
+      const status = res.status;
+      cancelResponseBody(res);
+      throw new Error(`FCM OAuth2 token exchange failed: HTTP ${status}`);
+    }
+    const bytes = await readResponseBytes(res, MAX_OAUTH_RESPONSE_BYTES, signal);
+    let json: { access_token: string; expires_in: number };
+    try {
+      json = JSON.parse(new TextDecoder().decode(bytes)) as typeof json;
+    } catch {
+      throw new Error("FCM OAuth2 token response was invalid");
+    }
+    if (typeof json.access_token !== "string" || typeof json.expires_in !== "number") {
+      throw new Error("FCM OAuth2 token response was invalid");
+    }
+    cachedToken = {
+      accessToken: json.access_token,
+      expiresAt: Date.now() + json.expires_in * 1000,
+    };
+    return json.access_token;
   });
-  if (!res.ok) {
-    throw new Error(`FCM OAuth2 token exchange failed: ${res.status} ${await res.text()}`);
-  }
-  const json = (await res.json()) as { access_token: string; expires_in: number };
-  cachedToken = { accessToken: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
-  return json.access_token;
 }
 
 function getServiceAccount(): ServiceAccount | null {
@@ -94,7 +123,7 @@ function getServiceAccount(): ServiceAccount | null {
   try {
     return JSON.parse(raw) as ServiceAccount;
   } catch (err) {
-    console.error("Invalid FCM_SERVICE_ACCOUNT_JSON", err);
+    console.error("Invalid FCM_SERVICE_ACCOUNT_JSON", describeSafeError(err));
     return null;
   }
 }
@@ -119,8 +148,8 @@ export async function sendFcmNotifications(params: {
   let accessToken: string;
   try {
     accessToken = await getAccessToken(sa);
-  } catch (err) {
-    console.error("FCM token exchange error", err);
+  } catch {
+    console.error("FCM token exchange error");
     return;
   }
 
@@ -128,27 +157,67 @@ export async function sendFcmNotifications(params: {
 
   await Promise.allSettled(
     tokens.map(async ({ id, fcm_token }) => {
-      const res = await fetch(sendUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          message: {
-            token: fcm_token,
-            notification: { title, body },
-            data: { url, ...(tag ? { tag } : {}) },
-          },
-        }),
-      });
-      if (res.ok) return;
+      try {
+        const result = await withHttpDeadline(HTTP_TIMEOUT_MS, async (signal) => {
+          const res = await fetch(sendUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              message: {
+                token: fcm_token,
+                notification: { title, body },
+                data: { url, ...(tag ? { tag } : {}) },
+              },
+            }),
+            redirect: "manual",
+            signal,
+          });
+          const httpStatus = res.status;
+          if (res.ok) {
+            cancelResponseBody(res);
+            return { httpStatus, status: undefined };
+          }
 
-      const errJson = (await res.json().catch(() => null)) as {
-        error?: { status?: string };
-      } | null;
-      const status = errJson?.error?.status;
-      if (status === "UNREGISTERED" || status === "NOT_FOUND" || status === "INVALID_ARGUMENT") {
-        await onInvalidToken(id);
-      } else {
-        console.error("FCM push error", { subscriptionId: id, httpStatus: res.status, status });
+          let status: string | undefined;
+          try {
+            const bytes = await readResponseBytes(res, MAX_FCM_RESPONSE_BYTES, signal);
+            const errJson = JSON.parse(new TextDecoder().decode(bytes)) as {
+              error?: { status?: string };
+            };
+            const providerStatus = errJson.error?.status;
+            status = [
+              "UNREGISTERED",
+              "NOT_FOUND",
+              "INVALID_ARGUMENT",
+              "UNAVAILABLE",
+              "INTERNAL",
+              "QUOTA_EXCEEDED",
+              "SENDER_ID_MISMATCH",
+              "THIRD_PARTY_AUTH_ERROR",
+            ].includes(providerStatus ?? "")
+              ? providerStatus
+              : undefined;
+          } catch (error) {
+            if (error instanceof HttpDeadlineError) throw error;
+            cancelResponseBody(res);
+          }
+          return { httpStatus, status };
+        });
+        if (
+          result.status === "UNREGISTERED" ||
+          result.status === "NOT_FOUND" ||
+          result.status === "INVALID_ARGUMENT"
+        ) {
+          await onInvalidToken(id);
+        } else if (result.httpStatus < 200 || result.httpStatus >= 300) {
+          console.error("FCM push error", {
+            subscriptionId: id,
+            httpStatus: result.httpStatus,
+            status: result.status,
+          });
+        }
+      } catch {
+        console.error("FCM push error", { subscriptionId: id });
       }
     }),
   );

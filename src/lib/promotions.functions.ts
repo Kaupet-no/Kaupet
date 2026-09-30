@@ -108,14 +108,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
     const returnUrl = `${origin}/bekrefter/${promo.id}`;
 
-    console.log("[promotions] createPromotionCheckout", {
-      promotion_id: promo.id,
-      duration_days: data.duration_days,
-      price_nok: pricing.price_nok,
-      vipps_mode: vippsMode,
-      host,
-      reference,
-    });
+    console.log("[promotions] createPromotionCheckout", { promotion_id: promo.id });
 
     try {
       const result = await createVippsPayment({
@@ -140,19 +133,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
           });
         }
       }
-      console.log("[promotions] createPromotionCheckout ok", {
-        promotion_id: promo.id,
-        vipps_mode: vippsMode,
-        psp_reference: result.pspReference ?? null,
-      });
+      console.log("[promotions] createPromotionCheckout ok", { promotion_id: promo.id });
       return { promotion_id: promo.id, redirect_url: result.redirectUrl };
     } catch (err) {
-      console.error("[promotions] createPromotionCheckout failed", {
-        promotion_id: promo.id,
-        vipps_mode: vippsMode,
-        host,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      console.error("[promotions] createPromotionCheckout failed", { promotion_id: promo.id });
       const { error: failErr } = await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "failed" })

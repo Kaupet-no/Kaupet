@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { describeSafeError } from "@/lib/safe-error";
 
 /**
  * Vipps webhook handler — receives payment state changes.
@@ -47,13 +48,11 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           : null;
         if (!host || rejectionReason) {
           console.warn("[vipps webhook] signature rejected", {
-            reason: host ? rejectionReason : "missing_host",
-            host,
-            pathAndQuery,
+            reason: rejectionReason ?? "missing_host",
             method: request.method,
             hasDateHeader: date !== "",
             hasContentHashHeader: contentHash !== "",
-            authorizationScheme: authorization.split(" ")[0] || null,
+            authorizationScheme: authorization.startsWith("HMAC-SHA256 ") ? "HMAC-SHA256" : "other",
           });
           return new Response("Invalid signature", { status: 401 });
         }
@@ -92,7 +91,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // event so a known Vipps retry remains idempotent even after the
         // freshness window.
         if (!existing && !isFreshVippsWebhookDate(date)) {
-          console.warn("[vipps webhook] stale webhook", { date, host });
+          console.warn("[vipps webhook] stale webhook");
           return new Response("Stale webhook", { status: 401 });
         }
         if (!existing) {
@@ -134,7 +133,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         try {
           payment = await getVippsPayment(reference, host, promoMode);
         } catch (err) {
-          console.error("[vipps webhook] state fetch failed", err);
+          console.error("[vipps webhook] state fetch failed", describeSafeError(err));
           return new Response("Retry later", { status: 503 });
         }
 
@@ -151,7 +150,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
                   promoMode,
                 );
               } catch (err) {
-                console.error("[vipps webhook] capture failed", err);
+                console.error("[vipps webhook] capture failed", describeSafeError(err));
                 // Keep the promotion pending and the event unprocessed. Vipps
                 // or the reconciliation job can safely retry the idempotent
                 // capture instead of granting an unpaid promotion.

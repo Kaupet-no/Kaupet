@@ -20,6 +20,7 @@ import { useIsAdmin, useIsModerator } from "@/hooks/use-user-roles";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
+import { describeSafeError } from "@/lib/safe-error";
 import { useAuth } from "@/hooks/use-auth";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
@@ -311,7 +312,7 @@ function RootSlugPage() {
 
 function ListingErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
-  console.error(error);
+  console.error("[listing route] error", describeSafeError(error));
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
@@ -396,7 +397,7 @@ function ListingDetailPage() {
         setTimeout(poll, 1500);
       } catch (e) {
         if (cancelled) return;
-        console.error("[promotion reconcile]", e);
+        console.error("[promotion reconcile]", describeSafeError(e));
         if (attempts >= maxAttempts) {
           showErrorToast("Kunne ikke bekrefte betalingen. Prøv igjen senere.");
           finish();
@@ -684,7 +685,7 @@ function ListingDetailPage() {
   useEffect(() => {
     if (!data?.id || user?.id === data.seller_id) return;
     void logView({ data: { listingId: data.id } }).catch((error: unknown) => {
-      console.warn("[listing_views] log failed", error);
+      console.warn("[listing_views] log failed", describeSafeError(error));
     });
   }, [data?.id, data?.seller_id, logView, user?.id]);
 

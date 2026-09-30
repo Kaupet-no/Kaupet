@@ -8,6 +8,17 @@ import { AwsClient } from "aws4fetch";
  * (meldingsvedlegg m.m.). */
 export type R2BucketName = "BILDER" | "VEDLEGG";
 
+export class PrefixDeleteError extends Error {
+  constructor(
+    cause: unknown,
+    readonly attemptedObjects: number,
+    readonly deletedObjects: number,
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "PrefixDeleteError";
+  }
+}
+
 function readEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -40,7 +51,18 @@ function bucketUrl(bucket: R2BucketName): string {
 }
 
 function objectUrl(bucket: R2BucketName, key: string): string {
-  return `${bucketUrl(bucket)}/${key}`;
+  const segments = key.split("/");
+  if (
+    !key ||
+    key.includes("\\") ||
+    key.includes("%") ||
+    /[?#]/.test(key) ||
+    [...key].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127) ||
+    segments.some((segment) => !segment || segment === "." || segment === "..")
+  ) {
+    throw new Error("Ugyldig R2-objektnøkkel");
+  }
+  return `${bucketUrl(bucket)}/${segments.map(encodeURIComponent).join("/")}`;
 }
 
 export async function putObject(
@@ -100,13 +122,23 @@ export async function deleteObject(bucket: R2BucketName, key: string): Promise<v
  * Derfor sjekker vi at kroppen faktisk er et S3-listesvar før vi stoler på
  * uttrekket. Et gyldig, tomt `ListBucketResult` (uten `<Contents>`) gir
  * fortsatt en tom liste, som den skal. */
-export async function listObjectKeys(bucket: R2BucketName, prefix: string): Promise<string[]> {
+export async function listObjectKeys(
+  bucket: R2BucketName,
+  prefix: string,
+  maxObjects?: number,
+): Promise<string[]> {
+  if (maxObjects !== undefined && (!Number.isSafeInteger(maxObjects) || maxObjects < 1)) {
+    throw new Error("maxObjects må være et positivt heltall");
+  }
   const keys: string[] = [];
   let continuationToken: string | undefined;
   do {
     const url = new URL(bucketUrl(bucket));
     url.searchParams.set("list-type", "2");
     url.searchParams.set("prefix", prefix);
+    if (maxObjects !== undefined) {
+      url.searchParams.set("max-keys", String(Math.min(1000, maxObjects - keys.length)));
+    }
     if (continuationToken) url.searchParams.set("continuation-token", continuationToken);
 
     const response = await getClient().fetch(url.toString(), { method: "GET" });
@@ -121,10 +153,15 @@ export async function listObjectKeys(bucket: R2BucketName, prefix: string): Prom
         `Uventet svar ved listing av R2-objekter (${bucket}/${prefix}): svaret var ikke et gyldig ListBucketResult`,
       );
     }
-    for (const match of xml.matchAll(/<Key>([^<]*)<\/Key>/g)) keys.push(match[1]);
-    continuationToken = /<IsTruncated>true<\/IsTruncated>/.test(xml)
-      ? /<NextContinuationToken>([^<]*)<\/NextContinuationToken>/.exec(xml)?.[1]
-      : undefined;
+    for (const match of xml.matchAll(/<Key>([^<]*)<\/Key>/g)) {
+      if (maxObjects !== undefined && keys.length >= maxObjects) break;
+      keys.push(match[1]);
+    }
+    continuationToken =
+      (maxObjects === undefined || keys.length < maxObjects) &&
+      /<IsTruncated>true<\/IsTruncated>/.test(xml)
+        ? /<NextContinuationToken>([^<]*)<\/NextContinuationToken>/.exec(xml)?.[1]
+        : undefined;
   } while (continuationToken);
   return keys;
 }
@@ -133,14 +170,24 @@ export async function listObjectKeys(bucket: R2BucketName, prefix: string): Prom
  *
  * Prefikset må være ikke-tomt: et tomt prefiks ville tømt hele bucketen, og
  * denne funksjonen kalles med verdier som stammer fra databaserader. */
-export async function deletePrefix(bucket: R2BucketName, prefix: string): Promise<number> {
+export async function deletePrefix(
+  bucket: R2BucketName,
+  prefix: string,
+  maxObjects?: number,
+): Promise<number> {
   if (!prefix) throw new Error("deletePrefix krever et ikke-tomt prefiks");
 
-  const keys = await listObjectKeys(bucket, prefix);
-  // ponytail: én DELETE per nøkkel i stedet for S3 DeleteObjects (batch på
-  // 1000). Et annonseprefiks rommer maks 20 bilder + thumbnails + 36
-  // 360-frames ≈ 76 objekter, så batching sparer lite. Bytt til
-  // DeleteObjects hvis prefiksene vokser vesentlig.
-  for (const key of keys) await deleteObject(bucket, key);
-  return keys.length;
+  const keys = await listObjectKeys(bucket, prefix, maxObjects);
+  // ponytail: én DELETE per nøkkel; callerens maksgrense holder oppryddingen
+  // avgrenset, og funksjonen brukes bare av cleanup-ruten.
+  let deleted = 0;
+  for (const key of keys) {
+    try {
+      await deleteObject(bucket, key);
+      deleted += 1;
+    } catch (cause) {
+      throw new PrefixDeleteError(cause, deleted + 1, deleted);
+    }
+  }
+  return deleted;
 }

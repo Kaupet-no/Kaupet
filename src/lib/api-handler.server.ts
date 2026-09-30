@@ -28,6 +28,7 @@ import {
   tooManyRequests,
   type ApiErrorCode,
 } from "@/lib/api-response.server";
+import { describeSafeError } from "@/lib/safe-error";
 
 export type ApiHandlerContext = {
   request: Request;
@@ -115,7 +116,7 @@ export function withApiHandler(
           field: error.field,
         });
       }
-      console.error("[api/v1] Uventet feil", error);
+      console.error("[api/v1] Uventet feil", describeSafeError(error));
       return internalError();
     }
   };

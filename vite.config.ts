@@ -4,6 +4,7 @@ import viteReact from "@vitejs/plugin-react";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
 import { buildSecurityHeaders } from "./src/lib/security-headers.ts";
+import { cloudflareImagesDev } from "./scripts/cloudflare-images-dev.ts";
 
 // Deploy target: Cloudflare Workers (module format), matching production today.
 // Change `preset` here if Kaupet moves to a different host later.
@@ -74,7 +75,7 @@ export default defineConfig(({ command, mode }) => {
         // dev-servere uten .vite-cache). Listen er hentet fra dev-serverens
         // «dependencies optimized»-logg; legg til nye klientpakker her ved behov.
         optimizeDeps: {
-          exclude: ["@tanstack/start-client-core"],
+          exclude: ["@tanstack/start-client-core", "cloudflare:workers"],
           include: [
             "@capacitor/app",
             "@capacitor/camera",
@@ -206,6 +207,7 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       tailwindcss(),
+      cloudflareImagesDev(),
       tanstackStart({
         importProtection: {
           behavior: "error",

@@ -211,24 +211,17 @@ export const getIntegrationUsage = createServerFn({ method: "GET" })
       }),
     );
 
-    const todayIso = startOfUtcDayIso();
+    const todayIso = startOfUtcDayIso().slice(0, 10);
     const [
-      { count: newListingsToday, error: listingsError },
-      { count: newImagesToday, error: newImagesError },
+      { data: quota, error: quotaError },
       { count: imagesProcessing, error: processingError },
       { count: imagesFailed, error: failedError },
     ] = await Promise.all([
       supabaseAdmin
-        .from("organization_listing_imports")
-        .select("id", { count: "exact", head: true })
+        .from("organization_daily_quotas")
+        .select("usage_date, new_listings, new_images")
         .eq("organization_id", organizationId)
-        .eq("status", "created")
-        .gte("created_at", todayIso),
-      supabaseAdmin
-        .from("listing_image_jobs")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .gte("created_at", todayIso),
+        .maybeSingle(),
       supabaseAdmin
         .from("listing_image_jobs")
         .select("id", { count: "exact", head: true })
@@ -240,16 +233,15 @@ export const getIntegrationUsage = createServerFn({ method: "GET" })
         .eq("organization_id", organizationId)
         .eq("status", "failed"),
     ]);
-    if (listingsError) throw await toClientError("database", listingsError);
-    if (newImagesError) throw await toClientError("database", newImagesError);
+    if (quotaError) throw await toClientError("database", quotaError);
     if (processingError) throw await toClientError("database", processingError);
     if (failedError) throw await toClientError("database", failedError);
 
     return {
       keys,
       organization: {
-        newListingsToday: newListingsToday ?? 0,
-        newImagesToday: newImagesToday ?? 0,
+        newListingsToday: quota?.usage_date === todayIso ? quota.new_listings : 0,
+        newImagesToday: quota?.usage_date === todayIso ? quota.new_images : 0,
         imagesProcessing: imagesProcessing ?? 0,
         imagesFailed: imagesFailed ?? 0,
       },

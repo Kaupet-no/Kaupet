@@ -32,6 +32,25 @@ export function publicImageUrl(key: string): string {
  * tidligere migrering, eller forsøk på å referere en annen bucket). */
 export function pathFromPublicImageUrl(url: string): string | null {
   const base = (readBaseUrl() ?? "").replace(/\/+$/, "");
-  if (!base || !url.startsWith(`${base}/`)) return null;
-  return url.slice(base.length + 1);
+  if (!base) return null;
+
+  try {
+    const baseUrl = new URL(base);
+    const imageUrl = new URL(url);
+    const basePath = baseUrl.pathname.replace(/\/+$/, "");
+    if (
+      imageUrl.origin !== baseUrl.origin ||
+      imageUrl.search ||
+      imageUrl.hash ||
+      imageUrl.username ||
+      imageUrl.password ||
+      !imageUrl.pathname.startsWith(`${basePath}/`)
+    ) {
+      return null;
+    }
+    const path = imageUrl.pathname.slice(basePath.length + 1);
+    return path && !path.includes("%") ? path : null;
+  } catch {
+    return null;
+  }
 }

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { describeSafeError } from "@/lib/safe-error";
 
 // Kalles av notify_expiring_organization_api_keys() (pg_cron, daglig, via
 // pg_net) — se supabase/migrations/20260924140000_organization_api_keys.sql.
@@ -100,7 +101,7 @@ export const Route = createFileRoute("/api/public/api-keys/expiry-notify")({
             await sendNotificationEmail({ to, type: "api_key_expiring", subject, body, url });
             sent += 1;
           } catch (err) {
-            console.error("API key expiry email dispatch error", err);
+            console.error("API key expiry email dispatch error", describeSafeError(err));
             return new Response("Retry later", { status: 503 });
           }
         }

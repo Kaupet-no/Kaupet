@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
+const { signMock } = vi.hoisted(() => ({ signMock: vi.fn() }));
 
 vi.mock("aws4fetch", () => ({
   AwsClient: class {
     fetch = fetchMock;
+    sign = signMock;
   },
 }));
 
@@ -24,6 +26,7 @@ describe("deletePrefix", () => {
   beforeEach(async () => {
     vi.resetModules();
     fetchMock.mockReset();
+    signMock.mockReset();
     process.env.R2_ACCOUNT_ID = "konto";
     process.env.R2_BILDER_BUCKET = "kaupet-bilder";
     process.env.R2_ACCESS_KEY_ID = "id";
@@ -47,6 +50,18 @@ describe("deletePrefix", () => {
       "https://konto.r2.cloudflarestorage.com/kaupet-bilder/annonse/a-thumb.jpg",
       "https://konto.r2.cloudflarestorage.com/kaupet-bilder/annonse/0.jpg",
     ]);
+  });
+
+  it("begrenser listing og sletting til gjenværende objektbudsjett", async () => {
+    const { deletePrefix } = await import("./r2.server");
+    fetchMock
+      .mockResolvedValueOnce(listResponse(["annonse/1.jpg", "annonse/2.jpg"], "more"))
+      .mockResolvedValue({ ok: true, status: 204, statusText: "No Content" });
+
+    await expect(deletePrefix("BILDER", "annonse/", 2)).resolves.toBe(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("max-keys=2");
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "DELETE")).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   // Et tomt prefiks ville listet og slettet hele bucketen.
@@ -79,5 +94,43 @@ describe("deletePrefix", () => {
     const { deletePrefix } = await import("./r2.server");
     fetchMock.mockResolvedValueOnce(listResponse([]));
     await expect(deletePrefix("BILDER", "annonse/")).resolves.toBe(0);
+  });
+});
+
+describe("R2 object URLs", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    fetchMock.mockReset();
+    signMock.mockReset();
+    process.env.R2_ACCOUNT_ID = "konto";
+    process.env.R2_BILDER_BUCKET = "kaupet-bilder";
+    process.env.R2_ACCESS_KEY_ID = "id";
+    process.env.R2_SECRET_ACCESS_KEY = "hemmelig";
+  });
+
+  it("encodes each key segment before presigning and deleting", async () => {
+    const { deleteObject, presignGetUrl } = await import("./r2.server");
+    fetchMock.mockResolvedValue({ ok: true, status: 204, statusText: "No Content" });
+    signMock.mockImplementation(async (url: string) => ({ url }));
+
+    await deleteObject("BILDER", "user-id/avatar one.jpg");
+    await presignGetUrl("BILDER", "user-id/avatar one.jpg", 30);
+
+    const expected =
+      "https://konto.r2.cloudflarestorage.com/kaupet-bilder/user-id/avatar%20one.jpg";
+    expect(fetchMock).toHaveBeenCalledWith(expected, { method: "DELETE" });
+    expect(signMock.mock.calls[0][0]).toBe(`${expected}?X-Amz-Expires=30`);
+  });
+
+  it.each([
+    "../victim/file.jpg",
+    "a/%2e%2e/file.jpg",
+    "a\\..\\file.jpg",
+    "a/file.jpg?x=1",
+    "/a.jpg",
+  ])("rejects unsafe key %s before any R2 request", async (key) => {
+    const { deleteObject } = await import("./r2.server");
+    await expect(deleteObject("BILDER", key)).rejects.toThrow("Ugyldig R2-objektnøkkel");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

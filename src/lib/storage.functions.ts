@@ -30,13 +30,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { ClientError } from "@/lib/to-client-error";
 import { deleteObject, presignGetUrl, putObject } from "@/lib/r2.server";
 import { pathFromPublicImageUrl, publicImageUrl } from "@/lib/image-url";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
 import {
   ATTACHMENT_URL_TTL_SECONDS,
   describeImageError,
-  extFromMime,
   MAX_ATTACHMENT_PATHS_PER_REQUEST,
+  extFromMime,
   thumbPathFor,
   validateImages,
 } from "@/lib/storage";
@@ -46,14 +49,61 @@ import {
 // conversationId, se uploadMessageAttachment).
 const UUID_DIR_UUID_FILE_PATH_RE =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|jxl)$/i;
+const UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const AVATAR_PATH_RE = new RegExp(`^${UUID_RE}/avatar-${UUID_RE}\\.(jpg|png|webp|jxl)$`, "i");
+const ORGANIZATION_IMAGE_PATH_RE = new RegExp(
+  `^(${UUID_RE})/(logo|contact)-${UUID_RE}\\.(jpg|png|webp|jxl)$`,
+  "i",
+);
 
 function assertServerSideImage(file: File): void {
   const err = validateImages([file]);
   if (err) throw new Error(describeImageError(err));
 }
 
+async function readServerSideImage(file: File): Promise<Uint8Array> {
+  // Kun formattsignatur, ingen full dekoding; klienten komprimerer før opplasting.
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const matches = (signature: number[], offset = 0) =>
+    signature.every((byte, index) => bytes[offset + index] === byte);
+  const valid =
+    (file.type === "image/jpeg" && bytes.length >= 3 && matches([0xff, 0xd8, 0xff])) ||
+    (file.type === "image/png" &&
+      bytes.length >= 8 &&
+      matches([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ||
+    (file.type === "image/webp" &&
+      bytes.length >= 12 &&
+      matches([0x52, 0x49, 0x46, 0x46]) &&
+      matches([0x57, 0x45, 0x42, 0x50], 8)) ||
+    (file.type === "image/jxl" &&
+      ((bytes.length >= 2 && matches([0xff, 0x0a])) ||
+        (bytes.length >= 12 &&
+          matches([0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a]))));
+  if (!valid) throw new ClientError("Bildefilen kunne ikke leses", 400);
+  return bytes;
+}
+
 function listingIdFromValidatedPath(path: string): string {
   return path.split("/", 1)[0];
+}
+
+async function reserveUploadQuota(userId: string, bytes: number): Promise<void> {
+  const { data: reserved, error } = await supabaseAdmin.rpc("reserve_standard_upload_quota", {
+    _user_id: userId,
+    _bytes: bytes,
+  });
+  if (error) throw new Error("Kunne ikke reservere opplastingskvote");
+  if (!reserved) {
+    throw new ClientError("Du har nådd grensen for opplastinger de siste 24 timene", 429);
+  }
+}
+
+async function registerUpload(bucket: "BILDER" | "VEDLEGG", key: string): Promise<void> {
+  const { error } = await supabaseAdmin.rpc("register_standard_upload_object", {
+    _bucket: bucket,
+    _key: key,
+  });
+  if (error) throw new Error("Kunne ikke registrere R2-opplasting");
 }
 
 export const uploadListingImage = createServerFn({ method: "POST" })
@@ -76,8 +126,12 @@ export const uploadListingImage = createServerFn({ method: "POST" })
     if (error) throw new Error("Kunne ikke sjekke tilgang til annonsen");
     if (!allowed) throw new Error("Du har ikke tilgang til å laste opp bilder til denne annonsen");
 
+    await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
+    const bytes = await readServerSideImage(data.file);
+    await reserveUploadQuota(context.userId, data.file.size);
     const key = `${data.listingId}/${crypto.randomUUID()}.${extFromMime(data.file.type)}`;
-    await putObject("BILDER", key, await data.file.arrayBuffer(), data.file.type);
+    await registerUpload("BILDER", key);
+    await putObject("BILDER", key, bytes, data.file.type);
     return { path: key };
   });
 
@@ -102,12 +156,12 @@ export const uploadListingImageThumb = createServerFn({ method: "POST" })
     if (error) throw new Error("Kunne ikke sjekke tilgang til annonsen");
     if (!allowed) throw new Error("Du har ikke tilgang til å laste opp bilder til denne annonsen");
 
-    await putObject(
-      "BILDER",
-      thumbPathFor(data.path),
-      await data.file.arrayBuffer(),
-      data.file.type,
-    );
+    await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
+    const bytes = await readServerSideImage(data.file);
+    await reserveUploadQuota(context.userId, data.file.size);
+    const key = thumbPathFor(data.path);
+    await registerUpload("BILDER", key);
+    await putObject("BILDER", key, bytes, data.file.type);
     return { ok: true as const };
   });
 
@@ -149,8 +203,12 @@ export const uploadAvatarImage = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     assertServerSideImage(data.file);
+    await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
+    const bytes = await readServerSideImage(data.file);
+    await reserveUploadQuota(context.userId, data.file.size);
     const key = `${context.userId}/avatar-${crypto.randomUUID()}.${extFromMime(data.file.type)}`;
-    await putObject("BILDER", key, await data.file.arrayBuffer(), data.file.type);
+    await registerUpload("BILDER", key);
+    await putObject("BILDER", key, bytes, data.file.type);
     return { url: publicImageUrl(key) };
   });
 
@@ -165,7 +223,9 @@ export const deletePreviousAvatarImage = createServerFn({ method: "POST" })
     // Path-eierskap er den eneste autorisasjonen avatars_owner_delete krevde
     // — så vi håndhever nøyaktig det samme her, selv om dette er best-effort
     // opprydning (feil svelges, avataren er allerede byttet ut).
-    if (!path || path.split("/", 1)[0] !== context.userId) return { ok: true as const };
+    if (!path || !AVATAR_PATH_RE.test(path) || path.split("/", 1)[0] !== context.userId) {
+      return { ok: true as const };
+    }
     await deleteObject("BILDER", path).catch(() => {});
     return { ok: true as const };
   });
@@ -204,8 +264,12 @@ export const uploadOrganizationLogo = createServerFn({ method: "POST" })
       throw new Error("Du har ikke tilgang til å laste opp logo for denne organisasjonen");
     }
 
+    await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
+    const bytes = await readServerSideImage(data.file);
+    await reserveUploadQuota(context.userId, data.file.size);
     const key = `${data.organizationId}/${data.kind}-${crypto.randomUUID()}.${extFromMime(data.file.type)}`;
-    await putObject("BILDER", key, await data.file.arrayBuffer(), data.file.type);
+    await registerUpload("BILDER", key);
+    await putObject("BILDER", key, bytes, data.file.type);
     return { path: key };
   });
 
@@ -216,7 +280,9 @@ export const deletePreviousOrganizationLogo = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (!data.previousPath) return { ok: true as const };
-    const organizationId = data.previousPath.split("/", 1)[0];
+    const match = ORGANIZATION_IMAGE_PATH_RE.exec(data.previousPath);
+    if (!match) return { ok: true as const };
+    const organizationId = match[1];
     const [superuserResult, proffResult] = await Promise.all([
       context.supabase.rpc("is_organization_superuser", { _organization_id: organizationId }),
       context.supabase.rpc("organization_has_proff_access", { _organization_id: organizationId }),
@@ -262,9 +328,23 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
     if (!conv || (conv.buyer_id !== context.userId && conv.seller_id !== context.userId)) {
       throw new Error("Du er ikke deltaker i denne samtalen");
     }
+    const otherPartyId = conv.buyer_id === context.userId ? conv.seller_id : conv.buyer_id;
+    const { data: blocked, error: blockError } = await context.supabase.rpc("is_blocked_between", {
+      _a: context.userId,
+      _b: otherPartyId,
+      _conversation_id: data.conversationId,
+    });
+    if (blockError) throw new Error("Kunne ikke sjekke blokkering mellom brukerne");
+    if (blocked !== false) {
+      throw new ClientError("Vedlegg kan ikke sendes mellom blokkerte brukere", 403);
+    }
 
+    await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
+    const bytes = await readServerSideImage(data.file);
+    await reserveUploadQuota(context.userId, data.file.size);
     const key = `${data.conversationId}/${crypto.randomUUID()}.${extFromMime(data.file.type)}`;
-    await putObject("VEDLEGG", key, await data.file.arrayBuffer(), data.file.type);
+    await registerUpload("VEDLEGG", key);
+    await putObject("VEDLEGG", key, bytes, data.file.type);
     return { path: key };
   });
 

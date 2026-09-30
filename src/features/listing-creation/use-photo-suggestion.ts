@@ -51,7 +51,8 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
 
   const turnstileRef = useRef<TurnstileInstance | null>(null);
 
-  const revision = `${images.map((image) => image.id).join(",")}|${title.trim()}`;
+  const imagesKey = images.map((image) => image.id).join(",");
+  const revision = `${imagesKey}|${title.trim()}`;
   const [consentedRevision, setConsentedRevision] = useState<string | null>(null);
   const [status, setStatus] = useState<PhotoSuggestionStatus>("idle");
   const [categorySuggestions, setCategorySuggestions] = useState<PhotoCategorySuggestion[]>([]);
@@ -66,12 +67,26 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
   // symmetrically to accepted ones — a stale suggestion for a different
   // photo set/title must never linger).
   const [seenRevision, setSeenRevision] = useState(revision);
+  // Revisjonen som tittelforslaget selv sist skrev inn i feltet (via
+  // applyTitleSuggestion): den påfølgende tittelendringen er systemets egen
+  // utfylling, ikke ny brukerinput, og skal ikke nullstille forslagene.
+  const [selfAppliedRevision, setSelfAppliedRevision] = useState<string | null>(null);
   if (seenRevision !== revision) {
-    setSeenRevision(revision);
-    setConsentedRevision(null);
-    setStatus("idle");
-    setCategorySuggestions([]);
-    setTitleSuggestion(null);
+    if (selfAppliedRevision === revision) {
+      // Tittelforslaget ble skrevet inn i feltet: behold kategoriforslaget,
+      // og la samtykket følge med over på den nye tittelen (den er generert
+      // av samme bilder som samtykket gjaldt).
+      setSeenRevision(revision);
+      setSelfAppliedRevision(null);
+      setConsentedRevision((current) => (current === seenRevision ? revision : current));
+    } else {
+      setSeenRevision(revision);
+      setConsentedRevision(null);
+      setStatus("idle");
+      setCategorySuggestions([]);
+      setTitleSuggestion(null);
+      setSelfAppliedRevision(null);
+    }
   }
 
   async function getVerifiedToken() {
@@ -133,6 +148,16 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     }
   }
 
+  /** Melder at tittelforslaget er skrevet inn i skjemaet (automatisk
+   * utfylling av et tomt felt, eller «Bruk»-knappen): lukker tittelforslaget
+   * og registrerer revisjonen, slik at input-resettiingen over adopterer den
+   * påfølgende tittelendringen i stedet for å forkaste kategoriforslaget og
+   * samtykket. */
+  function applyTitleSuggestion(value: string) {
+    setTitleSuggestion(null);
+    setSelfAppliedRevision(`${imagesKey}|${value.trim()}`);
+  }
+
   /** True once consent covers the current images+title — the gate for
    * showing "Foreslå detaljer fra bildene" on the category-attributes step,
    * regardless of whether `identify` itself found a category. */
@@ -182,7 +207,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     analyzePhotos,
     categorySuggestions,
     titleSuggestion,
-    dismissTitleSuggestion: () => setTitleSuggestion(null),
+    applyTitleSuggestion,
     canRequestAttributes,
     attributeSuggestionLoading,
     requestAttributeSuggestions,

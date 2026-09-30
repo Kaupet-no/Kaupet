@@ -132,7 +132,7 @@ export function PhotosGroup({
   photoSuggestionStatus,
   analyzePhotos,
   photoTitleSuggestion,
-  dismissPhotoTitleSuggestion,
+  applyPhotoTitleSuggestion,
   photoCategorySuggestions,
 }: Pick<
   WizardSharedProps,
@@ -146,7 +146,7 @@ export function PhotosGroup({
   | "photoSuggestionStatus"
   | "analyzePhotos"
   | "photoTitleSuggestion"
-  | "dismissPhotoTitleSuggestion"
+  | "applyPhotoTitleSuggestion"
   | "photoCategorySuggestions"
 >) {
   const photoCategory = photoCategorySuggestions[0];
@@ -155,7 +155,7 @@ export function PhotosGroup({
   useEffect(() => {
     if (photoTitleSuggestion && !title.trim()) {
       setValue("title", photoTitleSuggestion, { shouldValidate: true });
-      dismissPhotoTitleSuggestion();
+      applyPhotoTitleSuggestion(photoTitleSuggestion);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoTitleSuggestion]);
@@ -233,7 +233,7 @@ export function PhotosGroup({
                 className="native-touch-target"
                 onClick={() => {
                   setValue("title", photoTitleSuggestion, { shouldValidate: true });
-                  dismissPhotoTitleSuggestion();
+                  applyPhotoTitleSuggestion(photoTitleSuggestion);
                 }}
               >
                 Bruk

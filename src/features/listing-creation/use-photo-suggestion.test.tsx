@@ -75,4 +75,46 @@ describe("usePhotoSuggestion", () => {
     expect(result.current.status).toBe("idle");
     expect(result.current.verificationNeeded).toBe(false);
   });
+
+  it("beholder kategoriforslaget når tittelforslaget fylles inn i feltet", async () => {
+    suggestListingFromPhotos.mockResolvedValue({
+      status: "pending",
+      source: "photo-ai",
+      categories: [
+        { category_id: "c1", parent_id: "p1", name_nb: "Bil", parent_name_nb: "Kjøretøy" },
+      ],
+      title: "Toyota GT86",
+    });
+    const { result, rerender } = renderHook(
+      ({ title }) => usePhotoSuggestion({ images: [image], title }),
+      { initialProps: { title: "" } },
+    );
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => Promise.resolve("token"),
+      reset: vi.fn(),
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+
+    await act(async () => result.current.analyzePhotos());
+    expect(result.current.categorySuggestions).toHaveLength(1);
+    expect(result.current.titleSuggestion).toBe("Toyota GT86");
+    expect(result.current.status).toBe("ok");
+    expect(result.current.canRequestAttributes).toBe(true);
+
+    // PhotosGroup fyller tittelen automatisk og melder det via
+    // applyTitleSuggestion: tittelendringen er systemets egen utfylling og
+    // skal ikke nullstille kategoriforslaget eller samtykket.
+    act(() => result.current.applyTitleSuggestion("Toyota GT86"));
+    rerender({ title: "Toyota GT86" });
+    expect(result.current.categorySuggestions).toHaveLength(1);
+    expect(result.current.titleSuggestion).toBeNull();
+    expect(result.current.status).toBe("ok");
+    expect(result.current.canRequestAttributes).toBe(true);
+
+    // Brukerens egen tittelredigering er fortsatt ny input og nullstiller.
+    rerender({ title: "Toyota GT86 2016" });
+    expect(result.current.categorySuggestions).toHaveLength(0);
+    expect(result.current.titleSuggestion).toBeNull();
+    expect(result.current.status).toBe("idle");
+    expect(result.current.canRequestAttributes).toBe(false);
+  });
 });

@@ -256,7 +256,10 @@ export type WizardSharedProps = {
     parent_name_nb: string | null;
   }[];
   photoTitleSuggestion: string | null;
-  dismissPhotoTitleSuggestion: () => void;
+  /** Melder at tittelforslaget er skrevet inn i skjemaet (auto-utfylling av
+   * tomt felt eller «Bruk»): hooken registrerer tittelendringen som egen
+   * utfylling, slik at kategoriforslaget og samtykket ikke nullstilles. */
+  applyPhotoTitleSuggestion: (value: string) => void;
   /** True once consent covers the images+title currently on the form — the
    * gate for offering "Foreslå detaljer fra bildene" once a category is
    * confirmed. */

@@ -27,7 +27,7 @@ const noopPhotoSuggestionProps = {
   photoSuggestionStatus: "idle" as const,
   analyzePhotos: vi.fn(),
   photoTitleSuggestion: null,
-  dismissPhotoTitleSuggestion: vi.fn(),
+  applyPhotoTitleSuggestion: vi.fn(),
   photoCategorySuggestions: [],
 };
 
@@ -121,7 +121,7 @@ describe("PhotosGroup", () => {
 
   it("fyller en tom tittel direkte med forslaget fra bildene", () => {
     const setValue = vi.fn();
-    const dismissPhotoTitleSuggestion = vi.fn();
+    const applyPhotoTitleSuggestion = vi.fn();
     render(
       <PhotosGroup
         images={[image]}
@@ -131,12 +131,12 @@ describe("PhotosGroup", () => {
         {...noopPhotoSuggestionProps}
         photoSuggestionEnabled
         setValue={setValue}
-        dismissPhotoTitleSuggestion={dismissPhotoTitleSuggestion}
+        applyPhotoTitleSuggestion={applyPhotoTitleSuggestion}
         photoTitleSuggestion="Grå sofa i stoff"
       />,
     );
     expect(setValue).toHaveBeenCalledWith("title", "Grå sofa i stoff", { shouldValidate: true });
-    expect(dismissPhotoTitleSuggestion).toHaveBeenCalled();
+    expect(applyPhotoTitleSuggestion).toHaveBeenCalledWith("Grå sofa i stoff");
   });
 
   it("viser kategoriforslaget fra bildene", () => {

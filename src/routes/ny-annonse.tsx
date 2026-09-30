@@ -1739,7 +1739,7 @@ function NewListingPage() {
     analyzePhotos: photoSuggestion.analyzePhotos,
     photoCategorySuggestions: photoSuggestion.categorySuggestions,
     photoTitleSuggestion: photoSuggestion.titleSuggestion,
-    dismissPhotoTitleSuggestion: photoSuggestion.dismissTitleSuggestion,
+    applyPhotoTitleSuggestion: photoSuggestion.applyTitleSuggestion,
     photoAttributesAvailable: photoSuggestion.canRequestAttributes,
     photoAttributeSuggestionLoading: photoSuggestion.attributeSuggestionLoading,
     requestPhotoAttributeSuggestions: photoSuggestion.requestAttributeSuggestions,

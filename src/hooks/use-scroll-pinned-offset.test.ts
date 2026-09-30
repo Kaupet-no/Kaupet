@@ -19,34 +19,55 @@ afterEach(() => {
 });
 
 describe("useScrollPinnedOffset", () => {
-  it("fester hjemme, scroller saktere enn siden, og holder følge idet innholdet tar den igjen", async () => {
-    // Fest til 300 px, halv fart, klemme fra 500: offset ≤ 500 − scrollY.
-    const { result } = renderHook(() => useScrollPinnedOffset(300, 0.5, 500));
+  it("fester hjemme, holder rolig parallaks-fart, og fader i takt med at innholdet dekker elementet", async () => {
+    // Fest til 100 px, halv fart. Gapet fra elementets bunn til innholdets
+    // topp er 300 px ved scrollY 0; faden starter 32 px før innholdet tar
+    // elementet og er ferdig når hele dets 120 px er dekket.
+    const { result } = renderHook(() =>
+      useScrollPinnedOffset(100, 0.5, { gap0: 300, startGapPx: 32, endGapPx: -120 }),
+    );
 
-    // Før festepunktet: hjem-posisjon.
-    await scrollTo(150);
-    expect(result.current).toBe(0);
-
-    // Etter festepunktet: halv fart — 100 px scroll gir 50 px forskjøving.
-    await scrollTo(400);
-    expect(result.current).toBe(-50);
-    await scrollTo(600);
-    expect(result.current).toBe(-150);
-
-    // Når klemmen binder (700 px), følger elementet innholdets fart igjen:
-    // 100 px videre scroll gir 100 px forskjøving, i stedet for at innholdet
-    // scroller over det.
-    await scrollTo(700);
-    expect(result.current).toBe(-200);
-    await scrollTo(800);
-    expect(result.current).toBe(-300);
-    await scrollTo(1000);
-    expect(result.current).toBe(-500);
-
-    // Scroll tilbake: elementet scroller til hjem-posisjonen og blir der.
-    await scrollTo(400);
-    expect(result.current).toBe(-50);
+    // Hjem-posisjon med full synlighet helt til festet slipper.
+    await scrollTo(0);
+    expect(result.current).toEqual({ offset: 0, opacity: 1 });
     await scrollTo(100);
-    expect(result.current).toBe(0);
+    expect(result.current).toEqual({ offset: 0, opacity: 1 });
+
+    // Etter festepunktet: halv fart — 200 px scroll gir 100 px forskjøving.
+    await scrollTo(300);
+    expect(result.current.offset).toBeCloseTo(-100);
+    expect(result.current.opacity).toBe(1);
+
+    // Innholdet når elementets bunn (gap = 32): faden starter her, og
+    // farten er uendret — den øker ikke når innholdet nærmer seg.
+    await scrollTo(436);
+    expect(result.current.offset).toBeCloseTo(-168);
+    expect(result.current.opacity).toBeCloseTo(1);
+
+    // Halvveis dekket av innholdet: halvveis uttonet.
+    await scrollTo(588);
+    expect(result.current.offset).toBeCloseTo(-244);
+    expect(result.current.opacity).toBeCloseTo(0.5);
+
+    // Hele elementet dekket: helt uttonet — farten fortsatt rolig.
+    await scrollTo(740);
+    expect(result.current.offset).toBeCloseTo(-320);
+    expect(result.current.opacity).toBe(0);
+  });
+
+  it("returnerer til hjem-posisjon og full synlighet ved scroll oppover", async () => {
+    const { result } = renderHook(() =>
+      useScrollPinnedOffset(100, 0.5, { gap0: 300, startGapPx: 32, endGapPx: -120 }),
+    );
+
+    await scrollTo(740);
+    expect(result.current.opacity).toBe(0);
+
+    await scrollTo(300);
+    expect(result.current.offset).toBeCloseTo(-100);
+    expect(result.current.opacity).toBe(1);
+
+    await scrollTo(0);
+    expect(result.current).toEqual({ offset: 0, opacity: 1 });
   });
 });

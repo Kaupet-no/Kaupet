@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 
-/** Opacity that fades from 1 to 0 as the window scrolls down over `fadeDistance` px. */
-export function useScrollFadeOpacity(fadeDistance = 140): number {
+/**
+ * Opacity that fades from 1 to 0 as the window scrolls down over `fadeDistance`
+ * px. `enabled = false` keeps it at 1 and attaches no listener — for layouts
+ * that don't fade on scroll (e.g. the native home hero on tablets).
+ */
+export function useScrollFadeOpacity(fadeDistance = 140, enabled = true): number {
   const [opacity, setOpacity] = useState(1);
 
   useEffect(() => {
+    if (!enabled) return;
     let raf = 0;
     const update = () => {
       raf = 0;
@@ -19,7 +24,7 @@ export function useScrollFadeOpacity(fadeDistance = 140): number {
       window.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(raf);
     };
-  }, [fadeDistance]);
+  }, [fadeDistance, enabled]);
 
   return opacity;
 }

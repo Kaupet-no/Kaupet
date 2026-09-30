@@ -1354,6 +1354,35 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_daily_quotas: {
+        Row: {
+          new_images: number
+          new_listings: number
+          organization_id: string
+          usage_date: string
+        }
+        Insert: {
+          new_images?: number
+          new_listings?: number
+          organization_id: string
+          usage_date: string
+        }
+        Update: {
+          new_images?: number
+          new_listings?: number
+          organization_id?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_daily_quotas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_api_keys: {
         Row: {
           acting_user_id: string
@@ -2165,6 +2194,39 @@ export type Database = {
           last_error?: string | null
           prefix?: string
           requested_at?: string
+        }
+        Relationships: []
+      }
+      standard_upload_objects: {
+        Row: {
+          attempts: number
+          bucket: string
+          claimed_at: string | null
+          created_at: string
+          id: number
+          last_error: string | null
+          object_key: string
+          state: string
+        }
+        Insert: {
+          attempts?: number
+          bucket: string
+          claimed_at?: string | null
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          object_key: string
+          state?: string
+        }
+        Update: {
+          attempts?: number
+          bucket?: string
+          claimed_at?: string | null
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          object_key?: string
+          state?: string
         }
         Relationships: []
       }
@@ -3638,6 +3700,22 @@ export type Database = {
       }
       purge_expired_accounts: { Args: never; Returns: number }
       purge_expired_personal_data: { Args: never; Returns: Json }
+      reserve_standard_upload_quota: {
+        Args: { _bytes: number; _user_id: string }
+        Returns: boolean
+      }
+      register_standard_upload_object: {
+        Args: { _bucket: string; _key: string }
+        Returns: undefined
+      }
+      claim_orphan_standard_uploads: {
+        Args: { _limit: number }
+        Returns: { attempts: number; bucket: string; id: number; object_key: string }[]
+      }
+      finish_orphan_standard_upload: {
+        Args: { _deleted: boolean; _error?: string; _id: number }
+        Returns: undefined
+      }
       remove_organization_location_member: {
         Args: { _location_id: string; _user_id: string }
         Returns: undefined

@@ -423,6 +423,178 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
   });
 });
 
+describe.skipIf(!canRun)("RLS: F07 message immutability", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    sender: `rls-message-immutable-sender-${suffix}@example.com`,
+    other: `rls-message-immutable-other-${suffix}@example.com`,
+    outsider: `rls-message-immutable-outsider-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let listingId: string;
+  let conversationId: string;
+  let messageId: string;
+  let attachmentPath: string;
+  let clientId: string;
+  let blockId: string | undefined;
+
+  beforeAll(async () => {
+    const createUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+    const senderId = await createUser(emails.sender);
+    const otherId = await createUser(emails.other);
+    await createUser(emails.outsider);
+
+    const listing = await admin
+      .from("listings")
+      .insert({ seller_id: otherId, title: "F07 RLS listing", price_nok: 100, status: "active" })
+      .select("id")
+      .single();
+    if (listing.error) throw listing.error;
+    listingId = listing.data.id;
+
+    const conversation = await admin
+      .from("conversations")
+      .insert({ listing_id: listingId, buyer_id: senderId, seller_id: otherId })
+      .select("id")
+      .single();
+    if (conversation.error) throw conversation.error;
+    conversationId = conversation.data.id;
+
+    attachmentPath = `${conversationId}/${crypto.randomUUID()}.jpg`;
+    clientId = crypto.randomUUID();
+    const message = await admin
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender_id: senderId,
+        body: "F07 immutability fixture",
+        attachment_path: attachmentPath,
+        client_id: clientId,
+      })
+      .select("id")
+      .single();
+    if (message.error) throw message.error;
+    messageId = message.data.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    if (blockId) await admin.from("user_blocks").delete().eq("id", blockId);
+    if (messageId) {
+      await admin
+        .from("push_dispatch_failures")
+        .delete()
+        .eq("kind", "message")
+        .eq("payload->>message_id", messageId);
+    }
+    if (messageId) await admin.from("messages").delete().eq("id", messageId);
+    if (conversationId) await admin.from("conversations").delete().eq("id", conversationId);
+    if (listingId) await admin.from("listings").delete().eq("id", listingId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("blocks authenticated attachment_path and client_id changes, including for a blocked pair", async () => {
+    const senderId = userIds[0]!;
+    const otherId = userIds[1]!;
+    const sender = await signInWithRetry(emails.sender);
+    const block = await admin
+      .from("user_blocks")
+      .insert({ blocker_id: otherId, blocked_id: senderId, scope: "all" })
+      .select("id")
+      .single();
+    expect(block.error).toBeNull();
+    blockId = block.data!.id;
+
+    const attachmentChange = await sender
+      .from("messages")
+      .update({ attachment_path: `${conversationId}/${crypto.randomUUID()}.jpg` })
+      .eq("id", messageId);
+    expect(attachmentChange.error).not.toBeNull();
+
+    const clientIdChange = await sender
+      .from("messages")
+      .update({ client_id: crypto.randomUUID() })
+      .eq("id", messageId);
+    expect(clientIdChange.error).not.toBeNull();
+
+    const { data: row } = await admin
+      .from("messages")
+      .select("attachment_path, client_id")
+      .eq("id", messageId)
+      .single();
+    expect(row).toEqual({ attachment_path: attachmentPath, client_id: clientId });
+  });
+
+  it("allows only the sender's first soft-delete and denies other or anonymous users", async () => {
+    const sender = await signInWithRetry(emails.sender);
+    const other = await signInWithRetry(emails.other);
+    const anonymous = createClient(URL!, ANON_KEY!);
+
+    const otherDelete = await other
+      .from("messages")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", messageId)
+      .select("id");
+    expect(otherDelete.error).toBeNull();
+    expect(otherDelete.data).toHaveLength(0);
+
+    const anonymousDelete = await anonymous
+      .from("messages")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", messageId);
+    expect(anonymousDelete.error).not.toBeNull();
+
+    const { data: unchanged } = await admin
+      .from("messages")
+      .select("deleted_at")
+      .eq("id", messageId)
+      .single();
+    expect(unchanged?.deleted_at).toBeNull();
+
+    const deletedAt = new Date().toISOString();
+    const ownDelete = await sender
+      .from("messages")
+      .update({ deleted_at: deletedAt })
+      .eq("id", messageId);
+    expect(ownDelete.error).toBeNull();
+
+    const reset = await sender.from("messages").update({ deleted_at: null }).eq("id", messageId);
+    expect(reset.error).not.toBeNull();
+    const changedTimestamp = await sender
+      .from("messages")
+      .update({ deleted_at: new Date(Date.now() + 2000).toISOString() })
+      .eq("id", messageId);
+    expect(changedTimestamp.error).not.toBeNull();
+
+    const { data: persisted } = await admin
+      .from("messages")
+      .select("deleted_at")
+      .eq("id", messageId)
+      .single();
+    expect(Date.parse(persisted!.deleted_at!)).toBe(Date.parse(deletedAt));
+  });
+
+  it("rejects immutable-column changes from service_role through the trigger", async () => {
+    for (const update of [
+      { attachment_path: `${conversationId}/${crypto.randomUUID()}.jpg` },
+      { client_id: crypto.randomUUID() },
+    ]) {
+      const { error } = await admin.from("messages").update(update).eq("id", messageId);
+      expect(error?.message).toMatch("Only deleted_at may be updated on messages");
+    }
+  });
+});
+
 describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writes", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();
@@ -1029,6 +1201,11 @@ describe.skipIf(!canRun)("RLS: push_subscriptions are private to their owner", (
   const userIds: string[] = [];
   let ownerId: string;
   let subscriptionId: string;
+  const p256dh = Buffer.from(
+    "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+    "hex",
+  ).toString("base64url");
+  const auth = Buffer.alloc(16, 1).toString("base64url");
 
   async function signIn(email: string) {
     return signInWithRetry(email);
@@ -1052,9 +1229,9 @@ describe.skipIf(!canRun)("RLS: push_subscriptions are private to their owner", (
       .from("push_subscriptions")
       .insert({
         user_id: ownerId,
-        endpoint: `https://push.example.com/${suffix}`,
-        p256dh: "test-p256dh",
-        auth: "test-auth",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`,
+        p256dh,
+        auth,
       })
       .select("id")
       .single();
@@ -1099,6 +1276,69 @@ describe.skipIf(!canRun)("RLS: push_subscriptions are private to their owner", (
       .eq("id", subscriptionId)
       .single();
     expect(check).not.toBeNull();
+  });
+
+  it("rejects direct writes to untrusted endpoints and atomically caps devices at 20", async () => {
+    const owner = await signIn(emails.owner);
+    const { error: invalidError } = await owner.from("push_subscriptions").insert({
+      user_id: ownerId,
+      endpoint: "https://127.0.0.1/latest",
+      p256dh,
+      auth,
+    });
+    expect(invalidError).not.toBeNull();
+    const { error: invalidKeysError } = await owner.from("push_subscriptions").insert({
+      user_id: ownerId,
+      endpoint: `https://fcm.googleapis.com/fcm/send/invalid-keys-${suffix}`,
+      p256dh: "bad",
+      auth: "bad",
+    });
+    expect(invalidKeysError).not.toBeNull();
+
+    const additions = Array.from({ length: 18 }, (_, i) => ({
+      user_id: ownerId,
+      endpoint: `https://updates.push.services.mozilla.com/wpush/v1/${suffix}-${i}`,
+      p256dh,
+      auth,
+    }));
+    const { error: seedError } = await owner.from("push_subscriptions").insert(additions);
+    expect(seedError).toBeNull();
+
+    const competingAdds = [18, 19].map((i) =>
+      owner.from("push_subscriptions").insert({
+        user_id: ownerId,
+        endpoint: `https://updates.push.services.mozilla.com/wpush/v1/${suffix}-${i}`,
+        p256dh,
+        auth,
+      }),
+    );
+    const results = await Promise.all(competingAdds);
+    expect(results.filter(({ error }) => !error)).toHaveLength(1);
+    expect(results.filter(({ error }) => error)).toHaveLength(1);
+
+    const { error: mixedPlatformError } = await owner.from("push_subscriptions").insert({
+      user_id: ownerId,
+      platform: "android",
+      fcm_token: `native-${suffix}`,
+    });
+    expect(mixedPlatformError).not.toBeNull();
+
+    const { error: existingDeviceError } = await owner.from("push_subscriptions").upsert(
+      {
+        user_id: ownerId,
+        endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`,
+        p256dh,
+        auth,
+      },
+      { onConflict: "endpoint" },
+    );
+    expect(existingDeviceError).toBeNull();
+
+    const { error: updateError } = await owner
+      .from("push_subscriptions")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("id", subscriptionId);
+    expect(updateError).toBeNull();
   });
 });
 
@@ -1254,6 +1494,230 @@ async function grantAdmin(admin: SupabaseClient, userId: string) {
   const { error } = await admin.from("user_roles").insert({ user_id: userId, role: "admin" });
   if (error) throw error;
 }
+
+describe.skipIf(!canRun)(
+  "RLS: moderation blocks publication for banned and suspended owners",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-publish-admin-${suffix}@example.com`,
+      banned: `rls-publish-banned-${suffix}@example.com`,
+      suspended: `rls-publish-suspended-${suffix}@example.com`,
+      normal: `rls-publish-normal-${suffix}@example.com`,
+    };
+    const userIds: string[] = [];
+    const listingIds: string[] = [];
+    const wtbIds: string[] = [];
+    let adminId: string;
+    let bannedId: string;
+    let suspendedId: string;
+    let normalId: string;
+    let bannedWtbId: string;
+    let suspendedWtbId: string;
+    let expiredSuspensionWtbId: string;
+
+    async function createListing(sellerId: string, status: "active" | "draft") {
+      const { data, error } = await admin
+        .from("listings")
+        .insert({ seller_id: sellerId, title: "Moderation test listing", price_nok: 100, status })
+        .select("id")
+        .single();
+      if (error) throw error;
+      listingIds.push(data.id);
+      return data.id;
+    }
+
+    async function createWtb(userId: string, status: "active" | "archived") {
+      const { data, error } = await admin
+        .from("wtb_listings")
+        .insert({ user_id: userId, title: "Moderation test purchase", status })
+        .select("id")
+        .single();
+      if (error) throw error;
+      wtbIds.push(data.id);
+      return data.id;
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      adminId = await mkUser(emails.admin);
+      bannedId = await mkUser(emails.banned);
+      suspendedId = await mkUser(emails.suspended);
+      normalId = await mkUser(emails.normal);
+      await grantAdmin(admin, adminId);
+
+      for (const userId of [bannedId, suspendedId]) await createListing(userId, "draft");
+      const activeToDisable = await createListing(bannedId, "active");
+      await createListing(normalId, "active");
+      bannedWtbId = await createWtb(bannedId, "active");
+      suspendedWtbId = await createWtb(suspendedId, "active");
+      expiredSuspensionWtbId = await createWtb(normalId, "active");
+      const { error: expiredSuspensionError } = await admin.from("user_suspensions").insert({
+        user_id: normalId,
+        reason: "Expired publication test",
+        suspended_by: adminId,
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+      });
+      if (expiredSuspensionError) throw expiredSuspensionError;
+
+      const adminClient = await signInWithRetry(emails.admin);
+      const { error: disableError } = await adminClient.rpc("admin_ban_user", {
+        _user_id: bannedId,
+        _reason: "Publication test",
+      });
+      if (disableError) throw disableError;
+      const { error: suspendError } = await adminClient.rpc("admin_suspend_user", {
+        _user_id: suspendedId,
+        _reason: "Publication test",
+        _days: 30,
+      });
+      if (suspendError) throw suspendError;
+      const { data: disabled, error: readError } = await admin
+        .from("listings")
+        .select("id")
+        .eq("id", activeToDisable)
+        .eq("status", "disabled")
+        .single();
+      if (readError) throw readError;
+      expect(disabled.id).toBe(activeToDisable);
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await admin.from("wtb_listings").delete().in("id", wtbIds);
+      await admin.from("listings").delete().in("id", listingIds);
+      await admin.from("user_bans").delete().in("user_id", userIds);
+      await admin.from("user_suspensions").delete().in("user_id", userIds);
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("allows normal active listing and WTB publication through service-role", async () => {
+      await expect(createListing(normalId, "active")).resolves.toEqual(expect.any(String));
+      await expect(createWtb(normalId, "active")).resolves.toEqual(expect.any(String));
+    });
+
+    it("archives active WTB listings when ban or active suspension is applied", async () => {
+      const { data, error } = await admin
+        .from("wtb_listings")
+        .select("id, status")
+        .in("id", [bannedWtbId, suspendedWtbId]);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(2);
+      expect(data?.every(({ status }) => status === "archived")).toBe(true);
+    });
+
+    it("does not archive WTB listings for expired suspensions", async () => {
+      const { data, error } = await admin
+        .from("wtb_listings")
+        .select("status")
+        .eq("id", expiredSuspensionWtbId)
+        .single();
+      expect(error).toBeNull();
+      expect(data?.status).toBe("active");
+    });
+
+    it.each(["banned", "suspended"] as const)(
+      "blocks %s listing publication through service-role",
+      async (label) => {
+        const userId = label === "banned" ? bannedId : suspendedId;
+        const { data: drafts, error: readError } = await admin
+          .from("listings")
+          .select("id")
+          .eq("seller_id", userId)
+          .eq("status", "draft");
+        expect(readError).toBeNull();
+        expect(drafts).toHaveLength(1);
+
+        const { error: titleError } = await admin
+          .from("listings")
+          .update({ title: "Draft remains editable" })
+          .eq("id", drafts![0].id);
+        expect(titleError).toBeNull();
+        const { error: activateError } = await admin
+          .from("listings")
+          .update({ status: "active" })
+          .eq("id", drafts![0].id);
+        expect(activateError).not.toBeNull();
+        const { error: insertError } = await admin.from("listings").insert({
+          seller_id: userId,
+          title: "Blocked new publication",
+          price_nok: 100,
+          status: "active",
+        });
+        expect(insertError).not.toBeNull();
+        const { error: draftInsertError } = await admin.from("listings").insert({
+          seller_id: userId,
+          title: "Blocked draft creation",
+          price_nok: 100,
+          status: "draft",
+        });
+        expect(draftInsertError).not.toBeNull();
+        const { error: unpublishError } = await admin
+          .from("listings")
+          .update({ status: "archived" })
+          .eq("id", drafts![0].id);
+        expect(unpublishError).toBeNull();
+      },
+    );
+
+    it.each(["banned", "suspended"] as const)(
+      "blocks WTB publication by moderated user %s",
+      async (label) => {
+        const userId = label === "banned" ? bannedId : suspendedId;
+        const { error: insertError } = await admin
+          .from("wtb_listings")
+          .insert({ user_id: userId, title: "Blocked purchase publication", status: "active" });
+        expect(insertError).not.toBeNull();
+        const archivedId = await createWtb(userId, "archived");
+        const { error: activateError } = await admin
+          .from("wtb_listings")
+          .update({ status: "active" })
+          .eq("id", archivedId);
+        expect(activateError).not.toBeNull();
+      },
+    );
+
+    it("allows non-publication WTB status changes and keeps admin_enable_listing explicit", async () => {
+      const archivedId = await createWtb(normalId, "active");
+      const { error: archiveError } = await admin
+        .from("wtb_listings")
+        .update({ status: "archived" })
+        .eq("id", archivedId);
+      expect(archiveError).toBeNull();
+
+      const adminClient = await signInWithRetry(emails.admin);
+      const { data: disabled } = await admin
+        .from("listings")
+        .select("id")
+        .eq("seller_id", bannedId)
+        .eq("status", "disabled")
+        .limit(1)
+        .single();
+      expect(disabled).not.toBeNull();
+      const { error: enableError } = await adminClient.rpc("admin_enable_listing", {
+        _id: disabled!.id,
+      });
+      expect(enableError).toBeNull();
+      const { data: enabled, error: enabledReadError } = await admin
+        .from("listings")
+        .select("status")
+        .eq("id", disabled!.id)
+        .single();
+      expect(enabledReadError).toBeNull();
+      expect(enabled?.status).toBe("active");
+    });
+  },
+);
 
 describe.skipIf(!canRun)(
   "RLS: user_bans — users see only their own ban, only admins can ban",
@@ -2044,6 +2508,182 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)("RLS: listing sales cannot be removed after reviews", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    seller: `rls-sale-integrity-seller-${suffix}@example.com`,
+    buyer: `rls-sale-integrity-buyer-${suffix}@example.com`,
+    outsider: `rls-sale-integrity-outsider-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  const listingIds: string[] = [];
+  const conversationIds: string[] = [];
+  let sellerId: string;
+  let buyerId: string;
+
+  beforeAll(async () => {
+    sellerId = await createRlsUser(admin, emails.seller, userIds);
+    buyerId = await createRlsUser(admin, emails.buyer, userIds);
+    await createRlsUser(admin, emails.outsider, userIds);
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    for (const listingId of listingIds) {
+      const { error: reviewError } = await admin
+        .from("user_reviews")
+        .delete()
+        .eq("listing_id", listingId);
+      if (reviewError) throw reviewError;
+      const { error: saleError } = await admin
+        .from("listing_sales")
+        .delete()
+        .eq("listing_id", listingId);
+      if (saleError) throw saleError;
+    }
+    if (conversationIds.length) {
+      const { error } = await admin.from("conversations").delete().in("id", conversationIds);
+      if (error) throw error;
+    }
+    if (listingIds.length) {
+      const { error } = await admin.from("listings").delete().in("id", listingIds);
+      if (error) throw error;
+    }
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  async function createSale() {
+    const { data: listing, error: listingError } = await admin
+      .from("listings")
+      .insert({
+        seller_id: sellerId,
+        title: "RLS sale integrity listing",
+        price_nok: 100,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (listingError) throw listingError;
+    listingIds.push(listing.id);
+
+    const { data: conversation, error: conversationError } = await admin
+      .from("conversations")
+      .insert({ listing_id: listing.id, buyer_id: buyerId, seller_id: sellerId })
+      .select("id")
+      .single();
+    if (conversationError) throw conversationError;
+    conversationIds.push(conversation.id);
+
+    const { error: saleError } = await admin.from("listing_sales").insert({
+      listing_id: listing.id,
+      seller_id: sellerId,
+      buyer_id: buyerId,
+      conversation_id: conversation.id,
+    });
+    if (saleError) throw saleError;
+    return listing.id;
+  }
+
+  it("allows the seller to delete a sale without reviews", async () => {
+    const listingId = await createSale();
+    const seller = await signInWithRetry(emails.seller);
+    const { error, count } = await seller
+      .from("listing_sales")
+      .delete({ count: "exact" })
+      .eq("listing_id", listingId);
+    expect(error).toBeNull();
+    expect(count).toBe(1);
+  });
+
+  it("denies sale deletion to an outsider and anonymous visitor", async () => {
+    const listingId = await createSale();
+    const outsider = await signInWithRetry(emails.outsider);
+    const { error: outsiderError, count } = await outsider
+      .from("listing_sales")
+      .delete({ count: "exact" })
+      .eq("listing_id", listingId);
+    expect(outsiderError).toBeNull();
+    expect(count).toBe(0);
+
+    const anon = createClient(URL!, ANON_KEY!);
+    const { error: anonError, count: anonCount } = await anon
+      .from("listing_sales")
+      .delete({ count: "exact" })
+      .eq("listing_id", listingId);
+    expect(anonError).toBeNull();
+    expect(anonCount).toBe(0);
+    const { data: sale, error: readError } = await admin
+      .from("listing_sales")
+      .select("listing_id")
+      .eq("listing_id", listingId)
+      .single();
+    expect(readError).toBeNull();
+    expect(sale).not.toBeNull();
+  });
+
+  it("refuses seller deletion after a review", async () => {
+    const listingId = await createSale();
+    const buyer = await signInWithRetry(emails.buyer);
+    const { error: reviewError } = await buyer.from("user_reviews").insert({
+      listing_id: listingId,
+      reviewer_id: buyerId,
+      reviewee_id: sellerId,
+      role: "buyer",
+      rating: 5,
+    });
+    expect(reviewError).toBeNull();
+
+    const seller = await signInWithRetry(emails.seller);
+    const { error } = await seller.from("listing_sales").delete().eq("listing_id", listingId);
+    expect(error?.code).toBe("23514");
+    expect(error?.message).toBe("Salget kan ikke angres etter at vurderinger er gitt");
+    const { data: sale, error: readError } = await admin
+      .from("listing_sales")
+      .select("listing_id")
+      .eq("listing_id", listingId)
+      .single();
+    expect(readError).toBeNull();
+    expect(sale).not.toBeNull();
+  });
+
+  it("serializes simultaneous review insertion and sale deletion without an orphan review", async () => {
+    const listingId = await createSale();
+    const buyer = await signInWithRetry(emails.buyer);
+    const seller = await signInWithRetry(emails.seller);
+    const [reviewResult, deleteResult] = await Promise.all([
+      buyer.from("user_reviews").insert({
+        listing_id: listingId,
+        reviewer_id: buyerId,
+        reviewee_id: sellerId,
+        role: "buyer",
+        rating: 4,
+      }),
+      seller.from("listing_sales").delete().eq("listing_id", listingId),
+    ]);
+
+    const { data: sale, error: saleReadError } = await admin
+      .from("listing_sales")
+      .select("listing_id")
+      .eq("listing_id", listingId)
+      .maybeSingle();
+    const { data: reviews, error: reviewReadError } = await admin
+      .from("user_reviews")
+      .select("id")
+      .eq("listing_id", listingId);
+    expect(saleReadError).toBeNull();
+    expect(reviewReadError).toBeNull();
+    if (!reviewResult.error) {
+      expect(sale).not.toBeNull();
+      expect(deleteResult.error?.code).toBe("23514");
+      expect(reviews).toHaveLength(1);
+    } else {
+      expect(sale).toBeNull();
+      expect(reviews).toHaveLength(0);
+    }
+  });
+});
 
 describe.skipIf(!canRun)(
   "RLS: wtb_listings — owner sees own regardless of status, others see only active",
@@ -5012,6 +5652,133 @@ describe.skipIf(!canRun)("RLS: authenticated write limits are isolated per user"
       .eq("bucket", bucket);
     expect(cleanupError).toBeNull();
   });
+
+  it("serializes concurrent reservations so calls cannot race past the limit", async () => {
+    const concurrentBucket = `${bucket}-concurrent`;
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        admin.rpc("check_user_rate_limit", {
+          _bucket: concurrentBucket,
+          _user_id: userA,
+          _limit: 3,
+          _window_seconds: 60,
+        }),
+      ),
+    );
+
+    expect(results.every(({ error }) => error === null)).toBe(true);
+    expect(results.filter(({ data }) => data === true)).toHaveLength(3);
+    expect(results.filter(({ data }) => data === false)).toHaveLength(5);
+
+    const { error } = await admin
+      .from("endpoint_rate_limits")
+      .delete()
+      .eq("bucket", concurrentBucket);
+    expect(error).toBeNull();
+  });
+});
+
+describe.skipIf(!canRun)("RLS: user creation quotas and limiter state are protected", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const email = `rls-user-creation-limit-${suffix}@example.com`;
+  const userIds: string[] = [];
+  let userId: string;
+  let client: SupabaseClient;
+  const listingBucket = "listing_creation";
+  const wtbBucket = "wtb_creation";
+  let keyHash: string;
+
+  beforeAll(async () => {
+    userId = await createRlsUser(admin, email, userIds);
+    client = await signInWithRetry(email);
+    keyHash = createHash("sha256").update(userId).digest("hex");
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("endpoint_rate_limits").delete().eq("key_hash", keyHash);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("keeps direct Data API inserts disabled and denies client access to limiter state", async () => {
+    const { error: listingError } = await client
+      .from("listings")
+      .insert({ seller_id: userId, title: "Forsøk på direkte annonse", price_nok: 100 });
+    expect(listingError?.code).toBe("42501");
+    const { error: wtbError } = await client
+      .from("wtb_listings")
+      .insert({ user_id: userId, title: "Forsøk på direkte kjøpsønske" });
+    expect(wtbError?.code).toBe("42501");
+
+    const { error: stateError } = await client.from("endpoint_rate_limits").select("attempts");
+    expect(stateError?.code).toBe("42501");
+    const { error: updateStateError } = await client
+      .from("endpoint_rate_limits")
+      .update({ attempts: 0 })
+      .eq("bucket", listingBucket);
+    expect(updateStateError?.code).toBe("42501");
+    const { error: deleteStateError } = await client
+      .from("endpoint_rate_limits")
+      .delete()
+      .eq("bucket", listingBucket);
+    expect(deleteStateError?.code).toBe("42501");
+    const { error: rpcError } = await client.rpc("check_user_rate_limit", {
+      _bucket: listingBucket,
+      _user_id: userId,
+      _limit: 5,
+      _window_seconds: 3600,
+    });
+    expect(rpcError?.code).toBe("42501");
+
+    const { data: state, error } = await admin
+      .from("endpoint_rate_limits")
+      .select("bucket")
+      .in("bucket", [listingBucket, wtbBucket])
+      .eq("key_hash", keyHash);
+    expect(error).toBeNull();
+    expect(state).toEqual([]);
+  });
+
+  it("keeps the hourly counter after a listing row is deleted and recreated", async () => {
+    for (let i = 0; i < 4; i++) {
+      const { data, error } = await admin.rpc("check_user_rate_limit", {
+        _bucket: listingBucket,
+        _user_id: userId,
+        _limit: 5,
+        _window_seconds: 3600,
+      });
+      expect(error).toBeNull();
+      expect(data).toBe(true);
+    }
+
+    const insertListing = (title: string) =>
+      admin.from("listings").insert({ seller_id: userId, title }).select("id").single();
+    const { data: first, error: firstError } = await insertListing("Kvotetest først");
+    expect(firstError).toBeNull();
+    expect((await admin.from("listings").delete().eq("id", first!.id)).error).toBeNull();
+    const { data: replacement, error: replacementError } =
+      await insertListing("Kvotetest erstattet");
+    expect(replacementError).toBeNull();
+    expect((await admin.from("listings").delete().eq("id", replacement!.id)).error).toBeNull();
+
+    const { data: fifth, error: fifthError } = await admin.rpc("check_user_rate_limit", {
+      _bucket: listingBucket,
+      _user_id: userId,
+      _limit: 5,
+      _window_seconds: 3600,
+    });
+    expect(fifthError).toBeNull();
+    expect(fifth).toBe(true);
+    const { data: sixth, error: sixthError } = await admin.rpc("check_user_rate_limit", {
+      _bucket: listingBucket,
+      _user_id: userId,
+      _limit: 5,
+      _window_seconds: 3600,
+    });
+    expect(sixthError).toBeNull();
+    expect(sixth).toBe(false);
+  });
 });
 
 describe.skipIf(!canRun)("RLS: report submission enforces the per-user limit", () => {
@@ -5787,6 +6554,16 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
         .select("internal_error")
         .eq("id", imageJobId);
       expect(secret.error).not.toBeNull();
+      const quotaRead = await client
+        .from("organization_daily_quotas")
+        .select("organization_id")
+        .eq("organization_id", organizationId);
+      expect(quotaRead.error).not.toBeNull();
+      const quotaWrite = await client.from("organization_daily_quotas").insert({
+        organization_id: organizationId,
+        usage_date: new Date().toISOString().slice(0, 10),
+      });
+      expect(quotaWrite.error).not.toBeNull();
       const insert = await client.from("listing_image_jobs").insert({
         organization_id: organizationId,
         listing_id: listingId,
@@ -6034,6 +6811,580 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
       .from("organizations")
       .update({ proff_access_until: new Date(Date.now() + 86_400_000).toISOString() })
       .eq("id", organizationId);
+  });
+});
+
+describe.skipIf(!canRun)("RLS: standard R2 upload quotas are atomic and service-only", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const email = `rls-upload-quota-${suffix}@example.com`;
+  const userIds: string[] = [];
+
+  beforeAll(async () => {
+    await createRlsUser(admin, email, userIds);
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  async function seedQuota(objectCount: number, totalBytes: number, windowStartedAt = new Date()) {
+    const { error } = await admin.from("standard_upload_quotas").upsert({
+      user_id: userIds[0]!,
+      window_started_at: windowStartedAt.toISOString(),
+      object_count: objectCount,
+      total_bytes: totalBytes,
+    });
+    expect(error).toBeNull();
+  }
+
+  it("denies anon/authenticated quota reads, writes, and RPC execution", async () => {
+    const client = await signInWithRetry(email);
+    const anon = createClient(URL!, ANON_KEY!);
+
+    for (const candidate of [anon, client]) {
+      const { data, error } = await candidate.from("standard_upload_quotas").select("user_id");
+      expect(error !== null || (data ?? []).length === 0).toBe(true);
+      const insert = await candidate.from("standard_upload_quotas").insert({
+        user_id: userIds[0]!,
+        object_count: 0,
+        total_bytes: 0,
+      });
+      expect(insert.error).not.toBeNull();
+      const update = await candidate
+        .from("standard_upload_quotas")
+        .update({ object_count: 0 })
+        .eq("user_id", userIds[0]!);
+      expect(update.error !== null || update.count === 0).toBe(true);
+      const rpc = await candidate.rpc("reserve_standard_upload_quota", {
+        _user_id: userIds[0]!,
+        _bytes: 1,
+      });
+      expect(rpc.error).not.toBeNull();
+    }
+  });
+
+  it("enforces the object ceiling under concurrent reservations", async () => {
+    const userId = userIds[0]!;
+    await seedQuota(499, 1);
+
+    const reservations = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        admin.rpc("reserve_standard_upload_quota", { _user_id: userId, _bytes: 1 }),
+      ),
+    );
+    expect(reservations.filter((result) => result.data === true)).toHaveLength(1);
+    expect(reservations.every((result) => result.error === null)).toBe(true);
+
+    const { data: quota, error: quotaError } = await admin
+      .from("standard_upload_quotas")
+      .select("object_count, total_bytes")
+      .eq("user_id", userId)
+      .single();
+    expect(quotaError).toBeNull();
+    expect(quota).toMatchObject({ object_count: 500, total_bytes: 2 });
+    const overLimit = await admin.rpc("reserve_standard_upload_quota", {
+      _user_id: userId,
+      _bytes: 1,
+    });
+    expect(overLimit.error).toBeNull();
+    expect(overLimit.data).toBe(false);
+  });
+
+  it("enforces the byte ceiling under concurrent reservations", async () => {
+    const userId = userIds[0]!;
+    await seedQuota(1, 536870911);
+    const reservations = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        admin.rpc("reserve_standard_upload_quota", { _user_id: userId, _bytes: 1 }),
+      ),
+    );
+    expect(reservations.filter((result) => result.data === true)).toHaveLength(1);
+    expect(reservations.every((result) => result.error === null)).toBe(true);
+    const { data: quota, error } = await admin
+      .from("standard_upload_quotas")
+      .select("object_count, total_bytes")
+      .eq("user_id", userId)
+      .single();
+    expect(error).toBeNull();
+    expect(quota).toMatchObject({ object_count: 2, total_bytes: 536870912 });
+  });
+
+  it("resets an expired 24-hour window atomically", async () => {
+    const userId = userIds[0]!;
+    await seedQuota(500, 536870912, new Date(Date.now() - 25 * 60 * 60 * 1000));
+    const result = await admin.rpc("reserve_standard_upload_quota", {
+      _user_id: userId,
+      _bytes: 7,
+    });
+    expect(result).toMatchObject({ data: true, error: null });
+    const { data: quota, error } = await admin
+      .from("standard_upload_quotas")
+      .select("object_count, total_bytes")
+      .eq("user_id", userId)
+      .single();
+    expect(error).toBeNull();
+    expect(quota).toMatchObject({ object_count: 1, total_bytes: 7 });
+  });
+
+  it("rejects zero and over-5-MiB reservations without changing quota totals", async () => {
+    const userId = userIds[0]!;
+    await seedQuota(3, 17);
+    const zeroBytes = await admin.rpc("reserve_standard_upload_quota", {
+      _user_id: userId,
+      _bytes: 0,
+    });
+    const tooManyBytes = await admin.rpc("reserve_standard_upload_quota", {
+      _user_id: userId,
+      _bytes: 5242881,
+    });
+    expect(zeroBytes).toMatchObject({ data: false, error: null });
+    expect(tooManyBytes).toMatchObject({ data: false, error: null });
+    const { data, error } = await admin
+      .from("standard_upload_quotas")
+      .select("object_count, total_bytes")
+      .eq("user_id", userId)
+      .single();
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ object_count: 3, total_bytes: 17 });
+  });
+});
+
+describe.skipIf(!canRun)("RLS: registered R2 orphan cleanup", () => {
+  const admin = createClient(URL!, SERVICE_ROLE_KEY!);
+  const userEmail = `rls-r2-cleanup-${Date.now()}@example.com`;
+  const partnerEmail = `rls-r2-cleanup-partner-${Date.now()}@example.com`;
+  let userId = "";
+  let partnerId = "";
+  let listingId = "";
+  let conversationId = "";
+  let organizationId = "";
+  let locationId = "";
+  let anon: SupabaseClient;
+  const keys: string[] = [];
+
+  beforeAll(async () => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email: userEmail,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (error) throw error;
+    userId = data.user!.id;
+    const partner = await admin.auth.admin.createUser({
+      email: partnerEmail,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (partner.error) throw partner.error;
+    partnerId = partner.data.user!.id;
+    anon = createClient(URL!, ANON_KEY!);
+
+    const listing = await admin
+      .from("listings")
+      .insert({ seller_id: userId, title: "R2 orphan fixture", price_nok: 100, status: "draft" })
+      .select("id")
+      .single();
+    if (listing.error) throw listing.error;
+    listingId = listing.data.id;
+    const conversation = await admin
+      .from("conversations")
+      .insert({ listing_id: listingId, buyer_id: partnerId, seller_id: userId })
+      .select("id")
+      .single();
+    if (conversation.error) throw conversation.error;
+    conversationId = conversation.data.id;
+
+    const organization = await admin
+      .from("organizations")
+      .insert({
+        organization_number: String(400_000_000 + (Date.now() % 500_000_000)),
+        legal_name: "R2 orphan fixture",
+        display_name: "R2 orphan fixture",
+      })
+      .select("id")
+      .single();
+    if (organization.error) throw organization.error;
+    organizationId = organization.data.id;
+    const location = await admin
+      .from("organization_locations")
+      .insert({ organization_id: organizationId, name: "R2 orphan fixture", is_default: true })
+      .select("id")
+      .single();
+    if (location.error) throw location.error;
+    locationId = location.data.id;
+  });
+
+  afterAll(async () => {
+    if (keys.length) await admin.from("standard_upload_objects").delete().in("object_key", keys);
+    if (conversationId) {
+      await admin.from("messages").delete().eq("conversation_id", conversationId);
+      await admin.from("conversations").delete().eq("id", conversationId);
+    }
+    if (listingId) {
+      await admin.from("listing_images").delete().eq("listing_id", listingId);
+      await admin.from("listings").delete().eq("id", listingId);
+    }
+    if (locationId) {
+      await admin.from("organization_location_contacts").delete().eq("location_id", locationId);
+      await admin.from("organization_locations").delete().eq("id", locationId);
+    }
+    if (organizationId) await admin.from("organizations").delete().eq("id", organizationId);
+    if (userId) await admin.auth.admin.deleteUser(userId);
+    if (partnerId) await admin.auth.admin.deleteUser(partnerId);
+  });
+
+  it("claims old orphans, retains references, rejects late references, and retries failures", async () => {
+    const orphanKey = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
+    const referencedKey = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
+    const recentKey = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
+    keys.push(orphanKey, referencedKey, recentKey);
+    expect(
+      await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: orphanKey }),
+    ).toMatchObject({ error: null });
+    expect(
+      await admin.rpc("register_standard_upload_object", {
+        _bucket: "BILDER",
+        _key: referencedKey,
+      }),
+    ).toMatchObject({ error: null });
+    expect(
+      await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: recentKey }),
+    ).toMatchObject({ error: null });
+    await admin
+      .from("standard_upload_objects")
+      .update({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+      .in("object_key", [orphanKey, referencedKey]);
+    const { error: referenceError } = await admin
+      .from("profiles")
+      .update({ avatar_url: `https://bilder.kaupet.no/${referencedKey}` })
+      .eq("id", userId);
+    expect(referenceError).toBeNull();
+
+    const { data: firstClaim, error: claimError } = await admin.rpc(
+      "claim_orphan_standard_uploads",
+      { _limit: 100 },
+    );
+    expect(claimError).toBeNull();
+    const firstRows = firstClaim as
+      { id: number; bucket: string; object_key: string; attempts: number }[] | null;
+    const orphan = firstRows!.find((row) => row.object_key === orphanKey);
+    expect(orphan).toMatchObject({ bucket: "BILDER", object_key: orphanKey, attempts: 0 });
+    expect(firstRows!.some((row) => row.object_key === referencedKey)).toBe(false);
+    expect(firstRows!.some((row) => row.object_key === recentKey)).toBe(false);
+
+    const { error: lateReferenceError } = await admin
+      .from("profiles")
+      .update({ avatar_url: `https://bilder.kaupet.no/${orphanKey}` })
+      .eq("id", userId);
+    expect(lateReferenceError).not.toBeNull();
+    expect(lateReferenceError!.message).toMatch(/under opprydding/);
+
+    expect(
+      (
+        await admin.rpc("finish_orphan_standard_upload", {
+          _id: orphan!.id,
+          _deleted: false,
+          _error: "R2 nede",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await admin.rpc("register_standard_upload_object", {
+          _bucket: "BILDER",
+          _key: orphanKey,
+        })
+      ).error,
+    ).not.toBeNull();
+    await admin
+      .from("standard_upload_objects")
+      .update({ claimed_at: new Date(Date.now() - 16 * 60 * 1000).toISOString() })
+      .eq("id", orphan!.id);
+    const { data: retryClaim, error: retryError } = await admin.rpc(
+      "claim_orphan_standard_uploads",
+      { _limit: 100 },
+    );
+    expect(retryError).toBeNull();
+    const retryRows = retryClaim as
+      { id: number; bucket: string; object_key: string; attempts: number }[] | null;
+    const retry = retryRows!.find((row) => row.object_key === orphanKey);
+    expect(retry).toMatchObject({ attempts: 1 });
+    expect(
+      (await admin.rpc("finish_orphan_standard_upload", { _id: retry!.id, _deleted: true })).error,
+    ).toBeNull();
+    const { error: deletedReferenceError } = await admin
+      .from("profiles")
+      .update({ avatar_url: `https://bilder.kaupet.no/${orphanKey}` })
+      .eq("id", userId);
+    expect(deletedReferenceError).not.toBeNull();
+    expect(
+      (
+        await admin.rpc("register_standard_upload_object", {
+          _bucket: "BILDER",
+          _key: orphanKey,
+        })
+      ).error,
+    ).not.toBeNull();
+  });
+
+  it("retains each supported metadata reference until it is cleared", async () => {
+    const listingKey = `${listingId}/${crypto.randomUUID()}.jpg`;
+    const thumbKey = listingKey.replace(/\.jpg$/, "-thumb.jpg");
+    const logoKey = `${organizationId}/logo-${crypto.randomUUID()}.jpg`;
+    const contactKey = `${organizationId}/contact-${crypto.randomUUID()}.jpg`;
+    const attachmentKey = `${conversationId}/${crypto.randomUUID()}.jpg`;
+    const mediaKeys = [listingKey, thumbKey, logoKey, contactKey, attachmentKey];
+    keys.push(...mediaKeys);
+
+    for (const [index, key] of mediaKeys.entries()) {
+      const bucket = index === mediaKeys.length - 1 ? "VEDLEGG" : "BILDER";
+      expect(
+        await admin.rpc("register_standard_upload_object", { _bucket: bucket, _key: key }),
+      ).toMatchObject({ error: null });
+    }
+    await admin
+      .from("standard_upload_objects")
+      .update({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+      .eq("object_key", thumbKey);
+    const thumbBefore = await admin
+      .from("standard_upload_objects")
+      .select("created_at")
+      .eq("object_key", thumbKey)
+      .single();
+    expect(
+      (await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: thumbKey }))
+        .error,
+    ).toBeNull();
+    const thumbAfter = await admin
+      .from("standard_upload_objects")
+      .select("created_at")
+      .eq("object_key", thumbKey)
+      .single();
+    expect(new Date(thumbAfter.data!.created_at).getTime()).toBeGreaterThan(
+      new Date(thumbBefore.data!.created_at).getTime(),
+    );
+    await admin
+      .from("standard_upload_objects")
+      .update({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+      .in("object_key", mediaKeys);
+
+    const listingImage = await admin
+      .from("listing_images")
+      .insert({ listing_id: listingId, storage_path: listingKey })
+      .select("id")
+      .single();
+    expect(listingImage.error).toBeNull();
+    expect(
+      (await admin.from("organizations").update({ logo_path: logoKey }).eq("id", organizationId))
+        .error,
+    ).toBeNull();
+    const contact = await admin
+      .from("organization_location_contacts")
+      .insert({
+        location_id: locationId,
+        organization_id: organizationId,
+        name: "R2 testkontakt",
+        phone: "12345678",
+        avatar_path: contactKey,
+      })
+      .select("id")
+      .single();
+    expect(contact.error).toBeNull();
+    const message = await admin
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        body: "Vedleggstest",
+        attachment_path: attachmentKey,
+      })
+      .select("id")
+      .single();
+    expect(message.error).toBeNull();
+
+    const { data: firstClaim, error: firstError } = await admin.rpc(
+      "claim_orphan_standard_uploads",
+      { _limit: 100 },
+    );
+    expect(firstError).toBeNull();
+    const firstRows = firstClaim as { id: number; bucket: string; object_key: string }[] | null;
+    expect(mediaKeys.every((key) => !firstRows!.some((row) => row.object_key === key))).toBe(true);
+
+    expect(
+      (await admin.from("listing_images").delete().eq("id", listingImage.data!.id)).error,
+    ).toBeNull();
+    expect(
+      (await admin.from("organizations").update({ logo_path: null }).eq("id", organizationId))
+        .error,
+    ).toBeNull();
+    expect(
+      (await admin.from("organization_location_contacts").delete().eq("id", contact.data!.id))
+        .error,
+    ).toBeNull();
+    expect((await admin.from("messages").delete().eq("id", message.data!.id)).error).toBeNull();
+
+    const { data: clearedClaim, error: clearedError } = await admin.rpc(
+      "claim_orphan_standard_uploads",
+      { _limit: 100 },
+    );
+    expect(clearedError).toBeNull();
+    const clearedRows = clearedClaim as { id: number; bucket: string; object_key: string }[] | null;
+    const nowClaimed = clearedRows!.filter((row) => mediaKeys.includes(row.object_key));
+    expect(nowClaimed.map((row) => row.object_key).sort()).toEqual([...mediaKeys].sort());
+    for (const row of nowClaimed) {
+      expect(
+        (await admin.rpc("finish_orphan_standard_upload", { _id: row.id, _deleted: true })).error,
+      ).toBeNull();
+    }
+  });
+
+  it("renews cleanup grace when an old thumbnail is registered again", async () => {
+    const thumbKey = `${listingId}/${crypto.randomUUID()}-thumb.jpg`;
+    const orphanKey = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
+    keys.push(thumbKey, orphanKey);
+    for (const key of [thumbKey, orphanKey]) {
+      expect(
+        (await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: key }))
+          .error,
+      ).toBeNull();
+    }
+    await admin
+      .from("standard_upload_objects")
+      .update({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+      .in("object_key", [thumbKey, orphanKey]);
+
+    expect(
+      (await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: thumbKey }))
+        .error,
+    ).toBeNull();
+    const { data, error } = await admin.rpc("claim_orphan_standard_uploads", { _limit: 100 });
+    expect(error).toBeNull();
+    const rows = data as { object_key: string }[] | null;
+    expect(rows!.some((row) => row.object_key === thumbKey)).toBe(false);
+    expect(rows!.some((row) => row.object_key === orphanKey)).toBe(true);
+  });
+
+  it("rejects listing and message references after claim and after deletion", async () => {
+    const listingKey = `${listingId}/${crypto.randomUUID()}.jpg`;
+    const attachmentKey = `${conversationId}/${crypto.randomUUID()}.jpg`;
+    keys.push(listingKey, attachmentKey);
+    for (const [bucket, key] of [
+      ["BILDER", listingKey],
+      ["VEDLEGG", attachmentKey],
+    ] as const) {
+      expect(
+        (await admin.rpc("register_standard_upload_object", { _bucket: bucket, _key: key })).error,
+      ).toBeNull();
+    }
+    await admin
+      .from("standard_upload_objects")
+      .update({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+      .in("object_key", [listingKey, attachmentKey]);
+    const { data, error } = await admin.rpc("claim_orphan_standard_uploads", { _limit: 100 });
+    expect(error).toBeNull();
+    const claimedRows = data as { id: number; object_key: string }[] | null;
+    const claimedIds = new Map(claimedRows!.map((row) => [row.object_key, row.id]));
+    expect(claimedIds.has(listingKey)).toBe(true);
+    expect(claimedIds.has(attachmentKey)).toBe(true);
+
+    const rejectReferences = async () => {
+      const listingInsert = await admin
+        .from("listing_images")
+        .insert({ listing_id: listingId, storage_path: listingKey });
+      const messageInsert = await admin.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        body: "Vedlegg etter sletting",
+        attachment_path: attachmentKey,
+      });
+      expect(listingInsert.error?.message).toMatch(/under opprydding/);
+      expect(messageInsert.error?.message).toMatch(/under opprydding/);
+    };
+    await rejectReferences();
+    for (const id of claimedIds.values()) {
+      expect(
+        (await admin.rpc("finish_orphan_standard_upload", { _id: id, _deleted: true })).error,
+      ).toBeNull();
+    }
+    await rejectReferences();
+    expect(
+      (await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: listingKey }))
+        .error,
+    ).not.toBeNull();
+    expect(
+      (
+        await admin.rpc("register_standard_upload_object", {
+          _bucket: "VEDLEGG",
+          _key: attachmentKey,
+        })
+      ).error,
+    ).not.toBeNull();
+  });
+
+  it("excludes max-retry rows and prunes deleted tombstones older than seven days", async () => {
+    const exhaustedKey = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
+    const pruneKey = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
+    keys.push(exhaustedKey, pruneKey);
+    for (const key of [exhaustedKey, pruneKey]) {
+      expect(
+        (await admin.rpc("register_standard_upload_object", { _bucket: "BILDER", _key: key }))
+          .error,
+      ).toBeNull();
+    }
+    await admin
+      .from("standard_upload_objects")
+      .update({
+        created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+        attempts: 10,
+      })
+      .eq("object_key", exhaustedKey);
+    await admin
+      .from("standard_upload_objects")
+      .update({ created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+      .eq("object_key", pruneKey);
+
+    const { data: claim, error } = await admin.rpc("claim_orphan_standard_uploads", {
+      _limit: 100,
+    });
+    expect(error).toBeNull();
+    const claimRows = claim as { id: number; object_key: string }[] | null;
+    expect(claimRows!.some((row) => row.object_key === exhaustedKey)).toBe(false);
+    const pruned = claimRows!.find((row) => row.object_key === pruneKey);
+    expect(pruned).toBeDefined();
+    expect(
+      (await admin.rpc("finish_orphan_standard_upload", { _id: pruned!.id, _deleted: true })).error,
+    ).toBeNull();
+    await admin
+      .from("standard_upload_objects")
+      .update({ claimed_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString() })
+      .eq("object_key", pruneKey);
+    expect((await admin.rpc("claim_orphan_standard_uploads", { _limit: 100 })).error).toBeNull();
+    const tombstone = await admin
+      .from("standard_upload_objects")
+      .select("id")
+      .eq("object_key", pruneKey)
+      .maybeSingle();
+    expect(tombstone.error).toBeNull();
+    expect(tombstone.data).toBeNull();
+    expect(
+      (
+        await admin
+          .from("standard_upload_objects")
+          .select("state, attempts")
+          .eq("object_key", exhaustedKey)
+          .single()
+      ).data,
+    ).toMatchObject({ state: "ready", attempts: 10 });
+  });
+
+  it("keeps the registry and claim RPC private to service role", async () => {
+    const { error: tableError } = await anon.from("standard_upload_objects").select("id").limit(1);
+    expect(tableError).not.toBeNull();
+    const signedIn = await signInWithRetry(userEmail);
+    const { error: rpcError } = await signedIn.rpc("claim_orphan_standard_uploads", { _limit: 1 });
+    expect(rpcError).not.toBeNull();
   });
 });
 

@@ -141,16 +141,22 @@ describe("business plan comparison", () => {
     expect(hasEffectiveProffAccess(expired, Date.parse("2026-09-01T00:00:00.000Z"))).toBe(false);
 
     cleanup();
+    // Evergreen-datoer: komponenten sammenligner mot reell nåtid
+    // (hasEffectiveProffAccess med Date.now()), så hardkodede datoer for
+    // «aktiv» ble en tidsbombe — testen blei grønn skrevet, men rød idet
+    // access_until-datoen passerte (29.→30. sep 2026). +14 dager holder
+    // planen aktiv uansett når testen kjører.
+    const activeNow = Date.now();
     const active = {
       selected_plan: "proff",
-      proff_access_until: "2026-09-30T00:00:00.000Z",
-      proff_trial_started_at: "2026-09-01T00:00:00.000Z",
-      proff_trial_ends_at: "2026-10-01T00:00:00.000Z",
+      proff_access_until: new Date(activeNow + 14 * 864e5).toISOString(),
+      proff_trial_started_at: new Date(activeNow - 14 * 864e5).toISOString(),
+      proff_trial_ends_at: new Date(activeNow + 14 * 864e5).toISOString(),
       proff_trial_cancelled_at: null,
     } as const;
     renderPlans(active);
     expect(screen.getAllByRole("button", { name: "Valgt" }).length).toBeGreaterThan(0);
-    expect(hasEffectiveProffAccess(active, Date.parse("2026-09-15T00:00:00.000Z"))).toBe(true);
+    expect(hasEffectiveProffAccess(active, activeNow)).toBe(true);
   });
 
   it("switches the Proff price to the discounted yearly term", async () => {

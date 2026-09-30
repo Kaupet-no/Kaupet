@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Laptop } from "lucide-react";
 import { registerPlugin } from "@capacitor/core";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { androidNavigationUrl, localDevServerUrl } from "@/lib/dev-server-url";
 
 interface ServerTargetPlugin {
   set(options: { url: string | null }): Promise<void>;
+  lastDevAddress(): Promise<{ url: string | null }>;
 }
 
 // Bridges to the native ServerTargetPlugin. Persists the choice natively and
@@ -23,6 +24,20 @@ export function DevServerSwitch() {
   const onStaging = currentHost === STAGING_HOST;
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
+
+  // Forhåndsutfyll med sist brukte dev-serveradresse (lagret nativt av
+  // ServerTargetPlugin) — samme husking som velgeren ved kaldstart viser.
+  // Metoden finnes bare i Android-pluginen; på iOS avvises kallet og feltet
+  // står tomt.
+  useEffect(() => {
+    ServerTarget.lastDevAddress()
+      .then(({ url }) => {
+        if (url) {
+          setAddress(url.replace(/^http:\/\//, ""));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const connectToLocal = () => {
     const url = localDevServerUrl(address);

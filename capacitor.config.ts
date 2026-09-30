@@ -20,6 +20,9 @@ const config: CapacitorConfig = {
     // kommet forbi access-veggen ved kaldstart. I stedet lastes den lokale
     // capacitor-shell/index.html først, som lar brukeren velge
     // staging.kaupet.no eller en lokal IP før WebViewen navigerer dit.
+    // Velgeren vises ved hver kaldstart; sist brukte dev-adresse huskes
+    // nativt og forhåndsutfylles (ServerTargetPlugin/MainActivity på
+    // Android).
     url: isStaging ? undefined : "https://kaupet.no",
     errorPath: "offline.html",
     // Staging may connect to a local private-network dev server, but never

@@ -38,10 +38,10 @@ public class MainActivity extends BridgeActivity {
         // ServerTargetPlugin is staging-only, the same boundary iOS draws with
         // #if DEBUG (see KaupetBridgeViewController.capacitorDidLoad in
         // AppDelegate.swift, and the reasoning in its comment there): set()
-        // decides what origin every future cold launch is built against, and
-        // must not be callable from JS running on the bridge origin in a signed
-        // production build. Gating only the READ of the stored value still left
-        // set() reachable — and it calls recreate().
+        // decides what origin the next Bridge (after recreate()) is built
+        // against, and must not be callable from JS running on the bridge
+        // origin in a signed production build. Gating only the READ of the
+        // stored value still left set() reachable — and it calls recreate().
         if (isStaging()) {
             registerPlugin(ServerTargetPlugin.class);
         }
@@ -51,23 +51,32 @@ public class MainActivity extends BridgeActivity {
         // Staging's "Velg server" screen (capacitor-shell/index.html) and
         // the in-app DevServerSwitch persist their choice via
         // ServerTargetPlugin instead of redirecting the live WebView there.
-        // If a choice is stored, build the Bridge's config with server.url
-        // already pointing at it — set on `config` (read by
-        // BridgeActivity.load(), called from super.onCreate()) BEFORE
-        // super.onCreate() runs. A runtime redirect never gets Capacitor's
-        // plugin-dispatch JS injection (scoped to the origin the Bridge was
-        // created with — see Bridge.loadWebView in
-        // node_modules/@capacitor/android), which is why every native
-        // plugin used to die on staging once the user picked a server.
-        // Without a stored choice, the shell loads exactly as it does today.
+        // A runtime redirect never gets Capacitor's plugin-dispatch JS
+        // injection (scoped to the origin the Bridge was created with — see
+        // Bridge.loadWebView in node_modules/@capacitor/android), which is
+        // why every native plugin used to die on staging once the user picked
+        // a server. The chosen target is therefore applied as server.url —
+        // set on `config` (read by BridgeActivity.load(), called from
+        // super.onCreate()) BEFORE super.onCreate() runs — but only when the
+        // Activity is RE-created within the same session
+        // (savedInstanceState != null: recreate() after a pick, rotation or
+        // other config change while connected). A cold launch from the
+        // launcher (savedInstanceState == null) ALWAYS lands on the chooser:
+        // any stored target is stale from a previous session and is cleared,
+        // so the user is asked every time. The last dev-server address is
+        // kept separately (ServerTargetPlugin.KEY_LAST_DEV) and pre-filled in
+        // the chooser's input, so it never has to be re-typed.
         if (isStaging()) {
             SharedPreferences prefs = getSharedPreferences(ServerTargetPlugin.PREFS, MODE_PRIVATE);
             String target = prefs.getString(ServerTargetPlugin.KEY_URL, null);
-            if (target != null) {
+            if (target != null && savedInstanceState != null) {
                 CapConfig overridden = configWithServerUrl(target);
                 if (overridden != null) {
                     config = overridden;
                 }
+            } else if (target != null) {
+                // Cold start: ask again, regardless of the previous choice.
+                prefs.edit().remove(ServerTargetPlugin.KEY_URL).apply();
             }
         }
 
@@ -270,25 +279,27 @@ public class MainActivity extends BridgeActivity {
         view.evaluateJavascript(script, null);
     }
 
-    // Redder appen ut av en død dev-server uten å røre UI. Når et servermål
-    // ligger lagret, er Bridge-en bygget mot DET målet (se onCreate), så
-    // "Velg server"-skjermen (capacitor-shell/index.html) lastes aldri igjen
-    // — den vises kun når INGEN mål er lagret. Slutter Vite-serveren å svare
-    // (utviklerens maskin sover, byttet nettverk), faller Capacitor tilbake
-    // på errorPath: capacitor-shell/offline.html, servert fra appens egen
-    // lokale origin. Der er window.Capacitor aldri injisert — plugin-dispatch
-    // er origin-scoped til origin-en Bridge-en ble opprettet med (server.url),
-    // ikke den lokale origin-en siden er servert fra — så offline.html kan
-    // ikke kalle ServerTarget.set({url: null}) for å rydde opp selv.
-    // DevServerSwitch, som ellers kunne løst det samme, ligger i SPA-en som
-    // aldri booter. Uten dette er eneste vei ut å slette appdata eller
-    // installere på nytt.
+    // Redder appen ut av en død dev-server uten å røre UI. Et valgt mål
+    // ligger lagret frem til kaldstart (se onCreate), så lenge økten varer
+    // er Bridge-en bygget mot DET målet, og "Velg server"-skjermen
+    // (capacitor-shell/index.html) kan ikke lastes direkte — den vises ved
+    // kaldstart og etter at et mål ryddes vekk her. Slutter Vite-serveren å
+    // svare (utviklerens maskin sover, byttet nettverk), faller Capacitor
+    // tilbake på errorPath: capacitor-shell/offline.html, servert fra
+    // appens egen lokale origin. Der er window.Capacitor aldri injisert —
+    // plugin-dispatch er origin-scoped til origin-en Bridge-en ble
+    // opprettet med (server.url), ikke den lokale origin-en siden er servert
+    // fra — så offline.html kan ikke kalle ServerTarget.set({url: null}) for
+    // å rydde opp selv. DevServerSwitch, som ellers kunne løst det samme,
+    // ligger i SPA-en som aldri booter. Uten dette er eneste vei ut å slette
+    // appdata eller installere på nytt.
     //
     // Regelen er trygg: lagret mål ⇒ Bridge mot det målet ⇒ lokal shell-side
     // kan kun nås via errorPath ⇒ målet er dødt. Etter recreate() er intet
-    // mål lagret lenger, så neste Bridge bygges mot den lokale origin-en, og
-    // DA er "siden er lokal shell" den NORMALE tilstanden — men betingelsen
-    // under er da false (ingenting er lagret), så det looper aldri.
+    // mål lagret lenger, så neste Bridge bygges mot den lokale origin-en og
+    // viser velgeren — med sist brukte dev-adresse forhåndsutfylt
+    // (KEY_LAST_DEV ryddes ikke her) — og betingelsen under er da false
+    // (ingenting er lagret), så det looper aldri.
     //
     // Bevisst avveining: en forbigående nettverksfeil mot et ellers GYLDIG
     // staging-mål trigger det samme og sender utvikleren tilbake til

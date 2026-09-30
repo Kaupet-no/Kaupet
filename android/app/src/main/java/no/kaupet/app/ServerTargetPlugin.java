@@ -2,6 +2,7 @@ package no.kaupet.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -22,16 +23,21 @@ import java.net.URL;
 // Registered by MainActivity.onCreate ONLY on the staging flavor (package name
 // ending in ".staging") — the same boundary iOS draws with #if DEBUG, see
 // KaupetBridgeViewController.capacitorDidLoad in AppDelegate.swift. set()
-// decides what origin every future cold launch is built against, so it must not
-// be reachable from JS running on the bridge origin in a signed production
-// build; gating only the READ of the stored value would leave set() — which
-// calls recreate() — callable. In production the plugin is simply not
+// decides what origin the next Bridge (after recreate()) is built against, so
+// it must not be reachable from JS running on the bridge origin in a signed
+// production build; gating only the READ of the stored value would leave set()
+// — which calls recreate() — callable. In production the plugin is simply not
 // registered, and a call from JS rejects with "not implemented".
 @CapacitorPlugin(name = "ServerTarget")
 public class ServerTargetPlugin extends Plugin {
 
     static final String PREFS = "server_target";
     static final String KEY_URL = "url";
+    // Sist brukte dev-serveradresse. KEY_URL ryddes vekk ved kaldstart (se
+    // MainActivity.onCreate), mens denne skal overleve — den er det som
+    // forhåndsutfyller velgerens adressefelt (capacitor-shell/index.html)
+    // og DevServerSwitch, slik at adressen ikke må tastes inn på nytt.
+    static final String KEY_LAST_DEV = "last_dev";
 
     @PluginMethod
     public void set(PluginCall call) {
@@ -48,6 +54,20 @@ public class ServerTargetPlugin extends Plugin {
         SharedPreferences.Editor editor = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
         if (resolved != null) {
             editor.putString(KEY_URL, resolved);
+            // Husk dev-adressen på tvers av økter — også etter at brukeren
+            // har koblet tilbake til staging. Å velge staging.kaupet.no skal
+            // ikke viske ut en adresse brukeren kanskje vil gjenbruke i morgen.
+            // Lagres i «innskrevet form»: localhost er allerede oversatt til
+            // 127.0.0.1 her (androidNavigationUrl, for adb reverse), men
+            // velgerens validering avviser 127.0.0.1 — så mappes den tilbake
+            // før den huskes, slik at forhåndsutfyllingen faktisk godtas.
+            if (!"https://staging.kaupet.no".equals(resolved)) {
+                String remembered = resolved;
+                if (resolved.startsWith("http://127.0.0.1")) {
+                    remembered = "http://localhost" + resolved.substring("http://127.0.0.1".length());
+                }
+                editor.putString(KEY_LAST_DEV, remembered);
+            }
         } else {
             editor.remove(KEY_URL);
         }
@@ -57,6 +77,19 @@ public class ServerTargetPlugin extends Plugin {
         // Cold-load a fresh Bridge against the new (or cleared) target
         // instead of navigating the live WebView there.
         getActivity().runOnUiThread(() -> getActivity().recreate());
+    }
+
+    // Velgerens adressefelt og DevServerSwitch pre-filler herfra. Leser
+    // KEY_LAST_DEV (ikke KEY_URL), så husket adresse overlever både
+    // kaldstartens opprydding og velgerens staging-valg.
+    @PluginMethod
+    public void lastDevAddress(PluginCall call) {
+        String lastDev = getContext()
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_LAST_DEV, null);
+        JSObject result = new JSObject();
+        result.put("url", lastDev);
+        call.resolve(result);
     }
 
     // Re-validates server-side — never trust the JS caller alone, since this

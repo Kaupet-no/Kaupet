@@ -22,6 +22,7 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/**/*.integration.test.ts",
+        "src/lib/rls-test-helpers.ts",
         "src/integrations/supabase/types.ts",
         "src/routeTree.gen.ts",
         "src/components/ui/**",

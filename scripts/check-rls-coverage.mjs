@@ -15,7 +15,11 @@ for (const file of readdirSync(migrationDir)
   }
 }
 
-const rlsTests = readFileSync("src/lib/rls.integration.test.ts", "utf8");
+const rlsDir = "src/lib/rls";
+const rlsTests = readdirSync(rlsDir)
+  .filter((name) => name.endsWith(".integration.test.ts"))
+  .map((name) => readFileSync(join(rlsDir, name), "utf8"))
+  .join("\n");
 const referenced = new Set(
   [...rlsTests.matchAll(/\.from\(\s*["']([a-z][a-z0-9_]*)["']\s*\)/g)].map((match) => match[1]),
 );

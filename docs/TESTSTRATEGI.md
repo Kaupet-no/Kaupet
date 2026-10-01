@@ -71,15 +71,15 @@ ISTQB-nivåene mappet konkret til dette repoet:
 **Nivåvalgstabell.** Slå opp raden som passer og bruk nivået den gir. Ikke
 vurder — slå opp. Passer flere rader, velg den øverste.
 
-| Det du tester                                                  | Nivå      | Filnavn                           | Kommando                                           |
-| -------------------------------------------------------------- | --------- | --------------------------------- | -------------------------------------------------- |
-| Ren funksjon, domeneregel, parser, validator, formatering      | Unit      | `<modul>.test.ts`                 | `bun run test -- <sti>`                            |
-| Hook uten DOM                                                  | Unit      | `<hook>.test.ts`                  | `bun run test -- <sti>`                            |
-| Fokus, ARIA, etikett, tastatur, betinget rendering, tilstander | Komponent | `<komponent>.test.tsx`            | `bun run test -- <sti>`                            |
-| Hvem får lese/skrive rad X                                     | RLS       | `src/lib/rls.integration.test.ts` | `bun run test:rls`                                 |
-| Serverfunksjon: autorisasjon, validering, idempotens           | Unit      | `<modul>.test.ts`                 | `bun run test -- <sti>`                            |
-| Flere sider, navigasjon, ekte publisering, innlogging          | E2E       | `e2e/<flyt>.spec.ts`              | `bunx playwright test <fil> --project=desktop-web` |
-| Layout/visuell kontrakt på avtalt milepælsflate                | Visuell   | `e2e/<flyt>.visual.spec.ts`       | `bunx playwright test <fil> --project=visual-web`  |
+| Det du tester                                                  | Nivå      | Filnavn                             | Kommando                                           |
+| -------------------------------------------------------------- | --------- | ----------------------------------- | -------------------------------------------------- |
+| Ren funksjon, domeneregel, parser, validator, formatering      | Unit      | `<modul>.test.ts`                   | `bun run test -- <sti>`                            |
+| Hook uten DOM                                                  | Unit      | `<hook>.test.ts`                    | `bun run test -- <sti>`                            |
+| Fokus, ARIA, etikett, tastatur, betinget rendering, tilstander | Komponent | `<komponent>.test.tsx`              | `bun run test -- <sti>`                            |
+| Hvem får lese/skrive rad X                                     | RLS       | `src/lib/rls/*.integration.test.ts` | `bun run test:rls`                                 |
+| Serverfunksjon: autorisasjon, validering, idempotens           | Unit      | `<modul>.test.ts`                   | `bun run test -- <sti>`                            |
+| Flere sider, navigasjon, ekte publisering, innlogging          | E2E       | `e2e/<flyt>.spec.ts`                | `bunx playwright test <fil> --project=desktop-web` |
+| Layout/visuell kontrakt på avtalt milepælsflate                | Visuell   | `e2e/<flyt>.visual.spec.ts`         | `bunx playwright test <fil> --project=visual-web`  |
 
 Å skrive en E2E-test for noe en unit-test kan bevise er en feil, ikke
 grundighet. Finner du ingen rad som passer: **stopp og eskaler** (§ 16.3).
@@ -319,7 +319,7 @@ Hver playbook er selvstendig. En agent som får en oppgave skal:
 
 ```
 1. Krever lokal stack: supabase start (Docker). Testene ligger i
-   src/lib/rls.integration.test.ts.
+   src/lib/rls/*.integration.test.ts (hjelpere i src/lib/rls-test-helpers.ts).
 2. For hver tabell som eksponeres skal minst tre roller testes:
    eier, annen innlogget bruker, anonym. Der relevant også: moderator,
    admin, utestengt/suspendert bruker.
@@ -678,7 +678,7 @@ eller mot mock.
 
 ### 11.12 Data, migrasjoner og RLS — R1
 
-Gjennomføres etter PB-4. `src/lib/rls.integration.test.ts` dekker i dag ~35
+Gjennomføres etter PB-4. `src/lib/rls/*.integration.test.ts` dekker i dag ~35
 tabeller/scenarioer. Kravet er _fullstendig_ dekning av tabellene under.
 
 | ID    | Nivå    | P   | Tittel                                                                                     | Forventet resultat                                                                                                                   |

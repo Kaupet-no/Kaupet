@@ -14,5 +14,9 @@ export default defineConfig({
     // two or three sign-ins can legitimately take longer than that even
     // though nothing is actually broken.
     testTimeout: 30000,
+    // Filene deler Supabase-stacken og globale rader (site_settings, rate-limit-
+    // tabeller, kategorislugs, auth-rate-limit) og lager data med Date.now()-
+    // suffikser. Serielt er trygt og gir deterministiske feil.
+    fileParallelism: false,
   },
 });

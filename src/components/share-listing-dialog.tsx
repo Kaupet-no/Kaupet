@@ -21,29 +21,36 @@ type Props = {
 export function ShareListingDialog({ open, onOpenChange, kaupetCode, title, isNative }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [qrSrc, setQrSrc] = useState<string | null>(null);
-  const [qrError, setQrError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [qr, setQr] = useState<{ url: string; src: string | null; error: string | null } | null>(
+    null,
+  );
   const url = `https://kaupet.no/${kaupetCode}`;
+
+  // Åpning nullstiller resultatet, så en gjenåpning viser spinner og genererer
+  // på nytt; ved lukking står QR-en til animasjonen er ferdig (som før).
+  // Resultat for en annen url regnes som ingen.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setQr(null);
+  }
+  const current = qr?.url === url ? qr : null;
+  const qrSrc = current?.src ?? null;
+  const qrError = current?.error ?? null;
+  const generating = open && current === null;
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setGenerating(true);
-    setQrError(null);
-    setQrSrc(null);
     generateBrandedQrDataUrl(url)
       .then((dataUrl) => {
         if (cancelled) return;
-        setQrSrc(dataUrl);
+        setQr({ url, src: dataUrl, error: null });
       })
       .catch((err) => {
         if (cancelled) return;
         console.error("QR generation failed", err);
-        setQrError("Kunne ikke generere QR-kode");
-      })
-      .finally(() => {
-        if (!cancelled) setGenerating(false);
+        setQr({ url, src: null, error: "Kunne ikke generere QR-kode" });
       });
     return () => {
       cancelled = true;

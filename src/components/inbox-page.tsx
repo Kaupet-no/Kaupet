@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
-import { isUnread } from "@/lib/unread";
+import { isUnread, messagePreview } from "@/lib/unread";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
 type ConversationRow = {
@@ -154,7 +154,7 @@ export function InboxPage() {
           buyer: pmap.get(c.buyer_id) ?? null,
           seller: pmap.get(c.seller_id) ?? null,
         }));
-        return await attachLastMessage(enriched);
+        return hideUnstartedForCounterpart(await attachLastMessage(enriched), user!.id);
       }
       const normalised = ((data ?? []) as unknown as RawConv[]).map((c) => ({
         ...c,
@@ -162,7 +162,7 @@ export function InboxPage() {
         buyer: (Array.isArray(c.buyer) ? c.buyer[0] : c.buyer) ?? null,
         seller: (Array.isArray(c.seller) ? c.seller[0] : c.seller) ?? null,
       }));
-      return await attachLastMessage(normalised);
+      return hideUnstartedForCounterpart(await attachLastMessage(normalised), user!.id);
     },
   });
 
@@ -567,6 +567,12 @@ function PushHintForMessages() {
   );
 }
 
+/** En samtale kjøperen bare har åpnet (ingen meldinger ennå) vises ikke for
+ * selgeren — se #3 i docs/test/staging-gjennomgang-2026-10-01.md. */
+function hideUnstartedForCounterpart(rows: ConversationRow[], myId: string): ConversationRow[] {
+  return rows.filter((c) => c.last_message || c.buyer_id === myId);
+}
+
 async function attachLastMessage(
   convs: Omit<ConversationRow, "last_message">[],
 ): Promise<ConversationRow[]> {
@@ -574,14 +580,14 @@ async function attachLastMessage(
   const ids = convs.map((c) => c.id);
   const { data } = await supabase
     .from("messages")
-    .select("conversation_id, body, created_at, sender_id, deleted_at")
+    .select("conversation_id, body, created_at, sender_id, deleted_at, attachment_path")
     .in("conversation_id", ids)
     .order("created_at", { ascending: false });
   const lastByConv = new Map<string, { body: string; created_at: string; sender_id: string }>();
   for (const m of data ?? []) {
     if (!lastByConv.has(m.conversation_id)) {
       lastByConv.set(m.conversation_id, {
-        body: m.deleted_at ? "Melding slettet" : m.body,
+        body: messagePreview(m),
         created_at: m.created_at,
         sender_id: m.sender_id,
       });

@@ -15,6 +15,8 @@ import {
 import { ReviewForm } from "@/components/meldinger/review-form";
 
 type SalePanelProps = {
+  /** Samtalen har minst én melding — før det er det ingen å selge til. */
+  hasMessages: boolean;
   isSeller: boolean;
   sale: { listing_id: string; buyer_id: string; seller_id: string; conversation_id: string } | null;
   saleIsForThisConversation: boolean;
@@ -33,6 +35,7 @@ type SalePanelProps = {
 export function SalePanel(props: SalePanelProps) {
   const {
     isSeller,
+    hasMessages,
     sale,
     saleConfirmedForOtherBuyer,
     iAmInSale,
@@ -50,7 +53,7 @@ export function SalePanel(props: SalePanelProps) {
 
   // No sale yet
   if (!sale) {
-    if (!isSeller) return null;
+    if (!isSeller || !hasMessages) return null;
     return (
       <div className="mt-3 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm">

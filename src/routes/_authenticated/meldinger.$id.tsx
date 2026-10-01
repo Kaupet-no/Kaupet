@@ -728,6 +728,7 @@ function ConversationPage() {
         {conv && !(native && keyboardVisible) && !personalSellerControlsDisabled && (
           <SalePanel
             isSeller={isSeller}
+            hasMessages={(messages ?? []).length > 0}
             sale={sale ?? null}
             saleIsForThisConversation={saleIsForThisConversation}
             saleConfirmedForOtherBuyer={saleConfirmedForOtherBuyer}

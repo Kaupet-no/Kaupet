@@ -10,8 +10,21 @@ export function isUnread(
   myId: string | null | undefined,
   myLastReadAt: string | null | undefined,
 ): boolean {
-  if (!lastMessageAt) return false;
-  if (lastMessageSenderId && myId && lastMessageSenderId === myId) return false;
+  // Ingen avsender = ingen meldinger ennå (messages.sender_id er NOT NULL):
+  // en samtale som bare er åpnet, er ikke ulest.
+  if (!lastMessageAt || !lastMessageSenderId) return false;
+  if (myId && lastMessageSenderId === myId) return false;
   if (!myLastReadAt) return true;
   return new Date(lastMessageAt).getTime() > new Date(myLastReadAt).getTime();
+}
+
+/** Forhåndsvisning av siste melding i innbokslister. */
+export function messagePreview(m: {
+  body: string;
+  deleted_at: string | null;
+  attachment_path: string | null;
+}): string {
+  if (m.deleted_at) return "Melding slettet";
+  if (!m.body.trim() && m.attachment_path) return "📷 Bilde";
+  return m.body;
 }

@@ -66,12 +66,14 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
           .select("id, display_name, avatar_url")
           .in("id", buyerIds);
         const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
-        return (convs ?? []).map((c) => ({
-          conversationId: c.id,
-          buyerId: c.buyer_id,
-          displayName: pmap.get(c.buyer_id)?.display_name ?? "Ukjent bruker",
-          avatarUrl: pmap.get(c.buyer_id)?.avatar_url ?? null,
-        }));
+        return onlyStartedConversations(
+          (convs ?? []).map((c) => ({
+            conversationId: c.id,
+            buyerId: c.buyer_id,
+            displayName: pmap.get(c.buyer_id)?.display_name ?? "Ukjent bruker",
+            avatarUrl: pmap.get(c.buyer_id)?.avatar_url ?? null,
+          })),
+        );
       }
       type Row = {
         id: string;
@@ -81,15 +83,17 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
           | { display_name: string; avatar_url: string | null }[]
           | null;
       };
-      return ((data ?? []) as unknown as Row[]).map((c) => {
-        const buyer = Array.isArray(c.buyer) ? c.buyer[0] : c.buyer;
-        return {
-          conversationId: c.id,
-          buyerId: c.buyer_id,
-          displayName: buyer?.display_name ?? "Ukjent bruker",
-          avatarUrl: buyer?.avatar_url ?? null,
-        };
-      });
+      return onlyStartedConversations(
+        ((data ?? []) as unknown as Row[]).map((c) => {
+          const buyer = Array.isArray(c.buyer) ? c.buyer[0] : c.buyer;
+          return {
+            conversationId: c.id,
+            buyerId: c.buyer_id,
+            displayName: buyer?.display_name ?? "Ukjent bruker",
+            avatarUrl: buyer?.avatar_url ?? null,
+          };
+        }),
+      );
     },
   });
 
@@ -183,4 +187,19 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+/** Bare samtaler med minst én melding kan bli et salg — en samtale kjøperen
+ * bare har åpnet, er ingen kontakt. */
+async function onlyStartedConversations(contacts: Contact[]): Promise<Contact[]> {
+  if (contacts.length === 0) return contacts;
+  const { data } = await supabase
+    .from("messages")
+    .select("conversation_id")
+    .in(
+      "conversation_id",
+      contacts.map((c) => c.conversationId),
+    );
+  const started = new Set((data ?? []).map((m) => m.conversation_id));
+  return contacts.filter((c) => started.has(c.conversationId));
 }

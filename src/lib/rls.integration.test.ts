@@ -3374,7 +3374,7 @@ describe.skipIf(!canRun)(
       expect(extraSegmentError).not.toBeNull();
     });
 
-    it("still enforces the 20-images-per-listing cap", async () => {
+    it("allows 100 images per listing and rejects image 101", async () => {
       const owner = await signIn(emails.seller);
       const { data: capListing, error: capListingErr } = await admin
         .from("listings")
@@ -3388,7 +3388,7 @@ describe.skipIf(!canRun)(
         .single();
       if (capListingErr) throw capListingErr;
 
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 100; i++) {
         const { error } = await owner.from("listing_images").insert({
           listing_id: capListing.id,
           storage_path: `${capListing.id}/${crypto.randomUUID()}.jpg`,

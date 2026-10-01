@@ -12,7 +12,7 @@ const s = vi.hoisted(() => ({
   logServerError: vi.fn(),
   /** Køer med resultater per tabell; hvert terminalkall (maybeSingle/single/await) tar neste. */
   queues: {} as Record<string, Result[]>,
-  ops: [] as { table: string; op: string; values?: unknown }[],
+  ops: [] as { table: string; op: string; values?: unknown; args?: unknown[] }[],
   context: undefined as unknown,
 }));
 
@@ -60,7 +60,14 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "neq", "limit", "order"]) chain[m] = () => chain;
+      for (const m of ["select", "neq", "limit", "order"]) chain[m] = () => chain;
+      // eq/in registreres i s.ops (med argumenter) slik at tester kan sjekke filtrene.
+      for (const m of ["eq", "in"]) {
+        chain[m] = (...args: unknown[]) => {
+          s.ops.push({ table, op: m, args });
+          return chain;
+        };
+      }
       for (const m of ["insert", "update"]) {
         chain[m] = (values: unknown) => {
           s.ops.push({ table, op: m, values });
@@ -304,6 +311,22 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     const [values] = ops("listing_promotions", "update") as Record<string, string>[];
     expect(values).toMatchObject({ status: "active", vipps_psp_reference: "psp-1" });
     expect((Date.parse(values.expires_at) - Date.parse(values.starts_at)) / 86_400_000).toBe(7);
+  });
+
+  it("aktiveringsoppdateringen er betinget: bare pending/failed-rad med riktig id", async () => {
+    s.queues.listing_promotions = [
+      { data: pending },
+      { data: { status: "active", expires_at: "x" } },
+    ];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED", pspReference: "psp-1" });
+    await run();
+    const log = s.ops.filter((o) => o.table === "listing_promotions");
+    const i = log.findIndex((o) => o.op === "update");
+    const after = log.slice(i + 1, i + 3).map((o) => [o.op, ...(o.args ?? [])]);
+    expect(after).toEqual([
+      ["eq", "id", promotionId],
+      ["in", "status", ["pending", "failed"]],
+    ]);
   });
 
   it("feil ved failed-markering logges, men resultatet er fortsatt failed", async () => {

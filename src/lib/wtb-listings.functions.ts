@@ -53,7 +53,16 @@ export type WtbListing = {
   expires_at: string;
 };
 
-export type WtbListingWithProfile = WtbListing & {
+/** Offentlig liste: bare feltene WtbListingCard leser. Aldri `*` — da lekker
+ * notify_matches, draft_expiry_notified_at m.fl. til alle. user_id trengs for
+ * «din annonse» og for å starte samtale (buyer_id). */
+const WTB_PUBLIC_LIST_COLUMNS =
+  "id, user_id, title, subtitle, description, max_price_nok, created_at, profiles(display_name, avatar_url), categories(name_nb, slug)";
+
+export type WtbListingWithProfile = Pick<
+  WtbListing,
+  "id" | "user_id" | "title" | "subtitle" | "description" | "max_price_nok" | "created_at"
+> & {
   profiles: { display_name: string | null; avatar_url: string | null } | null;
   categories: { name_nb: string; slug: string } | null;
 };
@@ -363,7 +372,7 @@ export const listWtbListings = createServerFn({ method: "GET" })
     const ids = matches.map((m) => m.id);
     const { data: rows, error } = await supabaseAdmin
       .from("wtb_listings")
-      .select("*, profiles(display_name, avatar_url), categories(name_nb, slug)")
+      .select(WTB_PUBLIC_LIST_COLUMNS)
       .in("id", ids);
     if (error) {
       throw await toClientError("database", error);
@@ -418,6 +427,8 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("match-wtb-for-listing", 60, 300);
     const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: rows, error } = await supabaseAdmin.rpc("wtb_match_count", {

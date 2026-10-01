@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { assertUserNotRateLimited, from } = vi.hoisted(() => ({
+const { assertUserNotRateLimited, assertNotRateLimited, from, rpc } = vi.hoisted(() => ({
+  assertNotRateLimited: vi.fn(),
+  rpc: vi.fn(),
   assertUserNotRateLimited: vi.fn(),
   from: vi.fn(),
 }));
@@ -31,10 +33,15 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
-vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from } }));
-vi.mock("@/lib/rate-limit.server", () => ({ assertUserNotRateLimited }));
+vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from, rpc } }));
+vi.mock("@/lib/rate-limit.server", () => ({ assertUserNotRateLimited, assertNotRateLimited }));
 
-import { createWtbListing, saveWtbDraft } from "./wtb-listings.functions";
+import {
+  createWtbListing,
+  listWtbListings,
+  matchWtbListingsForListing,
+  saveWtbDraft,
+} from "./wtb-listings.functions";
 
 const wtbInput = { title: "Ønsker meg en bil" };
 
@@ -94,5 +101,33 @@ describe("WTB creation quota", () => {
 
     await expect(saveWtbDraft({ data: wtbInput })).rejects.toThrow("limit");
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe("offentlige WTB-lesninger", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    assertNotRateLimited.mockResolvedValue(undefined);
+  });
+
+  it("listWtbListings ber ikke om * eller private kolonner", async () => {
+    const select = vi.fn(() => ({ in: async () => ({ data: [], error: null }) }));
+    from.mockReturnValue({ select });
+    rpc.mockResolvedValue({ data: [{ id: "w1", total_count: 1 }], error: null });
+
+    await listWtbListings({ data: {} });
+
+    const columns = (select.mock.calls[0] as unknown as [string])[0];
+    expect(columns).not.toMatch(/\*/u);
+    expect(columns).not.toContain("notify_matches");
+    expect(columns).not.toContain("draft_expiry_notified_at");
+  });
+
+  it("matchWtbListingsForListing rate-limiter med riktig bucket", async () => {
+    rpc.mockResolvedValue({ data: [{ match_count: 2, max_price: 100 }], error: null });
+
+    await matchWtbListingsForListing({ data: { title: "Sykkel" } });
+
+    expect(assertNotRateLimited).toHaveBeenCalledWith("match-wtb-for-listing", 60, 300);
   });
 });

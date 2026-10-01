@@ -71,6 +71,7 @@ const serverFnErrorLogMiddleware = createMiddleware({ type: "function" }).server
 // In-memory cache to avoid hitting the DB on every request.
 const ipCache = new Map<string, { banned: boolean; expires: number }>();
 const IP_CACHE_TTL_MS = 60_000;
+const IP_CACHE_MAX = 10_000;
 
 function extractIp(headers: Headers): string | null {
   const cf = headers.get("cf-connecting-ip");
@@ -113,6 +114,7 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
     if (cached && cached.expires > now) {
       banned = cached.banned;
     } else {
+      ipCache.delete(ip);
       const { createClient } = await import("@supabase/supabase-js");
       const url = process.env.SUPABASE_URL;
       const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -122,6 +124,8 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
         });
         const { data } = await admin.rpc("is_ip_banned", { _ip: ip });
         banned = data === true;
+        // ponytail: hard cap, clear() instead of LRU; cache just refills from the DB
+        if (ipCache.size >= IP_CACHE_MAX) ipCache.clear();
         ipCache.set(ip, { banned, expires: now + IP_CACHE_TTL_MS });
       }
     }

@@ -162,7 +162,10 @@ export function prefetchCategorySuggestion(title: string) {
   if (!suggestionCache.has(key)) {
     suggestionCache.set(
       key,
-      suggestCategoryForTitle({ data: { title: key } }).catch(() => ({ suggestions: [] })),
+      suggestCategoryForTitle({ data: { title: key } }).catch(() => {
+        suggestionCache.delete(key); // don't cache failures; next call retries
+        return { suggestions: [] };
+      }),
     );
   }
   return suggestionCache.get(key)!;

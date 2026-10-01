@@ -43,4 +43,17 @@ describe("focusWhenReady", () => {
     expect(document.activeElement).not.toBe(input);
     disconnect.mockRestore();
   });
+
+  it.each([
+    ["trykk", () => window.dispatchEvent(new Event("pointerdown"))],
+    ["tastetrykk", () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }))],
+    ["tilbake-navigering", () => window.dispatchEvent(new PopStateEvent("popstate"))],
+  ])("gir opp ved %s, så fokus ikke hopper til en senere side", async (_n, interact) => {
+    focusWhenReady(() => document.body.querySelector("input"));
+    interact();
+    const input = makeInput();
+    document.body.append(input);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.activeElement).not.toBe(input);
+  });
 });

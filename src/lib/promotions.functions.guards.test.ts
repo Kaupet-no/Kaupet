@@ -42,7 +42,9 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/lib/server-error-log", () => ({ logServerError: s.logServerError }));
-vi.mock("@/lib/vipps.server", () => ({
+vi.mock("@/lib/vipps.server", async (importActual) => ({
+  isVippsPaymentCaptured: (await importActual<typeof import("@/lib/vipps.server")>())
+    .isVippsPaymentCaptured,
   getVippsMode: () => s.vippsMode,
   createVippsPayment: s.createVippsPayment,
   getVippsPayment: s.getVippsPayment,
@@ -201,6 +203,22 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     expect(s.captureVippsPayment).not.toHaveBeenCalled();
     expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
       expect.objectContaining({ promotionId, captured: false }),
+    );
+  });
+
+  it("failed + AUTHORIZED med belastet beløp (ePayment) + annen aktiv: refunderer", async () => {
+    s.queues.listing_promotions = [
+      { data: { ...pending, status: "failed", listing_id: listingId } },
+      { data: [{ id: "annen" }] },
+    ];
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: { value: 4900, currency: "NOK" } },
+    });
+    await expect(run()).resolves.toEqual({ status: "refunded", expires_at: null });
+    expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ promotionId, captured: true }),
     );
   });
 

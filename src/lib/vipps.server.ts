@@ -250,15 +250,18 @@ export type VippsPaymentStatus =
   | "REFUNDED"
   | "PARTIALLY_REFUNDED";
 
+export type VippsPayment = {
+  state: VippsPaymentStatus;
+  pspReference?: string;
+  amount?: { value: number; currency: string };
+  aggregate?: { capturedAmount?: { value: number; currency: string } };
+};
+
 export async function getVippsPayment(
   reference: string,
   host?: string | null,
   explicitMode?: "test" | "production",
-): Promise<{
-  state: VippsPaymentStatus;
-  pspReference?: string;
-  amount?: { value: number; currency: string };
-}> {
+): Promise<VippsPayment> {
   assertVippsConfigured(host);
   const e = hostAwareEnv(host, explicitMode);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}`, {
@@ -268,11 +271,13 @@ export async function getVippsPayment(
     const text = await res.text();
     throw new Error(`Vipps get-payment feilet: ${res.status} ${text}`);
   }
-  return (await res.json()) as {
-    state: VippsPaymentStatus;
-    pspReference?: string;
-    amount?: { value: number; currency: string };
-  };
+  return (await res.json()) as VippsPayment;
+}
+
+/** ePayment beholder `state: "AUTHORIZED"` etter capture; det belastede
+ * beløpet står bare i `aggregate.capturedAmount`. */
+export function isVippsPaymentCaptured(payment: VippsPayment): boolean {
+  return payment.state === "CAPTURED" || (payment.aggregate?.capturedAmount?.value ?? 0) > 0;
 }
 
 export async function captureVippsPayment(

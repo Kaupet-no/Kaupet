@@ -40,7 +40,9 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: state.supabaseAdmin }));
-vi.mock("@/lib/vipps.server", () => ({
+vi.mock("@/lib/vipps.server", async (importActual) => ({
+  isVippsPaymentCaptured: (await importActual<typeof import("@/lib/vipps.server")>())
+    .isVippsPaymentCaptured,
   getVippsMode: state.getVippsMode,
   createVippsPayment: state.createVippsPayment,
   getVippsPayment: state.getVippsPayment,

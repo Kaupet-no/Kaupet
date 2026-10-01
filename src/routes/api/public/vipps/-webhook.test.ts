@@ -8,7 +8,9 @@ const state = vi.hoisted(() => ({
   updatePromotion: vi.fn(),
 }));
 
-vi.mock("@/lib/vipps.server", () => ({
+vi.mock("@/lib/vipps.server", async (importActual) => ({
+  isVippsPaymentCaptured: (await importActual<typeof import("@/lib/vipps.server")>())
+    .isVippsPaymentCaptured,
   getVippsWebhookSecret: async () => "test-secret",
   getVippsWebhookRejectionReason: () => null,
   getVippsWebhookEventId: (payload: { pspReference?: string }) => payload.pspReference,

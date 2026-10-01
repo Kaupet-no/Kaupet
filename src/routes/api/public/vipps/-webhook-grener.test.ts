@@ -23,7 +23,9 @@ const s = vi.hoisted(() => ({
   releaseSupersededPromotionPayment: vi.fn(),
 }));
 
-vi.mock("@/lib/vipps.server", () => ({
+vi.mock("@/lib/vipps.server", async (importActual) => ({
+  isVippsPaymentCaptured: (await importActual<typeof import("@/lib/vipps.server")>())
+    .isVippsPaymentCaptured,
   getVippsWebhookSecret: async () => s.secret,
   getVippsWebhookRejectionReason: () => s.rejection,
   getVippsWebhookEventId: (p: { pspReference?: string }) => p.pspReference ?? null,
@@ -313,6 +315,21 @@ describe("Vipps-webhook: statusoverganger", () => {
       expect.objectContaining({ captured: false }),
     );
     expect(processed()).toBe(true);
+  });
+
+  it("failed + AUTHORIZED med belastet beløp (ePayment) + annen aktiv: refunderer", async () => {
+    // ePayment beholder state AUTHORIZED etter capture; aggregate viser beløpet.
+    s.promo = { ...pendingPromo, status: "failed", listing_id: "l-1" };
+    s.live = [{ id: "promo-2" }];
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: { value: 4900, currency: "NOK" } },
+    });
+    expect((await post()).status).toBe(200);
+    expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ captured: true }),
+    );
   });
 
   it("failed + CAPTURED: 23505 ved aktivering (kappløp) logges, svarer 200 og markerer behandlet", async () => {

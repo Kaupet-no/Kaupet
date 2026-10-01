@@ -222,8 +222,12 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       }
     })();
 
-    const { getVippsPayment, captureVippsPayment, releaseSupersededPromotionPayment } =
-      await import("@/lib/vipps.server");
+    const {
+      getVippsPayment,
+      captureVippsPayment,
+      isVippsPaymentCaptured,
+      releaseSupersededPromotionPayment,
+    } = await import("@/lib/vipps.server");
     const vippsMode = promo.vipps_mode as "test" | "production";
     let payment;
     try {
@@ -274,7 +278,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           await logServerError("reconcilePromotionPayment.paidSupersededPromotion", payment.state, {
             promotion_id: promo.id,
           });
-          return release(payment.state === "CAPTURED");
+          return release(isVippsPaymentCaptured(payment));
         }
       }
       if (payment.state === "AUTHORIZED") {

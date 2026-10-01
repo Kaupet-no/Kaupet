@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const {
           getVippsWebhookSecret,
           getVippsPayment,
+          isVippsPaymentCaptured,
           getVippsWebhookEventId,
           isFreshVippsWebhookDate,
           getVippsWebhookRejectionReason,
@@ -184,7 +185,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               new Error(`Betalt fremheving kan ikke aktiveres (${payment.state})`),
               { promotion_id: promo.id },
             );
-            if (!(await releasePayment(payment.state === "CAPTURED"))) {
+            if (!(await releasePayment(isVippsPaymentCaptured(payment)))) {
               return new Response("Retry later", { status: 503 });
             }
           } else if (promo.status === "pending" || promo.status === "failed") {

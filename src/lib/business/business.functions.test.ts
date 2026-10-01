@@ -336,6 +336,9 @@ describe("business server functions", () => {
     expect(first.organization.proff_trial_started_at).toEqual(expect.any(String));
     expect(first.organization.proff_trial_ends_at).toEqual(expect.any(String));
     expect(first.organization.proff_access_until).toBe(first.organization.proff_trial_ends_at);
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith("sync_organization_entitlements", {
+      _organization_id: organizationId,
+    });
 
     const second = await setBusinessPlan({ data: { plan: "proff" } });
     expect(second.organization.proff_trial_started_at).toBe(
@@ -473,6 +476,19 @@ describe("business server functions", () => {
       proff: true,
       membership: { organization_id: organizationId, role: "member", status: "invited" },
     });
+    rpc.mockClear();
     await expect(acceptOrganizationInvite()).resolves.toEqual({ organizationId });
+    expect(rpc).toHaveBeenCalledWith("sync_organization_entitlements", {
+      _organization_id: organizationId,
+    });
+  });
+
+  it("requireOrganizationMember synker ikke tilgang ved lesing (cron tar utløp)", async () => {
+    buildAdmin();
+    await getBusinessListingStats({ data: { locationId: null, threshold: 10, soldDays: 30 } });
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalledWith(
+      "sync_organization_entitlements",
+      expect.anything(),
+    );
   });
 });

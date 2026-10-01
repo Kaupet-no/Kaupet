@@ -20,12 +20,8 @@ export async function requireOrganizationMember(userId: string) {
     throw await toClientError("database", error);
   }
   if (!membership) throw new ClientError(UNAUTHORIZED_MESSAGE, 403);
-  const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
-    _organization_id: membership.organization_id,
-  });
-  if (syncError) {
-    throw await toClientError("database", syncError);
-  }
+  // Utløp synkes av pg_cron-jobben schedule_organization_entitlement_sync (hvert 10. min);
+  // skrivestiene synker selv.
   return {
     supabaseAdmin,
     organizationId: membership.organization_id as string,

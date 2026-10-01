@@ -644,8 +644,6 @@ jobs:
       - name: Set R2 secrets on the staging Worker
         run: |
           printf '%s' "$R2_ACCOUNT_ID" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
-          printf '%s' "$R2_ACCESS_KEY_ID" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no-staging
-          printf '%s' "$R2_SECRET_ACCESS_KEY" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no-staging
           printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
           printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
           printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
@@ -658,8 +656,6 @@ jobs:
           fi
         env:
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
           R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}

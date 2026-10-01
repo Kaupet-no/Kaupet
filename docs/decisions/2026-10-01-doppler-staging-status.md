@@ -20,7 +20,7 @@ produksjonens testflyt. Produksjonens betalingscredentials endres ikke.
 | VAPID_PRIVATE_KEY                       | Separat staging-pair distribuert via PR 300                                        | Worker; offentlig nøkkel i klientbygg   |
 | R2_CLEANUP_SECRET                       | Separat staging-verdi distribuert via PR 300                                       | Worker og Supabase app_settings         |
 | RATE_LIMIT_HMAC_SECRET                  | Separat staging-verdi distribuert via PR 300                                       | Worker                                  |
-| R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY | Venter på egne credentials begrenset til to staging-buckets                        | Worker                                  |
+| R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY | Separate credentials i Doppler; lesetilgang til begge staging-buckets bekreftet    | Worker                                  |
 | VIPPS_TEST_*                            | Godkjent deling; importert til Doppler og distribuert til staging Worker           | Worker                                  |
 | STATENS_VEGVESEN_API_KEY                | Godkjent deling; importert til Doppler og distribuert til staging Worker           | Worker                                  |
 | FCM_SERVICE_ACCOUNT_JSON                | Ikke aktiv i staging; eksisterende kilde bruker produksjonsprosjekt                | Ikke aktiver før staging-oppsett finnes |
@@ -69,3 +69,16 @@ Produksjonens credentials og SOPS-kilde beholdes frem til produksjonens
 konsumenter migreres. En senere rotasjon av delte leverandørnøkler må
 koordineres for alle miljøene som bruker dem. SVV er ikke testet med et
 live kjøretøyoppslag i denne migreringen.
+
+## R2-credentials
+
+Separate R2_ACCESS_KEY_ID og R2_SECRET_ACCESS_KEY er lagt inn i Doppler.
+Signerte, lesende S3 ListObjectsV2-kall med max-keys=0 ga HTTP 200 for både
+kaupet-bilder-staging og kaupet-vedlegg-staging. Ingen objekter ble skrevet,
+slettet eller lastet ned. Skrivetilgang er ikke prøvd med et objekt.
+
+PR 301 inkluderer R2-nøklene i den eksplisitte Worker-listen og fjerner
+staging-deployens skriver fra GitHub-secrets. Runtime-bytte gjøres først ved
+utrulling av denne endringen, slik at gammel deploy ikke overskriver nye
+credentials. Gamle GitHub- og staging-SOPS-kopier fjernes etter bekreftet
+utrulling; produksjonens kopier beholdes.

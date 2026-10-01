@@ -121,7 +121,10 @@ function ReceiptPage() {
         <p className="mt-2 text-muted-foreground">
           {isActive && "Annonsen din er nå fremhevet."}
           {isPending2 && "Betalingen er mottatt og bekreftes om noen sekunder."}
-          {isFailed && "Betalingen ble ikke fullført. Du har ikke blitt belastet."}
+          {isFailed &&
+            (data.status === "refunded"
+              ? "Betalingen er refundert til deg via Vipps."
+              : "Betalingen ble ikke fullført. Du har ikke blitt belastet.")}
         </p>
       </div>
 

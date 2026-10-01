@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ListingComposerShell } from "./listing-composer-shell";
 
 vi.mock("@/components/native-page-header", () => ({
-  NativePageHeader: ({ right }: { right?: ReactNode }) => (
+  NativePageHeader: ({ right, center }: { right?: ReactNode; center?: ReactNode }) => (
     <header>
-      Ny annonse
+      {center ?? "Ny annonse"}
       {right}
     </header>
   ),
@@ -81,6 +81,37 @@ describe("ListingComposerShell", () => {
       screen.getByRole("heading", { name: "Tittel", hidden: true }),
     );
     requestAnimationFrame.mockRestore();
+  });
+
+  it("flytter fremdriftsviseren inn i headeren når native-kortet scrolles", () => {
+    render(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="title"
+        pageTitle="Tittel"
+        native
+        onCancel={vi.fn()}
+        progress={<span>Steg 2 av 5</span>}
+        footer={null}
+        firstStep={false}
+      >
+        Innhold
+      </ListingComposerShell>,
+    );
+    const header = screen.getByRole("banner");
+    const card = screen.getByTestId("composer-page-title");
+    expect(header.textContent).not.toContain("Steg 2 av 5");
+
+    card.scrollTop = 40;
+    fireEvent.scroll(card);
+    expect(header.textContent).toContain("Steg 2 av 5");
+    expect(header.textContent).not.toContain("Ny annonse");
+    expect(screen.getAllByText("Steg 2 av 5")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Avbryt annonseopprettelse" })).toBeTruthy();
+
+    card.scrollTop = 0;
+    fireEvent.scroll(card);
+    expect(header.textContent).toContain("Ny annonse");
   });
 
   it("skjuler Forrige på første native steg", () => {

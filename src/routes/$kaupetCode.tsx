@@ -846,6 +846,8 @@ function ListingDetailPage() {
           isLoggedIn={!!user}
           seller={seller ?? null}
           isOwner={isOwner}
+          isSold={data.status === "sold"}
+          sellerId={data.organization_id ? undefined : data.seller_id}
           listingId={data.id}
           kaupetCode={data.kaupet_code}
           title={data.title}
@@ -858,7 +860,7 @@ function ListingDetailPage() {
         />
       }
       stickyContactSlot={
-        !isOwner ? (
+        !isOwner && data.status !== "sold" ? (
           <Button
             size="native"
             className="flex-1 gap-2 sm:flex-none"

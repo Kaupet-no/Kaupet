@@ -34,7 +34,14 @@ export const Route = createFileRoute("/_authenticated/favoritter")({
 
 type FavoriteRow =
   | { kind: "available"; listing_id: string; card: ListingCardData }
-  | { kind: "unavailable"; listing_id: string; reason: "deleted" | "archived" };
+  | { kind: "unavailable"; listing_id: string; reason: "deleted" }
+  | {
+      kind: "unavailable";
+      listing_id: string;
+      reason: "sold" | "archived";
+      title: string;
+      kaupet_code: string;
+    };
 
 function FavoritesPage() {
   const native = useIsNative();
@@ -64,7 +71,13 @@ function FavoritesPage() {
           return { kind: "unavailable", listing_id: row.listing_id, reason: "deleted" };
         }
         if (l.status !== "active") {
-          return { kind: "unavailable", listing_id: row.listing_id, reason: "archived" };
+          return {
+            kind: "unavailable",
+            listing_id: row.listing_id,
+            reason: l.status === "sold" ? "sold" : "archived",
+            title: l.title,
+            kaupet_code: l.kaupet_code,
+          };
         }
         return {
           kind: "available",
@@ -132,10 +145,21 @@ function FavoritesPage() {
                     key={row.listing_id}
                     className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center"
                   >
-                    <p className="text-sm font-medium">
+                    {row.reason !== "deleted" && (
+                      <Link
+                        to="/$kaupetCode"
+                        params={{ kaupetCode: row.kaupet_code }}
+                        className="line-clamp-2 text-sm font-medium hover:underline"
+                      >
+                        {row.title}
+                      </Link>
+                    )}
+                    <p className="text-sm text-muted-foreground">
                       {row.reason === "deleted"
                         ? "Annonsen er slettet"
-                        : "Annonsen er ikke lenger tilgjengelig"}
+                        : row.reason === "sold"
+                          ? "Solgt"
+                          : "Annonsen er ikke lenger tilgjengelig"}
                     </p>
                     <Button
                       size="sm"

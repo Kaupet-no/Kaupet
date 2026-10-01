@@ -42,21 +42,22 @@ mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes ti
 ## AI-kategoriforslag
 
 KI-forslagene (Mistral) krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudflare
-Worker-secret. Legg den inn med SOPS (`bun run secrets:edit` og
-`bun run secrets:edit:staging`); aldri legg nøkkelen i `VITE_*` eller klartekst.
+Worker-secret. Lokal isolert utvikling bruker SOPS (`bun run secrets:edit`);
+staging bruker Doppler. Legg aldri nøkkelen i `VITE_*` eller klartekst.
 
-Staging-Workerens nye Mistral-nøkkel prøves nå administrert fra Doppler
-(`kaupet/stg`) gjennom en manuelt utløst workflow. Ikke kopier denne
+Staging-Workerens Mistral-nøkkel administreres fra Doppler (`kaupet/stg`)
+gjennom normal deploy og den manuelle synkworkflowen. Ikke kopier denne
 pilotnøkkelen til SOPS eller GitHub. Lokal utvikling beholder eksisterende
 SOPS-oppsett. Se [pilotbeslutningen](../docs/decisions/2026-10-01-doppler-staging-pilot.md).
 
 ### R2-opprydning
 
 `R2_CLEANUP_SECRET` i `cloudflare.env` er den delte hemmeligheten mellom
-pg_cron-jobben `r2-cleanup-hourly` og `/api/public/r2/cleanup`. Deploy-jobben
+produksjonens pg_cron-jobb `r2-cleanup-hourly` og `/api/public/r2/cleanup`. Produksjonsdeployen
 setter den på workeren fra GitHub Environment-secreten med samme navn — den må
 altså ligge begge steder, og i tillegg som `app_settings`-raden
-`r2_cleanup_secret` i Supabase (samme verdi i alle tre).
+`r2_cleanup_secret` i Supabase (samme verdi i alle tre). Staging har egen
+verdi i Doppler, som synkes til staging Worker og Supabase app_settings.
 
 ## Viktig
 

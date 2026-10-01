@@ -338,13 +338,24 @@ describe("adminRefundPromotion", () => {
     expect(ops("admin_moderation_log", "insert")).toEqual([]);
   });
 
-  it("logger (og lykkes) når statusoppdatering eller revisjonslogg feiler etter refusjon", async () => {
+  it("kaster kontrollert feil og hopper over revisjonslogg når statusoppdatering feiler etter refusjon", async () => {
     s.queues.listing_promotions = [{ data: promo }, { error: dbError }];
-    s.queues.admin_moderation_log = [{ error: dbError }];
-    await expect(run()).resolves.toEqual({ ok: true });
+    const e = await rejection(run());
+    expect(e).toMatchObject({
+      message: expect.stringContaining("Refusjonen er gjennomført i Vipps"),
+      status: 500,
+    });
+    expect(s.refundVippsPayment).toHaveBeenCalledTimes(1);
     expect(s.logServerError).toHaveBeenCalledWith("refundPromotion.updateStatus", dbError, {
       promotion_id: id,
     });
+    expect(ops("admin_moderation_log", "insert")).toEqual([]);
+  });
+
+  it("logger (og lykkes) når bare revisjonsloggen feiler etter refusjon", async () => {
+    s.queues.listing_promotions = [{ data: promo }, { data: null }];
+    s.queues.admin_moderation_log = [{ error: dbError }];
+    await expect(run()).resolves.toEqual({ ok: true });
     expect(s.logServerError).toHaveBeenCalledWith("refundPromotion.moderationLog", dbError, {
       promotion_id: id,
     });

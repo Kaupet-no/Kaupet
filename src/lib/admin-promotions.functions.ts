@@ -193,6 +193,12 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       .eq("id", promo.id);
     if (refundErr) {
       await logServerError("refundPromotion.updateStatus", refundErr, { promotion_id: promo.id });
+      // Pengene er refundert, men raden står som active: si fra til admin.
+      // Nytt forsøk er trygt (stabil idempotency-nøkkel).
+      throw new ClientError(
+        "Refusjonen er gjennomført i Vipps, men statusen kunne ikke lagres. Prøv igjen – pengene refunderes ikke to ganger.",
+        500,
+      );
     }
 
     const { error: logErr } = await supabaseAdmin.from("admin_moderation_log").insert({

@@ -37,7 +37,9 @@ bun run env:local
 bun run db:refresh-local -- --replace
 ```
 
-Importen leser staging-hemmelighetene fra `.env.staging.local`, kopierer
+Importen henter staging service-role direkte fra Doppler `kaupet/stg` og
+offentlige staging-innstillinger fra GitHub Environment `staging`. Doppler CLI
+og GitHub CLI må være innlogget. Den kopierer
 kategorier, filtre, flows, kjøretøydata, annonser, popularitetstall og
 annonsebilder, og legger alle annonser under en syntetisk lokal dev-bruker.
 Kladder og utløpte staging-annonser normaliseres til aktive lokale annonser.
@@ -51,13 +53,17 @@ Kommandoen krever `--replace` med vilje, fordi den sletter lokale dev-data.
 
 ### Alternativ: kjør mot Kaupet sitt staging-Supabase
 
-For å kjøre appen lokalt mot staging-prosjektet, dekrypter staging-hemmelighetene
-og legg dem i den lokale `.env`-filen:
+For å kjøre appen lokalt mot staging-prosjektet, logg inn med `doppler login`
+og `gh auth login`. Hent deretter oppdatert konfigurasjon til den gitignorede
+`.env`-filen (filtilgang begrenses til din bruker):
 
 ```bash
 bun run env:staging
 bun dev
 ```
+
+Kjør `bun run env:staging` på nytt etter rotasjon. `.env` er en generert lokal
+kopi, ikke en kilde for endringer. Gamle `.env.staging.local` brukes ikke lenger.
 
 Dette bruker delt staging-data. Ikke kjør destruktive eller produksjonslignende
 administrative operasjoner lokalt. Bytt tilbake til isolert lokal Supabase med:

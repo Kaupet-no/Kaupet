@@ -82,3 +82,19 @@ staging-deployens skriver fra GitHub-secrets. Runtime-bytte gjøres først ved
 utrulling av denne endringen, slik at gammel deploy ikke overskriver nye
 credentials. Gamle GitHub- og staging-SOPS-kopier fjernes etter bekreftet
 utrulling; produksjonens kopier beholdes.
+
+## Bekreftet utrulling og opprydding
+
+PR 301 er merget til staging. Deploy 36908379682 og separat verify
+36920250112 er grønne. Gamle GitHub staging-kopier av CLOUDFLARE_API_TOKEN,
+R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_CLEANUP_SECRET og
+SUPABASE_SERVICE_ROLE_KEY er slettet. DOPPLER_TOKEN og offentlig
+CLOUDFLARE_ACCOUNT_ID beholdes.
+
+Brukeren har godkjent migrering av lokal staging-bruk og fjerning av de 13
+migrerte SOPS-feltene. Lokal appkonfigurasjon og databaseimport henter nå
+fra Doppler gjennom scripts/staging-env.mjs, med offentlige GitHub-vars.
+Supabase-ref/role og staging-buckets valideres; management-tokens utelates.
+Fjerningen endrer ingen øvrige dekrypterte SOPS-verdier. Den krypterte filen
+kan fortsatt dekrypteres. Lokal utviklings og produksjonens kilder beholdes.
+Databaseimportens sletting av lokale data er ikke kjørt i denne kontrollen.

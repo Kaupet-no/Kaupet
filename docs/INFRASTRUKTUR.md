@@ -392,8 +392,9 @@ Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md)
 for bootstrap, miljøseparasjon og kontrollert videre migrering.
 
 Synkjobben henter nå også staging `SUPABASE_SERVICE_ROLE_KEY` fra Doppler.
-Den holdes utenfor Workerens bulk-payload; GitHub/SOPS-kopier fjernes først
-etter kontroll av den nye flyten og øvrige konsumenter.
+Den distribueres også til Workerens eksisterende serverklient. Management-
+og Cloudflare-token inngår ikke i Workerens bulk-payload. Gamle GitHub
+staging-kopier er fjernet etter bekreftet deploy og separat verify.
 
 `PUSH_DISPATCH_SECRET` inngår også i Doppler-synken til staging-Worker og
 `app_settings.push_dispatch_secret`. En midlertidig
@@ -409,3 +410,10 @@ Synken inkluderer også Workerens nødvendige Supabase service-role,
 men aldri Cloudflare- eller Supabase management-token i Worker-payloaden.
 R2-kontrollen kjører ikke opprydning. Se
 [statuslisten](decisions/2026-10-01-doppler-staging-status.md).
+
+Lokal staging-bruk er flyttet til samme Doppler-kilde: `bun run env:staging`
+genererer `.env` med appens hemmeligheter og offentlige GitHub staging-vars.
+`bun run db:refresh-local -- --replace` henter staging service-role direkte,
+og skriver bare til lokal Supabase. Gamle `.env.staging.local` brukes ikke.
+Kommandoene krever innlogget Doppler CLI og GitHub CLI. Migrerte SOPS-felt
+fjernes fra staging-filen; produksjon og lokal utviklings kilder beholdes.

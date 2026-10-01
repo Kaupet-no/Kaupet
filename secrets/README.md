@@ -4,7 +4,8 @@ Hemmelighetene i denne mappen er kryptert med [SOPS](https://github.com/mozilla/
 mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes til Git.
 
 - `dev.env` — lokale utviklingshemmeligheter
-- `staging.env` — hemmeligheter for staging-miljøet
+- `staging.env` — gjenværende eldre staging-konfigurasjon og inaktiv FCM-kilde;
+  migrerte staging-hemmeligheter administreres i Doppler `kaupet/stg`
 - `cloudflare.env` — Cloudflare API-token og account ID
 - `migration.env` — hemmeligheter brukt under Supabase-prosjektmigrering
 
@@ -27,34 +28,36 @@ mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes ti
 4. Hent hemmelighetene til lokale, gitignorede filer:
    ```
    bun run secrets:decrypt          # -> .env
-   bun run secrets:decrypt:staging  # -> .env.staging.local
+   bun run env:staging             # Doppler + GitHub-vars -> .env; krever innlogget doppler og gh
    ```
 
 ## Vanlig bruk
 
 - Redigere dev-hemmeligheter: `bun run secrets:edit` (åpner dekryptert i
   `$EDITOR`, krypterer automatisk ved lagring)
-- Redigere staging-hemmeligheter: `bun run secrets:edit:staging`
+- Redigere migrerte staging-hemmeligheter: Doppler `kaupet/stg`. Ikke legg dem
+  tilbake i SOPS eller GitHub-secrets.
 - Etter at noen er lagt til/fjernet i `.sops.yaml`: `bun run secrets:rekey`
 
 ## AI-kategoriforslag
 
 KI-forslagene (Mistral) krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudflare
-Worker-secret. Legg den inn med SOPS (`bun run secrets:edit` og
-`bun run secrets:edit:staging`); aldri legg nøkkelen i `VITE_*` eller klartekst.
+Worker-secret. Lokal isolert utvikling bruker SOPS (`bun run secrets:edit`);
+staging bruker Doppler. Legg aldri nøkkelen i `VITE_*` eller klartekst.
 
-Staging-Workerens nye Mistral-nøkkel prøves nå administrert fra Doppler
-(`kaupet/stg`) gjennom en manuelt utløst workflow. Ikke kopier denne
+Staging-Workerens Mistral-nøkkel administreres fra Doppler (`kaupet/stg`)
+gjennom normal deploy og den manuelle synkworkflowen. Ikke kopier denne
 pilotnøkkelen til SOPS eller GitHub. Lokal utvikling beholder eksisterende
 SOPS-oppsett. Se [pilotbeslutningen](../docs/decisions/2026-10-01-doppler-staging-pilot.md).
 
 ### R2-opprydning
 
 `R2_CLEANUP_SECRET` i `cloudflare.env` er den delte hemmeligheten mellom
-pg_cron-jobben `r2-cleanup-hourly` og `/api/public/r2/cleanup`. Deploy-jobben
+produksjonens pg_cron-jobb `r2-cleanup-hourly` og `/api/public/r2/cleanup`. Produksjonsdeployen
 setter den på workeren fra GitHub Environment-secreten med samme navn — den må
 altså ligge begge steder, og i tillegg som `app_settings`-raden
-`r2_cleanup_secret` i Supabase (samme verdi i alle tre).
+`r2_cleanup_secret` i Supabase (samme verdi i alle tre). Staging har egen
+verdi i Doppler, som synkes til staging Worker og Supabase app_settings.
 
 ## Viktig
 
@@ -67,3 +70,16 @@ altså ligge begge steder, og i tillegg som `app_settings`-raden
   kan da ikke lenger dekryptere fremtidige endringer (historiske commits i
   Git vil fortsatt inneholde data kryptert mot deres gamle nøkkel, så bytt
   også ut de faktiske hemmelighetene ved behov).
+
+## Lokal staging etter Doppler-migreringen
+
+`bun run env:staging` henter kun appens eksplisitte secret-liste fra Doppler,
+og offentlige innstillinger fra GitHub staging-vars. `.env` har tilgang 0600
+og er en generert kopi; hent på nytt etter rotasjon. Management-tokens inngår
+ikke. `bun run db:refresh-local -- --replace` henter bare staging service-role
+fra Doppler og skriver fortsatt bare til lokal Supabase. Gamle
+`.env.staging.local` leses ikke lenger av disse kommandoene.
+
+De 13 migrerte staging-SOPS-feltene er fjernet. Produksjonens og lokal
+utviklings SOPS-kilder er beholdt. FCM er ikke aktivert i staging, og dens
+historiske staging-SOPS-kopi er ikke tatt inn i lokal Doppler-konfigurasjon.

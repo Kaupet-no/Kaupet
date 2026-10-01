@@ -2,17 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useState } from "react";
-import { CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
+import { CheckCheck, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { SystemMessagesCard } from "@/components/system-messages-card";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { formatDistanceToNow } from "date-fns";
-import { nb } from "date-fns/locale";
 
 import { useAuth } from "@/hooks/use-auth";
-import { formatNok } from "@/lib/format";
+import { NotificationItemContent } from "@/components/notification-item-content";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -138,35 +136,7 @@ function VarslerPage() {
                           aria-label="Ulest"
                         />
                       )}
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-medium">
-                          {n.kind === "price_drop" && (
-                            <TrendingDown className="mr-1 inline size-3.5 text-brand" />
-                          )}
-                          {n.kind === "wtb_match" && (
-                            <ShoppingBag className="mr-1 inline size-3.5 text-brand" />
-                          )}
-                          {n.listing_title ??
-                            (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
-                        </p>
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
-                          {n.kind === "search" ? (
-                            <>Treff i "{n.search_name ?? "Lagret søk"}"</>
-                          ) : n.kind === "wtb_match" ? (
-                            <>Treff på "{n.wtb_title ?? "Ønskes kjøpt"}"</>
-                          ) : (
-                            <>
-                              Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
-                              {formatNok(n.old_price_nok)} → {formatNok(n.new_price_nok)}
-                            </>
-                          )}{" "}
-                          ·{" "}
-                          {formatDistanceToNow(new Date(n.created_at), {
-                            addSuffix: true,
-                            locale: nb,
-                          })}
-                        </p>
-                      </div>
+                      <NotificationItemContent n={n} />
                     </div>
                   </Link>
                   <button

@@ -126,7 +126,11 @@ export function useUnreadNotificationsCount(): number {
     enabled: !!user,
     queryFn: async () => {
       const countUnread = async (
-        table: "saved_search_notifications" | "favorite_price_drops" | "wtb_match_notifications",
+        table:
+          | "saved_search_notifications"
+          | "favorite_price_drops"
+          | "favorite_sold_notifications"
+          | "wtb_match_notifications",
       ) => {
         const { count, error } = await supabase
           .from(table)
@@ -135,12 +139,13 @@ export function useUnreadNotificationsCount(): number {
         if (error) return 0;
         return count ?? 0;
       };
-      const [notifs, drops, wtbMatches] = await Promise.all([
+      const [notifs, drops, solds, wtbMatches] = await Promise.all([
         countUnread("saved_search_notifications"),
         countUnread("favorite_price_drops"),
+        countUnread("favorite_sold_notifications"),
         countUnread("wtb_match_notifications"),
       ]);
-      return notifs + drops + wtbMatches;
+      return notifs + drops + solds + wtbMatches;
     },
     refetchInterval: 60_000,
   });

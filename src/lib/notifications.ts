@@ -4,14 +4,19 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   deleteNotification,
   deletePriceDrop,
+  deleteSoldNotification,
   listNotifications,
   listPriceDrops,
+  listSoldNotifications,
   markAllNotificationsRead as markAllSavedSearchNotificationsRead,
   markAllPriceDropsRead,
+  markAllSoldNotificationsRead,
   markNotificationRead,
   markPriceDropRead,
+  markSoldNotificationRead,
   type PriceDropNotification,
   type SavedSearchNotification,
+  type SoldNotification,
 } from "@/lib/saved-searches";
 import {
   deleteWtbMatchNotification,
@@ -32,13 +37,18 @@ type PriceDropItem = PriceDropNotification & {
   listing_title: string | null;
   listing_code: string | null;
 };
+type SoldItem = SoldNotification & {
+  kind: "sold";
+  listing_title: string | null;
+  listing_code: string | null;
+};
 type WtbMatchItem = WtbMatchNotification & {
   kind: "wtb_match";
   listing_title: string | null;
   listing_code: string | null;
   wtb_title: string | null;
 };
-export type NotificationItem = SearchItem | PriceDropItem | WtbMatchItem;
+export type NotificationItem = SearchItem | PriceDropItem | SoldItem | WtbMatchItem;
 
 export const notificationHistoryQueryKey = (userId?: string, pageSize?: number) =>
   pageSize === undefined
@@ -46,15 +56,17 @@ export const notificationHistoryQueryKey = (userId?: string, pageSize?: number) 
     : (["notifications", userId, "history", pageSize] as const);
 
 export async function listEnrichedNotifications(limit = 30, offset = 0) {
-  const [notifs, drops, wtbMatches] = await Promise.all([
+  const [notifs, drops, solds, wtbMatches] = await Promise.all([
     listNotifications(limit, offset),
     listPriceDrops(limit, offset),
+    listSoldNotifications(limit, offset),
     listWtbMatchNotifications(limit, offset),
   ]);
   const listingIds = Array.from(
     new Set([
       ...notifs.map((n) => n.listing_id),
       ...drops.map((d) => d.listing_id),
+      ...solds.map((d) => d.listing_id),
       ...wtbMatches.map((m) => m.listing_id),
     ]),
   );
@@ -89,6 +101,12 @@ export async function listEnrichedNotifications(limit = 30, offset = 0) {
       listing_title: listingMap.get(d.listing_id)?.title ?? null,
       listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
     })),
+    ...solds.map((d): SoldItem => ({
+      ...d,
+      kind: "sold",
+      listing_title: listingMap.get(d.listing_id)?.title ?? null,
+      listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
+    })),
     ...wtbMatches.map((m): WtbMatchItem => ({
       ...m,
       kind: "wtb_match",
@@ -100,7 +118,11 @@ export async function listEnrichedNotifications(limit = 30, offset = 0) {
 
   return {
     items,
-    hasMore: notifs.length === limit || drops.length === limit || wtbMatches.length === limit,
+    hasMore:
+      notifs.length === limit ||
+      drops.length === limit ||
+      solds.length === limit ||
+      wtbMatches.length === limit,
   };
 }
 
@@ -108,6 +130,7 @@ export async function markAllNotificationsRead() {
   await Promise.all([
     markAllSavedSearchNotificationsRead(),
     markAllPriceDropsRead(),
+    markAllSoldNotificationsRead(),
     markAllWtbMatchNotificationsRead(),
   ]);
 }
@@ -115,12 +138,14 @@ export async function markAllNotificationsRead() {
 export async function markNotificationItemRead(item: NotificationItem) {
   if (item.kind === "search") await markNotificationRead(item.id);
   else if (item.kind === "price_drop") await markPriceDropRead(item.id);
+  else if (item.kind === "sold") await markSoldNotificationRead(item.id);
   else await markWtbMatchNotificationRead(item.id);
 }
 
 export async function deleteNotificationItem(item: NotificationItem) {
   if (item.kind === "search") await deleteNotification(item.id);
   else if (item.kind === "price_drop") await deletePriceDrop(item.id);
+  else if (item.kind === "sold") await deleteSoldNotification(item.id);
   else await deleteWtbMatchNotification(item.id);
 }
 

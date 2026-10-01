@@ -69,6 +69,11 @@ export function summarizeCriteria(c: SearchCriteria): string {
   return parts.length ? parts.join(" · ") : "Alle annonser";
 }
 
+/** Søkenavn uten oppsummeringens anførselstegn (også for eldre lagrede navn). */
+export function savedSearchLabel(name: string): string {
+  return name.replace(/"/g, "").trim();
+}
+
 export async function listSavedSearches() {
   const { data, error } = await supabase
     .from("saved_searches")
@@ -184,5 +189,43 @@ export async function markAllPriceDropsRead() {
 
 export async function deletePriceDrop(id: string) {
   const { error } = await supabase.from("favorite_price_drops").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export type SoldNotification = {
+  id: string;
+  listing_id: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+export async function listSoldNotifications(limit = 30, offset = 0) {
+  const { data, error } = await supabase
+    .from("favorite_sold_notifications")
+    .select("id, listing_id, read_at, created_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return (data ?? []) as SoldNotification[];
+}
+
+export async function markSoldNotificationRead(id: string) {
+  const { error } = await supabase
+    .from("favorite_sold_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function markAllSoldNotificationsRead() {
+  const { error } = await supabase
+    .from("favorite_sold_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .is("read_at", null);
+  if (error) throw error;
+}
+
+export async function deleteSoldNotification(id: string) {
+  const { error } = await supabase.from("favorite_sold_notifications").delete().eq("id", id);
   if (error) throw error;
 }

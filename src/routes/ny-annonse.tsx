@@ -40,7 +40,12 @@ import { useLocationPicker } from "@/features/listing-creation/use-location-pick
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { usePhotoSuggestion } from "@/features/listing-creation/use-photo-suggestion";
 import { useVehicleTitleCategoryHint } from "@/features/listing-creation/use-vehicle-title-category-hint";
-import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
+import {
+  fieldGroupsForKeys,
+  pageLabel,
+  type FieldGroup,
+  type ValidateCtx,
+} from "@/features/listing-creation/field-groups/registry";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   categoryBreadcrumb,
@@ -96,6 +101,10 @@ import { blockImplicitSubmit, publishGate } from "@/features/listing-creation/pu
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import {
+  FIELD_ERRORS_MESSAGE,
+  visibleErrorSummary,
+} from "@/features/listing-creation/error-summary";
 import { ListingStrengthIndicator } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
@@ -1010,8 +1019,34 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Samme kontekst som stegvalidatorene får ved «Neste» — også brukt til å
+  // kjøre den blokkerende validatoren på nytt, så feilbanneret forsvinner når
+  // brukeren har rettet feilen.
+  const validateCtx: ValidateCtx = {
+    images,
+    attributes,
+    boatFactsActive,
+    missingFilters,
+    isFree,
+    priceNok,
+    categoryId,
+    categories: pickableCategories,
+    bilOgMcCategoryId,
+    vehicleLookupResult,
+    vehicleRegistered,
+    behavior,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    showMileage,
+    canShip,
+  };
+  const [blockingValidator, setBlockingValidator] = useState<{
+    validate: NonNullable<FieldGroup["validateExtra"]>;
+  } | null>(null);
+
   async function goToNextPage(): Promise<ComposerNavigationResult> {
     setValidationError(null);
+    setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
 
     // Kategorien regnes som valgt idet brukeren går videre fra "Om tingen"
@@ -1073,27 +1108,9 @@ function NewListingPage() {
         )
       )
         setAttributesTouched(true);
-      setValidationError("Rett feltene som er markert før du fortsetter.");
+      setValidationError(FIELD_ERRORS_MESSAGE);
       return "blocked";
     }
-    const validateCtx = {
-      images,
-      attributes,
-      boatFactsActive,
-      missingFilters,
-      isFree,
-      priceNok,
-      categoryId,
-      categories: pickableCategories,
-      bilOgMcCategoryId,
-      vehicleLookupResult,
-      vehicleRegistered,
-      behavior,
-      knownIssues,
-      noKnownIssues: !!noKnownIssues,
-      showMileage,
-      canShip,
-    };
     setExtraFieldError(null);
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
@@ -1107,6 +1124,7 @@ function NewListingPage() {
         if (group.key === "category-attributes" || group.key === "boat-facts")
           setAttributesTouched(true);
         setValidationError(result);
+        setBlockingValidator({ validate: group.validateExtra! });
         return "blocked";
       }
       if (result && typeof result === "object") {
@@ -1119,6 +1137,7 @@ function NewListingPage() {
           setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
+        setBlockingValidator({ validate: group.validateExtra! });
         return "blocked";
       }
     }
@@ -1764,7 +1783,14 @@ function NewListingPage() {
               </p>
             ) : undefined
           }
-          errorSummary={validationError}
+          errorSummary={visibleErrorSummary(validationError, {
+            hasFieldErrors: Object.keys(errors).length > 0,
+            stillInvalid: blockingValidator
+              ? ![null, "CONFIRM_NO_IMAGE"].includes(
+                  blockingValidator.validate(validateCtx) as string | null,
+                )
+              : undefined,
+          })}
           validationAttempt={validationAttempt}
           footer={composerFooter}
           challenge={photoChallenge}

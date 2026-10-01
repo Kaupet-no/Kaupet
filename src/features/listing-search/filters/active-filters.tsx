@@ -197,10 +197,12 @@ export function ActiveFilters({
   }
   const itemCount = allItems.length;
 
-  useEffect(() => {
+  const [prevItemCount, setPrevItemCount] = useState(itemCount);
+  if (itemCount !== prevItemCount) {
+    setPrevItemCount(itemCount);
     setMeasuring(true);
     setCollapsed(true);
-  }, [itemCount]);
+  }
 
   useEffect(() => {
     const parent = containerRef.current?.parentElement;

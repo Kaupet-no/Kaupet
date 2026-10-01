@@ -135,7 +135,11 @@ function BrowsePage() {
   });
 
   useEffect(() => setMounted(true), []);
-  useEffect(() => setQDraft(search.q), [search.q]);
+  const [prevQ, setPrevQ] = useState(search.q);
+  if (search.q !== prevQ) {
+    setPrevQ(search.q);
+    setQDraft(search.q);
+  }
 
   const { data: allCategoriesRaw } = useCategories();
   const categories = useMemo(
@@ -488,9 +492,15 @@ function BrowsePage() {
   });
 
   // Reset to listings tab when search criteria change
-  useEffect(() => {
+  const [prevCriteria, setPrevCriteria] = useState([search.q, search.category, search.categories]);
+  if (
+    search.q !== prevCriteria[0] ||
+    search.category !== prevCriteria[1] ||
+    search.categories !== prevCriteria[2]
+  ) {
+    setPrevCriteria([search.q, search.category, search.categories]);
     setActiveTab("listings");
-  }, [search.q, search.category, search.categories]);
+  }
 
   /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
      trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.

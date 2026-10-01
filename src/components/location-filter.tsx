@@ -34,9 +34,11 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
     });
   }, []);
 
-  useEffect(() => {
+  const [prevLabel, setPrevLabel] = useState(value.label);
+  if (value.label !== prevLabel) {
+    setPrevLabel(value.label);
     setQuery(value.label ?? "");
-  }, [value.label]);
+  }
 
   const pick = (r: NominatimResult) => {
     onChange({

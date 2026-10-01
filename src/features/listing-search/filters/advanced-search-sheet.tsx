@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
@@ -70,9 +70,11 @@ export function AdvancedSearchSheet({
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) setTermDraft("");
-  }, [open]);
+  }
 
   const addTerm = () => {
     const t = termDraft.trim();
@@ -697,12 +699,16 @@ export function SaveSearchDialog({
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevDefaultName, setPrevDefaultName] = useState(defaultName);
+  if (open !== prevOpen || defaultName !== prevDefaultName) {
+    setPrevOpen(open);
+    setPrevDefaultName(defaultName);
     if (open) {
       setName(defaultName);
       setNotify(true);
     }
-  }, [open, defaultName]);
+  }
 
   const handleSave = async () => {
     if (!name.trim()) {

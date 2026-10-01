@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { SlidersHorizontal, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -832,9 +832,11 @@ function PriceUpToField({
   onChange: (max: number | undefined) => void;
 }) {
   const [draft, setDraft] = useState(value != null ? String(value) : "");
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setDraft(value != null ? String(value) : "");
-  }, [value]);
+  }
   const commit = () => {
     const n = draft ? Number(draft) : undefined;
     if (n != null && n > PRICE_UPTO_MAX) {

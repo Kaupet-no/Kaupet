@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,12 +62,16 @@ export function RangeFilterField({
 
   // Re-sync when the applied value changes outside this field (e.g. the filter
   // was removed from the ActiveFilters row above the results).
-  useEffect(() => {
+  const [prevMin, setPrevMin] = useState(value.min);
+  if (value.min !== prevMin) {
+    setPrevMin(value.min);
     setMinDraft(value.min != null ? String(value.min) : "");
-  }, [value.min]);
-  useEffect(() => {
+  }
+  const [prevMax, setPrevMax] = useState(value.max);
+  if (value.max !== prevMax) {
+    setPrevMax(value.max);
     setMaxDraft(value.max != null ? String(value.max) : "");
-  }, [value.max]);
+  }
 
   const sliderMin = minDraft ? clampToBounds(Number(minDraft), bounds) : bounds.min;
   const sliderMaxRaw = maxDraft ? clampToBounds(Number(maxDraft), bounds) : bounds.max;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft, RotateCcw, Save, Search as SearchIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -82,9 +82,13 @@ export function NativeAdvancedSearch({
   const [saveOpen, setSaveOpen] = useState(false);
   const [section, setSection] = useState<NativeAdvancedSearchSection>(initialSection);
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevInitialSection, setPrevInitialSection] = useState(initialSection);
+  if (open !== prevOpen || initialSection !== prevInitialSection) {
+    setPrevOpen(open);
+    setPrevInitialSection(initialSection);
     if (open) setSection(initialSection);
-  }, [open, initialSection]);
+  }
 
   const handleApply = () => {
     void hapticNotification("success");

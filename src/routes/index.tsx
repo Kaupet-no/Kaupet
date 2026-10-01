@@ -221,7 +221,11 @@ function WebLanding({
   // nedenfor når en kategori er valgt. Nullstilles til default hver gang
   // brukeren bytter til en annen rotkategori, i tråd med filter-resetten over.
   const [feedSort, setFeedSort] = useState<CategoryFeedSort>("popular");
-  useEffect(() => setFeedSort("popular"), [activeCategory?.id]);
+  const [prevFeedCategoryId, setPrevFeedCategoryId] = useState(activeCategory?.id);
+  if (activeCategory?.id !== prevFeedCategoryId) {
+    setPrevFeedCategoryId(activeCategory?.id);
+    setFeedSort("popular");
+  }
   const {
     data: feedPages,
     isError: feedIsError,

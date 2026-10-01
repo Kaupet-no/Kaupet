@@ -288,10 +288,13 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           await logServerError("reconcilePromotionPayment.capture", e, {
             promotion_id: promo.id,
           });
-          // eslint-disable-next-line no-restricted-syntax -- uventet feil mot Vipps (500), ikke en brukerfeil
-          throw new Error("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.", {
-            cause: e,
-          });
+          throw new ClientError(
+            "Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.",
+            503,
+            {
+              cause: e,
+            },
+          );
         }
       }
 

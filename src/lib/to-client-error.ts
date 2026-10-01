@@ -21,8 +21,9 @@ export class ClientError extends Error {
   constructor(
     message: string,
     readonly status = 400,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
   }
 }
 

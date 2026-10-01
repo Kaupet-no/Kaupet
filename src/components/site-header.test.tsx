@@ -35,6 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  useRouterState: () => "/",
 }));
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({ user: headerMocks.user, session: null, loading: headerMocks.loading }),

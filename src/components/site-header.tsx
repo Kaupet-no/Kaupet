@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { MessageCircle, Search } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -12,6 +12,7 @@ import { useSearchPanel } from "@/features/listing-search/search-panel/search-pa
 import { BusinessPlanLogo } from "@/features/business-account/business-plan-logo";
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
+import { focusWhenReady } from "@/lib/focus-when-ready";
 
 const HEADER_SEARCH_SLOT_ID = "header-search-slot";
 
@@ -30,6 +31,7 @@ export function SiteHeader() {
   const { user, loading: authLoading } = useAuth();
   const { data: businessMembership } = useBusinessMembership();
   const { openPanel } = useSearchPanel();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const businessPlan = businessMembership?.organization.selected_plan ?? null;
 
   return (
@@ -62,10 +64,14 @@ export function SiteHeader() {
             className="md:hidden"
             aria-label="Åpne søk"
             onClick={() => {
-              const input = document.getElementById(ANNONSER_SEARCH_INPUT_ID);
-              if (input instanceof HTMLInputElement && input.getClientRects().length > 0) {
-                input.scrollIntoView({ block: "center" });
-                input.focus({ preventScroll: true });
+              const find = () => {
+                const el = document.getElementById(ANNONSER_SEARCH_INPUT_ID);
+                return el instanceof HTMLInputElement ? el : null;
+              };
+              // På /annonser kan sidesøket være under montering (treg enhet):
+              // vent på det i stedet for å åpne søkepanelet.
+              if (pathname === "/annonser") {
+                focusWhenReady(find, { scroll: true });
                 return;
               }
               openPanel("query");

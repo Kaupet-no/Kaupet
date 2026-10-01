@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { MessagesButton } from "@/components/messages-button";
 import logoIcon from "@/assets/brand/icon-only-green-letter.png";
+import { focusWhenReady } from "@/lib/focus-when-ready";
 import { readLastSearchContext, searchTabAction } from "@/lib/last-search-context";
 
 function initials(name: string | null | undefined, fallback: string) {
@@ -58,7 +59,7 @@ export function AppBottomNav({ hidden }: { hidden?: boolean }) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (action === "focus") {
       // Fokus settes i selve trykket: WKWebView åpner bare tastaturet da.
-      document.querySelector<HTMLInputElement>('main input[name="q"]')?.focus();
+      focusWhenReady(() => document.querySelector<HTMLInputElement>('main input[name="q"]'));
     } else {
       navigate({ to: "/annonser", search: readLastSearchContext()?.search ?? {} });
     }

@@ -36,10 +36,8 @@ test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
   await searchTab.click();
   await expect(page).toHaveURL(/\/annonser/);
   await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).not.toBeVisible();
-  // Forsiden har også et searchbox; vent på resultatsidens (name="q") så vi
-  // ikke trykker på fanen mens den gamle ruten fortsatt er montert.
+  // Ingen vent på inputen: trykket rett etter ruting skal tåle at siden ikke er montert ennå.
   const searchbox = page.locator('main input[name="q"]');
-  await expect(searchbox).toBeVisible();
   await expect(searchTab).toHaveAttribute("aria-current", "page");
   await expect(page.locator("html")).toHaveClass(/native/);
 

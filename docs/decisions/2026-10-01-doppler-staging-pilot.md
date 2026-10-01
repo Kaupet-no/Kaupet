@@ -8,17 +8,18 @@ som autoritativ kilde for pilothemmeligheter dedikert til staging.
 
 ## Valgt løsning
 
-Prosjekt `kaupet`, konfigurasjon `stg`, hemmeligheter `MISTRAL_API_KEY` og
-`IMAGE_JOBS_SECRET` og `PUSH_DISPATCH_SECRET`, samt
-`SUPABASE_SERVICE_ROLE_KEY` for synkjobben. Bildejobbhemmeligheten skal være en ny verdi kun for staging.
+Prosjekt `kaupet`, konfigurasjon `stg`, er autoritativ kilde for de migrerte
+staging-hemmelighetene. Mottakere og gjenværende oppgaver er ført i
+[statusoversikten](2026-10-01-doppler-staging-status.md).
+
 Et lesetoken avgrenset til konfigurasjonen lagres som `DOPPLER_TOKEN` i
 GitHub Environment `staging`. Developer støtter ikke OIDC.
-
-Den manuelt utløste workflowen `doppler-staging.yml` henter bare disse
-hemmelighetene gjennom Dopplers API. Kun `MISTRAL_API_KEY`,
-`IMAGE_JOBS_SECRET` og `PUSH_DISPATCH_SECRET` settes på `kaupet-no-staging` med eksisterende Wrangler;
-service-role brukes til databasekontroll og synk. Midlertidige filer slettes og nøkkelen maskeres i
-Actions-loggen. Vanlig staging-deploy administrerer ikke disse hemmelighetene.
+`scripts/doppler-staging.sh` brukes både av vanlig staging-deploy og den
+manuelle workflowen. Begge deler samme concurrency-gruppe.
+Cloudflare-token hentes etter klientbygget. Management-token og
+Cloudflare-token inngår aldri i Worker-payloaden. Serverens eksisterende
+service-role distribueres fra samme kilde som synkjobben bruker.
+Midlertidige filer slettes, og verdiene maskeres i Actions-loggen.
 
 ## Alternativer
 
@@ -44,7 +45,8 @@ En tilbakekalt API-nøkkel kan ikke brukes til tilbakeføring.
 
 Workflowen henter `SUPABASE_SERVICE_ROLE_KEY` fra Doppler. Denne har bred
 servertilgang; den brukes bare til Supabase-kontroll og synk, aldri i
-klientbygg eller Workerens bulk-payload. Eksisterende GitHub- og SOPS-kopier
+klientbygg. Workeren får sin nødvendige service-role for serverklienten
+fra samme Doppler-kilde, etter lesende kontroll mot staging-prosjektet. Eksisterende GitHub- og SOPS-kopier
 beholdes til den nye flyten er kontrollert og konsumentene er kartlagt. En egen begrenset databaserolle kan
 vurderes når piloten utvides. Ingen nye databasefunksjoner eller migrasjoner
 innføres.
@@ -96,9 +98,8 @@ Supabase-integrasjon synker Edge Function-secrets, ikke `app_settings` eller
 Auth SMTP/captcha; den erstatter derfor ikke jobbhemmelighetenes synk.
 
 `DOPPLER_TOKEN` er bootstrap og må kunne brukes uten først å hente seg selv
-fra Doppler. Staging service-role hentes fra Doppler i samme jobb. Cloudflare-token
-kan senere hentes derfra. De skal aldri inngå i Workerens bulk-payload eller
-klientbygg. Behold eksplisitt liste over hemmeligheter per mottaker.
+fra Doppler. Cloudflare- og Supabase management-token hentes fra Doppler. Disse to
+skal aldri inngå i Workerens bulk-payload eller klientbygg. Behold eksplisitt liste over hemmeligheter per mottaker.
 
 Migrer én gruppe om gangen: avklar staging-avgrensning og konsumenter,
 importer eller opprett credentials sikkert, distribuer, kontroller samsvar,
@@ -143,3 +144,33 @@ verdi og beviser ikke lenger at den konkrete gamle verdien avvises.
 Push-rotasjonen ble distribuert og kontrollert i
 [Actions-kjøring 36868040688](https://github.com/Kaupet-no/Kaupet/actions/runs/36868040688).
 Gammel verdi ble avvist og ny verdi nådde payloadvalideringen.
+
+## Fortsatt migrering med separate staging-credentials
+
+Brukeren valgte separate staging-credentials 2026-10-01. Eksisterende delte
+produksjonscredentials skal ikke kopieres til `kaupet/stg` eller tilbakekalles.
+
+Manuell workflow og vanlig staging-deploy gjenbruker
+`scripts/doppler-staging.sh`. Vanlig deploy skriver ikke lenger
+`R2_CLEANUP_SECRET` fra GitHub. En ny staging-verdi for R2-jobben er
+klargjort i Doppler; gammel fungerende verdi matcher kryptert SOPS-kilde
+og beholdes der fordi produksjon fortsatt bruker kilden.
+R2-verifisering leser databaseverdien og krever 401 med ugyldig secret.
+Den kjører ikke positiv opprydning og beviser derfor ikke alene at en
+gyldig request når jobbens sletteoperasjoner.
+
+Nye `RATE_LIMIT_HMAC_SECRET` og `VAPID_PRIVATE_KEY` er staging-spesifikke.
+Klientens offentlige VAPID-nøkkel kommer fra staging-byggvariabelen
+`VITE_VAPID_PUBLIC_KEY`; produksjon beholder dagens offentlige nøkkel.
+Før Worker-oppdatering kontrolleres at det nye VAPID-paret matcher.
+Aktivering skjer først ved staging-deploy med den nye klientkoden.
+Staging-brukere med gamle web-push-abonnementer må aktivere push på nytt.
+HMAC-rotasjon gir nye IP-fingeravtrykk for staging rate-limit-bøtter.
+
+Supabase PAT i SOPS svarte 401. Brukeren opprettet et nytt token direkte
+i Doppler med staging-prosjektavgrensning; Auth-lesing svarte 200.
+Captcha var deaktivert ved lesingen; migreringen skal ikke aktivere den
+ut fra en antakelse. SMTP/passord må komme fra en gyldig ny staging-nøkkel.
+
+Se statuslisten i `docs/decisions/2026-10-01-doppler-staging-status.md`
+for gjenstående leverandørtilganger og avsluttende opprydding.

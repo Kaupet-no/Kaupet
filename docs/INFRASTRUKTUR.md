@@ -400,3 +400,12 @@ etter kontroll av den nye flyten og øvrige konsumenter.
 `PUSH_DISPATCH_SECRET_PREVIOUS` i Doppler sikrer tilbakeføring: gammel
 staging-verdi avvek fra SOPS ved kontroll 2026-10-01. Push-verifisering
 sender ugyldig payload og kontrollerer 401/400 uten varselutsending.
+
+Manuell staging-synk og vanlig staging-deploy deler nå
+`scripts/doppler-staging.sh`. Separate staging-nøkler for VAPID, HMAC og
+R2-jobben er klargjort. Staging-bygg får `VITE_VAPID_PUBLIC_KEY`;
+produksjon beholder eksisterende offentlige VAPID-nøkkel.
+Synken inkluderer også Workerens nødvendige Supabase service-role,
+men aldri Cloudflare- eller Supabase management-token i Worker-payloaden.
+R2-kontrollen kjører ikke opprydning. Se
+[statuslisten](decisions/2026-10-01-doppler-staging-status.md).

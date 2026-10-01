@@ -22,3 +22,21 @@ describe("capturedUserAgent", () => {
     expect(capturedUserAgent()).toBe(MAC_UA);
   });
 });
+
+describe("VAPID_PUBLIC_KEY miljøseparasjon", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("bruker staging-byggvariabelen når den er satt", async () => {
+    vi.stubEnv("VITE_VAPID_PUBLIC_KEY", "staging-public-key");
+    vi.resetModules();
+    expect((await import("./push")).VAPID_PUBLIC_KEY).toBe("staging-public-key");
+  });
+
+  it("beholder eksisterende nøkkel uten byggvariabel", async () => {
+    vi.stubEnv("VITE_VAPID_PUBLIC_KEY", "");
+    vi.resetModules();
+    expect((await import("./push")).VAPID_PUBLIC_KEY).toBe(
+      "BPFo1ygL7dxhxhtTCPbE6b4qYkP9webql5QNaJuCReVeko8mzNCVyFunhDwIV95v4lKjHttAFgjxTN1zvsVvJnc",
+    );
+  });
+});

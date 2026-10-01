@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type Call = { table: string; op: "insert" | "update"; values: Record<string, unknown> };
+type Call = {
+  table: string;
+  op: "insert" | "update";
+  values: Record<string, unknown>;
+  inFilters?: Record<string, unknown>;
+};
 
 const s = vi.hoisted(() => ({
   secret: "test-secret" as string,
@@ -39,10 +44,15 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         return { error: null };
       },
       update: (values: Record<string, unknown>) => {
-        s.calls.push({ table, op: "update", values });
+        const call: Call = { table, op: "update", values };
+        s.calls.push(call);
         const result = { error: s.updateError[`${table}:${String(values.status ?? "")}`] ?? null };
         const chain: Record<string, unknown> = {
           eq: () => chain,
+          in: (col: string, vals: unknown[]) => {
+            call.inFilters = { ...call.inFilters, [col]: vals };
+            return chain;
+          },
           then: (resolve: (v: unknown) => void) => resolve(result),
         };
         return chain;
@@ -218,6 +228,38 @@ describe("Vipps-webhook: statusoverganger", () => {
       expect(processed()).toBe(true);
     },
   );
+
+  it("CAPTURED på failed fremheving (betalt etter reconcile): aktiverer med betingelse pending|failed", async () => {
+    s.promo = { ...pendingPromo, status: "failed" };
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED", pspReference: "psp-2" });
+    expect((await post()).status).toBe(200);
+    expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    const [update] = promoUpdates();
+    expect(update.values).toMatchObject({ status: "active", vipps_psp_reference: "psp-2" });
+    expect(update.inFilters).toEqual({ status: ["pending", "failed"] });
+    expect(processed()).toBe(true);
+  });
+
+  it("AUTHORIZED på failed fremheving: capturer med samme nøkkel, deretter aktiver", async () => {
+    s.promo = { ...pendingPromo, status: "failed" };
+    s.getVippsPayment.mockResolvedValue({ state: "AUTHORIZED" });
+    expect((await post()).status).toBe(200);
+    expect(s.captureVippsPayment).toHaveBeenCalledWith(
+      "ref-1",
+      10,
+      "capture-promo-1",
+      "test.kaupet.no",
+      "test",
+    );
+    expect(promoUpdates().map((c) => c.values.status)).toEqual(["active"]);
+  });
+
+  it("CANCELLED på failed fremheving endrer ingenting", async () => {
+    s.promo = { ...pendingPromo, status: "failed" };
+    s.getVippsPayment.mockResolvedValue({ state: "CANCELLED" });
+    expect((await post()).status).toBe(200);
+    expect(promoUpdates()).toEqual([]);
+  });
 
   it("feil ved aktivering kaster og lar hendelsen stå ubehandlet (Vipps prøver igjen)", async () => {
     s.updateError["listing_promotions:active"] = { message: "db nede" };

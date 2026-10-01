@@ -139,7 +139,8 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         }
 
         if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
-          if (promo.status === "pending") {
+          // `failed` kan være satt av reconcile før Vipps rapporterte betaling.
+          if (promo.status === "pending" || promo.status === "failed") {
             if (payment.state === "AUTHORIZED") {
               try {
                 const { captureVippsPayment } = await import("@/lib/vipps.server");
@@ -170,7 +171,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
                 vipps_psp_reference: payment.pspReference ?? null,
               })
               .eq("id", promo.id)
-              .eq("status", "pending");
+              .in("status", ["pending", "failed"]);
             if (activateError) throw activateError;
           }
         } else if (

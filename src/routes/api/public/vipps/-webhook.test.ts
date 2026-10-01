@@ -87,7 +87,7 @@ beforeEach(() => {
   state.captureVippsPayment.mockReset().mockResolvedValue(undefined);
   state.updatePromotion.mockReset().mockImplementation(() => ({
     eq: () => ({
-      eq: async () => {
+      in: async () => {
         state.promotionStatus = "active";
         return { error: null };
       },

@@ -207,7 +207,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     if (!promo) throw new ClientError("Fant ikke fremheving", 404);
     if (promo.user_id !== userId) throw new ClientError("Ikke tilgang", 403);
 
-    if (promo.status !== "pending") {
+    if (promo.status !== "pending" && promo.status !== "failed") {
       return { status: promo.status, expires_at: promo.expires_at };
     }
     if (!promo.vipps_reference) {
@@ -258,7 +258,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           vipps_psp_reference: payment.pspReference ?? null,
         })
         .eq("id", promo.id)
-        .eq("status", "pending")
+        .in("status", ["pending", "failed"])
         .select("status, expires_at")
         .maybeSingle();
       if (uerr) {

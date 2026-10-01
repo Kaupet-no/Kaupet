@@ -147,6 +147,19 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     expect(s.getVippsPayment).not.toHaveBeenCalled();
   });
 
+  it("failed + CAPTURED i Vipps: sjekker Vipps og aktiverer (betalt, ikke aktivert)", async () => {
+    s.queues.listing_promotions = [
+      { data: { ...pending, status: "failed" } },
+      { data: { status: "active", expires_at: "x" } },
+    ];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    await expect(run()).resolves.toEqual({ status: "active", expires_at: "x" });
+    expect(s.getVippsPayment).toHaveBeenCalled();
+    expect(ops("listing_promotions", "update")).toEqual([
+      expect.objectContaining({ status: "active" }),
+    ]);
+  });
+
   it("returnerer pending uten Vipps-kall når Vipps-referanse mangler", async () => {
     s.queues.listing_promotions = [{ data: { ...pending, vipps_reference: null } }];
     await expect(run()).resolves.toEqual({ status: "pending", expires_at: null });

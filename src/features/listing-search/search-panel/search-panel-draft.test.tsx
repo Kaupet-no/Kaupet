@@ -18,7 +18,9 @@ vi.mock("vaul", () => ({
   },
 }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
-vi.mock("@/components/advanced-search-sheet", () => ({ SaveSearchDialog: () => null }));
+vi.mock("@/features/listing-search/filters/advanced-search-sheet", () => ({
+  SaveSearchDialog: () => null,
+}));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/hooks/use-form-factor", () => ({
   useFormFactor: () => "phone",

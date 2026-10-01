@@ -22,12 +22,12 @@ import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Switch } from "@/components/ui/switch";
-import { CategorySlugPicker } from "@/components/advanced-search-sheet";
-import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { TermGroupRow } from "@/components/term-group-editor";
-import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
-import { describeAttrValue } from "@/components/active-filters";
+import { CategorySlugPicker } from "@/features/listing-search/filters/advanced-search-sheet";
+import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
+import { TermGroupRow } from "@/features/listing-search/filters/term-group-editor";
+import { SecondaryCategoryFilters } from "@/features/listing-search/filters/attribute-filter-chips";
+import { CategoryFilterFields } from "@/features/listing-search/filters/category-filter-fields";
+import { describeAttrValue } from "@/features/listing-search/filters/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS, type RangeBounds } from "@/lib/filter-range-bounds";
 import {

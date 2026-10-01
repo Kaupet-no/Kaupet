@@ -22,8 +22,8 @@ import { Button } from "@/components/ui/button";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Input } from "@/components/ui/input";
-import { SearchRuleFields } from "@/components/search-rule-fields";
-import { SaveSearchDialog } from "@/components/advanced-search-sheet";
+import { SearchRuleFields } from "@/features/listing-search/filters/search-rule-fields";
+import { SaveSearchDialog } from "@/features/listing-search/filters/advanced-search-sheet";
 import {
   criteriaToValue,
   defaultAdvancedSearchValue,

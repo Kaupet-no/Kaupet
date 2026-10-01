@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { setAttributeFilterValue } from "@/lib/category-filters";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { AttributeFilterChips } from "@/features/listing-search/filters/attribute-filter-chips";
 import { DeferredPopularCarousel } from "@/components/deferred-popular-carousel";
 import { HowItWorksSection, OpenSourceCtaSection } from "@/components/landing-static-sections";
 import { ListingCard } from "@/components/listing-card";

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SearchRuleFields } from "@/components/search-rule-fields";
+import { SearchRuleFields } from "@/features/listing-search/filters/search-rule-fields";
 import {
   Select,
   SelectContent,
@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ModeToggle } from "@/components/search-term-mode-toggle";
+import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
 import type { TermGroup } from "@/lib/term-groups";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import {

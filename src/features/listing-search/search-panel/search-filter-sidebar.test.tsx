@@ -17,7 +17,7 @@ vi.mock("@/components/ui/native-sheet", () => ({
     children: ReactNode;
   }) => (open ? <div aria-label={title}>{children}</div> : null),
 }));
-vi.mock("@/components/advanced-search-sheet", () => ({
+vi.mock("@/features/listing-search/filters/advanced-search-sheet", () => ({
   CategorySlugPicker: () => <div>kategorivelger</div>,
 }));
 vi.mock("@/lib/native", () => ({

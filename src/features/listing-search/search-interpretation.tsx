@@ -1,8 +1,8 @@
 import { formatNokNumber } from "@/lib/format";
 import { X } from "lucide-react";
 
-import { describeAttrValue } from "@/components/active-filters";
-import { FilterChip } from "@/components/filter-chip";
+import { describeAttrValue } from "@/features/listing-search/filters/active-filters";
+import { FilterChip } from "@/features/listing-search/filters/filter-chip";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import type { InterpretedCriterion } from "./resolve-text-to-filters";
 

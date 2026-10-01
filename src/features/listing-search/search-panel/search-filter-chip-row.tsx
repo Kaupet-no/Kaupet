@@ -2,7 +2,7 @@ import { formatNokNumber } from "@/lib/format";
 import { useState } from "react";
 import { ArrowUpDown, SlidersHorizontal } from "lucide-react";
 
-import { FilterChip } from "@/components/filter-chip";
+import { FilterChip } from "@/features/listing-search/filters/filter-chip";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { conditionOptionsFor } from "@/lib/advanced-search-value";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";

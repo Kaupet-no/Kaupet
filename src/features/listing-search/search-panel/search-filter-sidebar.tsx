@@ -3,7 +3,7 @@ import { LayoutGrid, ListFilter, RotateCcw, Save, SlidersHorizontal, X } from "l
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { describeAttrValue } from "@/components/active-filters";
+import { describeAttrValue } from "@/features/listing-search/filters/active-filters";
 import { cn } from "@/lib/utils";
 import {
   conditionOptionsFor,

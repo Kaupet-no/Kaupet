@@ -130,31 +130,10 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         throw await toClientError("inviteOrganizationMember", categoryError);
       }
     }
-    let assignments = data.locationAssignments;
-    if (!assignments) {
-      const { data: defaultLocation, error: defaultLocationError } = await supabaseAdmin
-        .from("organization_locations")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("is_default", true)
-        .single();
-      if (defaultLocationError || !defaultLocation) {
-        throw defaultLocationError ?? new Error("Bedriften må ha minst én aktiv lokasjon.");
-      }
-      assignments = [
-        {
-          locationId: defaultLocation.id,
-          role: "member" as const,
-          listingAccess: permissions.listingAccess,
-          listingEditScope: permissions.listingEditScope,
-          chatAccess: permissions.chatAccess,
-        },
-      ];
-    }
     const { error: locationsError } = await supabaseAdmin
       .from("organization_location_members")
       .insert(
-        assignments.map((assignment) => ({
+        data.locationAssignments.map((assignment) => ({
           location_id: assignment.locationId,
           organization_id: organizationId,
           user_id: userId,

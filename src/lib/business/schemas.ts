@@ -14,20 +14,10 @@ export type OrganizationPermissions = {
   allowedCategoryIds: string[];
 };
 
-/** Temporary wire-compatible shape while callers migrate to location scope. */
-export type OrganizationMemberPermissions = OrganizationPermissions & {
-  listingAccess: "own" | "all";
-  chatAccess: "own" | "all";
-  listingEditScope: "none" | "own" | "all";
-};
-
 export const memberPermissionsSchema = z
   .object({
     role: memberRoleSchema.default("member"),
-    listingAccess: listingAccessSchema.default("own"),
-    chatAccess: chatAccessSchema.default("own"),
     canCreateListings: z.boolean().default(true),
-    listingEditScope: listingEditScopeSchema.default("own"),
     categoryAccess: categoryAccessSchema.default("all"),
     allowedCategoryIds: z.array(uuid).default([]),
   })
@@ -45,23 +35,20 @@ export const memberPermissionsSchema = z
       });
     }
   });
+
 export function normalizeMemberPermissions(
-  value: OrganizationMemberPermissions,
-): OrganizationMemberPermissions {
+  value: OrganizationPermissions,
+): OrganizationPermissions {
   if (value.role === "superuser") {
     return {
       role: "superuser",
-      listingAccess: "all",
-      chatAccess: "all",
       canCreateListings: true,
-      listingEditScope: "all",
       categoryAccess: "all",
       allowedCategoryIds: [],
     };
   }
   return {
     ...value,
-    listingAccess: value.listingEditScope === "all" ? "all" : value.listingAccess,
     categoryAccess: value.canCreateListings ? value.categoryAccess : "all",
     allowedCategoryIds: value.categoryAccess === "restricted" ? value.allowedCategoryIds : [],
   };

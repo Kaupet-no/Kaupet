@@ -48,10 +48,5 @@
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
-  },
-  "src/routes/annonser.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
   }
 }

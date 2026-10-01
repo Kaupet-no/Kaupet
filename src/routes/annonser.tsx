@@ -2,7 +2,7 @@ import { formatNokNumber } from "@/lib/format";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, FolderOpen, Save, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
@@ -60,6 +60,8 @@ import { submitSearch } from "@/features/listing-search/submit-search";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
 import { SearchStart } from "@/features/listing-search/search-start";
 import { criteriaToValue, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
+
+const noopSubscribe = () => () => {};
 
 /** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
 function blurActiveElement() {
@@ -119,7 +121,13 @@ function BrowsePage() {
   const navigate = useNavigate({ from: "/annonser" });
   const { user } = useAuth();
   const [qDraft, setQDraft] = useState(search.q);
-  const [mounted, setMounted] = useState(false);
+  // false i SSR og under hydrering, true ellers — også ved første render
+  // på klientnavigasjon, så skjelettet ikke blinker da.
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
   const isDesktop = useIsDesktop();
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const { open: searchPanelOpen, openPanel } = useSearchPanel();
@@ -134,7 +142,6 @@ function BrowsePage() {
     },
   });
 
-  useEffect(() => setMounted(true), []);
   const [prevQ, setPrevQ] = useState(search.q);
   if (search.q !== prevQ) {
     setPrevQ(search.q);

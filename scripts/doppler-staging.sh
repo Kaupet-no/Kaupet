@@ -14,7 +14,7 @@ response=$(mktemp)
 payload=$(mktemp)
 trap 'rm -f "$response" "$payload"' EXIT
 
-secret_names='CLOUDFLARE_API_TOKEN,SUPABASE_ACCESS_TOKEN,RESEND_API_KEY,TURNSTILE_SECRET_KEY,MISTRAL_API_KEY,IMAGE_JOBS_SECRET,PUSH_DISPATCH_SECRET,PUSH_DISPATCH_SECRET_PREVIOUS,SUPABASE_SERVICE_ROLE_KEY,R2_CLEANUP_SECRET,RATE_LIMIT_HMAC_SECRET,VAPID_PRIVATE_KEY'
+secret_names='CLOUDFLARE_API_TOKEN,SUPABASE_ACCESS_TOKEN,RESEND_API_KEY,TURNSTILE_SECRET_KEY,MISTRAL_API_KEY,IMAGE_JOBS_SECRET,PUSH_DISPATCH_SECRET,PUSH_DISPATCH_SECRET_PREVIOUS,SUPABASE_SERVICE_ROLE_KEY,R2_CLEANUP_SECRET,RATE_LIMIT_HMAC_SECRET,VAPID_PRIVATE_KEY,VIPPS_TEST_CLIENT_ID,VIPPS_TEST_CLIENT_SECRET,VIPPS_TEST_SUBSCRIPTION_KEY,VIPPS_TEST_MSN,VIPPS_TEST_WEBHOOK_SECRET,STATENS_VEGVESEN_API_KEY'
 if [ "$OPERATION" = bootstrap ]; then secret_names='CLOUDFLARE_API_TOKEN'; fi
 
 curl --fail --silent --show-error --max-time 30 \
@@ -45,7 +45,7 @@ SUPABASE_SERVICE_ROLE_KEY=$(jq -er '
 echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
 
 jq -e '
-  {RESEND_API_KEY, TURNSTILE_SECRET_KEY, MISTRAL_API_KEY, IMAGE_JOBS_SECRET, PUSH_DISPATCH_SECRET, R2_CLEANUP_SECRET, RATE_LIMIT_HMAC_SECRET, VAPID_PRIVATE_KEY, SUPABASE_SERVICE_ROLE_KEY} |
+  {VIPPS_TEST_CLIENT_ID, VIPPS_TEST_CLIENT_SECRET, VIPPS_TEST_SUBSCRIPTION_KEY, VIPPS_TEST_MSN, VIPPS_TEST_WEBHOOK_SECRET, STATENS_VEGVESEN_API_KEY, RESEND_API_KEY, TURNSTILE_SECRET_KEY, MISTRAL_API_KEY, IMAGE_JOBS_SECRET, PUSH_DISPATCH_SECRET, R2_CLEANUP_SECRET, RATE_LIMIT_HMAC_SECRET, VAPID_PRIVATE_KEY, SUPABASE_SERVICE_ROLE_KEY} |
   select(all(.[]; type == "string")) |
   select(all(.[]; length > 0 and (test("[\\r\\n]") | not)))
 ' "$response" > "$payload"
@@ -118,7 +118,9 @@ if [ "$OPERATION" = sync ]; then
     --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
     --header 'Content-Type: application/json' --request PATCH --data-binary "@$response" \
     "$auth_url" --output /dev/null
-  bunx wrangler secret bulk "$payload" --name kaupet-no-staging
+  # Staging bruker delte Vipps test-credentials, aldri betalingsmiljøet i produksjon.
+  jq '. + {VIPPS_ENVIRONMENT: "test"}' "$payload" > "$response"
+  bunx wrangler secret bulk "$response" --name kaupet-no-staging
   echo 'Worker: administrerte staging-hemmeligheter er oppdatert.' >> "$GITHUB_STEP_SUMMARY"
 
   for setting in image_jobs_secret push_dispatch_secret r2_cleanup_secret; do

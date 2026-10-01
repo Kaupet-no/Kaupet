@@ -224,7 +224,15 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
 
     const { getVippsPayment, captureVippsPayment } = await import("@/lib/vipps.server");
     const vippsMode = promo.vipps_mode as "test" | "production";
-    const payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
+    let payment;
+    try {
+      payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
+    } catch (e) {
+      await logServerError("reconcilePromotionPayment.getPayment", e, {
+        promotion_id: promo.id,
+      });
+      throw new ClientError("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.", 503);
+    }
 
     if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
       // Se webhooken: en failed-rad som er erstattet av en ny fremheving på

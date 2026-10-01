@@ -205,6 +205,20 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     expect(ops("listing_promotions", "update")).toEqual([]);
   });
 
+  it("Vipps-feil ved statusoppslag: 503 med kontrollert melding, logger og oppdaterer ikke", async () => {
+    s.queues.listing_promotions = [{ data: pending }];
+    s.getVippsPayment.mockRejectedValue(new Error("vipps intern feil"));
+    const e = await rejection(run());
+    expect(e.status).toBe(503);
+    expect(e.message).toBe("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.");
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "reconcilePromotionPayment.getPayment",
+      expect.anything(),
+      { promotion_id: promotionId },
+    );
+    expect(ops("listing_promotions", "update")).toEqual([]);
+  });
+
   it("feilet capture: kaster brukervennlig feil, logger og aktiverer ikke", async () => {
     s.queues.listing_promotions = [{ data: pending }];
     s.getVippsPayment.mockResolvedValue({ state: "AUTHORIZED" });

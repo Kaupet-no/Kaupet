@@ -50,16 +50,14 @@ vi.mock("@/lib/email.server", () => ({
 
 const defaultContext = { userId: "superuser-1", supabase: supabaseAdmin };
 
+import { getBusinessListingStats, updateBusinessProfile } from "./organization.functions";
+import { requestProffSubscription, setBusinessPlan } from "./plans.functions";
+import { lookupBusinessOrganization } from "./signup.functions";
 import {
   acceptOrganizationInvite,
-  getBusinessListingStats,
   inviteOrganizationMember,
-  lookupBusinessOrganization,
   removeOrganizationMember,
-  requestProffSubscription,
-  setBusinessPlan,
-  updateBusinessProfile,
-} from "./business.functions";
+} from "./members.functions";
 import { fetchOrganizationFromBrreg } from "@/lib/brreg.server";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";

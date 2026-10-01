@@ -11,9 +11,10 @@ const ALLOWLIST = {
   "src/lib/attribute-bounds.functions.ts#getAttributeRangeBounds": "public read, rate-limited",
   "src/lib/attribute-suggestions.functions.ts#getAttributeValueSuggestions":
     "public read, rate-limited",
-  "src/lib/business.functions.ts#bindBusinessSignupEmail":
+  "src/lib/business/signup.functions.ts#bindBusinessSignupEmail":
     "token-authorized (signup_token), pre-signup",
-  "src/lib/business.functions.ts#lookupBusinessOrganization": "pre-signup, Turnstile + rate limit",
+  "src/lib/business/signup.functions.ts#lookupBusinessOrganization":
+    "pre-signup, Turnstile + rate limit",
   "src/lib/category-suggestion.functions.ts#getPhotoSuggestionAvailability": "public feature flag",
   "src/lib/category-suggestion.functions.ts#suggestCategoryForTitle": "public read, rate-limited",
   "src/lib/category-suggestion.functions.ts#suggestCategoryForTitleWithAi":

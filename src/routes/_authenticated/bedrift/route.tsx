@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 import { supabase } from "@/integrations/supabase/client";
-import { getBusinessOrganization } from "@/lib/business.functions";
+import { getBusinessOrganization } from "@/lib/business/organization.functions";
 
 export const Route = createFileRoute("/_authenticated/bedrift")({
   ssr: false,

@@ -8,10 +8,12 @@ const setBusinessPlanMock = vi.fn();
 const getOpenProffOrderMock = vi.fn();
 const requestProffSubscriptionMock = vi.fn();
 const getBusinessOrganizationMock = vi.fn();
-vi.mock("@/lib/business.functions", () => ({
+vi.mock("@/lib/business/plans.functions", () => ({
   setBusinessPlan: (...args: unknown[]) => setBusinessPlanMock(...args),
   getOpenProffOrder: (...args: unknown[]) => getOpenProffOrderMock(...args),
   requestProffSubscription: (...args: unknown[]) => requestProffSubscriptionMock(...args),
+}));
+vi.mock("@/lib/business/organization.functions", () => ({
   getBusinessOrganization: (...args: unknown[]) => getBusinessOrganizationMock(...args),
 }));
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));

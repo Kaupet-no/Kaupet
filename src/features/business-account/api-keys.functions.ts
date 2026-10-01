@@ -39,7 +39,7 @@ async function requireSuperuserOrganization(
  * interpoleres inn i dem. De videreformidles derfor uendret i stedet for å
  * gå via `toClientError` (som ellers ville sanert dem bort, se
  * `sanitizeClientError`/SAFE_CODE_MESSAGES i to-client-error.ts og
- * business.functions.ts sitt tilsvarende, men ikke fullt konsekvente,
+ * business/*.functions.ts sitt tilsvarende, men ikke fullt konsekvente,
  * mønster). Uventede feil (DB nede o.l.) mangler `message`/har en annen
  * `code` og faller uansett tilbake på den generelle sanerte teksten via
  * `toClientError` i kallerne.

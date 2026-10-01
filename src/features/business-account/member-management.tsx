@@ -26,11 +26,13 @@ import type {
 } from "@/features/business-account/use-business-membership";
 import {
   inviteOrganizationMember,
-  normalizeMemberPermissions,
   removeOrganizationMember,
-  setOrganizationLocationMember,
+} from "@/lib/business/members.functions";
+import {
+  normalizeMemberPermissions,
   type OrganizationMemberPermissions,
-} from "@/lib/business.functions";
+} from "@/lib/business/schemas";
+import { setOrganizationLocationMember } from "@/lib/business/locations.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { emailSchema } from "@/lib/auth-schemas";
 import { formatErrorMessage } from "@/lib/errors";

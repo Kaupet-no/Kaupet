@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatErrorMessage } from "@/lib/errors";
-import { getOpenProffOrder, setBusinessPlan } from "@/lib/business.functions";
+import { getOpenProffOrder, setBusinessPlan } from "@/lib/business/plans.functions";
 import { BusinessPlanLogo } from "./business-plan-logo";
 import { ProffOrderDialog } from "./proff-order-dialog";
 import { formatProffTermMonthlyEquivalent, formatProffTermPrice } from "./proff-pricing";

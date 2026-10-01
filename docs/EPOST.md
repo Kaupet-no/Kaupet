@@ -139,7 +139,7 @@ merkefargene i appen, må disse oppdateres manuelt.
 ### `sendInternalEmail` — varsler til Kaupet
 
 Ren tekst til en Kaupet-innboks (salg, drift). Kalles i dag fra
-`src/lib/business.functions.ts` ved bedriftsregistrering. Går bevisst ikke
+`src/lib/business/signup.functions.ts` ved bedriftsregistrering. Går bevisst ikke
 gjennom `renderNotificationEmail` — de malene er den kundevendte
 varseldesignen, ikke et internt format.
 

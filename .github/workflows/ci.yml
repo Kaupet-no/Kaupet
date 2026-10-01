@@ -573,6 +573,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging
+    concurrency:
+      group: doppler-staging
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -587,7 +590,6 @@ jobs:
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i staging-miljøet — hele siden krasjer uten den." >&2
@@ -595,10 +597,6 @@ jobs:
           fi
           if [ -z "$R2_ACCOUNT_ID" ]; then
             echo "R2_ACCOUNT_ID mangler i staging-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
-            exit 1
-          fi
-          if [ -z "$R2_CLEANUP_SECRET" ]; then
-            echo "R2_CLEANUP_SECRET mangler i staging-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
             exit 1
           fi
 
@@ -609,6 +607,7 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
@@ -631,10 +630,15 @@ jobs:
             esac
           done
 
+      - name: Hent staging-tilgang fra Doppler
+        run: bash scripts/doppler-staging.sh
+        env:
+          OPERATION: bootstrap
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
       - name: Deploy
         run: bun run deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set R2 secrets on the staging Worker
@@ -645,7 +649,6 @@ jobs:
           printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
           printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
           printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
-          printf '%s' "$R2_CLEANUP_SECRET" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
           # IMAGE_JOBS_SECRET administreres av Doppler-pilot (staging).
           # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
           if [ -n "$API_KEY_EXPIRY_SECRET" ]; then
@@ -660,7 +663,13 @@ jobs:
           R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
           R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
-          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
           API_KEY_EXPIRY_SECRET: ${{ secrets.API_KEY_EXPIRY_SECRET }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Synk administrerte staging-hemmeligheter fra Doppler
+        run: bash scripts/doppler-staging.sh
+        env:
+          OPERATION: sync
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

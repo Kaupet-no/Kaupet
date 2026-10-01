@@ -9,6 +9,7 @@ import { savePushSubscription, deletePushSubscription } from "./push.functions";
 // All push subscriptions created against the previous key stop working once
 // this ships to production — existing subscribers must re-enable push.
 export const VAPID_PUBLIC_KEY =
+  import.meta.env.VITE_VAPID_PUBLIC_KEY ||
   "BPFo1ygL7dxhxhtTCPbE6b4qYkP9webql5QNaJuCReVeko8mzNCVyFunhDwIV95v4lKjHttAFgjxTN1zvsVvJnc";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {

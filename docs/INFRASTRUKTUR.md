@@ -379,3 +379,33 @@ Dette må slås opp i de respektive dashbordene:
   Firebase, Apple Developer, Google Play Console, Vipps, Resend og Mistral.
 - Supabase-planer, backup og point-in-time recovery.
 - Verdiene i `app_settings` i hvert miljø.
+
+## Doppler staging: neste migreringssteg
+
+Doppler er målbildets eneste autoritative kilde for staging-hemmeligheter;
+GitHub, Worker og Supabase har nødvendige distribuerte kopier.
+Pilotens `verify` bruker tilfeldig ugyldig autentisering når gammel
+`IMAGE_JOBS_SECRET` er fjernet fra GitHub staging. Synken til
+`app_settings` må beholdes: Dopplers Supabase-integrasjon dekker
+Edge Function-secrets, ikke disse databaseradene eller Auth-oppsettet.
+Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md)
+for bootstrap, miljøseparasjon og kontrollert videre migrering.
+
+Synkjobben henter nå også staging `SUPABASE_SERVICE_ROLE_KEY` fra Doppler.
+Den holdes utenfor Workerens bulk-payload; GitHub/SOPS-kopier fjernes først
+etter kontroll av den nye flyten og øvrige konsumenter.
+
+`PUSH_DISPATCH_SECRET` inngår også i Doppler-synken til staging-Worker og
+`app_settings.push_dispatch_secret`. En midlertidig
+`PUSH_DISPATCH_SECRET_PREVIOUS` i Doppler sikrer tilbakeføring: gammel
+staging-verdi avvek fra SOPS ved kontroll 2026-10-01. Push-verifisering
+sender ugyldig payload og kontrollerer 401/400 uten varselutsending.
+
+Manuell staging-synk og vanlig staging-deploy deler nå
+`scripts/doppler-staging.sh`. Separate staging-nøkler for VAPID, HMAC og
+R2-jobben er klargjort. Staging-bygg får `VITE_VAPID_PUBLIC_KEY`;
+produksjon beholder eksisterende offentlige VAPID-nøkkel.
+Synken inkluderer også Workerens nødvendige Supabase service-role,
+men aldri Cloudflare- eller Supabase management-token i Worker-payloaden.
+R2-kontrollen kjører ikke opprydning. Se
+[statuslisten](decisions/2026-10-01-doppler-staging-status.md).

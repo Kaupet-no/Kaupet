@@ -3610,7 +3610,7 @@ export type Database = {
         }
       }
       match_listing_to_saved_searches: {
-        Args: { _listing_id: string }
+        Args: { _listing_id: string; _previous?: Json }
         Returns: undefined
       }
       match_listing_to_wtb_listings: {
@@ -3769,6 +3769,16 @@ export type Database = {
           id: string
           sender_id: string
         }
+      }
+      saved_search_basic_match: {
+        Args: {
+          _cat_slug: string
+          _condition: string
+          _is_free: boolean
+          _price_nok: number
+          c: Json
+        }
+        Returns: boolean
       }
       saved_search_unread_counts: {
         Args: never

@@ -318,6 +318,13 @@ Tre steder, avhengig av hvem som trenger verdien:
 Fullstendig liste over variabler med forklaring: `.env.example` og
 `.env.staging.example`.
 
+**Doppler-pilot (klargjort, ikke verifisert i staging):**
+`.github/workflows/doppler-staging.yml` distribuerer manuelt kun
+`MISTRAL_API_KEY` fra prosjekt `kaupet`, konfigurasjon `stg`, til
+`kaupet-no-staging`. `DOPPLER_TOKEN` ligger i GitHub Environment `staging`.
+Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md) for
+kjøring, verifisering og tilbakeføring.
+
 ## 8. CI/CD
 
 Én workflow, `.github/workflows/ci.yml`, kjører på pull request og push mot

@@ -43,6 +43,11 @@ KI-forslagene (Mistral) krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudf
 Worker-secret. Legg den inn med SOPS (`bun run secrets:edit` og
 `bun run secrets:edit:staging`); aldri legg nøkkelen i `VITE_*` eller klartekst.
 
+Staging-Workerens nye Mistral-nøkkel prøves nå administrert fra Doppler
+(`kaupet/stg`) gjennom en manuelt utløst workflow. Ikke kopier denne
+pilotnøkkelen til SOPS eller GitHub. Lokal utvikling beholder eksisterende
+SOPS-oppsett. Se [pilotbeslutningen](../docs/decisions/2026-10-01-doppler-staging-pilot.md).
+
 ### R2-opprydning
 
 `R2_CLEANUP_SECRET` i `cloudflare.env` er den delte hemmeligheten mellom

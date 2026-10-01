@@ -47,17 +47,20 @@ touch "$MARKER"
         (temp / command).chmod(0o700)
     env = dict(os.environ, PATH=directory + ':' + os.environ['PATH'],
                OPERATION='sync', OLD_IMAGE_JOBS_SECRET='old-secret', OLD_STATUS='401', DOPPLER_TOKEN='fake', CLOUDFLARE_API_TOKEN='fake',
-               CLOUDFLARE_ACCOUNT_ID='fake', SUPABASE_SERVICE_ROLE_KEY='fake',
+               CLOUDFLARE_ACCOUNT_ID='fake',
                FIXTURE=str(temp / 'fixture'), MARKER=str(temp / 'worker'),
                DATABASE=str(temp / 'database'), GITHUB_STEP_SUMMARY=str(temp / 'summary'),
                JOB_URL='https://staging.kaupet.no/api/public/images/process', FAIL_POST='0')
-    valid = {'MISTRAL_API_KEY': 'fake-key', 'IMAGE_JOBS_SECRET': 'fake-secret', 'EXTRA': 'excluded'}
+    valid = {'MISTRAL_API_KEY': 'fake-key', 'IMAGE_JOBS_SECRET': 'fake-secret', 'SUPABASE_SERVICE_ROLE_KEY': 'fake-service-role', 'EXTRA': 'excluded'}
     cases = [(valid, {}, True, True)]
     for invalid in (None, '', 42, 'line\nbreak'):
         cases.append((dict(valid, IMAGE_JOBS_SECRET=invalid), {}, False, False))
+    for invalid in (None, 42, 'line\nbreak'):
+        cases.append((dict(valid, SUPABASE_SERVICE_ROLE_KEY=invalid), {}, False, False))
+    cases.append(({k: v for k, v in valid.items() if k != 'SUPABASE_SERVICE_ROLE_KEY'}, {}, False, False))
     cases += [(valid, {'JOB_URL': 'https://example.invalid'}, False, False),
               (valid, {'FAIL_POST': '1'}, False, True),
-              (valid, {'SUPABASE_SERVICE_ROLE_KEY': ''}, False, False)]
+              (dict(valid, SUPABASE_SERVICE_ROLE_KEY=''), {}, False, False)]
     cases += [(valid, {'OPERATION': 'verify'}, True, False),
               (valid, {'OPERATION': 'verify', 'OLD_IMAGE_JOBS_SECRET': ''}, True, False),
               (valid, {'OPERATION': 'verify', 'OLD_IMAGE_JOBS_SECRET': '', 'OLD_STATUS': '200'}, False, False),

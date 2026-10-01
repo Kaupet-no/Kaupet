@@ -41,7 +41,6 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
           : "${DOPPLER_TOKEN:?DOPPLER_TOKEN mangler i staging}"
@@ -53,7 +52,6 @@ jobs:
             verify) ;;
             *) echo 'Ugyldig operasjon' >&2; exit 1 ;;
           esac
-          : "${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY mangler i staging}"
           umask 077
           response=$(mktemp)
           payload=$(mktemp)
@@ -65,8 +63,14 @@ jobs:
             --data-urlencode 'project=kaupet' \
             --data-urlencode 'config=stg' \
             --data-urlencode 'format=json' \
-            --data-urlencode 'secrets=MISTRAL_API_KEY,IMAGE_JOBS_SECRET' \
+            --data-urlencode 'secrets=MISTRAL_API_KEY,IMAGE_JOBS_SECRET,SUPABASE_SERVICE_ROLE_KEY' \
             --output "$response"
+
+          SUPABASE_SERVICE_ROLE_KEY=$(jq -er '
+            .SUPABASE_SERVICE_ROLE_KEY | select(type == "string") |
+            select(length > 0 and (test("[\\r\\n]") | not))
+          ' "$response")
+          echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
 
           jq -e '
             {MISTRAL_API_KEY, IMAGE_JOBS_SECRET} |

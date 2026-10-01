@@ -9,13 +9,14 @@ som autoritativ kilde for pilothemmeligheter dedikert til staging.
 ## Valgt løsning
 
 Prosjekt `kaupet`, konfigurasjon `stg`, hemmeligheter `MISTRAL_API_KEY` og
-`IMAGE_JOBS_SECRET`. Sistnevnte skal være en ny verdi kun for staging.
+`IMAGE_JOBS_SECRET`, samt `SUPABASE_SERVICE_ROLE_KEY` for synkjobben. Bildejobbhemmeligheten skal være en ny verdi kun for staging.
 Et lesetoken avgrenset til konfigurasjonen lagres som `DOPPLER_TOKEN` i
 GitHub Environment `staging`. Developer støtter ikke OIDC.
 
 Den manuelt utløste workflowen `doppler-staging.yml` henter bare disse
-hemmelighetene gjennom Dopplers API og setter dem på `kaupet-no-staging` med
-eksisterende Wrangler. Midlertidige filer slettes og nøkkelen maskeres i
+hemmelighetene gjennom Dopplers API. Kun `MISTRAL_API_KEY` og
+`IMAGE_JOBS_SECRET` settes på `kaupet-no-staging` med eksisterende Wrangler;
+service-role brukes til databasekontroll og synk. Midlertidige filer slettes og nøkkelen maskeres i
 Actions-loggen. Vanlig staging-deploy administrerer ikke disse hemmelighetene.
 
 ## Alternativer
@@ -40,9 +41,10 @@ En tilbakekalt API-nøkkel kan ikke brukes til tilbakeføring.
 
 ## Bildejobbhemmeligheten
 
-Workflowen bruker eksisterende `SUPABASE_SERVICE_ROLE_KEY` i GitHub
-Environment `staging`. Denne har bred servertilgang; den brukes bare i det
-manuelle synksteget, aldri i klientbygg. En egen begrenset databaserolle kan
+Workflowen henter `SUPABASE_SERVICE_ROLE_KEY` fra Doppler. Denne har bred
+servertilgang; den brukes bare til Supabase-kontroll og synk, aldri i
+klientbygg eller Workerens bulk-payload. Eksisterende GitHub- og SOPS-kopier
+beholdes til den nye flyten er kontrollert og konsumentene er kartlagt. En egen begrenset databaserolle kan
 vurderes når piloten utvides. Ingen nye databasefunksjoner eller migrasjoner
 innføres.
 
@@ -93,8 +95,8 @@ Supabase-integrasjon synker Edge Function-secrets, ikke `app_settings` eller
 Auth SMTP/captcha; den erstatter derfor ikke jobbhemmelighetenes synk.
 
 `DOPPLER_TOKEN` er bootstrap og må kunne brukes uten først å hente seg selv
-fra Doppler. Cloudflare-token og staging service-role kan senere hentes fra
-Doppler i samme jobb. De skal aldri inngå i Workerens bulk-payload eller
+fra Doppler. Staging service-role hentes fra Doppler i samme jobb. Cloudflare-token
+kan senere hentes derfra. De skal aldri inngå i Workerens bulk-payload eller
 klientbygg. Behold eksplisitt liste over hemmeligheter per mottaker.
 
 Migrer én gruppe om gangen: avklar staging-avgrensning og konsumenter,
@@ -107,3 +109,8 @@ Sikre fungerende tilbakeføring før tilbakekalling.
 Kilder: [GitHub Actions](https://docs.doppler.com/docs/github-actions),
 [Cloudflare Workers](https://docs.doppler.com/docs/cloudflare-workers),
 [Supabase](https://docs.doppler.com/docs/supabase).
+
+Staging service-role ble importert fra SOPS til Doppler 2026-10-01. JWT-rolle
+og prosjektref ble kontrollert, lesetilgang til staging `app_settings`
+bekreftet, og Doppler-verdien sammenlignet uten verdiutskrift. Importen
+roterer ikke nøkkelen og oppdaterer ikke Workerens runtime-kopi.

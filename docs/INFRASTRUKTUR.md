@@ -390,3 +390,7 @@ Pilotens `verify` bruker tilfeldig ugyldig autentisering når gammel
 Edge Function-secrets, ikke disse databaseradene eller Auth-oppsettet.
 Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md)
 for bootstrap, miljøseparasjon og kontrollert videre migrering.
+
+Synkjobben henter nå også staging `SUPABASE_SERVICE_ROLE_KEY` fra Doppler.
+Den holdes utenfor Workerens bulk-payload; GitHub/SOPS-kopier fjernes først
+etter kontroll av den nye flyten og øvrige konsumenter.

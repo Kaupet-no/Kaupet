@@ -139,11 +139,33 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Retry later", { status: 503 });
         }
 
+        // Gir kunden pengene tilbake for en betalt fremheving som ikke kan
+        // aktiveres. false = feilet (logget); kalleren svarer 503 så Vipps prøver igjen.
+        const releasePayment = async (captured: boolean) => {
+          try {
+            const { releaseSupersededPromotionPayment } = await import("@/lib/vipps.server");
+            await releaseSupersededPromotionPayment({
+              promotionId: promo.id,
+              reference,
+              amountNok: promo.price_nok,
+              captured,
+              host,
+              mode: promoMode,
+            });
+            return true;
+          } catch (err) {
+            await logServerError("vippsWebhook.releaseSupersededPayment", err, {
+              promotion_id: promo.id,
+            });
+            return false;
+          }
+        };
+
         if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
           // `failed` kan være satt av reconcile før Vipps rapporterte betaling.
           // Har annonsen fått en ny fremheving i mellomtiden, kan denne ikke
-          // aktiveres (uniq_active_promotion_per_listing): ikke belast, og
-          // flagg den for manuell refusjon i stedet for å feile i retry-løkke.
+          // aktiveres (uniq_active_promotion_per_listing): ikke aktiver, og gi
+          // pengene tilbake (refusjon/kansellering) i stedet for å feile i retry-løkke.
           let superseded = false;
           if (promo.status === "failed") {
             const { data: live, error: liveError } = await supabaseAdmin
@@ -162,6 +184,9 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               new Error(`Betalt fremheving kan ikke aktiveres (${payment.state})`),
               { promotion_id: promo.id },
             );
+            if (!(await releasePayment(payment.state === "CAPTURED"))) {
+              return new Response("Retry later", { status: 503 });
+            }
           } else if (promo.status === "pending" || promo.status === "failed") {
             if (payment.state === "AUTHORIZED") {
               try {
@@ -199,6 +224,10 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               await logServerError("vippsWebhook.paidSupersededPromotion", activateError, {
                 promotion_id: promo.id,
               });
+              // AUTHORIZED ble capturet like over, så betalingen er belastet.
+              if (!(await releasePayment(true))) {
+                return new Response("Retry later", { status: 503 });
+              }
             } else if (activateError) throw activateError;
           }
         } else if (

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
+  updates: [] as { values: unknown; inFilters: unknown[] }[],
+  updateError: null as unknown,
   result: { data: null, error: null } as { data: { secret: string } | null; error: unknown },
   throws: false,
 }));
@@ -8,6 +10,16 @@ const db = vi.hoisted(() => ({
 vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: () => ({
+      update: (values: unknown) => {
+        const call = { values, inFilters: [] as unknown[] };
+        db.updates.push(call);
+        const chain = {
+          eq: () => chain,
+          in: (...a: unknown[]) => (call.inFilters.push(a), chain),
+          then: (resolve: (v: unknown) => void) => resolve({ error: db.updateError }),
+        };
+        return chain;
+      },
       select: () => ({
         eq: () => ({
           maybeSingle: async () => {
@@ -60,6 +72,7 @@ async function load() {
 }
 
 beforeEach(() => {
+  db.updateError = null;
   for (const k of ENV_KEYS) {
     saved[k] = process.env[k];
     delete process.env[k];
@@ -219,6 +232,71 @@ describe("getVippsPayment", () => {
     await expect(getVippsPayment("r", "kaupet.no")).rejects.toThrow(
       "Vipps get-payment feilet: 404 nope",
     );
+  });
+});
+
+describe("cancelVippsPayment", () => {
+  it("poster tom body med gitt idempotency-key", async () => {
+    mockApi(new Response("{}"));
+    const { cancelVippsPayment } = await load();
+    await cancelVippsPayment("ref-1", "cancel-1", "kaupet.no");
+    const [url, init] = apiCalls()[0];
+    expect(url).toBe("https://api.vipps.no/epayment/v1/payments/ref-1/cancel");
+    expect(init.method).toBe("POST");
+    expect(init.headers["Idempotency-Key"]).toBe("cancel-1");
+    expect(JSON.parse(init.body)).toEqual({});
+  });
+
+  it("kaster ved feilrespons", async () => {
+    mockApi(new Response("conflict", { status: 409 }));
+    const { cancelVippsPayment } = await load();
+    await expect(cancelVippsPayment("ref-1", "k", "kaupet.no")).rejects.toThrow(
+      "Vipps cancel feilet: 409 conflict",
+    );
+  });
+});
+
+describe("releaseSupersededPromotionPayment", () => {
+  const input = {
+    promotionId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    reference: "ref-1",
+    amountNok: 10,
+    host: "kaupet.no",
+    mode: "production" as const,
+  };
+
+  it("belastet: refunderer med stabil nøkkel og setter raden refunded", async () => {
+    mockApi(new Response("{}"));
+    db.updates = [];
+    const { releaseSupersededPromotionPayment } = await load();
+    await releaseSupersededPromotionPayment({ ...input, captured: true });
+    const [url, init] = apiCalls()[0];
+    expect(url).toBe("https://api.vipps.no/epayment/v1/payments/ref-1/refund");
+    expect(init.headers["Idempotency-Key"]).toBe("r-aaaaaaaabbbb4ccc8dddeeeeeeeeeeee");
+    expect(db.updates).toHaveLength(1);
+    expect(db.updates[0].values).toMatchObject({ status: "refunded" });
+    expect(db.updates[0].inFilters).toEqual([["status", ["pending", "failed"]]]);
+  });
+
+  it("belastet: kaster når statusoppdateringen feiler", async () => {
+    mockApi(new Response("{}"));
+    db.updateError = { message: "db nede" };
+    const { releaseSupersededPromotionPayment } = await load();
+    await expect(releaseSupersededPromotionPayment({ ...input, captured: true })).rejects.toEqual({
+      message: "db nede",
+    });
+  });
+
+  it("bare autorisert: kansellerer, ingen refusjon og ingen oppdatering", async () => {
+    mockApi(new Response("{}"));
+    db.updates = [];
+    const { releaseSupersededPromotionPayment } = await load();
+    await releaseSupersededPromotionPayment({ ...input, captured: false });
+    const [url, init] = apiCalls()[0];
+    expect(url).toBe("https://api.vipps.no/epayment/v1/payments/ref-1/cancel");
+    expect(init.headers["Idempotency-Key"]).toBe(`cancel-${input.promotionId}`);
+    expect(apiCalls()).toHaveLength(1);
+    expect(db.updates).toEqual([]);
   });
 });
 

@@ -8,6 +8,7 @@ const s = vi.hoisted(() => ({
   createVippsPayment: vi.fn(),
   getVippsPayment: vi.fn(),
   captureVippsPayment: vi.fn(),
+  releaseSupersededPromotionPayment: vi.fn(),
   logServerError: vi.fn(),
   /** Køer med resultater per tabell; hvert terminalkall (maybeSingle/single/await) tar neste. */
   queues: {} as Record<string, Result[]>,
@@ -46,6 +47,7 @@ vi.mock("@/lib/vipps.server", () => ({
   createVippsPayment: s.createVippsPayment,
   getVippsPayment: s.getVippsPayment,
   captureVippsPayment: s.captureVippsPayment,
+  releaseSupersededPromotionPayment: s.releaseSupersededPromotionPayment,
 }));
 
 function next(table: string): Result {
@@ -102,6 +104,7 @@ beforeEach(() => {
   s.getVippsPayment.mockReset();
   s.captureVippsPayment.mockReset().mockResolvedValue(undefined);
   s.logServerError.mockReset().mockResolvedValue(undefined);
+  s.releaseSupersededPromotionPayment.mockReset().mockResolvedValue(undefined);
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -161,15 +164,18 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     ]);
   });
 
-  it("failed + CAPTURED + annen aktiv fremheving: returnerer failed uten oppdatering, logger", async () => {
+  it("failed + CAPTURED + annen aktiv fremheving: refunderer og returnerer refunded", async () => {
     s.queues.listing_promotions = [
       { data: { ...pending, status: "failed", listing_id: listingId } },
       { data: [{ id: "annen" }] },
     ];
     s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
-    await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
+    await expect(run()).resolves.toEqual({ status: "refunded", expires_at: null });
     expect(ops("listing_promotions", "update")).toEqual([]);
     expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ promotionId, captured: true }),
+    );
     expect(s.logServerError).toHaveBeenCalledWith(
       "reconcilePromotionPayment.paidSupersededPromotion",
       "CAPTURED",
@@ -177,14 +183,45 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     );
   });
 
-  it("23505 ved aktivering (kappløp): returnerer failed og logger", async () => {
+  it("failed + AUTHORIZED + annen aktiv fremheving: kansellerer, returnerer failed", async () => {
+    s.queues.listing_promotions = [
+      { data: { ...pending, status: "failed", listing_id: listingId } },
+      { data: [{ id: "annen" }] },
+    ];
+    s.getVippsPayment.mockResolvedValue({ state: "AUTHORIZED" });
+    await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
+    expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ promotionId, captured: false }),
+    );
+  });
+
+  it("superseded + release feiler: returnerer failed og logger", async () => {
+    s.queues.listing_promotions = [
+      { data: { ...pending, status: "failed", listing_id: listingId } },
+      { data: [{ id: "annen" }] },
+    ];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.releaseSupersededPromotionPayment.mockRejectedValue(new Error("vipps nede"));
+    await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "reconcilePromotionPayment.releaseSupersededPayment",
+      expect.any(Error),
+      { promotion_id: promotionId },
+    );
+  });
+
+  it("23505 ved aktivering (kappløp): refunderer, returnerer refunded og logger", async () => {
     s.queues.listing_promotions = [
       { data: { ...pending, status: "failed", listing_id: listingId } },
       { data: [] },
       { error: { code: "23505" } },
     ];
     s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
-    await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
+    await expect(run()).resolves.toEqual({ status: "refunded", expires_at: null });
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ promotionId, captured: true }),
+    );
     expect(s.logServerError).toHaveBeenCalledWith(
       "reconcilePromotionPayment.paidSupersededPromotion",
       { code: "23505" },

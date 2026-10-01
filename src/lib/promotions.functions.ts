@@ -222,7 +222,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       }
     })();
 
-    const { getVippsPayment, captureVippsPayment } = await import("@/lib/vipps.server");
+    const { getVippsPayment, captureVippsPayment, releaseSupersededPromotionPayment } =
+      await import("@/lib/vipps.server");
     const vippsMode = promo.vipps_mode as "test" | "production";
     let payment;
     try {
@@ -234,9 +235,30 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       throw new ClientError("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.", 503);
     }
 
+    // Refusjon/kansellering av betaling som ikke kan aktiveres. Ved feil
+    // blir raden `failed`; webhooken tar nytt forsøk.
+    const release = async (captured: boolean) => {
+      try {
+        await releaseSupersededPromotionPayment({
+          promotionId: promo.id,
+          reference: promo.vipps_reference!,
+          amountNok: promo.price_nok,
+          captured,
+          host,
+          mode: vippsMode,
+        });
+        return { status: captured ? ("refunded" as const) : ("failed" as const), expires_at: null };
+      } catch (e) {
+        await logServerError("reconcilePromotionPayment.releaseSupersededPayment", e, {
+          promotion_id: promo.id,
+        });
+        return { status: "failed" as const, expires_at: null };
+      }
+    };
+
     if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
       // Se webhooken: en failed-rad som er erstattet av en ny fremheving på
-      // samme annonse kan ikke aktiveres, og skal ikke belastes.
+      // samme annonse kan ikke aktiveres: gi kunden pengene tilbake.
       if (promo.status === "failed") {
         const { data: live, error: liveErr } = await supabaseAdmin
           .from("listing_promotions")
@@ -250,7 +272,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           await logServerError("reconcilePromotionPayment.paidSupersededPromotion", payment.state, {
             promotion_id: promo.id,
           });
-          return { status: "failed" as const, expires_at: null };
+          return release(payment.state === "CAPTURED");
         }
       }
       if (payment.state === "AUTHORIZED") {
@@ -292,7 +314,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
         await logServerError("reconcilePromotionPayment.paidSupersededPromotion", uerr, {
           promotion_id: promo.id,
         });
-        return { status: "failed" as const, expires_at: null };
+        // AUTHORIZED ble capturet like over, så betalingen er belastet.
+        return release(true);
       }
       if (uerr) {
         throw await toClientError("database", uerr);

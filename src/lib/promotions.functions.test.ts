@@ -45,6 +45,7 @@ vi.mock("@/lib/vipps.server", () => ({
   createVippsPayment: state.createVippsPayment,
   getVippsPayment: state.getVippsPayment,
   captureVippsPayment: state.captureVippsPayment,
+  releaseSupersededPromotionPayment: vi.fn(),
 }));
 
 import { createPromotionCheckout, reconcilePromotionPayment } from "./promotions.functions";

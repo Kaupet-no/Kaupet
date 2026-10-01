@@ -20,6 +20,7 @@ const s = vi.hoisted(() => ({
   calls: [] as Call[],
   getVippsPayment: vi.fn(),
   captureVippsPayment: vi.fn(),
+  releaseSupersededPromotionPayment: vi.fn(),
 }));
 
 vi.mock("@/lib/vipps.server", () => ({
@@ -29,6 +30,7 @@ vi.mock("@/lib/vipps.server", () => ({
   isFreshVippsWebhookDate: () => s.fresh,
   getVippsPayment: s.getVippsPayment,
   captureVippsPayment: s.captureVippsPayment,
+  releaseSupersededPromotionPayment: s.releaseSupersededPromotionPayment,
 }));
 
 vi.mock("@/lib/server-error-log", () => ({ logServerError: s.logServerError }));
@@ -101,6 +103,7 @@ beforeEach(() => {
   s.updateError = {};
   s.live = [];
   s.logServerError.mockReset().mockResolvedValue(undefined);
+  s.releaseSupersededPromotionPayment.mockReset().mockResolvedValue(undefined);
   s.calls = [];
   s.getVippsPayment.mockReset().mockResolvedValue({ state: "CAPTURED", pspReference: "psp-1" });
   s.captureVippsPayment.mockReset().mockResolvedValue(undefined);
@@ -273,7 +276,29 @@ describe("Vipps-webhook: statusoverganger", () => {
       expect.any(Error),
       { promotion_id: "promo-1" },
     );
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith({
+      promotionId: "promo-1",
+      reference: "ref-1",
+      amountNok: 10,
+      captured: true,
+      host: "test.kaupet.no",
+      mode: "test",
+    });
     expect(processed()).toBe(true);
+  });
+
+  it("superseded + release feiler: 503 og hendelsen står ubehandlet", async () => {
+    s.promo = { ...pendingPromo, status: "failed", listing_id: "l-1" };
+    s.live = [{ id: "promo-2" }];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.releaseSupersededPromotionPayment.mockRejectedValue(new Error("vipps nede"));
+    expect((await post()).status).toBe(503);
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "vippsWebhook.releaseSupersededPayment",
+      expect.any(Error),
+      { promotion_id: "promo-1" },
+    );
+    expect(processed()).toBe(false);
   });
 
   it("failed + AUTHORIZED + annen aktiv fremheving: capture kalles ikke", async () => {
@@ -284,6 +309,9 @@ describe("Vipps-webhook: statusoverganger", () => {
     expect(s.captureVippsPayment).not.toHaveBeenCalled();
     expect(promoUpdates()).toEqual([]);
     expect(s.logServerError).toHaveBeenCalled();
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ captured: false }),
+    );
     expect(processed()).toBe(true);
   });
 
@@ -295,6 +323,9 @@ describe("Vipps-webhook: statusoverganger", () => {
       "vippsWebhook.paidSupersededPromotion",
       { code: "23505" },
       { promotion_id: "promo-1" },
+    );
+    expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ captured: true }),
     );
     expect(processed()).toBe(true);
   });

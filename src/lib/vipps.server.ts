@@ -319,6 +319,56 @@ export async function refundVippsPayment(
   }
 }
 
+export async function cancelVippsPayment(
+  reference: string,
+  idempotencyKey: string,
+  host?: string | null,
+  explicitMode?: "test" | "production",
+) {
+  assertVippsConfigured(host);
+  const e = hostAwareEnv(host, explicitMode);
+  const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/cancel`, {
+    method: "POST",
+    headers: await vippsHeaders(e, { "Idempotency-Key": idempotencyKey }),
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Vipps cancel feilet: ${res.status} ${text}`);
+  }
+}
+
+/**
+ * Betalt fremheving som ikke kan aktiveres fordi annonsen allerede har en
+ * annen (uniq_active_promotion_per_listing): gi kunden pengene tilbake.
+ * Belastet → refusjon (samme nøkkel som adminRefundPromotion, så admin og
+ * automatikk aldri gir to refusjoner). Bare autorisert → kanseller
+ * reservasjonen; raden blir `failed` siden ingenting er trukket.
+ * Kaster ved feil; nytt forsøk er trygt pga. de stabile nøklene.
+ */
+export async function releaseSupersededPromotionPayment(input: {
+  promotionId: string;
+  reference: string;
+  amountNok: number;
+  captured: boolean;
+  host?: string | null;
+  mode: "test" | "production";
+}): Promise<void> {
+  const { promotionId, reference, amountNok, captured, host, mode } = input;
+  if (!captured) {
+    await cancelVippsPayment(reference, `cancel-${promotionId}`, host, mode);
+    return;
+  }
+  await refundVippsPayment(reference, amountNok, `r-${promotionId.replace(/-/g, "")}`, host, mode);
+  const supabaseAdmin = await getSupabaseAdmin();
+  const { error } = await supabaseAdmin
+    .from("listing_promotions")
+    .update({ status: "refunded", refunded_at: new Date().toISOString() })
+    .eq("id", promotionId)
+    .in("status", ["pending", "failed"]);
+  if (error) throw error;
+}
+
 export async function getVippsWebhookSecret(host?: string | null): Promise<string> {
   const env = hostAwareEnv(host);
   try {

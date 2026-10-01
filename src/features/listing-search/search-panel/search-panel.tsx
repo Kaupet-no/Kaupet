@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Drawer } from "vaul";
 import { useNavigate } from "@tanstack/react-router";
@@ -839,7 +840,7 @@ export function SearchPanel({
             {results && buttonResultCount != null
               ? buttonResultCount === 1
                 ? "Vis 1 annonse"
-                : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`
+                : `Vis ${formatNokNumber(buttonResultCount)} annonser`
               : submitting
                 ? "Søker…"
                 : "Vis annonser"}

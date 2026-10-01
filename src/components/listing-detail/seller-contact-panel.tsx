@@ -1,3 +1,4 @@
+import { formatMonthYear } from "@/lib/format";
 import {
   Building2,
   MessageCircle,
@@ -143,11 +144,7 @@ export function SellerContactPanel({
               )}
               {seller?.created_at && (
                 <p className="text-xs text-muted-foreground">
-                  Medlem siden{" "}
-                  {new Date(seller.created_at).toLocaleDateString("nb-NO", {
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  Medlem siden {formatMonthYear(seller.created_at)}
                 </p>
               )}
             </>

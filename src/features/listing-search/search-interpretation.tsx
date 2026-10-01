@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { X } from "lucide-react";
 
 import { describeAttrValue } from "@/components/active-filters";
@@ -20,7 +21,7 @@ function attributeLabel(filter: CategoryFilter, value: AttributeFilterValue) {
 }
 
 function priceLabel(min: number | undefined, max: number | undefined) {
-  const format = (value: number) => `${value.toLocaleString("nb-NO")} kr`;
+  const format = (value: number) => `${formatNokNumber(value)} kr`;
   if (min != null && max != null) return `${format(min)}–${format(max)}`;
   if (min != null) return `Fra ${format(min)}`;
   return `Under ${format(max ?? 0)}`;

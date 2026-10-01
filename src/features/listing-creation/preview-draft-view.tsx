@@ -1,3 +1,4 @@
+import { formatMonthYear } from "@/lib/format";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, Monitor, Smartphone, UserRound } from "lucide-react";
@@ -124,11 +125,7 @@ function usePreviewSeller(): {
       <p className="text-sm text-muted-foreground">Privatperson</p>
       {user && profile?.created_at && (
         <p className="text-xs text-muted-foreground">
-          Medlem siden{" "}
-          {new Date(profile.created_at).toLocaleDateString("nb-NO", {
-            month: "long",
-            year: "numeric",
-          })}
+          Medlem siden {formatMonthYear(profile.created_at)}
         </p>
       )}
     </>

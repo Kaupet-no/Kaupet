@@ -1,3 +1,4 @@
+import { formatDateShort } from "@/lib/format";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -265,11 +266,7 @@ export function VehicleBrandsTab() {
                   </TableCell>
                   <TableCell className="text-sm">{r.submitted_by_name ?? "Ukjent"}</TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                    {new Date(r.created_at).toLocaleDateString("nb-NO", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {formatDateShort(r.created_at)}
                   </TableCell>
                   <TableCell className="flex justify-end gap-1.5">
                     <Button

@@ -1,3 +1,4 @@
+import { formatMonthYear } from "@/lib/format";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -139,9 +140,7 @@ export function ProfileSection() {
   }
 
   const displayName = profile?.display_name ?? "";
-  const memberSince = stats
-    ? new Date(stats.created_at).toLocaleDateString("nb-NO", { month: "long", year: "numeric" })
-    : null;
+  const memberSince = stats ? formatMonthYear(stats.created_at) : null;
 
   if (isLoading) {
     return (

@@ -1,3 +1,4 @@
+import { formatNok } from "@/lib/format";
 import { useMemo, useState } from "react";
 
 import { Slider } from "@/components/ui/slider";
@@ -10,10 +11,6 @@ import {
 } from "@/components/ui/select";
 
 const TERM_YEARS_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
-
-function formatKr(value: number) {
-  return `${Math.round(value).toLocaleString("nb-NO")} kr`;
-}
 
 /**
  * Veiledende lånekalkulator for kjøretøy-annonser, vist rett under
@@ -52,16 +49,17 @@ export function LoanCalculator({ totalPriceKr }: { totalPriceKr: number | null }
     <div className="mt-4 rounded-xl border border-border bg-card p-4">
       <h3 className="font-display text-base">Lånekalkulator</h3>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Veiledende beregning basert på totalpris {formatKr(total)}. Ikke et bindende lånetilbud.
+        Veiledende beregning basert på totalpris {formatNok(Math.round(total))}. Ikke et bindende
+        lånetilbud.
       </p>
 
       <div className="mt-4 space-y-1.5">
         <div className="flex items-center justify-between gap-3 text-sm">
           <label htmlFor="loan-down-payment" className="text-muted-foreground">
-            Egenkapital: {formatKr(clampedDownPayment)}
+            Egenkapital: {formatNok(Math.round(clampedDownPayment))}
           </label>
           <span className="text-right text-muted-foreground">
-            Lånebeløp: {formatKr(loanAmountKr)}
+            Lånebeløp: {formatNok(Math.round(loanAmountKr))}
           </span>
         </div>
         <Slider
@@ -109,10 +107,13 @@ export function LoanCalculator({ totalPriceKr }: { totalPriceKr: number | null }
       </div>
 
       <div className="mt-5 border-t border-border pt-4">
-        <p className="font-display text-xl text-primary">{formatKr(monthlyPaymentKr)} / mnd</p>
+        <p className="font-display text-xl text-primary">
+          {formatNok(Math.round(monthlyPaymentKr))} / mnd
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Totalkostnad over {termYears} {termYears === 1 ? "år" : "år"}: {formatKr(totalCostKr)}{" "}
-          (hvorav {formatKr(totalInterestKr)} i renter)
+          Totalkostnad over {termYears} {termYears === 1 ? "år" : "år"}:{" "}
+          {formatNok(Math.round(totalCostKr))} (hvorav {formatNok(Math.round(totalInterestKr))} i
+          renter)
         </p>
       </div>
     </div>

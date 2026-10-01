@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, FolderOpen, Save, X } from "lucide-react";
@@ -411,9 +412,9 @@ function BrowsePage() {
       const filter = attrFilters.find((candidate) => candidate.key === match.filterKey);
       const value =
         match.min != null && match.max != null
-          ? `${match.min.toLocaleString("nb-NO")}–${match.max.toLocaleString("nb-NO")}`
+          ? `${formatNokNumber(match.min)}–${formatNokNumber(match.max)}`
           : match.min != null
-            ? `fra ${match.min.toLocaleString("nb-NO")}`
+            ? `fra ${formatNokNumber(match.min)}`
             : `opptil ${match.max?.toLocaleString("nb-NO") ?? ""}`;
       return {
         id: `${match.filterKey}:${match.matchedText}`,

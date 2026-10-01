@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { format } from "date-fns";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import {
@@ -75,7 +76,7 @@ export function getAttributeChipState(
       if (value.min == null && value.max == null) return fallback;
       const unit = filter.unit ? ` ${filter.unit}` : "";
       const noGrouping = boundsForFilter(filter).noGrouping;
-      const fmt = (n: number) => (noGrouping ? String(n) : n.toLocaleString("nb-NO"));
+      const fmt = (n: number) => (noGrouping ? String(n) : formatNokNumber(n));
       const label =
         value.min != null && value.max != null
           ? `${fmt(value.min)}–${fmt(value.max)}${unit}`

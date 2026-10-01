@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -72,8 +73,8 @@ function isActive(key: ApiKeySummary): boolean {
   return !key.revokedAt && new Date(key.expiresAt).getTime() > Date.now();
 }
 
-function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleDateString("nb-NO") : "Aldri";
+function formatDateOrNever(value: string | null): string {
+  return value ? formatDate(value) : "Aldri";
 }
 
 function CreateApiKeyOverlay({
@@ -498,8 +499,9 @@ export function IntegrationsPanel({
                       {key.scopes.map((scope) => SCOPE_LABELS_NB[scope] ?? scope).join(", ")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Opprettet {formatDate(key.createdAt)} · Utløper {formatDate(key.expiresAt)} ·
-                      Sist brukt {formatDate(key.lastUsedAt)}
+                      Opprettet {formatDateOrNever(key.createdAt)} · Utløper{" "}
+                      {formatDateOrNever(key.expiresAt)} · Sist brukt{" "}
+                      {formatDateOrNever(key.lastUsedAt)}
                     </p>
                   </div>
                   {active && (

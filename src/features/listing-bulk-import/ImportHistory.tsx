@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Clock, History } from "lucide-react";
 
@@ -230,7 +231,7 @@ export function ImportHistory({ organizationId }: { organizationId: string }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="flex items-center gap-2 font-medium">
               <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
-              {new Date(run.createdAt).toLocaleString("nb-NO")}
+              {formatDateTime(run.createdAt)}
             </span>
             <Badge variant="outline">{SOURCE_LABELS_NB[run.source] ?? run.source}</Badge>
           </div>

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -116,7 +117,7 @@ export function BansTab() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{b.reason}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(b.created_at).toLocaleDateString("nb-NO")}
+                    {formatDate(b.created_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

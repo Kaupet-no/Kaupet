@@ -1,3 +1,4 @@
+import { formatDayMonth } from "@/lib/format";
 import { Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
@@ -600,5 +601,5 @@ function formatRelative(iso: string): string {
   if (hours < 24) return `${hours} t`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days} d`;
-  return d.toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+  return formatDayMonth(iso);
 }

@@ -257,7 +257,7 @@ export function Price({
                   ? "h-16 w-full text-right text-2xl text-muted-foreground"
                   : "max-w-[200px] text-muted-foreground"
               }
-              value={`${totalprisKr.toLocaleString("nb-NO")} kr`}
+              value={`${formatNokNumber(totalprisKr)} kr`}
             />
           </div>
         )}
@@ -313,7 +313,7 @@ export function Price({
                 {" "}
                 — høyeste budsjett{" "}
                 <span className="font-medium text-foreground">
-                  {wtbMatch.maxPrice.toLocaleString("nb-NO")} kr
+                  {formatNokNumber(wtbMatch.maxPrice)} kr
                 </span>
               </span>
             )}

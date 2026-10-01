@@ -1,3 +1,4 @@
+import { formatDateShort } from "@/lib/format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -99,11 +100,7 @@ export function BlockedSection() {
                   ? "All kommunikasjon blokkert"
                   : `Samtale blokkert${b.listing ? ` · ${b.listing.title}` : ""}`}
                 {" · "}
-                {new Date(b.created_at).toLocaleDateString("nb-NO", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+                {formatDateShort(b.created_at)}
               </p>
             </div>
             <Button

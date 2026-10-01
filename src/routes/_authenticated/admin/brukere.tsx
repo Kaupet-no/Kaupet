@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -253,7 +254,7 @@ function AdminUsers() {
                         {u.display_name ?? "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {new Date(u.created_at).toLocaleDateString("nb-NO")}
+                        {formatDate(u.created_at)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 /** Strips everything but digits, so pasted "1 000 000", "1.000.000" or
  * "1,000,000" all parse the same way, and clamps to `max` so typing/pasting
  * a longer number never produces a value a Zod `.max()` would reject. */
@@ -18,5 +19,5 @@ export function formatThousands(
 ): string {
   const digits = value == null ? "" : digitsOnlyClamped(String(value), max);
   if (!digits) return "";
-  return noGrouping ? digits : Number(digits).toLocaleString("nb-NO");
+  return noGrouping ? digits : formatNokNumber(Number(digits));
 }

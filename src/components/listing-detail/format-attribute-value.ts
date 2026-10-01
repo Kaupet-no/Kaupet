@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import type { CategoryFilter } from "@/lib/category-filters";
 
 function optionLabel(filter: CategoryFilter, value: string): string {
@@ -16,7 +17,7 @@ export function formatAttributeValue(filter: CategoryFilter, raw: unknown): stri
   }
   if (typeof raw === "number") {
     if (!Number.isFinite(raw)) return null;
-    const value = raw.toLocaleString("nb-NO");
+    const value = formatNokNumber(raw);
     return filter.unit ? `${value} ${filter.unit}` : value;
   }
   if (typeof raw === "string") {

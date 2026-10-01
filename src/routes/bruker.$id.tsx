@@ -1,3 +1,4 @@
+import { formatDateLong, formatMonthYear } from "@/lib/format";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -105,10 +106,7 @@ function PublicProfilePage() {
     },
   });
 
-  const memberSince = new Date(profile.created_at).toLocaleDateString("nb-NO", {
-    month: "long",
-    year: "numeric",
-  });
+  const memberSince = formatMonthYear(profile.created_at);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -194,11 +192,7 @@ function PublicProfilePage() {
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(r.created_at).toLocaleDateString("nb-NO", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      {formatDateLong(r.created_at)}
                       {r.listing && (
                         <>
                           {" · "}

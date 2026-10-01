@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import {
   ArrowUpDown,
   Expand,
@@ -235,7 +236,7 @@ export function ResultList({
           <span role="status" aria-live="polite" aria-atomic="true">
             {isLoading
               ? "Søker…"
-              : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
+              : `${formatNokNumber(totalCount ?? cards.length)} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
           {toolbarLead}
         </div>
@@ -451,7 +452,7 @@ export function ResultList({
                         variant="outline"
                         onClick={() => onApplyZeroResultExpansion(option)}
                       >
-                        Vis {option.count.toLocaleString("nb-NO")} treff uten «{option.label}»
+                        Vis {formatNokNumber(option.count)} treff uten «{option.label}»
                       </Button>
                     ))
                   ) : zeroResultExpansionPending ? (

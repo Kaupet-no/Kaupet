@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MessageSquare, Tag, Calendar } from "lucide-react";
@@ -78,7 +79,7 @@ export function WtbListingCard({ listing }: Props) {
           <div className="shrink-0 text-right">
             <span className="text-xs text-muted-foreground">Maks</span>
             <p className="font-semibold text-primary">
-              {listing.max_price_nok.toLocaleString("nb-NO")} kr
+              {formatNokNumber(listing.max_price_nok)} kr
             </p>
           </div>
         )}

@@ -52,3 +52,39 @@ export function priceRange(prices: number[]): { low: number; high: number } | nu
   };
   return { low: Math.round(percentile(0.25)), high: Math.round(percentile(0.75)) };
 }
+
+// Datoformattering (nb-NO). Én funksjon per format som faktisk vises i appen.
+const NB = "nb-NO";
+const dateOf = (iso: string) => new Date(iso);
+
+/** `1.10.2026` */
+export const formatDate = (iso: string) => dateOf(iso).toLocaleDateString(NB);
+/** `1.10.2026, 14:05:09` */
+export const formatDateTime = (iso: string) => dateOf(iso).toLocaleString(NB);
+/** `1. okt. 2026, 14:05` */
+export const formatDateTimeMedium = (iso: string) =>
+  dateOf(iso).toLocaleString(NB, { dateStyle: "medium", timeStyle: "short" });
+/** `01. oktober 2026 kl. 14:05` */
+export const formatDateTimeLong = (iso: string) =>
+  dateOf(iso).toLocaleString(NB, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+/** `1. okt. 2026` */
+export const formatDateShort = (iso: string) =>
+  dateOf(iso).toLocaleDateString(NB, { day: "numeric", month: "short", year: "numeric" });
+/** `1. oktober 2026` */
+export const formatDateLong = (iso: string) =>
+  dateOf(iso).toLocaleDateString(NB, { day: "numeric", month: "long", year: "numeric" });
+/** `01. oktober 2026` */
+export const formatDateLongPadded = (iso: string) =>
+  dateOf(iso).toLocaleDateString(NB, { day: "2-digit", month: "long", year: "numeric" });
+/** `oktober 2026` */
+export const formatMonthYear = (iso: string) =>
+  dateOf(iso).toLocaleDateString(NB, { month: "long", year: "numeric" });
+/** `1. okt.` */
+export const formatDayMonth = (iso: string) =>
+  dateOf(iso).toLocaleDateString(NB, { day: "numeric", month: "short" });

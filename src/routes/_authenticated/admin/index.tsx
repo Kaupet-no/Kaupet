@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { lazy, Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -247,7 +248,7 @@ function StatCard({
         ) : (
           <>
             <div className="text-2xl font-semibold tabular-nums">
-              {value !== undefined ? Number(value).toLocaleString("nb-NO") : "—"}
+              {value !== undefined ? formatNokNumber(Number(value)) : "—"}
             </div>
             {subValue && <div className="mt-1 text-xs text-muted-foreground">{subValue}</div>}
           </>

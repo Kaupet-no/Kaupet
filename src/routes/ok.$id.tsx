@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -323,7 +324,7 @@ function WtbListingPage() {
               value={listing.max_price_nok}
               render={(v) =>
                 v != null ? (
-                  <p>{v.toLocaleString("nb-NO")} kr</p>
+                  <p>{formatNokNumber(v)} kr</p>
                 ) : (
                   <p className="text-muted-foreground">Ikke satt</p>
                 )

@@ -27,7 +27,7 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
-import { displayPriceNok } from "@/lib/format";
+import { displayPriceNok, formatNokNumber } from "@/lib/format";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { InboxPage } from "@/components/inbox-page";
@@ -519,7 +519,7 @@ function ConversationPage() {
   const priceLabel = conv?.listing?.is_free
     ? "Gis bort"
     : conversationPriceKr != null
-      ? `${conversationPriceKr.toLocaleString("nb-NO")} kr`
+      ? `${formatNokNumber(conversationPriceKr)} kr`
       : "Pris ved henvendelse";
   const isBusinessSeller = !!conv?.isBusinessSeller;
   const otherId = conv

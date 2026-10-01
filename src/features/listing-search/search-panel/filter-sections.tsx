@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -474,12 +475,12 @@ export function SearchFilterSections({
                     className={`${desktopGroup ? "h-9" : "min-h-12 rounded-full"} flex-1 px-3 text-xs`}
                     disabled={v.min != null && max < v.min}
                     onClick={() => setV((previous) => ({ ...previous, max }))}
-                    aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
+                    aria-label={`Inntil ${formatNokNumber(max)}`}
                     aria-pressed={v.max === max}
                   >
                     {/* Sidekolonnen er smal — «≤» i stedet for «Inntil». */}
                     {expanded ? "≤ " : "Inntil "}
-                    {max.toLocaleString("nb-NO")}
+                    {formatNokNumber(max)}
                   </Button>
                 ))}
             </div>
@@ -1113,7 +1114,7 @@ function InlineChoiceFilter({
 
 /** Faste hurtigvalg når søket har for få priser til å lage egne. */
 const FALLBACK_PRICE_RANGES: PriceQuickRange[] = [50_000, 100_000, 250_000].map((max) => ({
-  label: `Under ${max.toLocaleString("nb-NO")}`,
+  label: `Under ${formatNokNumber(max)}`,
   max,
 }));
 

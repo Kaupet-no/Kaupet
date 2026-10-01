@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
@@ -98,7 +99,7 @@ const priceText = (l: MapListing) =>
       ? "–"
       : l.price_nok >= 1_000_000
         ? `${(l.price_nok / 1_000_000).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} mill`
-        : l.price_nok.toLocaleString("nb-NO");
+        : formatNokNumber(l.price_nok);
 
 /** Prislapp i stedet for prikk på telefon: prisen er det kjøperen sammenligner
  * i kartet, og lappen er et større treffområde enn en 20 px prikk. */

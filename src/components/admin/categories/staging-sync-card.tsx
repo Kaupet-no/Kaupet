@@ -6,6 +6,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { invalidateSharedCategoryQueries } from "@/lib/reference-query-invalidation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatDateTimeMedium } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -33,9 +34,9 @@ function describeCategoryRow(row: Record<string, unknown>) {
   return String(row.name_nb ?? row.label_nb ?? row.phrase ?? row.slug ?? row.key ?? row.id ?? "");
 }
 
-function formatDate(iso: string | null) {
+function formatDateTimeOrNever(iso: string | null) {
   if (!iso) return "aldri";
-  return new Date(iso).toLocaleString("nb-NO", { dateStyle: "medium", timeStyle: "short" });
+  return formatDateTimeMedium(iso);
 }
 
 export function StagingSyncCard() {
@@ -118,7 +119,7 @@ export function StagingSyncCard() {
               </p>
               {statusQuery.data && (
                 <p className="text-xs text-muted-foreground">
-                  Sist synkronisert: {formatDate(statusQuery.data.lastSyncedAt)}
+                  Sist synkronisert: {formatDateTimeOrNever(statusQuery.data.lastSyncedAt)}
                 </p>
               )}
             </div>

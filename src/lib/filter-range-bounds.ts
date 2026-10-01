@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import type { CategoryFilter } from "@/lib/category-filters";
 
 /** Slider geometry for a from–to numeric filter. */
@@ -111,6 +112,6 @@ export function clampToBounds(value: number, bounds: RangeBounds): number {
 /** "120 000 km" / "2018" — space-grouped nb-NO digits plus the unit, unless
  * `noGrouping` (e.g. a year) asks for the plain digits instead. */
 export function formatRangeValue(value: number, unit?: string, noGrouping?: boolean): string {
-  const digits = noGrouping ? String(value) : value.toLocaleString("nb-NO");
+  const digits = noGrouping ? String(value) : formatNokNumber(value);
   return unit ? `${digits} ${unit}` : digits;
 }

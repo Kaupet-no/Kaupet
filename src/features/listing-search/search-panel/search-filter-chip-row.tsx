@@ -1,7 +1,8 @@
+import { formatNokNumber } from "@/lib/format";
 import { useState } from "react";
 import { ArrowUpDown, SlidersHorizontal } from "lucide-react";
 
-import { FilterChip } from "@/components/filter-chip";
+import { FilterChip } from "@/features/listing-search/filters/filter-chip";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { conditionOptionsFor } from "@/lib/advanced-search-value";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
@@ -35,10 +36,10 @@ type Props = {
   filterCount: number;
 };
 
-const kr = (n: number) => `${n.toLocaleString("nb-NO")} kr`;
+const kr = (n: number) => `${formatNokNumber(n)} kr`;
 
 function priceLabel(min: number | undefined, max: number | undefined, includeFree: boolean) {
-  if (min != null && max != null) return `${min.toLocaleString("nb-NO")}–${kr(max)}`;
+  if (min != null && max != null) return `${formatNokNumber(min)}–${kr(max)}`;
   if (min != null) return `Fra ${kr(min)}`;
   if (max != null) return `Maks ${kr(max)}`;
   return includeFree ? "Pris" : "Uten gratis";

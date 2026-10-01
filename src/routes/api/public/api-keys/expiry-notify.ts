@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
@@ -44,7 +45,7 @@ export const Route = createFileRoute("/api/public/api-keys/expiry-notify")({
         // Dynamisk import: en statisk import av en .server-modul i
         // src/routes drar den inn i klientgrafen (se
         // scripts/check-server-boundary.mjs).
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
 
         const { data: key } = await supabaseAdmin
           .from("organization_api_keys")

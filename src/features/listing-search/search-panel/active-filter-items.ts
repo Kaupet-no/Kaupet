@@ -1,4 +1,4 @@
-import { describeAttrValue } from "@/components/active-filters";
+import { describeAttrValue } from "@/features/listing-search/filters/active-filters";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import {

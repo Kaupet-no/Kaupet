@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 /**
  * Miljønøytral grensekonfig for Proff-integrasjonene (Excel-import, REST-API,
  * MCP). Ingen server-imports her: modulen brukes både av servertjenester som
@@ -102,7 +103,7 @@ export type IntegrationLimitKey = keyof typeof INTEGRATION_LIMIT_LABELS_NB;
 /** Formatterer en grenseverdi med norsk tallformat, f.eks.
  * `formatLimit(1000, "nye annonser / døgn")` → `"1 000 nye annonser / døgn"`. */
 export function formatLimit(value: number, unit: string): string {
-  const formattedValue = value.toLocaleString("nb-NO");
+  const formattedValue = formatNokNumber(value);
   return unit ? `${formattedValue} ${unit}` : formattedValue;
 }
 

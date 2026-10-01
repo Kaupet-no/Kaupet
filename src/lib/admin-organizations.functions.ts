@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -21,7 +22,7 @@ export const adminListUnverifiedOrganizations = createServerFn({ method: "GET" }
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdminRole(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from("organizations")
       .select("id, legal_name, display_name, organization_number, created_at")

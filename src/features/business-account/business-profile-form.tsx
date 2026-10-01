@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
 import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
-import { updateBusinessProfile } from "@/lib/business.functions";
+import { updateBusinessProfile } from "@/lib/business/organization.functions";
 import { compressImage } from "@/lib/image-compression";
 import {
   IMAGE_ACCEPT,

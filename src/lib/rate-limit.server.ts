@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { hashRequestIp } from "@/lib/request-ip.server";
 
@@ -9,7 +10,7 @@ export async function assertNotRateLimited(
   limit: number,
   windowSeconds: number,
 ): Promise<void> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const keyHash = await hashRequestIp();
   const { data: allowed, error } = await supabaseAdmin.rpc("check_endpoint_rate_limit", {
     _bucket: bucket,
@@ -32,7 +33,7 @@ export async function assertUserNotRateLimited(
   windowSeconds: number,
   message = "For mange forespørsler. Prøv igjen senere.",
 ): Promise<void> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data: allowed, error } = await supabaseAdmin.rpc("check_user_rate_limit", {
     _bucket: bucket,
     _user_id: userId,

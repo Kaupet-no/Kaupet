@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -20,7 +21,7 @@ export const getListingFacetCounts = createServerFn({ method: "POST" })
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("listing-filter-facet-counts", 60, 60);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: rows, error } = await supabaseAdmin.rpc("listing_filter_facet_counts", {
       p_category_ids: data.categoryIds ?? undefined,
       p_conditions: data.conditions ?? undefined,

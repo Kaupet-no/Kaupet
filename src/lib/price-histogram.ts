@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import type { RangeBounds } from "@/lib/filter-range-bounds";
 
 /** Antall søyler i prisfordelingen over prisslideren. */
@@ -46,7 +47,7 @@ export function priceScaleMax(prices: number[], boundsMax: number, selectedMax?:
 
 export type PriceQuickRange = { label: string; min?: number; max?: number };
 
-const kr = (n: number) => n.toLocaleString("nb-NO");
+const kr = (n: number) => formatNokNumber(n);
 
 /**
  * Hurtigvalg fra prisene i søket: «Under» nedre kvartil, nedre kvartil til

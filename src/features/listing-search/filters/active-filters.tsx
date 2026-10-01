@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "re
 import { X } from "lucide-react";
 
 import { format } from "date-fns";
-import { TermGroupChips } from "@/components/term-group-editor";
+import { TermGroupChips } from "@/features/listing-search/filters/term-group-editor";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import {

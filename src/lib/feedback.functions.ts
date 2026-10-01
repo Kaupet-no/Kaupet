@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -19,7 +20,7 @@ async function rateLimitedInsert(args: {
   categoryDescription?: string | null;
   rateLimitedMessage: string;
 }) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const keyHash = args.userId ? await sha256Hex(`user:${args.userId}`) : await hashRequestIp();
   const { error } = await supabaseAdmin.rpc("submit_feedback_rate_limited", {
     _key_hash: keyHash,
@@ -38,7 +39,7 @@ async function rateLimitedInsert(args: {
 
 /** Best-effort user attribution from the (optional) Authorization header. */
 async function attributedUserId(): Promise<string | null> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const request = getRequest();
   const authHeader = request?.headers?.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;

@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -41,7 +42,7 @@ export const createVehicleBrand = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertUserNotRateLimited(context.userId, "vehicle_suggestion", 10, 3600);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: existing } = await supabaseAdmin
       .from("vehicle_brands")
       .select("id, name, status")
@@ -79,7 +80,7 @@ export const createVehicleModel = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertUserNotRateLimited(context.userId, "vehicle_suggestion", 10, 3600);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: existing } = await supabaseAdmin
       .from("vehicle_models")
       .select("id, name, status")

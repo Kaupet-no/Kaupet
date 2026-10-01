@@ -24,8 +24,11 @@ vi.mock("vaul", () => ({
 }));
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
-vi.mock("@/components/advanced-search-sheet", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/components/advanced-search-sheet")>();
+vi.mock("@/features/listing-search/filters/advanced-search-sheet", async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import("@/features/listing-search/filters/advanced-search-sheet")
+    >();
   return { ...original, SaveSearchDialog: () => null };
 });
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));

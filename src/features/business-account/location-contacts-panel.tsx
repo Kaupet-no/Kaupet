@@ -14,7 +14,7 @@ import type {
   BusinessLocation,
   BusinessOrganization,
 } from "@/features/business-account/use-business-membership";
-import { updateLocationContacts } from "@/lib/business.functions";
+import { updateLocationContacts } from "@/lib/business/locations.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { compressImage } from "@/lib/image-compression";
 import { publicImageUrl } from "@/lib/image-url";

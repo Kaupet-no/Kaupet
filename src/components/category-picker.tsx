@@ -137,9 +137,11 @@ export function CategoryPicker({
    * visual confirmation. Clicking the highlighted card again re-expands the
    * level and clears the highlight — it does not change the selection. */
   const [manualExpand, setManualExpand] = useState(false);
-  useEffect(() => {
+  const [prevParentId, setPrevParentId] = useState(currentParentId);
+  if (prevParentId !== currentParentId) {
+    setPrevParentId(currentParentId);
     setManualExpand(false);
-  }, [currentParentId]);
+  }
   const selectedInLevel = filteredCurrentLevel.find((c) => c.id === selectedId);
   const gridLevel = !manualExpand && selectedInLevel ? [selectedInLevel] : filteredCurrentLevel;
 

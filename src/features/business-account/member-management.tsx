@@ -26,17 +26,39 @@ import type {
 } from "@/features/business-account/use-business-membership";
 import {
   inviteOrganizationMember,
-  normalizeMemberPermissions,
   removeOrganizationMember,
-  setOrganizationLocationMember,
-  type OrganizationMemberPermissions,
-} from "@/lib/business.functions";
+} from "@/lib/business/members.functions";
+import { normalizeMemberPermissions, type OrganizationPermissions } from "@/lib/business/schemas";
+import { setOrganizationLocationMember } from "@/lib/business/locations.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { emailSchema } from "@/lib/auth-schemas";
 import { formatErrorMessage } from "@/lib/errors";
 type Category = { id: string; name_nb: string; parent_id: string | null };
 
-export type OrganizationMember = OrganizationMemberPermissions & {
+/** Location-scoped access, stored per location assignment. */
+type LocationAccess = {
+  listingAccess: "own" | "all";
+  chatAccess: "own" | "all";
+  listingEditScope: "none" | "own" | "all";
+};
+
+/** The form edits org-level permissions and location access together. */
+type MemberFormPermissions = OrganizationPermissions & LocationAccess;
+
+function normalizeFormPermissions(value: MemberFormPermissions): MemberFormPermissions {
+  const org = normalizeMemberPermissions(value);
+  if (org.role === "superuser") {
+    return { ...org, listingAccess: "all", chatAccess: "all", listingEditScope: "all" };
+  }
+  return {
+    ...org,
+    listingAccess: value.listingEditScope === "all" ? "all" : value.listingAccess,
+    chatAccess: value.chatAccess,
+    listingEditScope: value.listingEditScope,
+  };
+}
+
+export type OrganizationMember = MemberFormPermissions & {
   user_id: string;
   status: "invited" | "active" | "deactivated";
   created_at: string;
@@ -57,7 +79,7 @@ const statusLabels: Record<OrganizationMember["status"], string> = {
   deactivated: "Deaktivert",
 };
 
-const defaultPermissions: OrganizationMemberPermissions = {
+const defaultPermissions: MemberFormPermissions = {
   role: "member",
   listingAccess: "own",
   chatAccess: "own",
@@ -67,7 +89,7 @@ const defaultPermissions: OrganizationMemberPermissions = {
   allowedCategoryIds: [],
 };
 
-function permissionValue(member: OrganizationMember): OrganizationMemberPermissions {
+function permissionValue(member: OrganizationMember): MemberFormPermissions {
   return {
     role: member.role,
     listingAccess: member.listingAccess,
@@ -85,13 +107,13 @@ function PermissionFields({
   onChange,
   collapsible = false,
 }: {
-  value: OrganizationMemberPermissions;
+  value: MemberFormPermissions;
   categories: Category[];
-  onChange: (next: OrganizationMemberPermissions) => void;
+  onChange: (next: MemberFormPermissions) => void;
   collapsible?: boolean;
 }) {
-  const update = (patch: Partial<OrganizationMemberPermissions>) =>
-    onChange(normalizeMemberPermissions({ ...value, ...patch }));
+  const update = (patch: Partial<MemberFormPermissions>) =>
+    onChange(normalizeFormPermissions({ ...value, ...patch }));
   const disabled = value.role === "superuser";
   const [showAdvanced, setShowAdvanced] = useState(!collapsible);
 
@@ -121,7 +143,7 @@ function PermissionFields({
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={value.role}
               onChange={(event) =>
-                update({ role: event.target.value as OrganizationMemberPermissions["role"] })
+                update({ role: event.target.value as MemberFormPermissions["role"] })
               }
             >
               <option value="member">Bruker</option>
@@ -140,7 +162,7 @@ function PermissionFields({
               ]}
               onChange={(listingAccess) =>
                 update({
-                  listingAccess: listingAccess as OrganizationMemberPermissions["listingAccess"],
+                  listingAccess: listingAccess as MemberFormPermissions["listingAccess"],
                 })
               }
             />
@@ -154,7 +176,7 @@ function PermissionFields({
                 ["all", "Alle bedriftens chatter"],
               ]}
               onChange={(chatAccess) =>
-                update({ chatAccess: chatAccess as OrganizationMemberPermissions["chatAccess"] })
+                update({ chatAccess: chatAccess as MemberFormPermissions["chatAccess"] })
               }
             />
             <Choice
@@ -169,8 +191,7 @@ function PermissionFields({
               ]}
               onChange={(listingEditScope) =>
                 update({
-                  listingEditScope:
-                    listingEditScope as OrganizationMemberPermissions["listingEditScope"],
+                  listingEditScope: listingEditScope as MemberFormPermissions["listingEditScope"],
                 })
               }
             />
@@ -192,8 +213,7 @@ function PermissionFields({
               disabled={disabled || !value.canCreateListings}
               onChange={(event) =>
                 update({
-                  categoryAccess: event.target
-                    .value as OrganizationMemberPermissions["categoryAccess"],
+                  categoryAccess: event.target.value as MemberFormPermissions["categoryAccess"],
                 })
               }
             >
@@ -348,13 +368,12 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
           display_name: names.get(member.user_id) ?? null,
           locationId: assignment?.location_id ?? locations[0]?.id ?? "",
           listingAccess: (assignment?.listing_access ??
-            "own") as OrganizationMemberPermissions["listingAccess"],
-          chatAccess: (assignment?.chat_access ??
-            "own") as OrganizationMemberPermissions["chatAccess"],
+            "own") as MemberFormPermissions["listingAccess"],
+          chatAccess: (assignment?.chat_access ?? "own") as MemberFormPermissions["chatAccess"],
           canCreateListings: member.can_create_listings,
           listingEditScope: (assignment?.listing_edit_scope ??
-            "own") as OrganizationMemberPermissions["listingEditScope"],
-          categoryAccess: member.category_access as OrganizationMemberPermissions["categoryAccess"],
+            "own") as MemberFormPermissions["listingEditScope"],
+          categoryAccess: member.category_access as MemberFormPermissions["categoryAccess"],
           allowedCategoryIds: allowed.get(member.user_id) ?? [],
         };
       });
@@ -368,7 +387,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
       if (name.trim().length < 2) throw new Error("Navnet må være minst 2 tegn.");
       const parsedEmail = emailSchema.safeParse(email);
       if (!parsedEmail.success) throw new Error(parsedEmail.error.issues[0].message);
-      const next = normalizeMemberPermissions(permissions);
+      const next = normalizeFormPermissions(permissions);
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");
       const defaultLocation = locations.find((location) => location.is_default) ?? locations[0];
@@ -377,7 +396,12 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
         data: {
           name: name.trim(),
           email: email.trim(),
-          permissions: next,
+          permissions: {
+            role: next.role,
+            canCreateListings: next.canCreateListings,
+            categoryAccess: next.categoryAccess,
+            allowedCategoryIds: next.allowedCategoryIds,
+          },
           locationAssignments: [
             {
               locationId: defaultLocation.id,
@@ -402,7 +426,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
   const updateMutation = useMutation({
     mutationFn: () => {
       if (!editing) throw new Error("Velg en bruker.");
-      const next = normalizeMemberPermissions(permissionValue(editing));
+      const next = normalizeFormPermissions(permissionValue(editing));
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");
       return callUpdate({

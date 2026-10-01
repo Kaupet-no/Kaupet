@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Drawer } from "vaul";
 import { useNavigate } from "@tanstack/react-router";
@@ -21,8 +22,8 @@ import { Button } from "@/components/ui/button";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Input } from "@/components/ui/input";
-import { SearchRuleFields } from "@/components/search-rule-fields";
-import { SaveSearchDialog } from "@/components/advanced-search-sheet";
+import { SearchRuleFields } from "@/features/listing-search/filters/search-rule-fields";
+import { SaveSearchDialog } from "@/features/listing-search/filters/advanced-search-sheet";
 import {
   criteriaToValue,
   defaultAdvancedSearchValue,
@@ -839,7 +840,7 @@ export function SearchPanel({
             {results && buttonResultCount != null
               ? buttonResultCount === 1
                 ? "Vis 1 annonse"
-                : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`
+                : `Vis ${formatNokNumber(buttonResultCount)} annonser`
               : submitting
                 ? "Søker…"
                 : "Vis annonser"}

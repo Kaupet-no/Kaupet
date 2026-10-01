@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FilterChip } from "@/components/filter-chip";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { FilterChip } from "@/features/listing-search/filters/filter-chip";
+import { CategoryFilterFields } from "@/features/listing-search/filters/category-filter-fields";
 import { PartVehicleSearchField } from "@/components/part-fitment-fields";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { RangeFilterField } from "@/components/range-filter-field";

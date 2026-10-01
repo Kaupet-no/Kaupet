@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { acceptOrganizationInvite } from "@/lib/business.functions";
+import { acceptOrganizationInvite } from "@/lib/business/members.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordSchema } from "@/lib/auth-schemas";
 

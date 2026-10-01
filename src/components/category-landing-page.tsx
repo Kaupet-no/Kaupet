@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
-import { ActiveFilters } from "@/components/active-filters";
+import { ActiveFilters } from "@/features/listing-search/filters/active-filters";
 import { ResultList } from "@/components/result-list";
 import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
@@ -12,7 +12,7 @@ import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import { vehicleCategoryGroupFor, genericBrandFilterFor } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { SearchBar } from "@/components/search-bar";
+import { SearchBar } from "@/features/listing-search/filters/search-bar";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -62,7 +62,11 @@ export function CategoryLandingPage({
   const [qDraft, setQDraft] = useState(search.q);
   const isDesktop = useIsDesktop();
 
-  useEffect(() => setQDraft(search.q), [search.q]);
+  const [prevSearchQ, setPrevSearchQ] = useState(search.q);
+  if (prevSearchQ !== search.q) {
+    setPrevSearchQ(search.q);
+    setQDraft(search.q);
+  }
 
   const { data: allCategoriesRaw } = useCategories();
   const categories = useMemo(

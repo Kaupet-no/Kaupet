@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -32,7 +32,7 @@ export const savePushSubscription = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     if (data.platform === "web") {
       if (!(await isValidWebPushKeys(data.p256dh, data.auth))) {
-        throw new Error("Ugyldig push-abonnement");
+        throw new ClientError("Ugyldig push-abonnement", 400);
       }
       const { error } = await supabase.from("push_subscriptions").upsert(
         {

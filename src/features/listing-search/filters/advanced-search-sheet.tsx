@@ -19,8 +19,8 @@ import {
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
-import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { TermGroupEditor } from "@/components/term-group-editor";
+import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
+import { TermGroupEditor } from "@/features/listing-search/filters/term-group-editor";
 import { type Category } from "@/lib/categories";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";

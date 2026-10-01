@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import { formatNokNumber } from "@/lib/format";
 import { ChevronDown } from "lucide-react";
 
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
@@ -61,7 +62,7 @@ export function VehicleTechTable({
     rows.push({ label: "Tilstand", value: label ?? condition });
   }
   if (mileageKm != null)
-    rows.push({ label: "Kilometerstand", value: `${mileageKm.toLocaleString("nb-NO")} km` });
+    rows.push({ label: "Kilometerstand", value: `${formatNokNumber(mileageKm)} km` });
   if (vehicleLookup?.year) rows.push({ label: "Årsmodell", value: String(vehicleLookup.year) });
   if (vehicleLookup?.brand) rows.push({ label: "Merke", value: vehicleLookup.brand });
   if (vehicleLookup?.model) rows.push({ label: "Modell", value: vehicleLookup.model });

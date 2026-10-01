@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
 import { getRequest, setResponseHeader, setResponseStatus } from "@tanstack/react-start/server";
@@ -71,6 +72,7 @@ const serverFnErrorLogMiddleware = createMiddleware({ type: "function" }).server
 // In-memory cache to avoid hitting the DB on every request.
 const ipCache = new Map<string, { banned: boolean; expires: number }>();
 const IP_CACHE_TTL_MS = 60_000;
+const IP_CACHE_MAX = 10_000;
 
 function extractIp(headers: Headers): string | null {
   const cf = headers.get("cf-connecting-ip");
@@ -113,15 +115,14 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
     if (cached && cached.expires > now) {
       banned = cached.banned;
     } else {
-      const { createClient } = await import("@supabase/supabase-js");
-      const url = process.env.SUPABASE_URL;
-      const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (url && key) {
-        const admin = createClient(url, key, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
+      ipCache.delete(ip);
+      // Without env (local/test) the check is skipped, as before; client.server would throw.
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const admin = await getSupabaseAdmin();
         const { data } = await admin.rpc("is_ip_banned", { _ip: ip });
         banned = data === true;
+        // ponytail: hard cap, clear() instead of LRU; cache just refills from the DB
+        if (ipCache.size >= IP_CACHE_MAX) ipCache.clear();
         ipCache.set(ip, { banned, expires: now + IP_CACHE_TTL_MS });
       }
     }

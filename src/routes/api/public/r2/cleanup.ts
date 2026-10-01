@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 
@@ -53,7 +54,7 @@ export const Route = createFileRoute("/api/public/r2/cleanup")({
         // import av en .server-modul i src/routes drar den inn i
         // klientgrafen (se scripts/check-server-boundary.mjs).
         const { deleteObject, deletePrefix, PrefixDeleteError } = await import("@/lib/r2.server");
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
 
         const { data: rows, error } = await supabaseAdmin
           .from("r2_delete_queue")

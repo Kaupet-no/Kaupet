@@ -27,7 +27,7 @@ import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { organizationLogoUrl } from "@/lib/organization-logo-url";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
-import { displayPriceNok } from "@/lib/format";
+import { displayPriceNok, formatNokNumber } from "@/lib/format";
 
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
@@ -205,7 +205,7 @@ export const Route = createFileRoute("/$kaupetCode")({
     const priceLabel = l.is_free
       ? "Gis bort gratis"
       : displayPrice != null
-        ? `${displayPrice.toLocaleString("nb-NO")} kr`
+        ? `${formatNokNumber(displayPrice)} kr`
         : "Pris ved henvendelse";
     const place = l.city ? ` i ${l.city}` : "";
     const rawTitle = `${l.title} — ${priceLabel}${place} | Kaupet.no`;

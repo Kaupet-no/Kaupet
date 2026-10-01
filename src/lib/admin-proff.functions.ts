@@ -1,4 +1,5 @@
-import { toClientError } from "@/lib/to-client-error";
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -33,11 +34,6 @@ export type AdminProffOrder = {
 
 const uuid = z.string().uuid();
 
-async function getAdminClient() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
-
 export const adminListProffOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
@@ -49,7 +45,7 @@ export const adminListProffOrders = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const supabaseAdmin = await getAdminClient();
+    const supabaseAdmin = await getSupabaseAdmin();
     let query = supabaseAdmin
       .from("proff_orders")
       .select(
@@ -77,7 +73,7 @@ export const adminMarkProffOrderInvoiced = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const supabaseAdmin = await getAdminClient();
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: updated, error } = await supabaseAdmin
       .from("proff_orders")
       .update({ status: "invoiced", fiken_invoice_number: data.fikenInvoiceNumber })
@@ -88,7 +84,7 @@ export const adminMarkProffOrderInvoiced = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!updated) throw new Error("Bestillingen er ikke lenger til fakturering.");
+    if (!updated) throw new ClientError("Bestillingen er ikke lenger til fakturering.", 409);
     return { ok: true };
   });
 
@@ -101,7 +97,7 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const supabaseAdmin = await getAdminClient();
+    const supabaseAdmin = await getSupabaseAdmin();
 
     // Claim the order first: the status filter is what makes a double click idempotent,
     // so access can never be extended twice for the same payment.
@@ -118,7 +114,8 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
     if (claimError) {
       throw await toClientError("database", claimError);
     }
-    if (!claimed) throw new Error("Bestillingen er allerede registrert betalt eller kansellert.");
+    if (!claimed)
+      throw new ClientError("Bestillingen er allerede registrert betalt eller kansellert.", 409);
 
     const { data: period, error: extendError } = await supabaseAdmin
       .rpc("extend_proff_access", {
@@ -148,7 +145,7 @@ export const adminCancelProffOrder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const supabaseAdmin = await getAdminClient();
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: cancelled, error } = await supabaseAdmin
       .from("proff_orders")
       .update({ status: "cancelled", admin_note: data.note || null })
@@ -159,7 +156,7 @@ export const adminCancelProffOrder = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!cancelled) throw new Error("Bestillingen kan ikke kanselleres.");
+    if (!cancelled) throw new ClientError("Bestillingen kan ikke kanselleres.", 409);
     return { ok: true };
   });
 
@@ -181,7 +178,7 @@ export const adminListLocationCharges = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const supabaseAdmin = await getAdminClient();
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from("organization_location_subscriptions")
       .select(
@@ -251,7 +248,7 @@ export const adminMarkLocationChargeInvoiced = createServerFn({ method: "POST" }
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const supabaseAdmin = await getAdminClient();
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: period, error } = await supabaseAdmin.rpc(
       "mark_organization_location_charge_invoiced",
       {

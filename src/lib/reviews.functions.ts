@@ -1,4 +1,5 @@
-import { toClientError } from "@/lib/to-client-error";
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -112,7 +113,7 @@ export const createReview = createServerFn({ method: "POST" })
     if (saleErr) {
       throw await toClientError("database", saleErr);
     }
-    if (!sale) throw new Error("Det finnes ingen bekreftet kjøper for denne annonsen");
+    if (!sale) throw new ClientError("Det finnes ingen bekreftet kjøper for denne annonsen", 409);
 
     let role: "buyer" | "seller";
     let revieweeId: string;
@@ -123,7 +124,7 @@ export const createReview = createServerFn({ method: "POST" })
       role = "seller";
       revieweeId = sale.buyer_id;
     } else {
-      throw new Error("Du er ikke part i dette salget");
+      throw new ClientError("Du er ikke part i dette salget", 403);
     }
 
     const { error } = await supabase.from("user_reviews").insert({
@@ -136,7 +137,7 @@ export const createReview = createServerFn({ method: "POST" })
     });
     if (error) {
       if (error.code === "23505") {
-        throw new Error("Du har allerede gitt en vurdering for dette salget");
+        throw new ClientError("Du har allerede gitt en vurdering for dette salget", 409);
       }
       throw await toClientError("database", error);
     }
@@ -163,7 +164,7 @@ export const getMyReviewForListing = createServerFn({ method: "POST" })
 export const getPublicProfile = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
   .handler(async ({ data }): Promise<PublicProfile | null> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
       .select("id, display_name, avatar_url, created_at, deleted_at")
@@ -240,7 +241,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }): Promise<ReviewRow[]> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const limit = data.limit ?? 20;
     const offset = data.offset ?? 0;
     const { data: rows, error } = await supabaseAdmin

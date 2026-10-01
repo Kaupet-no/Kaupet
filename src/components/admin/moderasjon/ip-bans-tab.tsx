@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -203,7 +204,7 @@ export function IpBansTab() {
                     <TableCell className="font-mono">{b.ip_address}</TableCell>
                     <TableCell className="text-muted-foreground">{b.reason}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {b.expires_at ? new Date(b.expires_at).toLocaleString("nb-NO") : "Permanent"}
+                      {b.expires_at ? formatDateTime(b.expires_at) : "Permanent"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

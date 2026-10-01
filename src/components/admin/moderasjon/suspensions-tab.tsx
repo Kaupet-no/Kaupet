@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -117,7 +118,7 @@ export function SuspensionsTab() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{s.reason}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(s.expires_at).toLocaleString("nb-NO")}
+                    {formatDateTime(s.expires_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

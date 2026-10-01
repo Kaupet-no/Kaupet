@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { Pencil } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,7 @@ export function OmregistreringsavgiftBox({
             className="flex items-center gap-1 font-medium text-foreground hover:text-primary"
           >
             {omregistreringsavgiftKr != null
-              ? `${omregistreringsavgiftKr.toLocaleString("nb-NO")} kr`
+              ? `${formatNokNumber(omregistreringsavgiftKr)} kr`
               : "Ikke beregnet — sett beløp"}
             <Pencil className="size-3" aria-hidden />
           </button>
@@ -84,7 +85,7 @@ export function OmregistreringsavgiftBox({
         <div className="flex items-center justify-between gap-2 text-muted-foreground">
           <span>Beregnet av Kaupet</span>
           <div className="flex items-center gap-2">
-            <span>{calculatedAvgiftKr.toLocaleString("nb-NO")} kr</span>
+            <span>{formatNokNumber(calculatedAvgiftKr)} kr</span>
             <Button
               type="button"
               variant="link"

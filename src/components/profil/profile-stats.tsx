@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -81,7 +82,7 @@ export function ProfileStats() {
         <StatCell label="Annonser" icon={<ListChecks className="size-3.5" />}>
           {stats.listings_count > 0 ? (
             <span className="text-xl font-semibold tabular-nums">
-              {stats.listings_count.toLocaleString("nb-NO")}
+              {formatNokNumber(stats.listings_count)}
             </span>
           ) : (
             <button
@@ -96,7 +97,7 @@ export function ProfileStats() {
         <StatCell label="Salg" icon={<ShoppingBag className="size-3.5" />}>
           {stats.sales_count > 0 ? (
             <span className="text-xl font-semibold tabular-nums">
-              {stats.sales_count.toLocaleString("nb-NO")}
+              {formatNokNumber(stats.sales_count)}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">Ingen ennå</span>

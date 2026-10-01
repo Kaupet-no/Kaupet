@@ -6,10 +6,20 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
+const getMutationRule = {
+  selector:
+    "CallExpression[callee.property.name='handler']" +
+    ":has(CallExpression[callee.name='createServerFn'] Property[key.name='method'] > Literal[value='GET'])" +
+    ":has(CallExpression[callee.property.name=/^(insert|update|upsert|delete)$/])",
+  message:
+    'GET-serverfunksjoner skal være lesende. Kapselsesjonen sendes automatisk på GET, så en muterende GET er et CSRF-hull (CSRF-middlewaren i src/start.ts unntar GET). Bruk method: "POST" for skriveoperasjoner.',
+};
+
 export default tseslint.config(
   {
     ignores: [
       "dist",
+      "coverage",
       ".output",
       ".vinxi",
       "src/integrations/supabase/types.ts",
@@ -178,15 +188,26 @@ export default tseslint.config(
     // deklarere dem STABLE.
     files: ["src/**/*.{ts,tsx}"],
     rules: {
+      "no-restricted-syntax": ["error", getMutationRule],
+    },
+  },
+  {
+    // Forventede brukerfeil i serverfunksjoner skal være ClientError (riktig
+    // HTTP-status, logges som advarsel). En bar `throw new Error("...")` blir
+    // HTTP 500 + console.error. Ekte serverfeil ("Noe gikk galt…", "Kunne ikke…")
+    // er unntatt. Samme regel som GET-regelen over må gjentas her, siden en
+    // senere blokk erstatter en tidligere.
+    files: ["src/**/*.functions.ts"],
+    rules: {
       "no-restricted-syntax": [
         "error",
+        getMutationRule,
         {
           selector:
-            "CallExpression[callee.property.name='handler']" +
-            ":has(CallExpression[callee.name='createServerFn'] Property[key.name='method'] > Literal[value='GET'])" +
-            ":has(CallExpression[callee.property.name=/^(insert|update|upsert|delete)$/])",
+            "ThrowStatement > NewExpression[callee.name='Error'] > Literal:first-child" +
+            ":not([value=/^(Noe gikk galt|Kunne ikke)/])",
           message:
-            'GET-serverfunksjoner skal være lesende. Kapselsesjonen sendes automatisk på GET, så en muterende GET er et CSRF-hull (CSRF-middlewaren i src/start.ts unntar GET). Bruk method: "POST" for skriveoperasjoner.',
+            "Forventede brukerfeil skal kastes som new ClientError(melding, status) (400/401/403/404/409/429); uventede feil via toClientError(). Se src/lib/to-client-error.ts.",
         },
       ],
     },

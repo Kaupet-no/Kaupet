@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -365,7 +366,7 @@ function MyListingsPage() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {w.categories && <span>{w.categories.name_nb}</span>}
                         {w.max_price_nok != null && (
-                          <span>· Maks {w.max_price_nok.toLocaleString("nb-NO")} kr</span>
+                          <span>· Maks {formatNokNumber(w.max_price_nok)} kr</span>
                         )}
                         <span>
                           ·{" "}

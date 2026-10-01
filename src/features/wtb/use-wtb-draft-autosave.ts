@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { discardWtbDraft, getLatestWtbDraft, saveWtbDraft } from "@/lib/wtb-listings.functions";
+import {
+  isDraftFresh,
+  readItem,
+  removeItems,
+  writeItem,
+} from "@/features/listing-creation/draft-storage";
 import type { WtbAttributeMap } from "./wtb-criteria-types";
 
 const DRAFT_KEY = "kaupet_draft_want_listing";
@@ -29,13 +35,13 @@ export type WtbDraftData = {
 function loadRestorableDraft(): WtbDraftData | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = readItem(DRAFT_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as WtbDraftData;
     const valid =
       data.draft_kind === "want" &&
       data.draft_version === DRAFT_VERSION &&
-      Date.now() - data.saved_at < 7 * 24 * 60 * 60 * 1000;
+      isDraftFresh(data.saved_at);
     return valid && (data.title || data.description || data.category_id)
       ? { ...data, notify_matches: data.notify_matches ?? false }
       : null;
@@ -67,7 +73,7 @@ export function useWtbDraftAutosave(
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const local = loadRestorableDraft();
-      setDraftId(localStorage.getItem(DRAFT_ID_KEY));
+      setDraftId(readItem(DRAFT_ID_KEY));
       setRestorableDraft(local);
       if (!authenticated) return;
       void getLatestWtbDraft()
@@ -75,7 +81,7 @@ export function useWtbDraftAutosave(
           if (!server) return;
           const savedAt = new Date(server.updated_at).getTime();
           setDraftId(server.id);
-          localStorage.setItem(DRAFT_ID_KEY, server.id);
+          writeItem(DRAFT_ID_KEY, server.id);
           if (local && local.saved_at >= savedAt) return;
           const attributes = (server.attributes ?? {}) as WtbAttributeMap;
           setRestorableDraft({
@@ -107,23 +113,18 @@ export function useWtbDraftAutosave(
    * the guest publish handoff must not navigate away on a lost draft. */
   function saveLocal(): boolean {
     if (savingStopped.current) return true;
-    try {
-      localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          draft_kind: "want",
-          draft_version: DRAFT_VERSION,
-          saved_at: Date.now(),
-          ...fieldsRef.current,
-        } satisfies WtbDraftData),
-      );
-      setLastSaved(new Date());
-      setDraftSaveError(false);
-      return true;
-    } catch {
-      setDraftSaveError(true);
-      return false;
-    }
+    const ok = writeItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        draft_kind: "want",
+        draft_version: DRAFT_VERSION,
+        saved_at: Date.now(),
+        ...fieldsRef.current,
+      } satisfies WtbDraftData),
+    );
+    if (ok) setLastSaved(new Date());
+    setDraftSaveError(!ok);
+    return ok;
   }
 
   useEffect(() => {
@@ -216,7 +217,7 @@ export function useWtbDraftAutosave(
           },
         });
         setDraftId(result.id);
-        localStorage.setItem(DRAFT_ID_KEY, result.id);
+        writeItem(DRAFT_ID_KEY, result.id);
         setLastSaved(new Date());
         setDraftSaveError(false);
         return result.id;
@@ -249,8 +250,7 @@ export function useWtbDraftAutosave(
   }, [draftId, authenticated]);
 
   function clearStorage() {
-    localStorage.removeItem(DRAFT_KEY);
-    localStorage.removeItem(DRAFT_ID_KEY);
+    removeItems(DRAFT_KEY, DRAFT_ID_KEY);
   }
 
   return {

@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -39,7 +40,7 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { lookupVehicle } = await import("@/lib/vehicle/vehicle-lookup.server");
     const { matchVehicleBrandAndModel } =
       await import("@/lib/vehicle/vehicle-brand-match.functions");

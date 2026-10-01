@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, FolderOpen, Save, X } from "lucide-react";
@@ -6,9 +7,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { Button } from "@/components/ui/button";
-import { SearchBar } from "@/components/search-bar";
-import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import { ActiveFilters } from "@/components/active-filters";
+import { SearchBar } from "@/features/listing-search/filters/search-bar";
+import { SaveSearchDialog } from "@/features/listing-search/filters/advanced-search-sheet";
+import { ActiveFilters } from "@/features/listing-search/filters/active-filters";
 import { ResultList } from "@/components/result-list";
 import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
 import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
@@ -411,9 +412,9 @@ function BrowsePage() {
       const filter = attrFilters.find((candidate) => candidate.key === match.filterKey);
       const value =
         match.min != null && match.max != null
-          ? `${match.min.toLocaleString("nb-NO")}–${match.max.toLocaleString("nb-NO")}`
+          ? `${formatNokNumber(match.min)}–${formatNokNumber(match.max)}`
           : match.min != null
-            ? `fra ${match.min.toLocaleString("nb-NO")}`
+            ? `fra ${formatNokNumber(match.min)}`
             : `opptil ${match.max?.toLocaleString("nb-NO") ?? ""}`;
       return {
         id: `${match.filterKey}:${match.matchedText}`,

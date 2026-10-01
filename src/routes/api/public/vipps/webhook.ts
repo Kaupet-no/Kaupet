@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { describeSafeError } from "@/lib/safe-error";
 
@@ -76,7 +77,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Missing webhook event identity", { status: 400 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
 
         // Idempotency
         const { data: existing } = await supabaseAdmin

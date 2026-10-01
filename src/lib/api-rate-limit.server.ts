@@ -11,6 +11,7 @@
  * — samme modul UI-en («Grenser og forbruk») leser tallene fra, slik at det
  * som håndheves og det som vises aldri kan avvike.
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { INTEGRATION_LIMITS } from "@/lib/integration-limits";
 import { sha256Hex } from "@/lib/request-ip.server";
 
@@ -65,7 +66,7 @@ export async function consumeApiRateLimit(
   keyId: string,
   kind: ApiRateLimitKind,
 ): Promise<ApiRateLimitResult> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const limit = LIMIT_BY_KIND[kind];
   const keyHash = await bucketKeyHash(keyId, kind);
   const { data, error } = await supabaseAdmin
@@ -87,7 +88,7 @@ export async function peekApiRateLimit(
   keyId: string,
   kind: ApiRateLimitKind,
 ): Promise<ApiRateLimitResult> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const limit = LIMIT_BY_KIND[kind];
   const keyHash = await bucketKeyHash(keyId, kind);
   const { data, error } = await supabaseAdmin

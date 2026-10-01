@@ -32,6 +32,9 @@ jobs:
       - name: Server/client boundary
         run: bun run check:server-boundary
 
+      - name: Server function auth
+        run: bun run check:server-fn-auth
+
       - name: RLS table inventory
         run: bun run check:rls-coverage
 

@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Gauge, ImageOff } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
-import { formatPrice, displayPriceNok } from "@/lib/format";
+import { displayPriceNok, formatNokNumber, formatPrice } from "@/lib/format";
 import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
 import { FavoriteButton } from "@/components/favorite-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,7 +41,7 @@ export function UsageLabel({
       className={`flex shrink-0 items-center gap-1 text-xs text-muted-foreground ${className ?? ""}`}
     >
       <Gauge className="size-3" />
-      {value.toLocaleString("nb-NO")} {unit}
+      {formatNokNumber(value)} {unit}
     </p>
   );
 }

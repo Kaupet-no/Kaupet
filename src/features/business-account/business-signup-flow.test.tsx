@@ -15,7 +15,7 @@ const signUpMock = vi.fn();
 const resendMock = vi.fn();
 const onAuthenticatedMock = vi.fn();
 
-vi.mock("@/lib/business.functions", () => ({
+vi.mock("@/lib/business/signup.functions", () => ({
   lookupBusinessOrganization: (...args: unknown[]) => lookupBusinessOrganizationMock(...args),
   bindBusinessSignupEmail: (...args: unknown[]) => bindBusinessSignupEmailMock(...args),
 }));

@@ -9,7 +9,8 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
-import { getBusinessOrganization, requestProffSubscription } from "@/lib/business.functions";
+import { getBusinessOrganization } from "@/lib/business/organization.functions";
+import { requestProffSubscription } from "@/lib/business/plans.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { PROFF_TERMS, type ProffTerm } from "./plans";
 import { formatProffTermPrice } from "./proff-pricing";

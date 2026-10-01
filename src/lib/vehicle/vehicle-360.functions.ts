@@ -1,4 +1,5 @@
-import { toClientError } from "@/lib/to-client-error";
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -30,7 +31,7 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -42,7 +43,7 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
     if (listingError) {
       throw await toClientError("database", listingError);
     }
-    if (!listing) throw new Error("Fant ikke annonseutkastet");
+    if (!listing) throw new ClientError("Fant ikke annonseutkastet", 404);
 
     const { data: existing, error: existingError } = await supabaseAdmin
       .from("listing_360_capture_sessions")
@@ -90,7 +91,7 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
 export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ token: TOKEN_SCHEMA }).parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: session, error } = await supabaseAdmin
       .from("listing_360_capture_sessions")
@@ -102,7 +103,8 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!session) throw new Error("Fant ikke QR-koden. Be selger vise en ny på annonsen.");
+    if (!session)
+      throw new ClientError("Fant ikke QR-koden. Be selger vise en ny på annonsen.", 404);
 
     const { data: existingFrames, error: framesError } = await supabaseAdmin
       .from("listing_360_frames")
@@ -171,7 +173,7 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { hashRequestIp } = await import("@/lib/request-ip.server");
 
     const { data: listingId, error: quotaError } = await supabaseAdmin.rpc(
@@ -182,15 +184,15 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       throw await toClientError("database", quotaError);
     }
     if (!listingId) {
-      throw new Error("Opptaksøkten er utløpt eller har for mange opplastingsforsøk.");
+      throw new ClientError("Opptaksøkten er utløpt eller har for mange opplastingsforsøk.", 409);
     }
 
     const bytes = Buffer.from(data.base64Data, "base64");
     if (bytes.byteLength > MAX_360_FRAME_BYTES) {
-      throw new Error("Bildet er for stort");
+      throw new ClientError("Bildet er for stort", 400);
     }
     if (!hasValid360MagicBytes(bytes, data.contentType)) {
-      throw new Error("Bildefilen samsvarer ikke med oppgitt format");
+      throw new ClientError("Bildefilen samsvarer ikke med oppgitt format", 400);
     }
     const path = `${listingId}/${data.frameOrder}.${extFrom360Mime(data.contentType)}`;
 
@@ -235,7 +237,7 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
 export const completeVehicle360CaptureSession = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ token: TOKEN_SCHEMA }).parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("listing_360_capture_sessions")
       .select("listing_id")
@@ -246,7 +248,7 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
     if (sessionError) {
       throw await toClientError("database", sessionError);
     }
-    if (!session) throw new Error("Opptaksøkten er utløpt eller allerede fullført");
+    if (!session) throw new ClientError("Opptaksøkten er utløpt eller allerede fullført", 409);
 
     const { count, error: countError } = await supabaseAdmin
       .from("listing_360_frames")
@@ -269,7 +271,7 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!completed) throw new Error("Opptaksøkten er allerede fullført");
+    if (!completed) throw new ClientError("Opptaksøkten er allerede fullført", 409);
     return { ok: true as const };
   });
 
@@ -277,7 +279,7 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -289,7 +291,7 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
     if (listingError) {
       throw await toClientError("database", listingError);
     }
-    if (!listing) throw new Error("Fant ikke annonseutkastet");
+    if (!listing) throw new ClientError("Fant ikke annonseutkastet", 404);
 
     const { data: frames, error } = await supabaseAdmin
       .from("listing_360_frames")
@@ -306,7 +308,7 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -318,7 +320,7 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
     if (listingError) {
       throw await toClientError("database", listingError);
     }
-    if (!listing) throw new Error("Fant ikke annonseutkastet");
+    if (!listing) throw new ClientError("Fant ikke annonseutkastet", 404);
 
     const { data: frames, error: framesError } = await supabaseAdmin
       .from("listing_360_frames")

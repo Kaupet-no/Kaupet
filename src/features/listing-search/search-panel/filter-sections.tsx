@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -21,12 +22,12 @@ import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Switch } from "@/components/ui/switch";
-import { CategorySlugPicker } from "@/components/advanced-search-sheet";
-import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { TermGroupRow } from "@/components/term-group-editor";
-import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
-import { describeAttrValue } from "@/components/active-filters";
+import { CategorySlugPicker } from "@/features/listing-search/filters/advanced-search-sheet";
+import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
+import { TermGroupRow } from "@/features/listing-search/filters/term-group-editor";
+import { SecondaryCategoryFilters } from "@/features/listing-search/filters/attribute-filter-chips";
+import { CategoryFilterFields } from "@/features/listing-search/filters/category-filter-fields";
+import { describeAttrValue } from "@/features/listing-search/filters/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS, type RangeBounds } from "@/lib/filter-range-bounds";
 import {
@@ -474,12 +475,12 @@ export function SearchFilterSections({
                     className={`${desktopGroup ? "h-9" : "min-h-12 rounded-full"} flex-1 px-3 text-xs`}
                     disabled={v.min != null && max < v.min}
                     onClick={() => setV((previous) => ({ ...previous, max }))}
-                    aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
+                    aria-label={`Inntil ${formatNokNumber(max)}`}
                     aria-pressed={v.max === max}
                   >
                     {/* Sidekolonnen er smal — «≤» i stedet for «Inntil». */}
                     {expanded ? "≤ " : "Inntil "}
-                    {max.toLocaleString("nb-NO")}
+                    {formatNokNumber(max)}
                   </Button>
                 ))}
             </div>
@@ -1113,7 +1114,7 @@ function InlineChoiceFilter({
 
 /** Faste hurtigvalg når søket har for få priser til å lage egne. */
 const FALLBACK_PRICE_RANGES: PriceQuickRange[] = [50_000, 100_000, 250_000].map((max) => ({
-  label: `Under ${max.toLocaleString("nb-NO")}`,
+  label: `Under ${formatNokNumber(max)}`,
   max,
 }));
 

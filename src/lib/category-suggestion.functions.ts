@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -22,7 +23,7 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("suggest-category-for-title", 40, 300);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: rows, error } = await supabaseAdmin.rpc("suggest_category_for_title", {
       _title: data.title,
@@ -71,7 +72,7 @@ export const suggestCategoryForTitleWithAi = createServerFn({ method: "POST" })
     await verifyTurnstileToken(data.turnstileToken);
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("suggest-category-for-title-ai", 20, 600);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: settings } = await supabaseAdmin
       .from("site_settings")
       .select("category_suggestion_ai_enabled")
@@ -123,7 +124,7 @@ export const suggestListingFromPhotos = createServerFn({ method: "POST" })
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("suggest-listing-from-photos", 10, 600);
     if (process.env.MISTRAL_PHOTO_SUGGESTIONS_ENABLED !== "true") return PHOTO_UNAVAILABLE;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: settings } = await supabaseAdmin
       .from("site_settings")
       .select("category_suggestion_ai_enabled")
@@ -144,7 +145,7 @@ export const suggestListingFromPhotos = createServerFn({ method: "POST" })
 export const getPhotoSuggestionAvailability = createServerFn({ method: "GET" }).handler(
   async () => {
     if (process.env.MISTRAL_PHOTO_SUGGESTIONS_ENABLED !== "true") return { enabled: false };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: settings } = await supabaseAdmin
       .from("site_settings")
       .select("category_suggestion_ai_enabled")
@@ -162,7 +163,10 @@ export function prefetchCategorySuggestion(title: string) {
   if (!suggestionCache.has(key)) {
     suggestionCache.set(
       key,
-      suggestCategoryForTitle({ data: { title: key } }).catch(() => ({ suggestions: [] })),
+      suggestCategoryForTitle({ data: { title: key } }).catch(() => {
+        suggestionCache.delete(key); // don't cache failures; next call retries
+        return { suggestions: [] };
+      }),
     );
   }
   return suggestionCache.get(key)!;

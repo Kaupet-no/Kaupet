@@ -59,6 +59,8 @@ touch "$MARKER"
               (valid, {'FAIL_POST': '1'}, False, True),
               (valid, {'SUPABASE_SERVICE_ROLE_KEY': ''}, False, False)]
     cases += [(valid, {'OPERATION': 'verify'}, True, False),
+              (valid, {'OPERATION': 'verify', 'OLD_IMAGE_JOBS_SECRET': ''}, True, False),
+              (valid, {'OPERATION': 'verify', 'OLD_IMAGE_JOBS_SECRET': '', 'OLD_STATUS': '200'}, False, False),
               (valid, {'OPERATION': 'verify', 'OLD_STATUS': '200'}, False, False),
               (valid, {'OPERATION': 'verify', 'OLD_IMAGE_JOBS_SECRET': 'fake-secret'}, False, False),
               (valid, {'OPERATION': 'invalid'}, False, False)]

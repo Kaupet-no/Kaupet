@@ -50,7 +50,7 @@ jobs:
               : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN mangler i staging}"
               : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID mangler i staging}"
               ;;
-            verify) : "${OLD_IMAGE_JOBS_SECRET:?Gammel IMAGE_JOBS_SECRET mangler i GitHub staging}" ;;
+            verify) ;;
             *) echo 'Ugyldig operasjon' >&2; exit 1 ;;
           esac
           : "${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY mangler i staging}"
@@ -114,17 +114,21 @@ jobs:
             'length == 1 and .[0].value == $expected[0].IMAGE_JOBS_SECRET' \
             "$response" > /dev/null
           if [ "$OPERATION" = verify ]; then
-            jq -e --arg old "$OLD_IMAGE_JOBS_SECRET" \
-              '.IMAGE_JOBS_SECRET != $old' "$payload" > /dev/null
+            rejected_secret="$OLD_IMAGE_JOBS_SECRET"
+            if [ -z "$rejected_secret" ]; then
+              rejected_secret="invalid-$(openssl rand -hex 32)"
+            fi
+            jq -e --arg rejected "$rejected_secret" \
+              '.IMAGE_JOBS_SECRET != $rejected' "$payload" > /dev/null
             old_status=$(curl --silent --show-error --max-time 30 \
               --request POST --write-out '%{http_code}' \
-              --header "x-image-jobs-secret: $OLD_IMAGE_JOBS_SECRET" \
+              --header "x-image-jobs-secret: $rejected_secret" \
               "$image_jobs_url" --output "$response")
             if [ "$old_status" != 401 ]; then
-              echo "Gammel hemmelighet: forventet 401, fikk $old_status" >&2
+              echo "Negativ autentiseringstest: forventet 401, fikk $old_status" >&2
               exit 1
             fi
-            echo 'Verifisert uten synk: gammel GitHub-verdi avvises med 401.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Verifisert uten synk: gammel GitHub-verdi eller tilfeldig ugyldig verdi avvises med 401.' >> "$GITHUB_STEP_SUMMARY"
           fi
           echo 'Tester bildejobb-endepunktet …'
           curl --fail --silent --show-error --max-time 120 \

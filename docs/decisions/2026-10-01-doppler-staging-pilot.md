@@ -62,8 +62,11 @@ deploy.
 
 Etter vanlig staging-deploy: kjør workflowen med `operation=verify`.
 Denne modusen endrer ingen hemmeligheter. Den krever at Doppler-verdien
-matcher Supabase, at gammel GitHub-verdi er forskjellig og avvises med 401,
-og at den nye verdien godtas av bildejobb-endepunktet. Positivt testkall kan
+matcher Supabase, at en ugyldig verdi avvises med 401, og at den nye
+verdien godtas av bildejobb-endepunktet. Hvis gammel GitHub-verdi fortsatt
+finnes, brukes den i den negative testen og må være forskjellig fra den nye.
+Etter sletting brukes en tilfeldig ugyldig verdi; dette beviser ikke lenger
+at den konkrete gamle verdien avvises. Positivt testkall kan
 behandle opptil fem ventende staging-bildejobber.
 
 `operation=sync` distribuerer nye verdier. Standardvalget er `verify`.
@@ -75,3 +78,32 @@ Environment `staging`. Produksjonens GitHub-secret og SOPS-verdi beholdes.
 
 Offline-kontroll: `python3 scripts/check-doppler-staging.py` og
 `actionlint .github/workflows/doppler-staging.yml`.
+
+## Videre migrering
+
+Doppler skal være eneste autoritative kilde for staging-hemmeligheter.
+Worker, GitHub og Supabase har bare nødvendige distribuerte kopier.
+Produksjon og lokal utvikling beholder sine kilder til de migreres separat.
+
+GitHub Actions-integrasjonen kan synke til Environment `staging`; avgrens
+til Kaupet-repoet og nødvendige hemmeligheter. Ikke aktiver en bred synk
+før det er avklart hvilke navn den vil oppdatere, særlig `DOPPLER_TOKEN`.
+Cloudflare Workers bruker fortsatt eksisterende Wrangler-synk. Dopplers
+Supabase-integrasjon synker Edge Function-secrets, ikke `app_settings` eller
+Auth SMTP/captcha; den erstatter derfor ikke jobbhemmelighetenes synk.
+
+`DOPPLER_TOKEN` er bootstrap og må kunne brukes uten først å hente seg selv
+fra Doppler. Cloudflare-token og staging service-role kan senere hentes fra
+Doppler i samme jobb. De skal aldri inngå i Workerens bulk-payload eller
+klientbygg. Behold eksplisitt liste over hemmeligheter per mottaker.
+
+Migrer én gruppe om gangen: avklar staging-avgrensning og konsumenter,
+importer eller opprett credentials sikkert, distribuer, kontroller samsvar,
+og fjern gammel staging-kilde. En SOPS-verdi som fortsatt brukes av
+produksjon eller lokal utvikling skal beholdes. Roter hos leverandøren der
+verdien er delt med produksjon, uten å tilbakekalle produksjonens credential.
+Sikre fungerende tilbakeføring før tilbakekalling.
+
+Kilder: [GitHub Actions](https://docs.doppler.com/docs/github-actions),
+[Cloudflare Workers](https://docs.doppler.com/docs/cloudflare-workers),
+[Supabase](https://docs.doppler.com/docs/supabase).

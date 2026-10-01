@@ -379,3 +379,14 @@ Dette må slås opp i de respektive dashbordene:
   Firebase, Apple Developer, Google Play Console, Vipps, Resend og Mistral.
 - Supabase-planer, backup og point-in-time recovery.
 - Verdiene i `app_settings` i hvert miljø.
+
+## Doppler staging: neste migreringssteg
+
+Doppler er målbildets eneste autoritative kilde for staging-hemmeligheter;
+GitHub, Worker og Supabase har nødvendige distribuerte kopier.
+Pilotens `verify` bruker tilfeldig ugyldig autentisering når gammel
+`IMAGE_JOBS_SECRET` er fjernet fra GitHub staging. Synken til
+`app_settings` må beholdes: Dopplers Supabase-integrasjon dekker
+Edge Function-secrets, ikke disse databaseradene eller Auth-oppsettet.
+Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md)
+for bootstrap, miljøseparasjon og kontrollert videre migrering.

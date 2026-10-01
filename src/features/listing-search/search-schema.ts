@@ -42,6 +42,9 @@ export const searchSchema = z.object({
   // search parameters (e.g. Bil's "hestekrefter"), see category-filters.ts
   // and encodeAttrFilters/decodeAttrFilters below for the wire format.
   attrs: z.string().optional().default(""),
+  // Valgt resultatfane. Utelates av writeAppliedSearchState, så et nytt søk
+  // alltid starter på «Til salgs».
+  results: z.enum(["wtb"]).optional(),
 });
 
 export type AppliedSearchState = {

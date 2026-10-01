@@ -131,7 +131,13 @@ function BrowsePage() {
   const isDesktop = useIsDesktop();
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const { open: searchPanelOpen, openPanel } = useSearchPanel();
-  const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
+  // I URL-en, så tilbake-knappen og delte lenker beholder fanen.
+  const activeTab = search.results ?? "listings";
+  const setActiveTab = (tab: "listings" | "wtb") =>
+    navigate({
+      search: (prev) => ({ ...prev, results: tab === "wtb" ? "wtb" : undefined }),
+      replace: true,
+    });
   // Søk fra forsiden/landingssiden tar med tolkningen i router-state, så
   // «Tolket som» viser hva Kaupet la til (f.eks. kategori) i stedet for at
   // filteret dukker opp uforklart.
@@ -504,17 +510,6 @@ function BrowsePage() {
     categories,
     activeTab,
   });
-
-  // Reset to listings tab when search criteria change
-  const [prevCriteria, setPrevCriteria] = useState([search.q, search.category, search.categories]);
-  if (
-    search.q !== prevCriteria[0] ||
-    search.category !== prevCriteria[1] ||
-    search.categories !== prevCriteria[2]
-  ) {
-    setPrevCriteria([search.q, search.category, search.categories]);
-    setActiveTab("listings");
-  }
 
   /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
      trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.

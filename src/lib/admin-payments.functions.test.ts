@@ -295,7 +295,7 @@ describe("adminRefundPromotion", () => {
     expect(s.refundVippsPayment).toHaveBeenCalledExactlyOnceWith(
       "ref-1",
       49,
-      expect.stringMatching(/^r-22222222222242228222222222222222-[a-z0-9]+$/),
+      "r-22222222222242228222222222222222",
       "kaupet.no",
       "production",
     );
@@ -309,6 +309,25 @@ describe("adminRefundPromotion", () => {
       target_type: "promotion",
       target_id: id,
     });
+  });
+
+  it("bruker samme idempotency-nøkkel ved gjentatte kall (dobbeltklikk)", async () => {
+    s.queues.listing_promotions = [
+      { data: promo },
+      { data: null },
+      { data: promo },
+      { data: null },
+    ];
+    s.queues.admin_moderation_log = [{ data: null }, { data: null }];
+    const now = vi.spyOn(Date, "now");
+    now.mockReturnValue(1_000);
+    await run();
+    now.mockReturnValue(2_000);
+    await run();
+    now.mockRestore();
+    const keys = s.refundVippsPayment.mock.calls.map((call: unknown[]) => call[2]);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
   });
 
   it("endrer ikke databasen når Vipps-refusjonen feiler", async () => {

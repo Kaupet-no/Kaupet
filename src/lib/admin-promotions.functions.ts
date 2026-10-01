@@ -179,7 +179,10 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     await refundVippsPayment(
       promo.vipps_reference,
       promo.price_nok,
-      `r-${promo.id.replace(/-/g, "")}-${Date.now().toString(36)}`,
+      // Stabil nøkkel per fremheving: et dobbeltklikk eller et nytt forsøk
+      // før status er satt til refunded gir samme Vipps-operasjon, ikke to
+      // refusjoner. Vi refunderer alltid hele beløpet, så én nøkkel holder.
+      `r-${promo.id.replace(/-/g, "")}`,
       host,
       promo.vipps_mode as "test" | "production",
     );

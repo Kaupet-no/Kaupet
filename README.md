@@ -4,135 +4,91 @@
 [![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5f5f.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/sprudlevann)
 
+**Kjøp og selg brukt: gratis, uten sporing og med åpen kildekode.**
+
+På [Kaupet.no](https://kaupet.no) koster det ingenting å legge ut en annonse. Vi selger ingen data, og all koden som kjører i produksjon ligger i dette repoet. Kaupet finnes på nett og som app for iOS og Android.
+
 ![Kaupet.no — forsiden](docs/images/forside.png)
 
-## Hva er Kaupet?
+## Hvorfor Kaupet?
 
-Kaupet er en bøyd form av det norrøne uttrykket _kaup_, som betyr _kjøp_ eller _avtale_. Det kan også spores til det latinske uttrykket _caupo_ for _kremmer_. Kaupet.no er bygget for å være en alternativ markedsplass der det skal være enkelt og gratis å omsette brukte gjenstander.
+En markedsplass for brukte ting er grunnleggende infrastruktur. Den bør være gratis og åpen, og den bør ikke tjene penger på brukernes data.
 
-**Kaupet.no** finnes fordi en nasjonal markedsplass for brukte varer bør være grunnleggende infrastruktur i et moderne samfunn, og bør derfor være gratis å bruke, uten sporing eller salg av brukerdata. Opprettelse av annonser er en grunnleggende funksjon **alle** bør ha tilgang til, og skal **aldri** være en betalt tjeneste.
+- **Gratis å legge ut annonser, alltid.** Finansiering av tjenesten skal skje gjennom tilleggstjenester som gir merverdi. Aldri av basisfunksjonalitet som å legge ut annonser.
+- **Ingen sporing.** Kaupet bruker ingen tredjeparts analyseverktøy eller sporende informasjonskapsler, og det lagres ingen adferdsdata. Det som ikke samles inn, kan ikke lekke eller selges. Se [personvernerklæringen](https://kaupet.no/personvern) og [behandlingsprotokollen](docs/PERSONVERN-BEHANDLINGSPROTOKOLL.md).
+- **Åpen kildekode under [AGPL-3.0](LICENSE).** Forbedringer kommer alle til gode, uten unntak.
 
-## Funksjoner
+Finansiering av Kaupet skjer gjennom frivillig betalt synlighet for annonser og på Proff-abonnement for bedrifter som ønsker utvidet funksjonalitet som API og MCP-grensesnitt og branding på egne annonser. Det er aldri en forutsetning for å bruke tjenesten som markedsplass for Kjøp og Salg.
 
-- **Ingen sporing.** Ingen tredjeparts analyseverktøy, ingen sporende informasjonskapsler, ingen lagring av adferds- eller markedsføringsdata av brukerne.
-- **Personvern først.** Ved å holde datainnsamlingen til et minimumsnivå, begrenser vi også hva som kan mistes, selges eller misbrukes av informasjon om brukerne. Se [personvernerklæringen](https://kaupet.no/personvern) og [behandlingsprotokollen](docs/PERSONVERN-BEHANDLINGSPROTOKOLL.md).
-- **All kode er åpen.** Hele den produksjonssatte kildekoden ligger i dette repoet under [AGPL-3.0](LICENSE). Det betyr at du står fritt til å lese, kjøre lokale kopier, bygge dine egne tjenester eller distribuere egne kopier, så lenge endringene dine deles tilbake med samme vilkår.
-- **Forbedringer skal komme fellesskapet til gode.** Ingen unntak.
+## Hva du kan gjøre
 
-Kaupet finnes både som nettside ([kaupet.no](https://kaupet.no)) og som app for iOS og Android. iOS og Android-appene er tilgjengelige i App Store og Google Play. Siste preview-build av Android-appen er også tilgjengelig under [Releases](https://github.com/Kaupet-no/Kaupet/releases) her på GitHub for både staging og produksjonsmiljøet.
+### Søk med vanlige ord
 
-### Søk du kan skrive med vanlige ord
-
-Søkefeltet forstår hva brukeren spør etter. Skriver du `elbil automat under 150000 kr`, plukker Kaupet ut drivstoff, girkasse og prisgrense som ekte filtre. Resten blir stående som fritekst.
+Skriv for eksempel `elbil automat under 150000 kr` i søkefeltet og Kaupet gjør om ordene til konkrete filtre. Hver tolkning vises som en egen filterbrikke.
 
 ![Søket tolker fritekst til filtre](docs/images/sok-tolkning.png)
 
-Søket håndterer blant annet:
+Søket forstår synonymer (`4x4`, `hengerfeste`) og tall med enhet (`over 100 hk`). Det fjerner treff med `unntatt` (`sykkel unntatt elsykkel`) og foreslår kategorier og bilmerker. I tillegg har du filterpanel, kart og stedssøk med radius. Lagrede søk gir **varsel når nye annonser dukker opp**. Finner du ikke det du leter etter, kan du legge ut en **ønskes kjøpt**-annonse. Selgere som oppretter en annonse som passer, får beskjed.
 
-- **Egenskaper og synonymer** — `automat`, `hengerfeste`, `4x4` og lignende ord kobles til de riktige filterverdiene i kategorien.
-- **Tall med enhet** — `under 150000 kr`, `over 100 hk`, `maks 12000 mil` blir til pris- og tallintervaller.
-- **Kategorier og bilmerker** — skriver du et kategorinavn eller et merke, foreslår Kaupet å navigere dit i stedet for å bare søke på ordet.
-- **Negasjon** — `sykkel unntatt elsykkel` fjerner treffene du ikke vil ha.
-- **Alle tolkninger er synlige og kan fjernes.** Hver tolkning vises som en brikke du kan klikke bort.
+### Lag en annonse på under ett minutt
 
-I tillegg finnes et filterpanel med kategori, tilstand, pris, kategorispesifikke felter, kart og stedssøk med radius (via OpenStreetMap), i tillegg til å støtte mer avanserte spørringer som _må inneholde_, _kan inneholde_, _skal ikke inneholde_ osv. Søk du bruker ofte kan lagres for å få **varsel når det kommer nye annonser** som treffer kriteriene.
+- **Tittelen velger kategori for deg.** Forslaget kommer fra annonsehistorikken, og ellers fra en språkmodell. Kategorien styrer hvilke felter du blir spurt om: rammestørrelse for sykler, mål for bokhyller.
+- **Regnummer → ferdig bilannonse.** Kaupet henter merke, modell, motor, utstyr og frist for EU-kontroll fra Statens vegvesen. Alt kan overstyres.
+- **360°-opptak med mobilen.** Gå rundt kjøretøyet med Kaupet-appen for å opprette en 360°-visning av kjøretøyet. Potensielle kjøperne kan snurre bilen rundt i annonsen.
+- Utkast lagres automatisk, bildene komprimeres før opplasting, og du bestemmer selv hvor presist lokasjon skal vises.
 
-Finner du ikke det du leter etter, kan du legge ut en **ønskes kjøpt**-annonse i stedet, slik at selgere kan finne deg. En selger som oppretter en ny annonse som treffer kriteriene til en ønskes kjøpt-annonse, varsles automatisk som del av annonseopprettelsesflyten.
+### Meldinger, vurderinger og Kaupet-kode
 
-### Annonseopprettelse med automatisk kategorigjenkjenning
-
-Alle annonser starter med en tittel. Kaupet vil da foreslå kategori automatisk:
-
-1. Dersom det finnes historikk for tilsvarende titler i samme kategori, foreslås den direkte.
-2. Mangler et treffsikkert historisk grunnlag, benyttes en språkmodell (Mistral Small 4) for å velge kategori fra den aktuelle kategorilisten. Svaret valideres mot Kaupets kategorioversikt før det presenteres til brukeren.
-
-Kategorien bestemmer resten av annonseopprettelsesflyten, da brukere vil være interessert i ulik informasjon etter om det er en bokhylle eller en bil som annonseres. En sykkelannonse vil be om rammestørrelse, en bil om girkasse og kilometerstand, en bokhylle vil be om dimensjon. I tillegg er det utviklet funksjonalitet for:
-
-- **Automatisk lagring av utkast**, så brukeren kan gå ut av flyten og fortsette senere.
-- **Bilder med komprimering** i nettleseren før opplasting, og kamera direkte i iOS og Android-appen.
-- **Sted** valgt i kart (kart fra Kartverket) med den presisjonen brukeren selv velger.
-- **Gjennomgang før publisering**, med mulighet til å endre bestemte felter før publisering.
-- **Bot-beskyttelse** ved publisering (Cloudflare Turnstile).
-
-### Kjøretøysoppslag mot Statens Vegvesen
-
-Ved salg av kjøretøy, blir brukeren bedt om registreringsnummeret. Kaupet vil hente relevante datae fra Statens vegvesens Enkeltoppslag-API som benyttes i annonsen:
-
-- merke, modell, årsmodell og førstegangsregistrering
-- drivstoff, girkasse, effekt (hk), sylindre, slagvolum og motorkode
-- hjuldrift, karosseritype, antall seter, farge og vekt
-- hengerfeste, bruktimport (ja/nei) og frist for neste EU-kontroll
-
-Kjøretøygruppen fra Vegvesenet brukes til å velge riktig kategori i Kaupet (personbil, motorsykkel, campingvogn og så videre), slik at annonsen havner i korrekt underkategori. Alle data kan overstyres manuelt av brukeren før publisering.
-
-For kjøretøy er det også mulig å opprette en **360°-visning** gjennom Kaupet-appen ved å gå rundt kjøretøyet med telefonen. Appen tar bilder automatisk mens brukeren beveger seg, og potensielle kjøpere kan snurre kjøretøyet rundt i salgsannonsen.
-
-### Meldinger mellom kjøper og selger
-
-Kaupet.no har en fullverdig meldingstjeneste for brukere.
-
-- Én samtale per annonse, med bilde, tittel og pris i innboksen.
-- Uleste meldinger markeres, og lest-status ligger i databasen slik at den er lik på tvers av enheter.
-- **Push-varsler** på web og i appen ved svar.
-- **Blokkering** og rapportering av brukere.
-- Når handelen er gjennomført kan selger markere annonsen som solgt, og partene kan **gi hverandre en vurdering**.
-
-Brukere kan dele annonser med QR-kode eller en **Kaupet-kode**. Dette er et åttesifret nummer som tar mottakeren rett til annonsen. Praktisk å lese opp over telefon eller skrive på en lapp for referanse.
+Hver annonse får sin egen samtale, med push-varsler, lest-status på tvers av enheter, blokkering og rapportering. Etter handelen kan kjøper og selger gi hverandre en vurdering. Hver annonse har også en **Kaupet-kode**, en kort kode som er lett å lese opp på telefon eller skrive på en lapp.
 
 ### App for iOS og Android
 
 <img src="docs/images/app-hjem.png" alt="Forsiden i Kaupet-appen, med bunnavigasjon" width="320">
 
-Appene deler kode med nettsiden, men benytter en egen native-tilpasset layout. Denne har blant annet en egen bunnavigasjon og sidetopper, og en mobiltilpasset flyt for annonseopprettelse. Appen er bygget med [Capacitor](https://capacitorjs.com) og føles som en native applikasjon, med blant annet:
+Appen deler kode med nettsiden, men har sin egen native layout. Den har bunnavigasjon, kamera, push-varsler, haptikk og systemets tilbakenavigasjon. Appen er tilgjengelig i App Store og Google Play. Preview-bygg for Android ligger under [Releases](https://github.com/Kaupet-no/Kaupet/releases). Se [README-CAPACITOR.md](README-CAPACITOR.md) for beskrivelse av hvordan du kan bygge appen selv.
 
-- kamera og bildevalg, inkludert 360°-opptak av kjøretøy
-- push-varsler for meldinger, lagrede søk og annen aktivitet
-- haptisk tilbakemelding, dra-for-å-oppdatere og native navigasjon
-- Android systemtilbake og iOS kantsveip følger historikk
-- respekterer safe area, skjermrotasjon og systemets tekststørrelse
+### Kaupet Proff for bedrifter
 
-Layouten er responsiv og er tilpasset både tablet og mobiltelefoner av varierende størrelse.
+Bedrifter får et eget bedriftskonsoll med flere lokasjoner, medlemmer, egen profil på annonsene og enkel statistikk. For bedrifter som ønsker utvidet funksjonalitet, er det mulig å abonnere på Kaupet Proff, som blant annet gir mulighet til å opprette og synksronisere annonser maskinelt:
 
-Se [README-CAPACITOR.md](README-CAPACITOR.md) for hvordan du bygger en tilsvarende app selv.
+- **Excel/CSV-import** av flere annonser på én gang
+- **REST-API** basert på OpenAPI-spesifikasjon (`/api/v1/openapi.json`)
+- **MCP-server**, for å la KI-assistenter administrere annonser direkte
+
+Se [docs/PROFF-API.md](docs/PROFF-API.md) for dokumentasjon.
+
+Kaupet Proff er en frivillig, betalt tjeneste, og er ingen forutsetning for å kunne benytte Kaupets øvrige funksjoner. Det skal være gratis å opprette annonser på Kaupet, også for bedrifter.
 
 ## Kjør Kaupet lokalt
 
-Raskeste vei med Bun:
-
 ```bash
-git clone https://github.com/Kaupet-no/kaupet.git
-cd kaupet
+git clone https://github.com/Kaupet-no/Kaupet.git
+cd Kaupet
 bun install
 bun dev
 ```
 
-Appen kjører på `http://localhost:8080`. For fullstendig lokalt oppsett — Supabase i Docker, import av staging-data og kjøring mot eksterne Supabase-prosjekter — se [README-LOKALT.md](README-LOKALT.md).
+Appen kjører på `http://localhost:8080`. For fullt oppsett med Supabase i Docker, staging-data og eksterne prosjekter, se [README-LOKALT.md](README-LOKALT.md).
 
-## Teknologi som benyttes
+## Teknologi
 
-- [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 8
-- [Tailwind CSS v4](https://tailwindcss.com)
-- [shadcn/ui](https://ui.shadcn.com) komponenter
-- [Supabase](https://supabase.com) for database, auth, realtime og RLS
-- [Cloudflare Workers](https://www.cloudflare.com/products/workers/) for hosting
-- [Cloudflare R2](https://www.cloudflare.com/products/r2/) for lagring av filer
-- [Capacitor](https://capacitorjs.com) for native iOS og Android-app — se [README-CAPACITOR.md](README-CAPACITOR.md) for oppsett av native build
-- [Statens vegvesen (Datautlevering)](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) for kjøretøyoppslag
-- [Mistral Small 4](https://mistral.ai) for KI-basert kategoriforslag ved annonseopprettelse
-- [Vipps/MobilePay](https://vipps.no) for betaling av promoteringer
-- [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) for bot-beskyttelse
+[TanStack Start](https://tanstack.com/start) (React 19, SSR) · [Tailwind CSS v4](https://tailwindcss.com) · [shadcn/ui](https://ui.shadcn.com) · [Supabase](https://supabase.com) · [Cloudflare Workers, R2 og Turnstile](https://www.cloudflare.com) · [Capacitor](https://capacitorjs.com)
 
-Alle kall mot tredjeparter skjer server-side. Arkitekturen er beskrevet i [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Integrasjoner: [Statens vegvesen](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) (kjøretøyoppslag), [Mistral](https://mistral.ai) (kategoriforslag), [Vipps/MobilePay](https://vipps.no) (betaling), Kartverket og OpenStreetMap (kart og sted). Alle kall til tredjeparter skjer på server-nivå. Se [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Bidra
 
-Vi tar gjerne imot bidrag — store og små. Les [CONTRIBUTING.md](CONTRIBUTING.md) for hvordan du kommer i gang, og [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for hvordan vi snakker sammen.
+Vi tar gjerne imot bidrag, både store og små. Start med [CONTRIBUTING.md](CONTRIBUTING.md) og [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-- Testing: `bun run test` kjører unittester. Se [docs/STAGING.md](docs/STAGING.md) for e2e-tester, RLS-tester og hvordan staging-miljøet fungerer, og [docs/TESTSTRATEGI.md](docs/TESTSTRATEGI.md) for teststrategien.
-- Endringer testes aldri direkte i produksjon — push til `staging`-branchen for å teste på **https://staging.kaupet.no**. Detaljer i [docs/STAGING.md](docs/STAGING.md).
+- `bun run test` kjører enhetstestene. [docs/STAGING.md](docs/STAGING.md) beskriver e2e- og RLS-tester og staging-miljøet, og [docs/TESTSTRATEGI.md](docs/TESTSTRATEGI.md) beskriver teststrategien.
+- Ingenting testes i produksjon. Push til `staging`-branchen for å teste på **https://staging.kaupet.no**.
 
-Funnet en sårbarhet? Se [SECURITY.md](SECURITY.md) — ikke åpne en offentlig issue.
+Har du funnet en sårbarhet? Følg [SECURITY.md](SECURITY.md), og ikke opprett en offentlig issue.
 
 ## Lisens
 
-Kaupet.no og tilhørende kildekode er lisensiert under [GNU Affero General Public License v3.0](LICENSE). Se [NOTICE](NOTICE) for hva det betyr i praksis — særlig at om du gjør endringer eller videreutvikler kildekoden, må du dele all kode tilbake til fellesskapet under samme vilkår. Dette gjelder også for SaaS-tjenester.
+[GNU Affero General Public License v3.0](LICENSE). Endrer eller videreutvikler du koden, må du dele den tilbake under samme vilkår. Det gjelder også når du kjører den som en tjeneste (SaaS). Se [NOTICE](NOTICE).
+
+---
+
+<sub>_Kaupet_ er en bøyd form for det norrøne ordet _Kaup_ som betyr _kjøp_ eller _avtale_.</sub>

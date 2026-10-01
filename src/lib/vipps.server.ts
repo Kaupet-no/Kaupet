@@ -4,6 +4,7 @@
  * everything else uses production API + VIPPS_* secrets.
  * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { isTestHost } from "./env";
 import { describeSafeError } from "@/lib/safe-error";
@@ -321,7 +322,7 @@ export async function refundVippsPayment(
 export async function getVippsWebhookSecret(host?: string | null): Promise<string> {
   const env = hostAwareEnv(host);
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data } = await supabaseAdmin
       .from("vipps_webhook_secrets")
       .select("secret")

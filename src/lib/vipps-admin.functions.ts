@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -134,7 +135,7 @@ export const registerVippsWebhook = createServerFn({ method: "POST" })
 
     // Lagre secret i DB slik at webhook-handleren kan verifisere signaturen
     // automatisk uten manuell env-variabel.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { error: upsertError } = await supabaseAdmin.from("vipps_webhook_secrets").upsert(
       {
         mode: data.mode,
@@ -170,7 +171,7 @@ export const deleteVippsWebhook = createServerFn({ method: "POST" })
     if (!res.ok && res.status !== 204) {
       throw new Error(`Delete webhook feilet: ${res.status} ${await res.text()}`);
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     await supabaseAdmin
       .from("vipps_webhook_secrets")
       .delete()

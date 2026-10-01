@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -103,7 +104,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => wtbInputSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const fields = {
@@ -159,7 +160,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const fields = {
       title: data.title,
       subtitle: data.subtitle ?? null,
@@ -205,7 +206,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
 export const getLatestWtbDraft = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from("wtb_listings")
       .select(
@@ -226,7 +227,7 @@ export const discardWtbDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { error } = await supabaseAdmin
       .from("wtb_listings")
       .delete()
@@ -258,7 +259,7 @@ export const updateWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => wtbUpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const fields = {
@@ -286,7 +287,7 @@ export const deleteWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { error } = await supabaseAdmin
@@ -336,7 +337,7 @@ const listWtbSchema = z.object({
 export const listWtbListings = createServerFn({ method: "GET" })
   .validator((input: unknown) => listWtbSchema.parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const q = data.q?.trim() || undefined;
 
     // websearch_to_tsquery('norwegian', …) stemmer ikke sammensatte norske
@@ -383,7 +384,7 @@ export const countWtbListings = createServerFn({ method: "GET" })
     z.object({ q: z.string().optional(), categories: z.array(z.string()).optional() }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: count, error } = await supabaseAdmin.rpc("wtb_listings_match_count", {
       _q: data.q?.trim() || undefined,
       _category_ids: data.categories?.length ? data.categories : undefined,
@@ -417,7 +418,7 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: rows, error } = await supabaseAdmin.rpc("wtb_match_count", {
       _category_id: data.category_id ?? null,
@@ -460,7 +461,7 @@ export const matchListingsForWtb = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<{ count: number; listings: WtbExistingMatch[] }> => {
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("match-listings-for-wtb", 60, 300);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: page, error } = await supabaseAdmin.rpc("listings_matching_wtb", {
       _category_id: data.category_id,

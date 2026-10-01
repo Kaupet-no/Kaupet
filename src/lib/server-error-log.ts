@@ -2,6 +2,7 @@
  * Logger feil fra server-funksjoner til konsoll og til `error_log`-tabellen,
  * slik at en admin kan inspisere dem i admin-UI. Kaster aldri selv.
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import type { Json } from "@/integrations/supabase/types";
 import { describeSafeError, safeErrorContext } from "@/lib/safe-error";
 
@@ -18,7 +19,7 @@ export async function logServerError(
   console.error(`[${safeFunctionName}]`, descriptor, safeContext);
 
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     await supabaseAdmin.from("error_log").insert({
       function_name: safeFunctionName,
       error_message: descriptor.type,

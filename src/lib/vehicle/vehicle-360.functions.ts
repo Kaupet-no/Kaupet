@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -30,7 +31,7 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -90,7 +91,7 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
 export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ token: TOKEN_SCHEMA }).parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: session, error } = await supabaseAdmin
       .from("listing_360_capture_sessions")
@@ -172,7 +173,7 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { hashRequestIp } = await import("@/lib/request-ip.server");
 
     const { data: listingId, error: quotaError } = await supabaseAdmin.rpc(
@@ -236,7 +237,7 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
 export const completeVehicle360CaptureSession = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ token: TOKEN_SCHEMA }).parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("listing_360_capture_sessions")
       .select("listing_id")
@@ -278,7 +279,7 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { data: listing, error: listingError } = await supabaseAdmin
@@ -307,7 +308,7 @@ export const deleteVehicle360Frames = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { data: listing, error: listingError } = await supabaseAdmin

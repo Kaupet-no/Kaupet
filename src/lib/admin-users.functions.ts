@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -17,7 +18,7 @@ export const createDemoUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdminRole(context.supabase, context.userId);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     // Create auth user with confirmed email
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({

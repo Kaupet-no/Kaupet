@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/api/public/images/process")({
         // Dynamisk import: en statisk import av en .server-modul i
         // src/routes drar den inn i klientgrafen (se
         // scripts/check-server-boundary.mjs).
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
         const { processListingImageJob } = await import("@/lib/listing-image-jobs.server");
         const { CloudflareImagesTransformer } = await import("@/lib/image-compression.server");
 

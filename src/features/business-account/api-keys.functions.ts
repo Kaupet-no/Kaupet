@@ -3,6 +3,7 @@
  * del 1). Kun organisasjonens superbrukere kan liste/opprette/tilbakekalle
  * API-nøkler eller se forbruk — se kravet i planens fase 4.
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -19,7 +20,7 @@ const UNAUTHORIZED_MESSAGE = "Du har ikke tilgang til API-nøkler.";
 async function requireSuperuserOrganization(
   userId: string,
 ): Promise<{ supabaseAdmin: AdminClient; organizationId: string }> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data: membership, error } = await supabaseAdmin
     .from("organization_members")
     .select("organization_id, role, status")

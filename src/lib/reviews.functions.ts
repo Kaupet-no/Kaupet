@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -163,7 +164,7 @@ export const getMyReviewForListing = createServerFn({ method: "POST" })
 export const getPublicProfile = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
   .handler(async ({ data }): Promise<PublicProfile | null> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
       .select("id, display_name, avatar_url, created_at, deleted_at")
@@ -240,7 +241,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }): Promise<ReviewRow[]> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const limit = data.limit ?? 20;
     const offset = data.offset ?? 0;
     const { data: rows, error } = await supabaseAdmin

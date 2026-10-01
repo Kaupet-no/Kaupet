@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -108,13 +109,8 @@ function assertOrganizationNumber(value: string): string {
   return normalized;
 }
 
-async function getAdmin(): Promise<AdminClient> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
-
 async function requireOrganizationMember(userId: string) {
-  const supabaseAdmin = await getAdmin();
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data: membership, error } = await supabaseAdmin
     .from("organization_members")
     .select("organization_id, role, status")
@@ -187,7 +183,7 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
     await verifyTurnstileToken(data.turnstileToken);
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("lookup-business-organization", 20, 600);
-    const supabaseAdmin = await getAdmin();
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: existing, error: existingError } = await supabaseAdmin
       .from("organizations")
@@ -257,7 +253,7 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const email = data.email.trim().toLowerCase();
-    const supabaseAdmin = await getAdmin();
+    const supabaseAdmin = await getSupabaseAdmin();
     const now = new Date().toISOString();
     const { data: intent, error: intentError } = await supabaseAdmin
       .from("business_signup_intents")
@@ -1146,7 +1142,7 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
 export const acceptOrganizationInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const supabaseAdmin = await getAdmin();
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: membership, error: lookupError } = await supabaseAdmin
       .from("organization_members")
       .select("organization_id, role, status")

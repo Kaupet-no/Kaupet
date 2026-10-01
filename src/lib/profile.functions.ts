@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -13,7 +14,7 @@ export const updateOwnProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => profileSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
       .update({ display_name: data.displayName })
@@ -53,7 +54,7 @@ export const updateOwnAvatar = createServerFn({ method: "POST" })
     if (!validR2Avatar && !validLegacyAvatar) {
       throw new ClientError("Ugyldig profilbilde", 400);
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
       .update({ avatar_url: data.avatarUrl })

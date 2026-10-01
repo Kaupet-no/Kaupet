@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
@@ -203,7 +204,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           return new Response("Invalid payload", { status: 400 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
 
         // Build notification content from authoritative DB rows only.
         let userId: string | null;

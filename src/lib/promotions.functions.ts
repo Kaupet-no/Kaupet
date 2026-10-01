@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHost } from "@tanstack/react-start/server";
@@ -10,7 +11,7 @@ import { logServerError } from "@/lib/server-error-log";
 import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
 
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("promotion_pricing")
     .select("duration_days, price_nok")
@@ -34,7 +35,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const host = (() => {
       try {
@@ -191,7 +192,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
@@ -338,7 +339,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: idRows, error: idErr } = await supabaseAdmin.rpc("get_featured_listing_ids", {
       _category_slug: data.category_slug ?? undefined,
       _limit: data.limit ?? 2,

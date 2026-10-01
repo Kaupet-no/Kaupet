@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -30,7 +31,7 @@ export const adminListFeedback = createServerFn({ method: "GET" })
   .validator((i: unknown) => listSchema.parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminRole(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     let query = supabaseAdmin
       .from("feedback")
@@ -79,7 +80,7 @@ export const adminDeleteFeedback = createServerFn({ method: "POST" })
   .validator((i: unknown) => z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminRole(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { error } = await supabaseAdmin.from("feedback").delete().in("id", data.ids);
     if (error) {
       throw await toClientError("database", error);

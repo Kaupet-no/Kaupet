@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -376,7 +377,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const fields = {
@@ -483,7 +484,7 @@ export const discardDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
     const { error } = await supabaseAdmin
       .from("listings")
@@ -535,7 +536,7 @@ export const createListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
@@ -680,7 +681,7 @@ export const republishListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
 
@@ -733,7 +734,7 @@ export const updateListingStatus = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const listing = await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
     if (listing.status === "disabled") {
       throw new ClientError("Denne annonsen er deaktivert av moderator", 409);
@@ -757,7 +758,7 @@ export const updateListingStatus = createServerFn({ method: "POST" })
 export const getListingKaupetCodeById = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     // Unauthenticated (legacy /annonse/:id → /$kaupetCode redirect), so this
     // must not use service-role to reveal a draft/disabled listing's code —
     // same visibility RLS gives everyone else. See

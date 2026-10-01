@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -10,7 +11,7 @@ export const adminListPromotionPricing = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from("promotion_pricing")
       .select("id, duration_days, price_nok, active, updated_at")
@@ -34,7 +35,7 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { error } = await supabaseAdmin.from("promotion_pricing").upsert(
       {
         duration_days: data.duration_days,
@@ -63,7 +64,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     let q = supabaseAdmin
       .from("listing_promotions")
       .select(
@@ -109,7 +110,7 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
       .select("id, status, price_nok, vipps_reference, vipps_mode, is_gift")
@@ -158,7 +159,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
       .select("id, price_nok, vipps_reference, vipps_mode, status, is_gift")
@@ -216,7 +217,7 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: listing, error: lerr } = await supabaseAdmin
       .from("listings")
@@ -276,7 +277,7 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ q: z.string().trim().min(1).max(120) }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: rows, error } = await supabaseAdmin
       .from("listings")
       .select("id, title, city, status, seller_id")

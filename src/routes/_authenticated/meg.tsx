@@ -1,3 +1,4 @@
+import { initials } from "@/lib/format";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Bell,
@@ -57,13 +58,6 @@ export const Route = createFileRoute("/_authenticated/meg")({
   head: () => ({ meta: [{ title: "Meg — Kaupet.no" }] }),
   component: MegPage,
 });
-
-function initials(name: string | null | undefined, fallback: string) {
-  const source = (name ?? fallback).trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/u).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
-}
 
 function MegPage() {
   const { user } = useAuth();

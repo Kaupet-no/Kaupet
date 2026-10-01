@@ -1,3 +1,4 @@
+import { initials } from "@/lib/format";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Search, MessageCircle, Plus, X, LogIn, Loader2 } from "lucide-react";
 import { IntentTitleLanding } from "@/components/intent-title-landing";
@@ -18,13 +19,6 @@ import { MessagesButton } from "@/components/messages-button";
 import logoIcon from "@/assets/brand/icon-only-green-letter.png";
 import { focusWhenReady } from "@/lib/focus-when-ready";
 import { readLastSearchContext, searchTabAction } from "@/lib/last-search-context";
-
-function initials(name: string | null | undefined, fallback: string) {
-  const source = (name ?? fallback).trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/u).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
-}
 
 export function AppBottomNav({ hidden }: { hidden?: boolean }) {
   const { user, loading: authLoading } = useAuth();

@@ -1,4 +1,4 @@
-import { formatDateLong, formatMonthYear } from "@/lib/format";
+import { formatDateLong, formatMonthYear, initials } from "@/lib/format";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -117,7 +117,7 @@ function PublicProfilePage() {
             <AvatarImage src={profile.avatar_url} alt={profile.display_name} />
           )}
           <AvatarFallback className="bg-primary/10 text-2xl font-medium text-primary">
-            {profile.display_name?.slice(0, 2).toUpperCase() || "?"}
+            {initials(profile.display_name)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">

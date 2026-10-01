@@ -94,3 +94,12 @@ export const formatMonthYear = (iso: string) =>
 /** `1. okt.` */
 export const formatDayMonth = (iso: string) =>
   dateOf(iso).toLocaleDateString(NB, { day: "numeric", month: "short" });
+
+/** Initialer til avatar — første bokstav i de to første ordene («Demo user 2»
+ * → «DU»). Samme regel overalt, ellers viser meny og profil ulike bokstaver. */
+export function initials(name: string | null | undefined, fallback = ""): string {
+  const source = (name ?? fallback).trim();
+  if (!source) return "?";
+  const parts = source.split(/\s+/u).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}

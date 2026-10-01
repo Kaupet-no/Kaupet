@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
-import { ClientError, toClientError } from "@/lib/to-client-error";
+import { ClientError, markLogged, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -232,7 +232,9 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       await logServerError("reconcilePromotionPayment.getPayment", e, {
         promotion_id: promo.id,
       });
-      throw new ClientError("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.", 503);
+      throw markLogged(
+        new ClientError("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.", 503),
+      );
     }
 
     // Refusjon/kansellering av betaling som ikke kan aktiveres. Ved feil
@@ -288,12 +290,10 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           await logServerError("reconcilePromotionPayment.capture", e, {
             promotion_id: promo.id,
           });
-          throw new ClientError(
-            "Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.",
-            503,
-            {
+          throw markLogged(
+            new ClientError("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.", 503, {
               cause: e,
-            },
+            }),
           );
         }
       }

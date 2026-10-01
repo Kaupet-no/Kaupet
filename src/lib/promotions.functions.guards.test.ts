@@ -75,7 +75,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 
-import { ClientError } from "@/lib/to-client-error";
+import { ClientError, isAlreadyLogged } from "@/lib/to-client-error";
 import { createPromotionCheckout, reconcilePromotionPayment } from "./promotions.functions";
 
 const listingId = "11111111-1111-4111-8111-111111111111";
@@ -248,6 +248,7 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     s.getVippsPayment.mockRejectedValue(new Error("vipps intern feil"));
     const e = await rejection(run());
     expect(e.status).toBe(503);
+    expect(isAlreadyLogged(e)).toBe(true);
     expect(e.message).toBe("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.");
     expect(s.logServerError).toHaveBeenCalledWith(
       "reconcilePromotionPayment.getPayment",
@@ -264,6 +265,7 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     const e = await rejection(run());
     expect(e).toBeInstanceOf(ClientError);
     expect(e.status).toBe(503);
+    expect(isAlreadyLogged(e)).toBe(true);
     expect(e.message).toBe("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.");
     expect(e.cause).toMatchObject({ message: "vipps 500" });
     expect(s.logServerError).toHaveBeenCalledWith(

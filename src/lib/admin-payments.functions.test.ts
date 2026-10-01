@@ -70,6 +70,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 
+import { isAlreadyLogged } from "@/lib/to-client-error";
 import {
   adminCancelProffOrder,
   adminMarkProffOrderInvoiced,
@@ -345,6 +346,7 @@ describe("adminRefundPromotion", () => {
       message: expect.stringContaining("Refusjonen er gjennomført i Vipps"),
       status: 500,
     });
+    expect(isAlreadyLogged(e)).toBe(true);
     expect(s.refundVippsPayment).toHaveBeenCalledTimes(1);
     expect(s.logServerError).toHaveBeenCalledWith("refundPromotion.updateStatus", dbError, {
       promotion_id: id,

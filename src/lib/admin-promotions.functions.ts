@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
-import { ClientError, toClientError } from "@/lib/to-client-error";
+import { ClientError, markLogged, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -195,9 +195,11 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       await logServerError("refundPromotion.updateStatus", refundErr, { promotion_id: promo.id });
       // Pengene er refundert, men raden står som active: si fra til admin.
       // Nytt forsøk er trygt (stabil idempotency-nøkkel).
-      throw new ClientError(
-        "Refusjonen er gjennomført i Vipps, men statusen kunne ikke lagres. Prøv igjen – pengene refunderes ikke to ganger.",
-        500,
+      throw markLogged(
+        new ClientError(
+          "Refusjonen er gjennomført i Vipps, men statusen kunne ikke lagres. Prøv igjen – pengene refunderes ikke to ganger.",
+          500,
+        ),
       );
     }
 

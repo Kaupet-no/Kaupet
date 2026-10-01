@@ -441,6 +441,16 @@ function NewListingPage() {
     bilOgMcCategoryId,
   });
 
+  // Fotoassistert kategori-/egenskapsforslag (salg), se
+  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2. Én
+  // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
+  // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
+  const photoSuggestion = usePhotoSuggestion({ images, title });
+  // Tittelbasert KI-kategoriforslag (samme Turnstile-widget som bildeforslaget)
+  // først når brukeren har gått forbi første steg — ikke per tastetrykk i
+  // tittelen, som i Ønskes kjøpt. Satt fra `step` lenger ned (avledet state).
+  const [pastFirstStep, setPastFirstStep] = useState(false);
+
   const {
     categorySuggestions,
     categorySuggestionLoading,
@@ -463,13 +473,16 @@ function NewListingPage() {
     attributes,
     setValue,
     clientCategoryHint,
+    aiFallback: {
+      enabled: pastFirstStep && photoSuggestion.enabled,
+      getToken: async () => {
+        const token = await photoSuggestion.getVerifiedToken();
+        photoSuggestion.turnstileRef.current?.reset();
+        return token;
+      },
+    },
   });
 
-  // Fotoassistert kategori-/egenskapsforslag (salg), se
-  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2. Én
-  // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
-  // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
-  const photoSuggestion = usePhotoSuggestion({ images, title });
   const photoChallengeRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (
@@ -637,6 +650,7 @@ function NewListingPage() {
     setValidationError,
     setCategoryEditConfirmOpen,
   });
+  if (pastFirstStep !== step > 1) setPastFirstStep(step > 1);
   // Intentionally kept fresh every render (not in an effect) since
   // useVehicleLookupFlow's goNext callback, constructed above
   // `pages`/`goNext`, must see the latest function the moment it's called,

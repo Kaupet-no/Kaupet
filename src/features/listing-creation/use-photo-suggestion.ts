@@ -194,6 +194,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     enabled,
     turnstileEnabled,
     turnstileRef,
+    getVerifiedToken,
     verificationNeeded,
     onBeforeInteractive: () => {
       setVerificationNeeded(true);

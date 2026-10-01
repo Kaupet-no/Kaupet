@@ -153,7 +153,7 @@ describe("OnboardingFlow", () => {
 
     expect(screen.getByText("Gratis å legge ut annonser")).toBeTruthy();
     expect(screen.getByText("Ingen sporing av brukeraktivitet")).toBeTruthy();
-    expect(screen.getByText("All kildekode er åpen. Sjekk selv!")).toBeTruthy();
+    expect(screen.getByText("100% åpen kildekode")).toBeTruthy();
   });
 
   it("nevner alle varseltypene og ber bare om push etter eksplisitt handling", async () => {

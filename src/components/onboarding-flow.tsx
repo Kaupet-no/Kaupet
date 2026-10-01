@@ -21,12 +21,10 @@ type Props = {
 
 type Card = "welcome" | "signin" | "notifications";
 
-// Samme liste-mønster som «Bygget for et fritt og åpent internett» på web
-// (landing-static-sections.tsx). Påstandene må stemme med personvern.tsx.
 const welcomePoints = [
   "Gratis å legge ut annonser",
   "Ingen sporing av brukeraktivitet",
-  "All kildekode er åpen. Sjekk selv!",
+  "100% åpen kildekode",
 ];
 
 function CardNav({

@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { describeSafeError } from "@/lib/safe-error";
+import { logServerError } from "@/lib/server-error-log";
 
 /**
  * Vipps webhook handler — receives payment state changes.
@@ -115,7 +116,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // Look up promotion
         const { data: promo } = await supabaseAdmin
           .from("listing_promotions")
-          .select("id, status, duration_days, price_nok, vipps_mode")
+          .select("id, listing_id, status, duration_days, price_nok, vipps_mode")
           .eq("vipps_reference", reference)
           .maybeSingle();
 
@@ -140,7 +141,28 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
 
         if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
           // `failed` kan være satt av reconcile før Vipps rapporterte betaling.
-          if (promo.status === "pending" || promo.status === "failed") {
+          // Har annonsen fått en ny fremheving i mellomtiden, kan denne ikke
+          // aktiveres (uniq_active_promotion_per_listing): ikke belast, og
+          // flagg den for manuell refusjon i stedet for å feile i retry-løkke.
+          let superseded = false;
+          if (promo.status === "failed") {
+            const { data: live, error: liveError } = await supabaseAdmin
+              .from("listing_promotions")
+              .select("id")
+              .eq("listing_id", promo.listing_id)
+              .in("status", ["active", "pending", "gifted"])
+              .neq("id", promo.id)
+              .limit(1);
+            if (liveError) throw liveError;
+            superseded = (live?.length ?? 0) > 0;
+          }
+          if (superseded) {
+            await logServerError(
+              "vippsWebhook.paidSupersededPromotion",
+              new Error(`Betalt fremheving kan ikke aktiveres (${payment.state})`),
+              { promotion_id: promo.id },
+            );
+          } else if (promo.status === "pending" || promo.status === "failed") {
             if (payment.state === "AUTHORIZED") {
               try {
                 const { captureVippsPayment } = await import("@/lib/vipps.server");
@@ -172,7 +194,12 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               })
               .eq("id", promo.id)
               .in("status", ["pending", "failed"]);
-            if (activateError) throw activateError;
+            if (activateError?.code === "23505") {
+              // Kappløp med en ny fremheving på samme annonse etter sjekken over.
+              await logServerError("vippsWebhook.paidSupersededPromotion", activateError, {
+                promotion_id: promo.id,
+              });
+            } else if (activateError) throw activateError;
           }
         } else if (
           payment.state === "CANCELLED" ||

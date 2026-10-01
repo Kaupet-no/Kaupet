@@ -58,7 +58,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "order"]) chain[m] = () => chain;
+      for (const m of ["select", "eq", "in", "neq", "limit", "order"]) chain[m] = () => chain;
       for (const m of ["insert", "update"]) {
         chain[m] = (values: unknown) => {
           s.ops.push({ table, op: m, values });
@@ -150,6 +150,7 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
   it("failed + CAPTURED i Vipps: sjekker Vipps og aktiverer (betalt, ikke aktivert)", async () => {
     s.queues.listing_promotions = [
       { data: { ...pending, status: "failed" } },
+      { data: [] },
       { data: { status: "active", expires_at: "x" } },
     ];
     s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
@@ -158,6 +159,37 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
     expect(ops("listing_promotions", "update")).toEqual([
       expect.objectContaining({ status: "active" }),
     ]);
+  });
+
+  it("failed + CAPTURED + annen aktiv fremheving: returnerer failed uten oppdatering, logger", async () => {
+    s.queues.listing_promotions = [
+      { data: { ...pending, status: "failed", listing_id: listingId } },
+      { data: [{ id: "annen" }] },
+    ];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
+    expect(ops("listing_promotions", "update")).toEqual([]);
+    expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "reconcilePromotionPayment.paidSupersededPromotion",
+      "CAPTURED",
+      { promotion_id: promotionId },
+    );
+  });
+
+  it("23505 ved aktivering (kappløp): returnerer failed og logger", async () => {
+    s.queues.listing_promotions = [
+      { data: { ...pending, status: "failed", listing_id: listingId } },
+      { data: [] },
+      { error: { code: "23505" } },
+    ];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "reconcilePromotionPayment.paidSupersededPromotion",
+      { code: "23505" },
+      { promotion_id: promotionId },
+    );
   });
 
   it("returnerer pending uten Vipps-kall når Vipps-referanse mangler", async () => {

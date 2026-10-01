@@ -197,7 +197,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
       .select(
-        "id, user_id, status, duration_days, price_nok, vipps_reference, vipps_mode, expires_at",
+        "id, user_id, listing_id, status, duration_days, price_nok, vipps_reference, vipps_mode, expires_at",
       )
       .eq("id", data.promotion_id)
       .maybeSingle();
@@ -227,6 +227,24 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     const payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
 
     if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+      // Se webhooken: en failed-rad som er erstattet av en ny fremheving på
+      // samme annonse kan ikke aktiveres, og skal ikke belastes.
+      if (promo.status === "failed") {
+        const { data: live, error: liveErr } = await supabaseAdmin
+          .from("listing_promotions")
+          .select("id")
+          .eq("listing_id", promo.listing_id)
+          .in("status", ["active", "pending", "gifted"])
+          .neq("id", promo.id)
+          .limit(1);
+        if (liveErr) throw await toClientError("database", liveErr);
+        if (live?.length) {
+          await logServerError("reconcilePromotionPayment.paidSupersededPromotion", payment.state, {
+            promotion_id: promo.id,
+          });
+          return { status: "failed" as const, expires_at: null };
+        }
+      }
       if (payment.state === "AUTHORIZED") {
         try {
           await captureVippsPayment(
@@ -261,6 +279,13 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
         .in("status", ["pending", "failed"])
         .select("status, expires_at")
         .maybeSingle();
+      if (uerr?.code === "23505") {
+        // Kappløp med en ny fremheving på samme annonse etter sjekken over.
+        await logServerError("reconcilePromotionPayment.paidSupersededPromotion", uerr, {
+          promotion_id: promo.id,
+        });
+        return { status: "failed" as const, expires_at: null };
+      }
       if (uerr) {
         throw await toClientError("database", uerr);
       }

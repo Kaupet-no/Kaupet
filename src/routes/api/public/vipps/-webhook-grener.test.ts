@@ -13,6 +13,9 @@ const s = vi.hoisted(() => ({
   fresh: true,
   existingEvent: null as { id: string; processed_at: string | null } | null,
   promo: null as Record<string, unknown> | null,
+  /** Andre aktive/ventende/gavefremhevinger på samme annonse (default: ingen). */
+  live: [] as { id: string }[],
+  logServerError: vi.fn(),
   updateError: {} as Record<string, unknown>,
   calls: [] as Call[],
   getVippsPayment: vi.fn(),
@@ -28,11 +31,14 @@ vi.mock("@/lib/vipps.server", () => ({
   captureVippsPayment: s.captureVippsPayment,
 }));
 
+vi.mock("@/lib/server-error-log", () => ({ logServerError: s.logServerError }));
+
 vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
+          in: () => ({ neq: () => ({ limit: async () => ({ data: s.live, error: null }) }) }),
           maybeSingle: async () => ({
             data: table === "vipps_webhook_events" ? s.existingEvent : s.promo,
             error: null,
@@ -93,6 +99,8 @@ beforeEach(() => {
   s.existingEvent = null;
   s.promo = { ...pendingPromo };
   s.updateError = {};
+  s.live = [];
+  s.logServerError.mockReset().mockResolvedValue(undefined);
   s.calls = [];
   s.getVippsPayment.mockReset().mockResolvedValue({ state: "CAPTURED", pspReference: "psp-1" });
   s.captureVippsPayment.mockReset().mockResolvedValue(undefined);
@@ -252,6 +260,43 @@ describe("Vipps-webhook: statusoverganger", () => {
       "test",
     );
     expect(promoUpdates().map((c) => c.values.status)).toEqual(["active"]);
+  });
+
+  it("failed + CAPTURED + annen aktiv fremheving: ingen aktivering, logget, hendelsen behandlet", async () => {
+    s.promo = { ...pendingPromo, status: "failed", listing_id: "l-1" };
+    s.live = [{ id: "promo-2" }];
+    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    expect((await post()).status).toBe(200);
+    expect(promoUpdates()).toEqual([]);
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "vippsWebhook.paidSupersededPromotion",
+      expect.any(Error),
+      { promotion_id: "promo-1" },
+    );
+    expect(processed()).toBe(true);
+  });
+
+  it("failed + AUTHORIZED + annen aktiv fremheving: capture kalles ikke", async () => {
+    s.promo = { ...pendingPromo, status: "failed", listing_id: "l-1" };
+    s.live = [{ id: "promo-2" }];
+    s.getVippsPayment.mockResolvedValue({ state: "AUTHORIZED" });
+    expect((await post()).status).toBe(200);
+    expect(s.captureVippsPayment).not.toHaveBeenCalled();
+    expect(promoUpdates()).toEqual([]);
+    expect(s.logServerError).toHaveBeenCalled();
+    expect(processed()).toBe(true);
+  });
+
+  it("failed + CAPTURED: 23505 ved aktivering (kappløp) logges, svarer 200 og markerer behandlet", async () => {
+    s.promo = { ...pendingPromo, status: "failed", listing_id: "l-1" };
+    s.updateError["listing_promotions:active"] = { code: "23505" };
+    expect((await post()).status).toBe(200);
+    expect(s.logServerError).toHaveBeenCalledWith(
+      "vippsWebhook.paidSupersededPromotion",
+      { code: "23505" },
+      { promotion_id: "promo-1" },
+    );
+    expect(processed()).toBe(true);
   });
 
   it("CANCELLED på failed fremheving endrer ingenting", async () => {

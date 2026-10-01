@@ -104,11 +104,14 @@ export function ListingCardContent({
   imgUrl,
   missingPriceLabel,
   onImageError,
+  imageFailed = false,
 }: {
   listing: ListingCardData;
   imgUrl: string | null;
   missingPriceLabel?: string;
   onImageError?: () => void;
+  /** Bildet ga feil (f.eks. 404) — vis «Ingen bilde», ikke evig skjelett. */
+  imageFailed?: boolean;
 }) {
   const displayPrice = displayPriceNok(listing);
   const priceLabel =
@@ -122,7 +125,7 @@ export function ListingCardContent({
       <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
         <ListingImage
           imgUrl={imgUrl}
-          hasCoverPath={!!listing.cover_path}
+          hasCoverPath={!!listing.cover_path && !imageFailed}
           alt={`${listing.title} — ${priceLabel}`}
           compact={false}
           onError={onImageError}
@@ -183,7 +186,7 @@ export const ListingCard = memo(function ListingCard({
     : null;
   const originalUrl = coverPath ? signListingImageUrls([coverPath])[coverPath] : null;
   const primaryImageUrl = signedImageUrl !== undefined ? signedImageUrl : thumbUrl;
-  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
+  const { effectiveImageUrl, imageFailed, handleImageError } = useListingImageFallback(
     primaryImageUrl,
     originalUrl,
   );
@@ -203,6 +206,7 @@ export const ListingCard = memo(function ListingCard({
           imgUrl={effectiveImageUrl}
           missingPriceLabel={missingPriceLabel}
           onImageError={handleImageError}
+          imageFailed={imageFailed}
         />
       </article>
     );
@@ -230,7 +234,7 @@ export const ListingCard = memo(function ListingCard({
           >
             <ListingImage
               imgUrl={effectiveImageUrl}
-              hasCoverPath={!!listing.cover_path}
+              hasCoverPath={!!listing.cover_path && !imageFailed}
               alt={`${listing.title} — ${priceLabel}`}
               compact
               onError={handleImageError}
@@ -292,6 +296,7 @@ export const ListingCard = memo(function ListingCard({
           listing={listing}
           imgUrl={effectiveImageUrl}
           onImageError={handleImageError}
+          imageFailed={imageFailed}
         />
       </Link>
       <FavoriteButton

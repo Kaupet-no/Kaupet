@@ -11,8 +11,12 @@ test("mobil toppsøk fokuserer sidesøket på annonser", async ({ page }, testIn
   await page.goto("/annonser");
   await waitForHydration(page);
 
+  // «Åpne søk» faller tilbake til søkepanelet hvis sidesøket ikke er synlig
+  // ennå (kald dev-server), så vent på det før vi trykker.
+  const input = page.locator("#annonser-search-input");
+  await expect(input).toBeVisible();
   await page.getByRole("button", { name: "Åpne søk" }).click();
-  await expect(page.locator("#annonser-search-input")).toBeFocused();
+  await expect(input).toBeFocused();
 });
 
 test("søkeforslag har strukturert type og tilgjengelig tilkobling", async ({ page }) => {

@@ -202,14 +202,14 @@ export const getMyProfileStats = createServerFn({ method: "POST" })
       { data: summary },
     ] = await Promise.all([
       supabase.from("profiles").select("created_at").eq("id", userId).maybeSingle(),
-      // Utkast holdes utenfor: telleren står ved siden av Salg og Vurdering
-      // og leses som "annonser jeg har ute", mens utkast bare er synlige for
-      // eieren selv. Den offentlige profilen viser allerede kun aktive.
+      // Bare aktive: telleren leses som "annonser jeg har ute" og skal stemme
+      // med «Aktive»-fanen i Mine annonser og den offentlige profilen. Solgte
+      // telles allerede i Salg ved siden av.
       supabase
         .from("listings")
         .select("id", { count: "exact", head: true })
         .eq("seller_id", userId)
-        .neq("status", "draft"),
+        .eq("status", "active"),
       supabase
         .from("listing_sales")
         .select("listing_id", { count: "exact", head: true })

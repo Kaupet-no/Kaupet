@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useEffectEvent, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
@@ -147,11 +147,13 @@ export function Price({
   // seller already entered a price — so the total can never drift past
   // MAX_PRICE_NOK just because the input's max wasn't this tight yet when it
   // was typed.
-  useEffect(() => {
-    if (priceNumeric != null && priceNumeric > maxPriceInputKr) {
-      setValue("price_nok", maxPriceInputKr, { shouldValidate: true, shouldDirty: true });
+  const clampPrice = useEffectEvent((max: number) => {
+    if (priceNumeric != null && priceNumeric > max) {
+      setValue("price_nok", max, { shouldValidate: true, shouldDirty: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    clampPrice(maxPriceInputKr);
   }, [maxPriceInputKr]);
   // Dempet prisforslag under feltet, basert på lignende AKTIVE annonser i
   // samme kategori (samme `similarListings` som "Lignende annonser"-lista

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
@@ -62,7 +62,11 @@ export function CategoryLandingPage({
   const [qDraft, setQDraft] = useState(search.q);
   const isDesktop = useIsDesktop();
 
-  useEffect(() => setQDraft(search.q), [search.q]);
+  const [prevSearchQ, setPrevSearchQ] = useState(search.q);
+  if (prevSearchQ !== search.q) {
+    setPrevSearchQ(search.q);
+    setQDraft(search.q);
+  }
 
   const { data: allCategoriesRaw } = useCategories();
   const categories = useMemo(

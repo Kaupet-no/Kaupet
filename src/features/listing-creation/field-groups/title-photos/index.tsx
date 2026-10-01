@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useEffectEvent, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Sparkles } from "lucide-react";
 
@@ -31,11 +31,13 @@ export function VehicleTitleFields({
 }: Pick<WizardSharedProps, "setValue" | "errors" | "title" | "attributes">) {
   const computedTitle = computeVehicleTitle(attributes);
 
-  useEffect(() => {
-    if (computedTitle && computedTitle !== title) {
-      setValue("title", computedTitle, { shouldValidate: true });
+  const syncTitle = useEffectEvent((next: string) => {
+    if (next && next !== title) {
+      setValue("title", next, { shouldValidate: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    syncTitle(computedTitle);
   }, [computedTitle]);
 
   return (
@@ -152,12 +154,14 @@ export function PhotosGroup({
   const photoCategory = photoCategorySuggestions[0];
   // Brukeren ba om å få tittelen fylt ut: er feltet tomt, brukes forslaget
   // direkte. Har de skrevet noe selv, får de heller velge med "Bruk" under.
-  useEffect(() => {
-    if (photoTitleSuggestion && !title.trim()) {
-      setValue("title", photoTitleSuggestion, { shouldValidate: true });
-      applyPhotoTitleSuggestion(photoTitleSuggestion);
+  const fillTitleFromSuggestion = useEffectEvent((suggestion: typeof photoTitleSuggestion) => {
+    if (suggestion && !title.trim()) {
+      setValue("title", suggestion, { shouldValidate: true });
+      applyPhotoTitleSuggestion(suggestion);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    fillTitleFromSuggestion(photoTitleSuggestion);
   }, [photoTitleSuggestion]);
 
   return (

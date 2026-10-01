@@ -1,5 +1,5 @@
 import { formatNokNumber } from "@/lib/format";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -20,6 +20,7 @@ import { NativeSheet } from "@/components/ui/native-sheet";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { signListingImageUrls } from "@/lib/storage";
 import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { isValidMapCoordinate, KARTVERKET_TILE_LAYER } from "@/lib/kartverket-map";
 
 const EARTH_RADIUS_KM = 6371;
@@ -232,6 +233,15 @@ function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: 
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+/** Kjører `reset` under render når en av `deps` endrer seg (ikke på første render). */
+function useResetOnChange(deps: readonly unknown[], reset: () => void) {
+  const [prev, setPrev] = useState(deps);
+  if (deps.some((d, i) => !Object.is(d, prev[i]))) {
+    setPrev(deps);
+    reset();
+  }
+}
+
 function ZoomRadiusSync({
   active,
   onDefaultRadius,
@@ -253,9 +263,9 @@ function ZoomRadiusSync({
     zoomend: () => active && sync(map),
     moveend: () => active && sync(map),
   });
+  const syncNow = useEffectEvent(() => sync(map));
   useEffect(() => {
-    if (active) sync(map);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (active) syncNow();
   }, [active]);
   return null;
 }
@@ -303,7 +313,6 @@ export function ListingsMap({
   const [previewRadiusKm, setPreviewRadiusKm] = useState(radiusKm);
   const [radiusManuallySet, setRadiusManuallySet] = useState(false);
   const [isSliderInteracting, setIsSliderInteracting] = useState(false);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [locQuery, setLocQuery] = useState("");
   const [pendingCenter, setPendingCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [locationSheetOpen, setLocationSheetOpen] = useState(false);
@@ -320,28 +329,24 @@ export function ListingsMap({
     search: searchLocation,
     clear: clearLocationSearch,
   } = useNominatimSearch();
-  useEffect(() => {
-    // Ruten er fasit etter et eksplisitt søk eller et filterapply.
-    setPendingCenter(null);
-  }, [center?.lat, center?.lng, radiusKm]);
-  useEffect(() => {
+  // Ruten er fasit etter et eksplisitt søk eller et filterapply.
+  useResetOnChange([center?.lat, center?.lng, radiusKm], () => setPendingCenter(null));
+  useResetOnChange([mapCenter?.lat, mapCenter?.lng, radiusKm], () =>
     setControlLocation({
       lat: mapCenter?.lat ?? null,
       lng: mapCenter?.lng ?? null,
       radius: radiusKm,
       label: "",
-    });
-  }, [mapCenter?.lat, mapCenter?.lng, radiusKm]);
-  useEffect(() => {
-    // Når et filter allerede er aktivt (eller brukeren har justert slideren
-    // selv), er radiusKm-propen fasit. Før noe filter er satt følger radiusen
-    // i stedet dynamisk standardverdi.
+    }),
+  );
+  // Når et filter allerede er aktivt (eller brukeren har justert slideren
+  // selv), er radiusKm-propen fasit. Før noe filter er satt følger radiusen
+  // i stedet dynamisk standardverdi.
+  useResetOnChange([radiusKm, mapCenter, radiusManuallySet], () => {
     if (mapCenter || radiusManuallySet) setPreviewRadiusKm(radiusKm);
-  }, [radiusKm, mapCenter, radiusManuallySet]);
+  });
 
-  useEffect(() => {
-    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
-  }, []);
+  const isTouchDevice = useMediaQuery("(hover: none)");
 
   const clearIcon = useMemo(() => makeClearIcon(isTouchDevice), [isTouchDevice]);
 

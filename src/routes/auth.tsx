@@ -130,7 +130,11 @@ function AuthPage() {
   const isSignUp = authMode === "signup";
   const native = useIsNative();
 
-  useEffect(() => setAuthMode(mode), [mode]);
+  const [prevMode, setPrevMode] = useState(mode);
+  if (prevMode !== mode) {
+    setPrevMode(mode);
+    setAuthMode(mode);
+  }
 
   // Signin/signup/reset er deep-linkbare via ?mode= — bytt via navigate slik at
   // URL-en og nettleserens tilbake-knapp følger den viste modusen. Resend/confirm
@@ -186,9 +190,13 @@ function AuthPage() {
   // Feltkrav endres når modusen byttes; fjern gamle feilmeldinger.
   useEffect(() => {
     clearErrors();
+  }, [authMode, clearErrors]);
+  const [prevAuthMode, setPrevAuthMode] = useState(authMode);
+  if (prevAuthMode !== authMode) {
+    setPrevAuthMode(authMode);
     setShowPassword(false);
     if (!isSignUp) setSignupKind("private");
-  }, [authMode, clearErrors, isSignUp]);
+  }
 
   const webOrigin = () => (isNative() ? "https://kaupet.no" : window.location.origin);
 

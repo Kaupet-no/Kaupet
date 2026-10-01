@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   effectiveFiltersForCategories,
   effectiveFiltersForCategory,
@@ -65,11 +65,14 @@ export function useCategoryDrilldown(params: {
   // Collapse "flere valg" again whenever the drilled-into category changes,
   // unless there are only a couple of secondary filters — cheap enough to
   // show by default rather than hiding behind an extra click.
-  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
-  useEffect(
-    () => setMoreFiltersOpen(secondaryFilters.length > 0 && secondaryFilters.length <= 2),
-    [currentParent?.id, secondaryFilters.length],
-  );
+  const defaultMoreFiltersOpen = secondaryFilters.length > 0 && secondaryFilters.length <= 2;
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(defaultMoreFiltersOpen);
+  const moreFiltersKey = `${currentParent?.id}|${secondaryFilters.length}`;
+  const [prevMoreFiltersKey, setPrevMoreFiltersKey] = useState(moreFiltersKey);
+  if (prevMoreFiltersKey !== moreFiltersKey) {
+    setPrevMoreFiltersKey(moreFiltersKey);
+    setMoreFiltersOpen(defaultMoreFiltersOpen);
+  }
 
   // currentParent plus every descendant category — the same scope /$kaupetCode
   // applies when it renders results for this category, so the live count below

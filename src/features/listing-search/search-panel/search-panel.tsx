@@ -26,6 +26,7 @@ import { SearchRuleFields } from "@/features/listing-search/filters/search-rule-
 import { SaveSearchDialog } from "@/features/listing-search/filters/advanced-search-sheet";
 import {
   criteriaToValue,
+  DEFAULT_SEARCH_RADIUS_KM,
   defaultAdvancedSearchValue,
   valueToCriteria,
   type AdvancedSearchValue,
@@ -383,7 +384,7 @@ export function SearchPanel({
             ...previous,
             value: {
               ...previous.value,
-              location: { lat: null, lng: null, radius: 10, label: "" },
+              location: { lat: null, lng: null, radius: DEFAULT_SEARCH_RADIUS_KM, label: "" },
             },
           })),
       })

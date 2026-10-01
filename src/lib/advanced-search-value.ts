@@ -5,6 +5,8 @@ import type { SearchCriteria } from "@/lib/saved-searches";
 import { VEHICLE_CONDITIONS_BY_SLUG } from "@/lib/constants";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
+export const DEFAULT_SEARCH_RADIUS_KM = 10;
+
 export type LocationValue = {
   lat: number | null;
   lng: number | null;
@@ -65,7 +67,7 @@ export function defaultAdvancedSearchValue(): AdvancedSearchValue {
     min: null,
     max: null,
     includeFree: true,
-    location: { lat: null, lng: null, radius: 10, label: "" },
+    location: { lat: null, lng: null, radius: DEFAULT_SEARCH_RADIUS_KM, label: "" },
     attributes: {},
     sort: "new",
     extraGroups: [],
@@ -111,7 +113,7 @@ export function criteriaToValue(c: SearchCriteria): AdvancedSearchValue {
     location: {
       lat: c.lat ?? null,
       lng: c.lng ?? null,
-      radius: c.radius ?? 10,
+      radius: c.radius ?? DEFAULT_SEARCH_RADIUS_KM,
       label: c.loc ?? "",
     },
   };

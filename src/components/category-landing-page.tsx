@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
@@ -274,7 +275,7 @@ export function CategoryLandingPage({
             onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
             mapListings={mapListings}
             mapCenter={mapCenter}
-            radiusKm={search.radius ?? 10}
+            radiusKm={search.radius ?? DEFAULT_SEARCH_RADIUS_KM}
             onMapClearLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }

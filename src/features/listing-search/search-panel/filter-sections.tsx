@@ -36,7 +36,11 @@ import {
   priceScaleMax,
   type PriceQuickRange,
 } from "@/lib/price-histogram";
-import { conditionOptionsFor, type AdvancedSearchValue } from "@/lib/advanced-search-value";
+import {
+  conditionOptionsFor,
+  DEFAULT_SEARCH_RADIUS_KM,
+  type AdvancedSearchValue,
+} from "@/lib/advanced-search-value";
 import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
@@ -289,7 +293,8 @@ export function SearchFilterSections({
       },
       location: {
         title: "Sted",
-        reset: () => onLocationChange({ lat: null, lng: null, radius: 10, label: "" }),
+        reset: () =>
+          onLocationChange({ lat: null, lng: null, radius: DEFAULT_SEARCH_RADIUS_KM, label: "" }),
       },
       conditions: {
         title: "Tilstand",

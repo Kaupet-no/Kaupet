@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
 import type { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -93,7 +94,7 @@ export function buildListingsSearchRpcArgs({
     _attribute_filters: queryAttrFilters as Json,
     _center_lat: search.lat ?? null,
     _center_lng: search.lng ?? null,
-    _radius_km: search.radius ?? 10,
+    _radius_km: search.radius ?? DEFAULT_SEARCH_RADIUS_KM,
     _sort: search.sort,
     _limit: limit,
     _offset: offset,

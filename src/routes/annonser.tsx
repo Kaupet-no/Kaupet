@@ -59,7 +59,7 @@ import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/catego
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
 import { SearchStart } from "@/features/listing-search/search-start";
-import { criteriaToValue } from "@/lib/advanced-search-value";
+import { criteriaToValue, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
 
 /** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
 function blurActiveElement() {
@@ -862,7 +862,7 @@ function BrowsePage() {
                 }}
                 mapListings={mapListings}
                 mapCenter={mapCenter}
-                radiusKm={search.radius ?? 10}
+                radiusKm={search.radius ?? DEFAULT_SEARCH_RADIUS_KM}
                 onMapClearLocation={() =>
                   updateSearch({
                     lat: undefined,

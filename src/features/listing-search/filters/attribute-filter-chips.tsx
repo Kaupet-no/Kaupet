@@ -24,7 +24,7 @@ import { CategoryFilterFields } from "@/features/listing-search/filters/category
 import { PartVehicleSearchField } from "@/components/part-fitment-fields";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { RangeFilterField } from "@/components/range-filter-field";
-import { CONDITIONS } from "@/lib/advanced-search-value";
+import { CONDITIONS, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 import {
@@ -623,14 +623,17 @@ export function AttributeFilterChips({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 space-y-3 p-3">
         <LocationPicker
-          value={location ?? { lat: null, lng: null, radius: 20 }}
+          value={location ?? { lat: null, lng: null, radius: DEFAULT_SEARCH_RADIUS_KM }}
           onChange={onLocationChange}
           onDone={() => setLocationOpen(false)}
         />
         <RadiusPicker
-          value={location?.radius ?? 20}
+          value={location?.radius ?? DEFAULT_SEARCH_RADIUS_KM}
           onChange={(r) =>
-            onLocationChange({ ...(location ?? { lat: null, lng: null, radius: 20 }), radius: r })
+            onLocationChange({
+              ...(location ?? { lat: null, lng: null, radius: DEFAULT_SEARCH_RADIUS_KM }),
+              radius: r,
+            })
           }
           disabled={location?.lat == null}
         />

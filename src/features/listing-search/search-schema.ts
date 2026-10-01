@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AdvancedSearchValue } from "@/lib/advanced-search-value";
+import { DEFAULT_SEARCH_RADIUS_KM, type AdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 
 export const stringArray = z.preprocess((v) => {
@@ -164,7 +164,7 @@ export function readAppliedSearchState(search: SearchParams): AppliedSearchState
       location: {
         lat: search.lat ?? null,
         lng: search.lng ?? null,
-        radius: search.radius ?? 10,
+        radius: search.radius ?? DEFAULT_SEARCH_RADIUS_KM,
         label: search.loc ?? "",
       },
     },

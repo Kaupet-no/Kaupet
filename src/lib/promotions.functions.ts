@@ -225,7 +225,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     const {
       getVippsPayment,
       captureVippsPayment,
-      isVippsPaymentCaptured,
+      vippsPaymentStatus,
       releaseSupersededPromotionPayment,
     } = await import("@/lib/vipps.server");
     const vippsMode = promo.vipps_mode as "test" | "production";
@@ -240,6 +240,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
         new ClientError("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.", 503),
       );
     }
+
+    const status = vippsPaymentStatus(payment);
 
     // Refusjon/kansellering av betaling som ikke kan aktiveres. Ved feil
     // blir raden `failed`; webhooken tar nytt forsøk.
@@ -262,7 +264,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       }
     };
 
-    if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+    if (status === "AUTHORIZED" || status === "CAPTURED") {
       // Se webhooken: en failed-rad som er erstattet av en ny fremheving på
       // samme annonse kan ikke aktiveres: gi kunden pengene tilbake.
       if (promo.status === "failed") {
@@ -275,13 +277,13 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           .limit(1);
         if (liveErr) throw await toClientError("database", liveErr);
         if (live?.length) {
-          await logServerError("reconcilePromotionPayment.paidSupersededPromotion", payment.state, {
+          await logServerError("reconcilePromotionPayment.paidSupersededPromotion", status, {
             promotion_id: promo.id,
           });
-          return release(isVippsPaymentCaptured(payment));
+          return release(status === "CAPTURED");
         }
       }
-      if (payment.state === "AUTHORIZED") {
+      if (status === "AUTHORIZED") {
         try {
           await captureVippsPayment(
             promo.vipps_reference,
@@ -341,11 +343,10 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     }
 
     if (
-      payment.state === "CANCELLED" ||
-      payment.state === "EXPIRED" ||
-      payment.state === "TERMINATED" ||
-      payment.state === "ABORTED" ||
-      payment.state === "FAILED"
+      status === "CANCELLED" ||
+      status === "EXPIRED" ||
+      status === "TERMINATED" ||
+      status === "ABORTED"
     ) {
       const { error: failErr } = await supabaseAdmin
         .from("listing_promotions")
@@ -360,11 +361,12 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       return { status: "failed" as const, expires_at: null };
     }
 
-    if (payment.state === "REFUNDED") {
+    if (status === "REFUNDED") {
       const { error: refundErr } = await supabaseAdmin
         .from("listing_promotions")
-        .update({ status: "refunded" })
-        .eq("id", promo.id);
+        .update({ status: "refunded", refunded_at: new Date().toISOString() })
+        .eq("id", promo.id)
+        .neq("status", "refunded");
       if (refundErr) {
         await logServerError("reconcilePromotionPayment.markRefunded", refundErr, {
           promotion_id: promo.id,
@@ -373,7 +375,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       return { status: "refunded" as const, expires_at: promo.expires_at };
     }
 
-    // CREATED — Vipps har ikke autorisert ennå.
+    // CREATED — Vipps har ikke autorisert ennå. PARTIALLY_REFUNDED kan ikke
+    // skje her: delvis refusjon krever en belastet, altså aktivert, fremheving.
     return { status: "pending" as const, expires_at: promo.expires_at };
   });
 

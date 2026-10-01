@@ -238,23 +238,25 @@ export async function createVippsPayment(input: CreatePaymentInput): Promise<Cre
   };
 }
 
+/** Tilstandene ePayment faktisk returnerer i `state`. */
+type VippsPaymentState = "CREATED" | "AUTHORIZED" | "TERMINATED" | "EXPIRED" | "ABORTED";
+
+/** Effektiv status utledet av `vippsPaymentStatus` (state + aggregate). */
 export type VippsPaymentStatus =
-  | "CREATED"
-  | "AUTHORIZED"
-  | "TERMINATED"
-  | "EXPIRED"
-  | "ABORTED"
-  | "CANCELLED"
-  | "FAILED"
-  | "CAPTURED"
-  | "REFUNDED"
-  | "PARTIALLY_REFUNDED";
+  VippsPaymentState | "CAPTURED" | "CANCELLED" | "REFUNDED" | "PARTIALLY_REFUNDED";
+
+type VippsAmount = { value: number; currency: string };
 
 export type VippsPayment = {
-  state: VippsPaymentStatus;
+  state: VippsPaymentState;
   pspReference?: string;
-  amount?: { value: number; currency: string };
-  aggregate?: { capturedAmount?: { value: number; currency: string } };
+  amount?: VippsAmount;
+  aggregate?: {
+    authorizedAmount?: VippsAmount;
+    cancelledAmount?: VippsAmount;
+    capturedAmount?: VippsAmount;
+    refundedAmount?: VippsAmount;
+  };
 };
 
 export async function getVippsPayment(
@@ -274,10 +276,19 @@ export async function getVippsPayment(
   return (await res.json()) as VippsPayment;
 }
 
-/** ePayment beholder `state: "AUTHORIZED"` etter capture; det belastede
- * beløpet står bare i `aggregate.capturedAmount`. */
-export function isVippsPaymentCaptured(payment: VippsPayment): boolean {
-  return payment.state === "CAPTURED" || (payment.aggregate?.capturedAmount?.value ?? 0) > 0;
+/**
+ * ePayment beholder `state: "AUTHORIZED"` etter capture, refusjon og
+ * kansellering; hva som er gjort med betalingen står bare i `aggregate`.
+ * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/concepts/
+ */
+export function vippsPaymentStatus(payment: VippsPayment): VippsPaymentStatus {
+  if (payment.state !== "AUTHORIZED") return payment.state;
+  const captured = payment.aggregate?.capturedAmount?.value ?? 0;
+  const refunded = payment.aggregate?.refundedAmount?.value ?? 0;
+  if (refunded > 0) return refunded >= captured ? "REFUNDED" : "PARTIALLY_REFUNDED";
+  if (captured > 0) return "CAPTURED";
+  if ((payment.aggregate?.cancelledAmount?.value ?? 0) > 0) return "CANCELLED";
+  return "AUTHORIZED";
 }
 
 export async function captureVippsPayment(

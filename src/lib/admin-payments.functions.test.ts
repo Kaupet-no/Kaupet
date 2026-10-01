@@ -37,7 +37,9 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/lib/admin-auth.server", () => ({ requireAdminRole: s.requireAdmin }));
 vi.mock("@/lib/server-error-log", () => ({ logServerError: s.logServerError }));
-vi.mock("@/lib/vipps.server", () => ({
+vi.mock("@/lib/vipps.server", async (importActual) => ({
+  vippsPaymentStatus: (await importActual<typeof import("@/lib/vipps.server")>())
+    .vippsPaymentStatus,
   refundVippsPayment: s.refundVippsPayment,
   getVippsPayment: s.getVippsPayment,
 }));
@@ -452,29 +454,40 @@ describe("adminGetVippsPaymentStatus", () => {
     expect(s.getVippsPayment).not.toHaveBeenCalled();
   });
 
+  // ePayment beholder `state: "AUTHORIZED"`; capture/refusjon/kansellering
+  // står bare i aggregate, og admin skal vise den utledede statusen.
+  const nok = (value: number) => ({ value, currency: "NOK" });
+  const captured = { capturedAmount: nok(4900) };
+  const refunded = { capturedAmount: nok(4900), refundedAmount: nok(4900) };
+  const cancelled = { cancelledAmount: nok(4900) };
   it.each([
-    ["CAPTURED", "pending", true],
-    ["AUTHORIZED", "failed", true],
-    ["CAPTURED", "active", false],
-    ["REFUNDED", "active", true],
-    ["REFUNDED", "refunded", false],
-    ["CANCELLED", "active", true],
-    ["ABORTED", "failed", false],
-  ])("tilstand %s mot status %s gir mismatch=%s", async (state, status, mismatch) => {
-    s.queues.listing_promotions = [{ data: { ...base, status } }];
-    s.getVippsPayment.mockResolvedValue({
-      state,
-      pspReference: "psp",
-      amount: { value: 4900, currency: "NOK" },
-    });
-    await expect(run()).resolves.toMatchObject({
-      hasVipps: true,
-      mismatch,
-      amountNok: 49,
-      mode: "test",
-    });
-    expect(s.getVippsPayment).toHaveBeenCalledWith("ref-1", "kaupet.no", "test");
-  });
+    ["AUTHORIZED", captured, "pending", "CAPTURED", true],
+    ["AUTHORIZED", {}, "failed", "AUTHORIZED", true],
+    ["AUTHORIZED", captured, "active", "CAPTURED", false],
+    ["AUTHORIZED", refunded, "active", "REFUNDED", true],
+    ["AUTHORIZED", refunded, "refunded", "REFUNDED", false],
+    ["AUTHORIZED", cancelled, "active", "CANCELLED", true],
+    ["ABORTED", undefined, "failed", "ABORTED", false],
+  ])(
+    "%s %o mot status %s: viser %s, mismatch=%s",
+    async (state, aggregate, status, shown, mismatch) => {
+      s.queues.listing_promotions = [{ data: { ...base, status } }];
+      s.getVippsPayment.mockResolvedValue({
+        state,
+        aggregate,
+        pspReference: "psp",
+        amount: { value: 4900, currency: "NOK" },
+      });
+      await expect(run()).resolves.toMatchObject({
+        hasVipps: true,
+        state: shown,
+        mismatch,
+        amountNok: 49,
+        mode: "test",
+      });
+      expect(s.getVippsPayment).toHaveBeenCalledWith("ref-1", "kaupet.no", "test");
+    },
+  );
 
   it("returnerer feilmelding i stedet for å kaste når Vipps feiler", async () => {
     s.queues.listing_promotions = [{ data: base }];

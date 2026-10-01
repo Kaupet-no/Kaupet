@@ -43,8 +43,8 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/lib/server-error-log", () => ({ logServerError: s.logServerError }));
 vi.mock("@/lib/vipps.server", async (importActual) => ({
-  isVippsPaymentCaptured: (await importActual<typeof import("@/lib/vipps.server")>())
-    .isVippsPaymentCaptured,
+  vippsPaymentStatus: (await importActual<typeof import("@/lib/vipps.server")>())
+    .vippsPaymentStatus,
   getVippsMode: () => s.vippsMode,
   createVippsPayment: s.createVippsPayment,
   getVippsPayment: s.getVippsPayment,
@@ -103,6 +103,10 @@ const rejection = async (p: Promise<unknown>) => {
 
 const ops = (table: string, op: string) =>
   s.ops.filter((o) => o.table === table && o.op === op).map((o) => o.values);
+
+// ePayment beholder `state: "AUTHORIZED"` etter capture/refusjon/kansellering;
+// hva som er gjort står i `aggregate`.
+const nok = (value: number) => ({ value, currency: "NOK" });
 
 beforeEach(() => {
   s.host = "kaupet.no";
@@ -166,7 +170,10 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
       { data: [] },
       { data: { status: "active", expires_at: "x" } },
     ];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     await expect(run()).resolves.toEqual({ status: "active", expires_at: "x" });
     expect(s.getVippsPayment).toHaveBeenCalled();
     expect(ops("listing_promotions", "update")).toEqual([
@@ -179,7 +186,10 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
       { data: { ...pending, status: "failed", listing_id: listingId } },
       { data: [{ id: "annen" }] },
     ];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     await expect(run()).resolves.toEqual({ status: "refunded", expires_at: null });
     expect(ops("listing_promotions", "update")).toEqual([]);
     expect(s.captureVippsPayment).not.toHaveBeenCalled();
@@ -227,7 +237,10 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
       { data: { ...pending, status: "failed", listing_id: listingId } },
       { data: [{ id: "annen" }] },
     ];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     s.releaseSupersededPromotionPayment.mockRejectedValue(new Error("vipps nede"));
     await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
     expect(s.logServerError).toHaveBeenCalledWith(
@@ -243,7 +256,10 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
       { data: [] },
       { error: { code: "23505" } },
     ];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     await expect(run()).resolves.toEqual({ status: "refunded", expires_at: null });
     expect(s.releaseSupersededPromotionPayment).toHaveBeenCalledWith(
       expect.objectContaining({ promotionId, captured: true }),
@@ -303,19 +319,28 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
 
   it("feil ved aktivering maskeres", async () => {
     s.queues.listing_promotions = [{ data: pending }, { error: dbError }];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     expect((await rejection(run())).message).toBe(GENERIC);
   });
 
   it("404 når raden forsvinner mellom aktivering og re-lesing", async () => {
     s.queues.listing_promotions = [{ data: pending }, { data: null }, { data: null }];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     expect(await rejection(run())).toMatchObject({ message: "Fant ikke fremheving", status: 404 });
   });
 
   it("feil ved re-lesing maskeres", async () => {
     s.queues.listing_promotions = [{ data: pending }, { data: null }, { error: dbError }];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
     expect((await rejection(run())).message).toBe(GENERIC);
   });
 
@@ -324,7 +349,11 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
       { data: pending },
       { data: { status: "active", expires_at: "x" } },
     ];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED", pspReference: "psp-1" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+      pspReference: "psp-1",
+    });
     await run();
     const [values] = ops("listing_promotions", "update") as Record<string, string>[];
     expect(values).toMatchObject({ status: "active", vipps_psp_reference: "psp-1" });
@@ -336,7 +365,11 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
       { data: pending },
       { data: { status: "active", expires_at: "x" } },
     ];
-    s.getVippsPayment.mockResolvedValue({ state: "CAPTURED", pspReference: "psp-1" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+      pspReference: "psp-1",
+    });
     await run();
     const log = s.ops.filter((o) => o.table === "listing_promotions");
     const i = log.findIndex((o) => o.op === "update");
@@ -349,7 +382,10 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
 
   it("feil ved failed-markering logges, men resultatet er fortsatt failed", async () => {
     s.queues.listing_promotions = [{ data: pending }, { error: dbError }];
-    s.getVippsPayment.mockResolvedValue({ state: "CANCELLED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { cancelledAmount: nok(4900) },
+    });
     await expect(run()).resolves.toEqual({ status: "failed", expires_at: null });
     expect(s.logServerError).toHaveBeenCalledWith(
       "reconcilePromotionPayment.markFailed",
@@ -360,7 +396,10 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
 
   it("feil ved refunded-markering logges, men resultatet er fortsatt refunded", async () => {
     s.queues.listing_promotions = [{ data: pending }, { error: dbError }];
-    s.getVippsPayment.mockResolvedValue({ state: "REFUNDED" });
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900), refundedAmount: nok(4900) },
+    });
     await expect(run()).resolves.toEqual({ status: "refunded", expires_at: null });
     expect(s.logServerError).toHaveBeenCalledWith(
       "reconcilePromotionPayment.markRefunded",

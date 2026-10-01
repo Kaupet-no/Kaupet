@@ -9,8 +9,8 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/vipps.server", async (importActual) => ({
-  isVippsPaymentCaptured: (await importActual<typeof import("@/lib/vipps.server")>())
-    .isVippsPaymentCaptured,
+  vippsPaymentStatus: (await importActual<typeof import("@/lib/vipps.server")>())
+    .vippsPaymentStatus,
   getVippsWebhookSecret: async () => "test-secret",
   getVippsWebhookRejectionReason: () => null,
   getVippsWebhookEventId: (payload: { pspReference?: string }) => payload.pspReference,
@@ -82,10 +82,16 @@ async function post() {
   return Route.options.server.handlers.POST({ request });
 }
 
+// ePayment beholder `state: "AUTHORIZED"` etter capture/refusjon/kansellering;
+// hva som er gjort står i `aggregate`.
+const nok = (value: number) => ({ value, currency: "NOK" });
+
 beforeEach(() => {
   state.processed = false;
   state.promotionStatus = "pending";
-  state.getVippsPayment.mockReset().mockResolvedValue({ state: "CAPTURED" });
+  state.getVippsPayment
+    .mockReset()
+    .mockResolvedValue({ state: "AUTHORIZED", aggregate: { capturedAmount: nok(4900) } });
   state.captureVippsPayment.mockReset().mockResolvedValue(undefined);
   state.updatePromotion.mockReset().mockImplementation(() => ({
     eq: () => ({

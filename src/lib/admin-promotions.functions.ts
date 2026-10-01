@@ -123,23 +123,26 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
     if (promo.is_gift || !promo.vipps_reference) {
       return { hasVipps: false as const };
     }
-    const { getVippsPayment } = await import("@/lib/vipps.server");
+    const { getVippsPayment, vippsPaymentStatus } = await import("@/lib/vipps.server");
     const { getRequest } = await import("@tanstack/react-start/server");
     const host = getRequest().headers.get("host");
     const mode = promo.vipps_mode as "test" | "production";
     try {
       const result = await getVippsPayment(promo.vipps_reference, host, mode);
-      const captured = result.state === "CAPTURED" || result.state === "AUTHORIZED";
-      const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED", "FAILED"];
+      // Vipps sin `state` blir stående på AUTHORIZED etter capture/refusjon;
+      // vis og sammenlign den utledede statusen.
+      const status = vippsPaymentStatus(result);
+      const paid = status === "CAPTURED" || status === "AUTHORIZED";
+      const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED"];
       const mismatch =
-        (captured && (promo.status === "pending" || promo.status === "failed")) ||
-        (result.state === "REFUNDED" && promo.status !== "refunded") ||
-        (failedStates.includes(result.state) && promo.status === "active");
+        (paid && (promo.status === "pending" || promo.status === "failed")) ||
+        (status === "REFUNDED" && promo.status !== "refunded") ||
+        (failedStates.includes(status) && promo.status === "active");
       return {
         hasVipps: true as const,
         mode,
         reference: promo.vipps_reference,
-        state: result.state,
+        state: status,
         pspReference: result.pspReference,
         amountNok: result.amount ? result.amount.value / 100 : undefined,
         mismatch,

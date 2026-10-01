@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const {
           getVippsWebhookSecret,
           getVippsPayment,
-          isVippsPaymentCaptured,
+          vippsPaymentStatus,
           getVippsWebhookEventId,
           isFreshVippsWebhookDate,
           getVippsWebhookRejectionReason,
@@ -139,6 +139,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           console.error("[vipps webhook] state fetch failed", describeSafeError(err));
           return new Response("Retry later", { status: 503 });
         }
+        const status = vippsPaymentStatus(payment);
 
         // Gir kunden pengene tilbake for en betalt fremheving som ikke kan
         // aktiveres. false = feilet (logget); kalleren svarer 503 så Vipps prøver igjen.
@@ -162,7 +163,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           }
         };
 
-        if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+        if (status === "AUTHORIZED" || status === "CAPTURED") {
           // `failed` kan være satt av reconcile før Vipps rapporterte betaling.
           // Har annonsen fått en ny fremheving i mellomtiden, kan denne ikke
           // aktiveres (uniq_active_promotion_per_listing): ikke aktiver, og gi
@@ -182,14 +183,14 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           if (superseded) {
             await logServerError(
               "vippsWebhook.paidSupersededPromotion",
-              new Error(`Betalt fremheving kan ikke aktiveres (${payment.state})`),
+              new Error(`Betalt fremheving kan ikke aktiveres (${status})`),
               { promotion_id: promo.id },
             );
-            if (!(await releasePayment(isVippsPaymentCaptured(payment)))) {
+            if (!(await releasePayment(status === "CAPTURED"))) {
               return new Response("Retry later", { status: 503 });
             }
           } else if (promo.status === "pending" || promo.status === "failed") {
-            if (payment.state === "AUTHORIZED") {
+            if (status === "AUTHORIZED") {
               try {
                 const { captureVippsPayment } = await import("@/lib/vipps.server");
                 await captureVippsPayment(
@@ -232,11 +233,10 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
             } else if (activateError) throw activateError;
           }
         } else if (
-          payment.state === "CANCELLED" ||
-          payment.state === "EXPIRED" ||
-          payment.state === "TERMINATED" ||
-          payment.state === "ABORTED" ||
-          payment.state === "FAILED"
+          status === "CANCELLED" ||
+          status === "EXPIRED" ||
+          status === "TERMINATED" ||
+          status === "ABORTED"
         ) {
           if (promo.status === "pending") {
             const { error: failError } = await supabaseAdmin
@@ -246,13 +246,19 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               .eq("status", "pending");
             if (failError) throw failError;
           }
-        } else if (payment.state === "REFUNDED") {
+        } else if (status === "REFUNDED") {
+          // Også refusjon gjort i Vipps-portalen. Allerede refunderte rader
+          // beholder sin opprinnelige refunded_at.
           const { error: refundError } = await supabaseAdmin
             .from("listing_promotions")
-            .update({ status: "refunded" })
-            .eq("id", promo.id);
+            .update({ status: "refunded", refunded_at: new Date().toISOString() })
+            .eq("id", promo.id)
+            .neq("status", "refunded");
           if (refundError) throw refundError;
-        } else {
+        } else if (status !== "CREATED" && status !== "PARTIALLY_REFUNDED") {
+          // Ukjent tilstand fra Vipps: prøv igjen. CREATED (ikke betalt ennå)
+          // og PARTIALLY_REFUNDED (delvis refusjon beholder fremhevingen)
+          // markeres behandlet uten endring.
           return new Response("Retry later", { status: 503 });
         }
 

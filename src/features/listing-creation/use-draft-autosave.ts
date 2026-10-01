@@ -9,6 +9,12 @@ import {
   loadDraftImages,
   saveDraftImages,
 } from "@/features/listing-creation/draft-image-store";
+import {
+  isDraftFresh,
+  readItem,
+  removeItems,
+  writeItem,
+} from "@/features/listing-creation/draft-storage";
 
 const DRAFT_KEY = "kaupet_draft_sell_listing";
 const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id";
@@ -25,10 +31,10 @@ const LEGACY_DRAFT_KEYS: [string, string][] = [
 
 function migrateLegacyDraftKeys() {
   for (const [from, to] of LEGACY_DRAFT_KEYS) {
-    const value = localStorage.getItem(from);
+    const value = readItem(from);
     if (value === null) continue;
-    if (localStorage.getItem(to) === null) localStorage.setItem(to, value);
-    localStorage.removeItem(from);
+    if (readItem(to) === null) writeItem(to, value);
+    removeItems(from);
   }
 }
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -151,33 +157,29 @@ export function useDraftAutosave(fields: DraftFields) {
   useEffect(() => {
     try {
       migrateLegacyDraftKeys();
-      const savedId = localStorage.getItem(DRAFT_ID_KEY);
-      draftUpdatedAtRef.current = localStorage.getItem(DRAFT_UPDATED_AT_KEY);
+      const savedId = readItem(DRAFT_ID_KEY);
+      draftUpdatedAtRef.current = readItem(DRAFT_UPDATED_AT_KEY);
       if (savedId) {
         draftIdRef.current = savedId;
         setDraftId(savedId);
       }
-      const saved = localStorage.getItem(DRAFT_KEY);
+      const saved = readItem(DRAFT_KEY);
       if (!saved) return;
       const data = JSON.parse(saved) as Record<string, unknown>;
       if (
         (data.draft_kind !== undefined && data.draft_kind !== "sell") ||
         (typeof data.draft_version === "number" && data.draft_version > 1)
       ) {
-        localStorage.removeItem(DRAFT_KEY);
-        localStorage.removeItem(DRAFT_ID_KEY);
-        localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
+        removeItems(DRAFT_KEY, DRAFT_ID_KEY, DRAFT_UPDATED_AT_KEY);
         draftIdRef.current = null;
         setDraftId(null);
         return;
       }
       const savedAt = typeof data.saved_at === "number" ? data.saved_at : 0;
-      if (Date.now() - savedAt < 7 * 24 * 60 * 60 * 1000) {
+      if (isDraftFresh(savedAt)) {
         if (data.title || data.description || Number(data.image_count) > 0) setHasDraftData(data);
       } else {
-        localStorage.removeItem(DRAFT_KEY);
-        localStorage.removeItem(DRAFT_ID_KEY);
-        localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
+        removeItems(DRAFT_KEY, DRAFT_ID_KEY, DRAFT_UPDATED_AT_KEY);
         draftIdRef.current = null;
         setDraftId(null);
       }
@@ -264,12 +266,7 @@ export function useDraftAutosave(fields: DraftFields) {
     if (draftRestorePending.current) return;
     const t = window.setTimeout(() => {
       if (draftSavingStopped.current) return;
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
-        setLastSaved(new Date());
-      } catch {
-        // ignore storage errors
-      }
+      if (writeItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()))) setLastSaved(new Date());
     }, 2000);
     return () => window.clearTimeout(t);
   }, [buildLocalDraft, hasDraftData]);
@@ -286,10 +283,9 @@ export function useDraftAutosave(fields: DraftFields) {
    * a signed-out guest is sent to /auth to publish: the draft has to survive
    * the redirect, and the server would reject an unauthenticated save. */
   async function flushLocalDraft(): Promise<boolean> {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
+    if (writeItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()))) {
       setLastSaved(new Date());
-    } catch {
+    } else {
       setDraftSaveError(true);
       return false;
     }
@@ -308,10 +304,9 @@ export function useDraftAutosave(fields: DraftFields) {
     if (draftConflictRef.current) return null;
     if (draftRestorePending.current) return null;
     const saveRevision = localDraftRevision.current;
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
+    if (writeItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()))) {
       setLastSaved(new Date());
-    } catch {
+    } else {
       setDraftSaveError(true);
       return null;
     }
@@ -361,11 +356,7 @@ export function useDraftAutosave(fields: DraftFields) {
         if ("conflict" in result) {
           draftConflictRef.current = true;
           draftUpdatedAtRef.current = result.updated_at;
-          try {
-            localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
-          } catch {
-            // The current form was already persisted locally above.
-          }
+          writeItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
           setDraftSaveError(true);
           setDraftSaveConflict(true);
           return null;
@@ -379,11 +370,8 @@ export function useDraftAutosave(fields: DraftFields) {
         setDraftSaveError(false);
         draftConflictRef.current = false;
         setDraftSaveConflict(false);
-        try {
-          localStorage.setItem(DRAFT_ID_KEY, result.id);
-          if (result.updated_at) localStorage.setItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
-        } catch {
-          // ignore
+        if (writeItem(DRAFT_ID_KEY, result.id) && result.updated_at) {
+          writeItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
         }
         return result.id;
       } catch {
@@ -393,16 +381,12 @@ export function useDraftAutosave(fields: DraftFields) {
         }
         return null;
       } finally {
-        try {
-          if (
-            !draftSavingStopped.current &&
-            localDraftRevision.current > saveRevision &&
-            latestLocalDraft.current
-          ) {
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current));
-          }
-        } catch {
-          // The current form was already persisted locally above.
+        if (
+          !draftSavingStopped.current &&
+          localDraftRevision.current > saveRevision &&
+          latestLocalDraft.current
+        ) {
+          writeItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current));
         }
         draftSaveInProgress.current = null;
       }
@@ -468,10 +452,9 @@ export function useDraftAutosave(fields: DraftFields) {
   const flushLocalDraftSync = useCallback(() => {
     if (draftSavingStopped.current || draftRestorePending.current) return;
     if (!latestLocalDraft.current) return;
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current));
+    if (writeItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current))) {
       setLastSaved(new Date());
-    } catch {
+    } else {
       setDraftSaveError(true);
     }
   }, []);
@@ -556,9 +539,7 @@ export function useDraftAutosave(fields: DraftFields) {
     saveGeneration.current += 1;
     latestLocalDraft.current = null;
     localDraftRevision.current += 1;
-    localStorage.removeItem(DRAFT_KEY);
-    localStorage.removeItem(DRAFT_ID_KEY);
-    localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
+    removeItems(DRAFT_KEY, DRAFT_ID_KEY, DRAFT_UPDATED_AT_KEY);
     draftUpdatedAtRef.current = null;
     draftConflictRef.current = false;
     setDraftSaveConflict(false);
@@ -582,16 +563,11 @@ export function useDraftAutosave(fields: DraftFields) {
     setDraftSaveConflict(false);
     setDraftId(null);
     setHasDraftData(null);
-    try {
-      localStorage.removeItem(DRAFT_ID_KEY);
-      localStorage.removeItem(DRAFT_UPDATED_AT_KEY);
-    } catch {
-      // ignore
-    }
+    removeItems(DRAFT_ID_KEY, DRAFT_UPDATED_AT_KEY);
   }
 
   async function discardDraft() {
-    const id = draftIdRef.current ?? localStorage.getItem(DRAFT_ID_KEY);
+    const id = draftIdRef.current ?? readItem(DRAFT_ID_KEY);
     clearDraftStorage();
     if (!authenticated || !id) return;
     try {

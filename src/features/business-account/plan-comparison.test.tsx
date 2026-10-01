@@ -119,7 +119,7 @@ describe("business plan comparison", () => {
     expect(
       screen.getAllByLabelText("Ikke inkludert: Egen branding på annonser").length,
     ).toBeGreaterThan(0);
-    expect(screen.getAllByText("Kommer senere", { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Kommer senere", { exact: false })).toBeNull();
   });
 
   it("disables Proff after an expired or cancelled trial but keeps it selectable while active", () => {

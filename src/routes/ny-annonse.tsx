@@ -82,7 +82,10 @@ import type {
   ComposerReviewStatus,
   WizardSharedProps,
 } from "@/features/listing-creation/field-groups/types";
-import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import {
+  buildPreviewDraft as buildPreviewDraftPure,
+  type PreviewDraft,
+} from "@/features/listing-creation/preview-draft-store";
 import {
   EditableListingReview,
   PhoneListingPreview,
@@ -1212,35 +1215,28 @@ function NewListingPage() {
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
   function buildPreviewDraft(): PreviewDraft {
-    const categoryNode = categoryId ? categoriesById.get(categoryId) : undefined;
-    return {
+    return buildPreviewDraftPure({
       title,
-      subtitle: subtitle || null,
+      subtitle,
       description,
-      priceNok: isFree ? null : validPriceNok,
       isFree,
-      condition: fieldGroupKeys.includes("condition") ? (condition ?? null) : null,
-      canShip: behavior.requiresDeliveryMethod && canShip != null ? canShip !== "pickup" : null,
+      validPriceNok,
+      fieldGroupKeys,
+      condition,
       requiresDeliveryMethod: behavior.requiresDeliveryMethod,
-      city: city || null,
-      postalCode: postalCode || null,
-      displayLat: coords?.lat ?? null,
-      displayLng: coords?.lng ?? null,
-      knownIssues: isVehicle ? knownIssues || null : null,
-      noKnownIssues: isVehicle ? !!noKnownIssues : null,
-      maintenanceHistory: isVehicle ? maintenanceHistory || null : null,
-      category: categoryNode
-        ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
-        : null,
-      categoryId: categoryId ?? null,
-      images: images.map((img, i) => ({
-        storage_path: String(i),
-        sort_order: i,
-        caption: img.caption?.trim() || null,
-      })),
-      imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
+      canShip,
+      city,
+      postalCode,
+      coords,
+      isVehicle,
+      knownIssues,
+      noKnownIssues,
+      maintenanceHistory,
+      categoryId,
+      categoryNode: categoryId ? categoriesById.get(categoryId) : undefined,
+      images,
       attributes,
-    };
+    });
   }
 
   /** Se over-steget redigerer annonsesiden direkte (eierens redigeringsmodus

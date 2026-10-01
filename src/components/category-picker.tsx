@@ -20,12 +20,24 @@ type Category = {
   search_synonyms?: string[] | null;
 };
 
-/** Name match first, then synonyms — so typing an exact category name never
- * gets outranked by another category that merely lists it as a synonym. */
+/** Lavere er bedre: et ord som *starter* med søket slår et treff midt i et ord
+ * («ski» → «Ski og snowboard» før «Fisking»/«Kaffemaskin»), og navn slår
+ * synonymer — så et eksakt kategorinavn aldri forbigås av en kategori som
+ * bare har det som synonym. -1 = ikke treff. */
+function textMatchRank(text: string, needle: string): number {
+  const lower = text.toLowerCase();
+  if (lower.startsWith(needle)) return 0;
+  if (lower.split(/[\s/-]+/).some((word) => word.startsWith(needle))) return 1;
+  return lower.includes(needle) ? 2 : -1;
+}
+
 function categoryMatchRank(category: Category, needle: string): number {
-  if (category.name_nb.toLowerCase().includes(needle)) return 0;
-  if (category.search_synonyms?.some((syn) => syn.toLowerCase().includes(needle))) return 1;
-  return -1;
+  const nameRank = textMatchRank(category.name_nb, needle);
+  if (nameRank >= 0) return nameRank;
+  const synonymRanks = (category.search_synonyms ?? [])
+    .map((syn) => textMatchRank(syn, needle))
+    .filter((rank) => rank >= 0);
+  return synonymRanks.length ? 3 + Math.min(...synonymRanks) : -1;
 }
 
 /** How long the checkmark confirmation is shown on the picked item before

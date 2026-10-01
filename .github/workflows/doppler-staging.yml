@@ -75,6 +75,7 @@ jobs:
           bunx wrangler secret bulk "$payload" --name kaupet-no-staging
           echo 'Worker: begge pilothemmelighetene er oppdatert.' >> "$GITHUB_STEP_SUMMARY"
 
+          echo 'Oppdaterer Supabase-raden …'
           jq '{key: "image_jobs_secret", value: .IMAGE_JOBS_SECRET}' "$payload" > "$response"
           curl --fail --silent --show-error --max-time 30 \
             --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
@@ -85,6 +86,7 @@ jobs:
             "$supabase_url/rest/v1/app_settings?on_conflict=key" --output /dev/null
           echo 'Supabase: image_jobs_secret er oppdatert.' >> "$GITHUB_STEP_SUMMARY"
 
+          echo 'Kontrollerer Supabase-raden …'
           curl --fail --silent --show-error --max-time 30 \
             --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
@@ -93,6 +95,7 @@ jobs:
           jq -e --slurpfile expected "$payload" \
             'length == 1 and .[0].value == $expected[0].IMAGE_JOBS_SECRET' \
             "$response" > /dev/null
+          echo 'Tester bildejobb-endepunktet …'
           curl --fail --silent --show-error --max-time 120 \
             --request POST \
             --header "x-image-jobs-secret: $(jq -r '.IMAGE_JOBS_SECRET' "$payload")" \

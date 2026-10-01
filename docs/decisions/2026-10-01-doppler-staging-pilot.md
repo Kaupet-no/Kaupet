@@ -114,3 +114,27 @@ Staging service-role ble importert fra SOPS til Doppler 2026-10-01. JWT-rolle
 og prosjektref ble kontrollert, lesetilgang til staging `app_settings`
 bekreftet, og Doppler-verdien sammenlignet uten verdiutskrift. Importen
 roterer ikke nøkkelen og oppdaterer ikke Workerens runtime-kopi.
+
+## Push-rotasjon i staging
+
+`PUSH_DISPATCH_SECRET` er en ny staging-spesifikk verdi i Doppler.
+Synkjobben setter den på `kaupet-no-staging` og i
+`app_settings.push_dispatch_secret`, etter kontroll av staging-URL-en.
+Vanlig deploy skriver ikke denne hemmeligheten.
+
+Ved kartlegging 2026-10-01 matchet fungerende databaseverdi ikke
+`PUSH_DISPATCH_SECRET` i SOPS. Før rotasjon sikres derfor den fungerende
+staging-verdien i Doppler som `PUSH_DISPATCH_SECRET_PREVIOUS`. Den er bare
+en midlertidig tilbakeføringsverdi og inngår aldri i Workerens bulk-payload.
+Ingen produksjonsverdier endres eller tilbakekalles.
+
+Kontrollen sammenligner Doppler med databaseverdien. Den sender `{}` til
+push-endepunktet: gammel/ugyldig verdi må gi 401, ny verdi må gi 400
+fra payloadvalideringen før databaseoppslag og varselutsending. Requesten
+bruker JSON og staging Origin. Ingen varsler sendes av denne kontrollen.
+
+Ved tilbakeføring byttes nåværende og forrige verdi i Doppler, og samme
+synk kjøres på nytt. Begge runtime-kopier må gjenopprettes; ikke bruk den
+avvikende SOPS-kopien. Når tilbakeføringsbehovet er avklart, slettes
+`PUSH_DISPATCH_SECRET_PREVIOUS`; kontrollen bruker da en tilfeldig ugyldig
+verdi og beviser ikke lenger at den konkrete gamle verdien avvises.

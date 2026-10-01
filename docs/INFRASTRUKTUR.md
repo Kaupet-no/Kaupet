@@ -394,3 +394,9 @@ for bootstrap, miljøseparasjon og kontrollert videre migrering.
 Synkjobben henter nå også staging `SUPABASE_SERVICE_ROLE_KEY` fra Doppler.
 Den holdes utenfor Workerens bulk-payload; GitHub/SOPS-kopier fjernes først
 etter kontroll av den nye flyten og øvrige konsumenter.
+
+`PUSH_DISPATCH_SECRET` inngår også i Doppler-synken til staging-Worker og
+`app_settings.push_dispatch_secret`. En midlertidig
+`PUSH_DISPATCH_SECRET_PREVIOUS` i Doppler sikrer tilbakeføring: gammel
+staging-verdi avvek fra SOPS ved kontroll 2026-10-01. Push-verifisering
+sender ugyldig payload og kontrollerer 401/400 uten varselutsending.

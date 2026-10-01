@@ -168,6 +168,7 @@ jobs:
     outputs:
       android: ${{ steps.filter.outputs.android }}
       flavor: ${{ steps.env.outputs.flavor }}
+      built_at: ${{ steps.build_apk.outputs.built_at }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -237,9 +238,12 @@ jobs:
         run: ./gradlew test${{ steps.env.outputs.flavorCap }}DebugUnitTest
 
       - name: Build debug APK
+        id: build_apk
         if: steps.filter.outputs.android == 'true'
         working-directory: android
-        run: ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
+        run: |
+          ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
+          echo "built_at=$(TZ=Europe/Oslo date '+%d.%m.%Y %H:%M %Z')" >> "$GITHUB_OUTPUT"
         env:
           # Gir hver publiserte APK et unikt, økende versionCode — se
           # android/app/build.gradle. github.run_number øker for hver
@@ -412,6 +416,11 @@ jobs:
             (${{ github.ref_name }}) —
             v${{ steps.app_version.outputs.full }}
             (${{ steps.app_version.outputs.sha }})
+            — ${{ needs.native-android.outputs.built_at }}
+          body: |
+            **APK bygget:** ${{ needs.native-android.outputs.built_at }} (Europe/Oslo)
+
+            [Se CI-kjøringen](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
           prerelease: true
           files: apk/app-${{ needs.native-android.outputs.flavor }}-debug.apk
 

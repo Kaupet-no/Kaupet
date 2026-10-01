@@ -338,6 +338,10 @@ I tillegg: `codeql.yml` (sikkerhetsskanning), `.github/workflows/release-native.
 (produksjonsutgivelser til butikkene, se § 9), og lokale hooks via
 `lefthook.yml` (lint før commit, typecheck før push).
 
+Android-preview gjenbruker én GitHub-release per branch. Tittel og beskrivelse
+viser tidspunktet APK-en ble bygget i `Europe/Oslo`, og beskrivelsen lenker til
+CI-kjøringen. GitHubs opprinnelige publiseringsdato for releasen blir stående.
+
 ## 9. Native apper
 
 - Capacitor-skall rundt samme webapp. Produksjonsappen laster

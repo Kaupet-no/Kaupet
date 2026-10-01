@@ -108,7 +108,7 @@ function VarslerPage() {
           ) : items.length === 0 ? (
             <EmptyState
               title="Ingen varsler ennå"
-              description="Lagre et søk for å bli varslet om nye treff."
+              description="Her kommer nye treff i lagrede søk, prisfall og salg av favoritter."
               action={
                 <Link to="/mine-sok">
                   <Button>Gå til mine søk</Button>

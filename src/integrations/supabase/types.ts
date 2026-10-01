@@ -3560,6 +3560,7 @@ export type Database = {
         Args: {
           _attributes: Json
           _category_id: string
+          _exclude_seller_id?: string
           _lat: number
           _limit?: number
           _lng: number

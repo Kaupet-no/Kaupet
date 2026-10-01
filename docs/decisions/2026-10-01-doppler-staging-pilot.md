@@ -4,18 +4,19 @@
 
 Hemmeligheter administreres i SOPS, GitHub, Cloudflare og Supabase. Manuell
 kopiering gjør rotasjon utsatt for avvik. Piloten prøver Doppler Developer
-som autoritativ kilde for én ny Mistral-nøkkel dedikert til staging.
+som autoritativ kilde for pilothemmeligheter dedikert til staging.
 
 ## Valgt løsning
 
-Prosjekt `kaupet`, konfigurasjon `stg`, hemmelighet `MISTRAL_API_KEY`.
+Prosjekt `kaupet`, konfigurasjon `stg`, hemmeligheter `MISTRAL_API_KEY` og
+`IMAGE_JOBS_SECRET`. Sistnevnte skal være en ny verdi kun for staging.
 Et lesetoken avgrenset til konfigurasjonen lagres som `DOPPLER_TOKEN` i
 GitHub Environment `staging`. Developer støtter ikke OIDC.
 
-Den manuelt utløste workflowen `doppler-staging.yml` henter bare denne
-nøkkelen gjennom Dopplers API og setter den på `kaupet-no-staging` med
+Den manuelt utløste workflowen `doppler-staging.yml` henter bare disse
+hemmelighetene gjennom Dopplers API og setter dem på `kaupet-no-staging` med
 eksisterende Wrangler. Midlertidige filer slettes og nøkkelen maskeres i
-Actions-loggen. Vanlig deploy administrerer ikke denne nøkkelen.
+Actions-loggen. Vanlig staging-deploy administrerer ikke disse hemmelighetene.
 
 ## Alternativer
 
@@ -37,5 +38,31 @@ workflowen på nytt. Er Doppler utilgjengelig, gjenopprett nøkkelen manuelt
 med `wrangler secret put MISTRAL_API_KEY --name kaupet-no-staging`.
 En tilbakekalt API-nøkkel kan ikke brukes til tilbakeføring.
 
-Neste trinn er en staging-spesifikk `IMAGE_JOBS_SECRET` med kontrollert
-distribusjon til både Worker og Supabase. Dette inngår ikke i første jobb.
+## Bildejobbhemmeligheten
+
+Workflowen bruker eksisterende `SUPABASE_SERVICE_ROLE_KEY` i GitHub
+Environment `staging`. Denne har bred servertilgang; den brukes bare i det
+manuelle synksteget, aldri i klientbygg. En egen begrenset databaserolle kan
+vurderes når piloten utvides. Ingen nye databasefunksjoner eller migrasjoner
+innføres.
+
+Før Worker-oppdateringen kontrolleres at staging-Supabase har `image_jobs_url`
+satt til `https://staging.kaupet.no/api/public/images/process`. Prosjekt-URL
+og Worker-navn er faste staging-verdier. Jobben oppdaterer først Workeren,
+deretter bare `app_settings.image_jobs_secret`. Den leser raden tilbake,
+sammenligner uten å skrive ut verdien og kaller bildejobb-endepunktet.
+Dette kallet kan behandle opptil fem ventende staging-bildejobber.
+
+Oppdateringene er ikke atomiske. Et kort avbrudd i cron-jobben under rotasjon
+aksepteres i staging. Ved delvis feil vises sist vellykkede mottaker i jobbens
+oppsummering; kjør samme jobb på nytt med samme Doppler-verdier. Ved
+utilgjengelig Doppler må både Worker og database gjenopprettes til samme
+kjent fungerende verdi. Ikke gjenopprett den gamle GitHub-kilden i vanlig
+deploy.
+
+Verifiser også en vanlig staging-deploy og gjenta synkjobben etterpå.
+Når rotasjon er bekreftet, fjern den gamle `IMAGE_JOBS_SECRET` fra GitHub
+Environment `staging`. Produksjonens GitHub-secret og SOPS-verdi beholdes.
+
+Offline-kontroll: `python3 scripts/check-doppler-staging.py` og
+`actionlint .github/workflows/doppler-staging.yml`.

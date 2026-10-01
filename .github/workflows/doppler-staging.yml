@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sync-mistral:
-    name: Synk Mistral-nøkkel til staging
+  sync-pilot:
+    name: Synk pilothemmeligheter til staging
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 10
@@ -26,17 +26,19 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Hent pilotnøkkelen og oppdater staging-Workeren
+      - name: Hent og verifiser pilothemmelighetene
         shell: bash
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
           : "${DOPPLER_TOKEN:?DOPPLER_TOKEN mangler i staging}"
           : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN mangler i staging}"
           : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID mangler i staging}"
+          : "${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY mangler i staging}"
           umask 077
           response=$(mktemp)
           payload=$(mktemp)
@@ -48,14 +50,52 @@ jobs:
             --data-urlencode 'project=kaupet' \
             --data-urlencode 'config=stg' \
             --data-urlencode 'format=json' \
-            --data-urlencode 'secrets=MISTRAL_API_KEY' \
+            --data-urlencode 'secrets=MISTRAL_API_KEY,IMAGE_JOBS_SECRET' \
             --output "$response"
 
           jq -e '
-            .MISTRAL_API_KEY | select(type == "string") |
-            select(length > 0 and (test("[\\r\\n]") | not)) |
-            {MISTRAL_API_KEY: .}
+            {MISTRAL_API_KEY, IMAGE_JOBS_SECRET} |
+            select(all(.[]; type == "string")) |
+            select(all(.[]; length > 0 and (test("[\\r\\n]") | not)))
           ' "$response" > "$payload"
-          echo "::add-mask::$(jq -r '.MISTRAL_API_KEY' "$payload")"
+          while IFS= read -r secret; do
+            echo "::add-mask::$secret"
+          done < <(jq -r '.[]' "$payload")
+
+          supabase_url='https://zpazmwzhvylptptygzlw.supabase.co'
+          image_jobs_url='https://staging.kaupet.no/api/public/images/process'
+          curl --fail --silent --show-error --max-time 30 \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$supabase_url/rest/v1/app_settings?key=eq.image_jobs_url&select=value" \
+            --output "$response"
+          jq -e --arg url "$image_jobs_url" \
+            'length == 1 and .[0].value == $url' "$response" > /dev/null
+
           bunx wrangler secret bulk "$payload" --name kaupet-no-staging
-          echo 'MISTRAL_API_KEY er distribuert til kaupet-no-staging. Test KI-kategoriforslag i staging.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Worker: begge pilothemmelighetene er oppdatert.' >> "$GITHUB_STEP_SUMMARY"
+
+          jq '{key: "image_jobs_secret", value: .IMAGE_JOBS_SECRET}' "$payload" > "$response"
+          curl --fail --silent --show-error --max-time 30 \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Content-Type: application/json' \
+            --header 'Prefer: resolution=merge-duplicates,return=minimal' \
+            --request POST --data-binary "@$response" \
+            "$supabase_url/rest/v1/app_settings?on_conflict=key" --output /dev/null
+          echo 'Supabase: image_jobs_secret er oppdatert.' >> "$GITHUB_STEP_SUMMARY"
+
+          curl --fail --silent --show-error --max-time 30 \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$supabase_url/rest/v1/app_settings?key=eq.image_jobs_secret&select=value" \
+            --output "$response"
+          jq -e --slurpfile expected "$payload" \
+            'length == 1 and .[0].value == $expected[0].IMAGE_JOBS_SECRET' \
+            "$response" > /dev/null
+          curl --fail --silent --show-error --max-time 120 \
+            --request POST \
+            --header "x-image-jobs-secret: $(jq -r '.IMAGE_JOBS_SECRET' "$payload")" \
+            "$image_jobs_url" --output "$response"
+          jq -e 'has("claimed") and (.claimed | type == "number")' "$response" > /dev/null
+          echo 'Verifisert: Supabase-verdien matcher og bildejobb-endepunktet svarer med JSON.' >> "$GITHUB_STEP_SUMMARY"

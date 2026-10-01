@@ -320,8 +320,11 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 
 **Doppler-pilot (klargjort, ikke verifisert i staging):**
 `.github/workflows/doppler-staging.yml` distribuerer manuelt kun
-`MISTRAL_API_KEY` fra prosjekt `kaupet`, konfigurasjon `stg`, til
+`MISTRAL_API_KEY` og `IMAGE_JOBS_SECRET` fra prosjekt `kaupet`, konfigurasjon `stg`, til
 `kaupet-no-staging`. `DOPPLER_TOKEN` ligger i GitHub Environment `staging`.
+Bildejobbhemmeligheten settes også i staging-Supabase
+som `app_settings.image_jobs_secret`, med etterfølgende verifisering.
+Vanlig staging-deploy skriver ikke lenger `IMAGE_JOBS_SECRET`.
 Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md) for
 kjøring, verifisering og tilbakeføring.
 

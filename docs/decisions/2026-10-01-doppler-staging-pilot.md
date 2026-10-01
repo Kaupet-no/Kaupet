@@ -9,13 +9,14 @@ som autoritativ kilde for pilothemmeligheter dedikert til staging.
 ## Valgt løsning
 
 Prosjekt `kaupet`, konfigurasjon `stg`, hemmeligheter `MISTRAL_API_KEY` og
-`IMAGE_JOBS_SECRET`, samt `SUPABASE_SERVICE_ROLE_KEY` for synkjobben. Bildejobbhemmeligheten skal være en ny verdi kun for staging.
+`IMAGE_JOBS_SECRET` og `PUSH_DISPATCH_SECRET`, samt
+`SUPABASE_SERVICE_ROLE_KEY` for synkjobben. Bildejobbhemmeligheten skal være en ny verdi kun for staging.
 Et lesetoken avgrenset til konfigurasjonen lagres som `DOPPLER_TOKEN` i
 GitHub Environment `staging`. Developer støtter ikke OIDC.
 
 Den manuelt utløste workflowen `doppler-staging.yml` henter bare disse
-hemmelighetene gjennom Dopplers API. Kun `MISTRAL_API_KEY` og
-`IMAGE_JOBS_SECRET` settes på `kaupet-no-staging` med eksisterende Wrangler;
+hemmelighetene gjennom Dopplers API. Kun `MISTRAL_API_KEY`,
+`IMAGE_JOBS_SECRET` og `PUSH_DISPATCH_SECRET` settes på `kaupet-no-staging` med eksisterende Wrangler;
 service-role brukes til databasekontroll og synk. Midlertidige filer slettes og nøkkelen maskeres i
 Actions-loggen. Vanlig staging-deploy administrerer ikke disse hemmelighetene.
 
@@ -138,3 +139,7 @@ synk kjøres på nytt. Begge runtime-kopier må gjenopprettes; ikke bruk den
 avvikende SOPS-kopien. Når tilbakeføringsbehovet er avklart, slettes
 `PUSH_DISPATCH_SECRET_PREVIOUS`; kontrollen bruker da en tilfeldig ugyldig
 verdi og beviser ikke lenger at den konkrete gamle verdien avvises.
+
+Push-rotasjonen ble distribuert og kontrollert i
+[Actions-kjøring 36868040688](https://github.com/Kaupet-no/Kaupet/actions/runs/36868040688).
+Gammel verdi ble avvist og ny verdi nådde payloadvalideringen.

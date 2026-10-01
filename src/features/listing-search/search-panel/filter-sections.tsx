@@ -34,6 +34,7 @@ import {
   bucketPrices,
   priceQuickRanges,
   priceScaleMax,
+  underPrice,
   type PriceQuickRange,
 } from "@/lib/price-histogram";
 import {
@@ -1118,10 +1119,7 @@ function InlineChoiceFilter({
 }
 
 /** Faste hurtigvalg når søket har for få priser til å lage egne. */
-const FALLBACK_PRICE_RANGES: PriceQuickRange[] = [50_000, 100_000, 250_000].map((max) => ({
-  label: `Under ${formatNokNumber(max)}`,
-  max,
-}));
+const FALLBACK_PRICE_RANGES: PriceQuickRange[] = [50_000, 100_000, 250_000].map(underPrice);
 
 /**
  * Telefonens prisfelt: fordelingen over slideren viser hvor annonsene faktisk

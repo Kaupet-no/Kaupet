@@ -49,6 +49,8 @@ export type PriceQuickRange = { label: string; min?: number; max?: number };
 
 const kr = (n: number) => formatNokNumber(n);
 
+export const underPrice = (max: number): PriceQuickRange => ({ label: `Under ${kr(max)}`, max });
+
 /**
  * Hurtigvalg fra prisene i søket: «Under» nedre kvartil, nedre kvartil til
  * median, og «Under» øvre kvartil — tallene brukeren faktisk velger mellom i
@@ -62,8 +64,8 @@ export function priceQuickRanges(prices: number[]): PriceQuickRange[] {
   const low = roundToNicePrice(at(0.25));
   const mid = roundToNicePrice(at(0.5));
   const high = roundToNicePrice(at(0.75));
-  const ranges: PriceQuickRange[] = [{ label: `Under ${kr(low)}`, max: low }];
+  const ranges: PriceQuickRange[] = [underPrice(low)];
   if (mid > low) ranges.push({ label: `${kr(low)}–${kr(mid)}`, min: low, max: mid });
-  if (high > mid) ranges.push({ label: `Under ${kr(high)}`, max: high });
+  if (high > mid) ranges.push(underPrice(high));
   return ranges;
 }

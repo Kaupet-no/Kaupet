@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -29,11 +29,12 @@ export const createDemoUser = createServerFn({ method: "POST" })
     if (createErr) {
       const msg = createErr.message ?? "";
       if (/already.*registered|exists/i.test(msg)) {
-        throw new Error("E-postadressen er allerede i bruk");
+        throw new ClientError("E-postadressen er allerede i bruk", 409);
       }
       throw new Error(msg || "Kunne ikke opprette bruker");
     }
     const userId = created.user?.id;
+    // eslint-disable-next-line no-restricted-syntax -- uventet serverfeil (500)
     if (!userId) throw new Error("Bruker ble ikke opprettet");
 
     // Ensure profile has the right display name (handle_new_user trigger creates it)

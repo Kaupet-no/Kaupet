@@ -103,7 +103,7 @@ export function normalizeMemberPermissions(
 function assertOrganizationNumber(value: string): string {
   const normalized = normalizeOrganizationNumber(value);
   if (!isValidOrganizationNumber(normalized)) {
-    throw new Error("Skriv inn et gyldig organisasjonsnummer.");
+    throw new ClientError("Skriv inn et gyldig organisasjonsnummer.", 400);
   }
   return normalized;
 }
@@ -268,9 +268,12 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
     if (intentError) {
       throw await toClientError("database", intentError);
     }
-    if (!intent) throw new Error("Registreringen er utløpt. Start på nytt.");
+    if (!intent) throw new ClientError("Registreringen er utløpt. Start på nytt.", 409);
     if (intent.email && intent.email !== email) {
-      throw new Error("Denne registreringen er allerede knyttet til en annen e-postadresse.");
+      throw new ClientError(
+        "Denne registreringen er allerede knyttet til en annen e-postadresse.",
+        409,
+      );
     }
     if (intent.email === email) return { email };
 
@@ -298,7 +301,10 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       throw await toClientError("database", reboundError);
     }
     if (rebound?.email === email) return { email };
-    throw new Error("Denne registreringen er allerede knyttet til en annen e-postadresse.");
+    throw new ClientError(
+      "Denne registreringen er allerede knyttet til en annen e-postadresse.",
+      409,
+    );
   });
 
 async function getOrganization(supabaseAdmin: AdminClient, organizationId: string) {
@@ -881,7 +887,7 @@ export const updateLocationContacts = createServerFn({ method: "POST" })
       let avatarPath = previous?.avatar_path ?? null;
       if (canUseAvatars && contact.avatarPath !== avatarPath) {
         if (contact.avatarPath && !contact.avatarPath.startsWith(avatarPrefix)) {
-          throw new Error("Ugyldig profilbilde.");
+          throw new ClientError("Ugyldig profilbilde.", 400);
         }
         avatarPath = contact.avatarPath;
       }
@@ -1150,7 +1156,8 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
     if (lookupError) {
       throw await toClientError("database", lookupError);
     }
-    if (!membership) throw new Error("Invitasjonen er ugyldig, utløpt eller allerede brukt.");
+    if (!membership)
+      throw new ClientError("Invitasjonen er ugyldig, utløpt eller allerede brukt.", 409);
     const organizationId = membership.organization_id as string;
     const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
       _organization_id: organizationId,
@@ -1159,7 +1166,7 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       throw await toClientError("database", syncError);
     }
     if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
-      throw new Error("Invitasjonen er ikke lenger tilgjengelig.");
+      throw new ClientError("Invitasjonen er ikke lenger tilgjengelig.", 409);
     }
     const { data: accepted, error } = await supabaseAdmin
       .from("organization_members")

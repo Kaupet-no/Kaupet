@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -56,9 +56,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (lerr) {
       throw await toClientError("database", lerr);
     }
-    if (!listing) throw new Error("Annonsen finnes ikke");
-    if (listing.seller_id !== userId) throw new Error("Du eier ikke denne annonsen");
-    if (listing.status !== "active") throw new Error("Annonsen må være aktiv for å fremheves");
+    if (!listing) throw new ClientError("Annonsen finnes ikke", 404);
+    if (listing.seller_id !== userId) throw new ClientError("Du eier ikke denne annonsen", 403);
+    if (listing.status !== "active")
+      throw new ClientError("Annonsen må være aktiv for å fremheves", 409);
 
     // Get price
     const { data: pricing, error: perr } = await supabaseAdmin
@@ -70,7 +71,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (perr) {
       throw await toClientError("createPromotionCheckout.getPricing", perr);
     }
-    if (!pricing) throw new Error("Ugyldig pakkevarighet");
+    if (!pricing) throw new ClientError("Ugyldig pakkevarighet", 400);
 
     // Block if an active or pending promotion exists
     const { data: existing } = await supabaseAdmin
@@ -80,7 +81,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .in("status", ["active", "pending", "gifted"])
       .maybeSingle();
     if (existing) {
-      throw new Error("Denne annonsen har allerede en aktiv eller ventende fremheving");
+      throw new ClientError("Denne annonsen har allerede en aktiv eller ventende fremheving", 409);
     }
 
     // Create pending row — vipps_mode is fixed at creation and reused for
@@ -165,8 +166,8 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke kvittering");
-    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+    if (!promo) throw new ClientError("Fant ikke kvittering", 404);
+    if (promo.user_id !== userId) throw new ClientError("Ikke tilgang", 403);
     const listing = Array.isArray(promo.listings) ? promo.listings[0] : promo.listings;
     return {
       id: promo.id,
@@ -202,8 +203,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke fremheving");
-    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+    if (!promo) throw new ClientError("Fant ikke fremheving", 404);
+    if (promo.user_id !== userId) throw new ClientError("Ikke tilgang", 403);
 
     if (promo.status !== "pending") {
       return { status: promo.status, expires_at: promo.expires_at };
@@ -238,6 +239,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           await logServerError("reconcilePromotionPayment.capture", e, {
             promotion_id: promo.id,
           });
+          // eslint-disable-next-line no-restricted-syntax -- uventet feil mot Vipps (500), ikke en brukerfeil
           throw new Error("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.", {
             cause: e,
           });
@@ -270,7 +272,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
         .eq("id", promo.id)
         .maybeSingle();
       if (currentErr) throw await toClientError("database", currentErr);
-      if (!current) throw new Error("Fant ikke fremheving");
+      if (!current) throw new ClientError("Fant ikke fremheving", 404);
       return { status: current.status, expires_at: current.expires_at };
     }
 

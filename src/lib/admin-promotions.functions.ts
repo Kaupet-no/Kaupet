@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -118,7 +118,7 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke fremheving");
+    if (!promo) throw new ClientError("Fant ikke fremheving", 404);
     if (promo.is_gift || !promo.vipps_reference) {
       return { hasVipps: false as const };
     }
@@ -167,10 +167,10 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke fremheving");
-    if (promo.is_gift) throw new Error("Gratis fremheving kan ikke refunderes");
-    if (!promo.vipps_reference) throw new Error("Mangler Vipps-referanse");
-    if (promo.status === "refunded") throw new Error("Allerede refundert");
+    if (!promo) throw new ClientError("Fant ikke fremheving", 404);
+    if (promo.is_gift) throw new ClientError("Gratis fremheving kan ikke refunderes", 409);
+    if (!promo.vipps_reference) throw new ClientError("Mangler Vipps-referanse", 409);
+    if (promo.status === "refunded") throw new ClientError("Allerede refundert", 400);
 
     const { refundVippsPayment } = await import("@/lib/vipps.server");
     const { getRequest } = await import("@tanstack/react-start/server");
@@ -226,8 +226,8 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
     if (lerr) {
       throw await toClientError("database", lerr);
     }
-    if (!listing) throw new Error("Annonsen finnes ikke");
-    if (listing.status !== "active") throw new Error("Annonsen må være aktiv");
+    if (!listing) throw new ClientError("Annonsen finnes ikke", 404);
+    if (listing.status !== "active") throw new ClientError("Annonsen må være aktiv", 409);
 
     const { data: existing } = await supabaseAdmin
       .from("listing_promotions")
@@ -235,7 +235,7 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
       .eq("listing_id", data.listing_id)
       .in("status", ["active", "pending", "gifted"])
       .maybeSingle();
-    if (existing) throw new Error("Annonsen har allerede en aktiv fremheving");
+    if (existing) throw new ClientError("Annonsen har allerede en aktiv fremheving", 409);
 
     const now = new Date();
     const expires = new Date(now.getTime() + data.duration_days * 24 * 60 * 60 * 1000);

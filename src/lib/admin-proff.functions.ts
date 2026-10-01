@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -88,7 +88,7 @@ export const adminMarkProffOrderInvoiced = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!updated) throw new Error("Bestillingen er ikke lenger til fakturering.");
+    if (!updated) throw new ClientError("Bestillingen er ikke lenger til fakturering.", 409);
     return { ok: true };
   });
 
@@ -118,7 +118,8 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
     if (claimError) {
       throw await toClientError("database", claimError);
     }
-    if (!claimed) throw new Error("Bestillingen er allerede registrert betalt eller kansellert.");
+    if (!claimed)
+      throw new ClientError("Bestillingen er allerede registrert betalt eller kansellert.", 409);
 
     const { data: period, error: extendError } = await supabaseAdmin
       .rpc("extend_proff_access", {
@@ -159,7 +160,7 @@ export const adminCancelProffOrder = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!cancelled) throw new Error("Bestillingen kan ikke kanselleres.");
+    if (!cancelled) throw new ClientError("Bestillingen kan ikke kanselleres.", 409);
     return { ok: true };
   });
 

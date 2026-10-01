@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -51,7 +51,7 @@ export const updateOwnAvatar = createServerFn({ method: "POST" })
       !parsed.password &&
       parsed.pathname.startsWith(expectedPath);
     if (!validR2Avatar && !validLegacyAvatar) {
-      throw new Error("Ugyldig profilbilde");
+      throw new ClientError("Ugyldig profilbilde", 400);
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile, error } = await supabaseAdmin

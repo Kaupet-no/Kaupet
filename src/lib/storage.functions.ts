@@ -112,9 +112,9 @@ export const uploadListingImage = createServerFn({ method: "POST" })
     const listingId = formData.get("listingId");
     const file = formData.get("file");
     if (typeof listingId !== "string" || !z.string().uuid().safeParse(listingId).success) {
-      throw new Error("Ugyldig annonse-id");
+      throw new ClientError("Ugyldig annonse-id", 400);
     }
-    if (!(file instanceof File)) throw new Error("Mangler bildefil");
+    if (!(file instanceof File)) throw new ClientError("Mangler bildefil", 400);
     return { listingId, file };
   })
   .handler(async ({ data, context }) => {
@@ -124,7 +124,8 @@ export const uploadListingImage = createServerFn({ method: "POST" })
       _listing_id: data.listingId,
     });
     if (error) throw new Error("Kunne ikke sjekke tilgang til annonsen");
-    if (!allowed) throw new Error("Du har ikke tilgang til å laste opp bilder til denne annonsen");
+    if (!allowed)
+      throw new ClientError("Du har ikke tilgang til å laste opp bilder til denne annonsen", 403);
 
     await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
     const bytes = await readServerSideImage(data.file);
@@ -141,9 +142,9 @@ export const uploadListingImageThumb = createServerFn({ method: "POST" })
     const path = formData.get("path");
     const file = formData.get("file");
     if (typeof path !== "string" || !UUID_DIR_UUID_FILE_PATH_RE.test(path)) {
-      throw new Error("Ugyldig bildesti");
+      throw new ClientError("Ugyldig bildesti", 400);
     }
-    if (!(file instanceof File)) throw new Error("Mangler miniatyrbilde");
+    if (!(file instanceof File)) throw new ClientError("Mangler miniatyrbilde", 400);
     return { path, file };
   })
   .handler(async ({ data, context }) => {
@@ -154,7 +155,8 @@ export const uploadListingImageThumb = createServerFn({ method: "POST" })
       _listing_id: listingId,
     });
     if (error) throw new Error("Kunne ikke sjekke tilgang til annonsen");
-    if (!allowed) throw new Error("Du har ikke tilgang til å laste opp bilder til denne annonsen");
+    if (!allowed)
+      throw new ClientError("Du har ikke tilgang til å laste opp bilder til denne annonsen", 403);
 
     await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
     const bytes = await readServerSideImage(data.file);
@@ -181,7 +183,7 @@ export const deleteListingImage = createServerFn({ method: "POST" })
       _listing_id: listingId,
     });
     if (error) throw new Error("Kunne ikke sjekke tilgang til annonsen");
-    if (!allowed) throw new Error("Du har ikke tilgang til å slette dette bildet");
+    if (!allowed) throw new ClientError("Du har ikke tilgang til å slette dette bildet", 403);
 
     await deleteObject("BILDER", data.path);
     await deleteObject("BILDER", thumbPathFor(data.path)).catch(() => {
@@ -198,7 +200,7 @@ export const uploadAvatarImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((formData: FormData) => {
     const file = formData.get("file");
-    if (!(file instanceof File)) throw new Error("Mangler bildefil");
+    if (!(file instanceof File)) throw new ClientError("Mangler bildefil", 400);
     return { file };
   })
   .handler(async ({ data, context }) => {
@@ -243,9 +245,9 @@ export const uploadOrganizationLogo = createServerFn({ method: "POST" })
       typeof organizationId !== "string" ||
       !z.string().uuid().safeParse(organizationId).success
     ) {
-      throw new Error("Ugyldig organisasjons-id");
+      throw new ClientError("Ugyldig organisasjons-id", 400);
     }
-    if (!(file instanceof File)) throw new Error("Mangler logofil");
+    if (!(file instanceof File)) throw new ClientError("Mangler logofil", 400);
     // «contact» = profilbilde for en kontaktperson (Proff), ellers logo.
     const kind = formData.get("kind") === "contact" ? "contact" : "logo";
     return { organizationId, file, kind };
@@ -261,7 +263,10 @@ export const uploadOrganizationLogo = createServerFn({ method: "POST" })
     ]);
     if (superuserResult.error || proffResult.error) throw new Error("Kunne ikke sjekke tilgang");
     if (!superuserResult.data || !proffResult.data) {
-      throw new Error("Du har ikke tilgang til å laste opp logo for denne organisasjonen");
+      throw new ClientError(
+        "Du har ikke tilgang til å laste opp logo for denne organisasjonen",
+        403,
+      );
     }
 
     await assertUserNotRateLimited(context.userId, "standard_upload", 60, 60);
@@ -311,9 +316,9 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
       typeof conversationId !== "string" ||
       !z.string().uuid().safeParse(conversationId).success
     ) {
-      throw new Error("Ugyldig samtale-id");
+      throw new ClientError("Ugyldig samtale-id", 400);
     }
-    if (!(file instanceof File)) throw new Error("Mangler vedleggsfil");
+    if (!(file instanceof File)) throw new ClientError("Mangler vedleggsfil", 400);
     return { conversationId, file };
   })
   .handler(async ({ data, context }) => {
@@ -326,7 +331,7 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error("Kunne ikke sjekke tilgang til samtalen");
     if (!conv || (conv.buyer_id !== context.userId && conv.seller_id !== context.userId)) {
-      throw new Error("Du er ikke deltaker i denne samtalen");
+      throw new ClientError("Du er ikke deltaker i denne samtalen", 403);
     }
     const otherPartyId = conv.buyer_id === context.userId ? conv.seller_id : conv.buyer_id;
     const { data: blocked, error: blockError } = await context.supabase.rpc("is_blocked_between", {

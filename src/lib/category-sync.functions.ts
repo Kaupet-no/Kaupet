@@ -20,6 +20,7 @@ type FilterSynonymRow = Tables<"filter_synonyms">;
 function assertProductionEnvironment() {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_URL === process.env.STAGING_SUPABASE_URL) {
     throw new Error(
+      // eslint-disable-next-line no-restricted-syntax -- miljøvakt for admin-verktøy, ikke en brukerfeil
       "Staging-synk kan ikke kjøres fra staging selv — dette miljøet er allerede staging.",
     );
   }

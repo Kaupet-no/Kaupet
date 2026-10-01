@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { ClientError } from "@/lib/to-client-error";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
@@ -88,7 +89,7 @@ async function assertAdmin(context: AuthCtx) {
     _user_id: context.userId,
     _role: "admin",
   });
-  if (!isAdmin) throw new Error("Kun administrator kan registrere Vipps-webhooks");
+  if (!isAdmin) throw new ClientError("Kun administrator kan registrere Vipps-webhooks", 403);
 }
 
 export const listVippsWebhooks = createServerFn({ method: "POST" })

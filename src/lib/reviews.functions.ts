@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -112,7 +112,7 @@ export const createReview = createServerFn({ method: "POST" })
     if (saleErr) {
       throw await toClientError("database", saleErr);
     }
-    if (!sale) throw new Error("Det finnes ingen bekreftet kjøper for denne annonsen");
+    if (!sale) throw new ClientError("Det finnes ingen bekreftet kjøper for denne annonsen", 409);
 
     let role: "buyer" | "seller";
     let revieweeId: string;
@@ -123,7 +123,7 @@ export const createReview = createServerFn({ method: "POST" })
       role = "seller";
       revieweeId = sale.buyer_id;
     } else {
-      throw new Error("Du er ikke part i dette salget");
+      throw new ClientError("Du er ikke part i dette salget", 403);
     }
 
     const { error } = await supabase.from("user_reviews").insert({
@@ -136,7 +136,7 @@ export const createReview = createServerFn({ method: "POST" })
     });
     if (error) {
       if (error.code === "23505") {
-        throw new Error("Du har allerede gitt en vurdering for dette salget");
+        throw new ClientError("Du har allerede gitt en vurdering for dette salget", 409);
       }
       throw await toClientError("database", error);
     }

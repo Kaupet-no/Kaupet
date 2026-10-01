@@ -68,9 +68,11 @@ export function SiteHeader() {
                 const el = document.getElementById(ANNONSER_SEARCH_INPUT_ID);
                 return el instanceof HTMLInputElement ? el : null;
               };
-              // På /annonser kan sidesøket være under montering (treg enhet):
-              // vent på det i stedet for å åpne søkepanelet.
-              if (pathname === "/annonser") {
+              // Synlig sidesøk (annonser og kategorisider) fokuseres direkte. På
+              // /annonser kan det være under montering (treg enhet): vent på det
+              // i stedet for å åpne søkepanelet.
+              const input = find();
+              if (pathname === "/annonser" || (input && input.getClientRects().length > 0)) {
                 focusWhenReady(find, { scroll: true });
                 return;
               }

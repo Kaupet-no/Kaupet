@@ -33,7 +33,10 @@ function renderPlans(organization: Parameters<typeof PlanComparison>[0]["organiz
   );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 beforeEach(() => {
   setBusinessPlanMock.mockReset().mockResolvedValue({ organization: {} });
   getBusinessOrganizationMock.mockReset().mockResolvedValue({
@@ -123,6 +126,7 @@ describe("business plan comparison", () => {
   });
 
   it("disables Proff after an expired or cancelled trial but keeps it selectable while active", () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-15T00:00:00.000Z"));
     const expired = {
       selected_plan: "proff_basis",
       proff_access_until: "2026-08-31T00:00:00.000Z",

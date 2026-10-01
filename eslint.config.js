@@ -10,6 +10,7 @@ export default tseslint.config(
   {
     ignores: [
       "dist",
+      "coverage",
       ".output",
       ".vinxi",
       "src/integrations/supabase/types.ts",

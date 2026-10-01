@@ -665,6 +665,69 @@ describe.skipIf(!canRun)(
 
       await admin.from("proff_orders").delete().eq("id", order!.id);
     });
+
+    it("sync_expired_organization_entitlements deactivates members of expired orgs only", async () => {
+      const mkUser = async (label: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email: `rls-sync-${label}-${suffix}@example.com`,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      const mkOrg = async (offset: number, accessUntil: number) => {
+        const { data, error } = await admin
+          .from("organizations")
+          .insert({
+            organization_number: String(100_000_000 + ((suffix + offset) % 800_000_000)),
+            legal_name: `RLS Sync ${offset} ${suffix}`,
+            display_name: `RLS Sync ${offset} ${suffix}`,
+            selected_plan: "proff",
+            proff_access_until: new Date(accessUntil).toISOString(),
+            verification_status: "verified",
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        organizationIds.push(data!.id);
+        return data!.id;
+      };
+      const expiredOrg = await mkOrg(10, Date.now() - 60_000);
+      const validOrg = await mkOrg(11, Date.now() + 86_400_000);
+      const [expSuper, expMember, valMember] = [
+        await mkUser("exp-super"),
+        await mkUser("exp-member"),
+        await mkUser("val-member"),
+      ];
+      const { error: insertError } = await admin.from("organization_members").insert([
+        { organization_id: expiredOrg, user_id: expSuper, role: "superuser", status: "active" },
+        { organization_id: expiredOrg, user_id: expMember, role: "member", status: "active" },
+        { organization_id: validOrg, user_id: valMember, role: "member", status: "active" },
+      ]);
+      expect(insertError).toBeNull();
+
+      const { error } = await admin.rpc("sync_expired_organization_entitlements");
+      expect(error).toBeNull();
+
+      const statusOf = async (org: string, user: string) => {
+        const { data } = await admin
+          .from("organization_members")
+          .select("status")
+          .eq("organization_id", org)
+          .eq("user_id", user)
+          .single();
+        return data?.status;
+      };
+      expect(await statusOf(expiredOrg, expMember)).toBe("deactivated");
+      expect(await statusOf(expiredOrg, expSuper)).toBe("active");
+      expect(await statusOf(validOrg, valMember)).toBe("active");
+
+      const anon = createClient(URL!, ANON_KEY!);
+      const { error: anonError } = await anon.rpc("sync_expired_organization_entitlements");
+      expect(anonError).not.toBeNull();
+    });
   },
 );
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
@@ -33,6 +34,7 @@ export function useListingEditMutations(params: {
     }
   }, []);
 
+  const router = useRouter();
   const saveField = useCallback(
     async (patch: ListingFieldPatch) => {
       setStatus(patch.group, "saving");
@@ -40,13 +42,16 @@ export function useListingEditMutations(params: {
         await saveListingField(listingId, patch, { behavior });
         setStatus(patch.group, "saved");
         await queryClient.invalidateQueries({ queryKey: ["listing", kaupetCode] });
+        // Fanetittel/meta (pris, tittel) kommer fra route-loaderen, ikke
+        // react-query — last den på nytt så <title> ikke viser gammel pris.
+        void router.invalidate({ filter: (match) => match.routeId === "/$kaupetCode" });
       } catch (e) {
         setStatus(patch.group, "error");
         showErrorToast(formatErrorMessage(e, "Kunne ikke lagre endringen"));
         throw e;
       }
     },
-    [listingId, kaupetCode, behavior, queryClient, setStatus],
+    [listingId, kaupetCode, behavior, queryClient, router, setStatus],
   );
 
   return { saveField, fieldStatus };

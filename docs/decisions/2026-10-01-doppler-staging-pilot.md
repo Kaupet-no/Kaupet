@@ -60,7 +60,16 @@ utilgjengelig Doppler må både Worker og database gjenopprettes til samme
 kjent fungerende verdi. Ikke gjenopprett den gamle GitHub-kilden i vanlig
 deploy.
 
-Verifiser også en vanlig staging-deploy og gjenta synkjobben etterpå.
+Etter vanlig staging-deploy: kjør workflowen med `operation=verify`.
+Denne modusen endrer ingen hemmeligheter. Den krever at Doppler-verdien
+matcher Supabase, at gammel GitHub-verdi er forskjellig og avvises med 401,
+og at den nye verdien godtas av bildejobb-endepunktet. Positivt testkall kan
+behandle opptil fem ventende staging-bildejobber.
+
+`operation=sync` distribuerer nye verdier. Standardvalget er `verify`.
+Fra CLI: `gh workflow run doppler-staging.yml --ref staging -f operation=verify`.
+Hvis Actions-skjemaet ikke viser operasjonsvalget, bruk CLI-kommandoen;
+workflowversjonen på main har ennå ikke dette feltet.
 Når rotasjon er bekreftet, fjern den gamle `IMAGE_JOBS_SECRET` fra GitHub
 Environment `staging`. Produksjonens GitHub-secret og SOPS-verdi beholdes.
 

@@ -14,9 +14,10 @@ with tempfile.TemporaryDirectory() as directory:
     temp = Path(directory)
     (temp / 'curl').write_text('''#!/bin/bash
 set -eu
-url=""; output=""; data=""
+url=""; output=""; data=""; write_out=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --write-out) write_out="$2"; shift ;;
     --output) output="$2"; shift ;;
     --data-binary) data="$2"; shift ;;
     https://*) url="$1" ;;
@@ -32,7 +33,7 @@ case "$url" in
     jq '[{value: .value}]' "${data#@}" > "$DATABASE"
     ;;
   *key=eq.image_jobs_secret*) cp "$DATABASE" "$output" ;;
-  https://staging.kaupet.no/api/public/images/process) echo '{"claimed":0}' > "$output" ;;
+  https://staging.kaupet.no/api/public/images/process) if [[ -n "$write_out" ]]; then printf '%s' "$OLD_STATUS"; else echo '{"claimed":0}' > "$output"; fi ;;
   *) exit 1 ;;
 esac
 ''')
@@ -45,7 +46,7 @@ touch "$MARKER"
     for command in ('curl', 'bunx'):
         (temp / command).chmod(0o700)
     env = dict(os.environ, PATH=directory + ':' + os.environ['PATH'],
-               DOPPLER_TOKEN='fake', CLOUDFLARE_API_TOKEN='fake',
+               OPERATION='sync', OLD_IMAGE_JOBS_SECRET='old-secret', OLD_STATUS='401', DOPPLER_TOKEN='fake', CLOUDFLARE_API_TOKEN='fake',
                CLOUDFLARE_ACCOUNT_ID='fake', SUPABASE_SERVICE_ROLE_KEY='fake',
                FIXTURE=str(temp / 'fixture'), MARKER=str(temp / 'worker'),
                DATABASE=str(temp / 'database'), GITHUB_STEP_SUMMARY=str(temp / 'summary'),
@@ -57,9 +58,14 @@ touch "$MARKER"
     cases += [(valid, {'JOB_URL': 'https://example.invalid'}, False, False),
               (valid, {'FAIL_POST': '1'}, False, True),
               (valid, {'SUPABASE_SERVICE_ROLE_KEY': ''}, False, False)]
+    cases += [(valid, {'OPERATION': 'verify'}, True, False),
+              (valid, {'OPERATION': 'verify', 'OLD_STATUS': '200'}, False, False),
+              (valid, {'OPERATION': 'verify', 'OLD_IMAGE_JOBS_SECRET': 'fake-secret'}, False, False),
+              (valid, {'OPERATION': 'invalid'}, False, False)]
     for payload, overrides, success, written in cases:
         (temp / 'fixture').write_text(json.dumps(payload))
         (temp / 'worker').unlink(missing_ok=True)
+        (temp / 'database').write_text(json.dumps([{'value': 'fake-secret'}]))
         result = subprocess.run(['bash', '-c', script], env=env | overrides, capture_output=True)
         assert (result.returncode == 0) == success, result.stderr.decode()
         assert (temp / 'worker').exists() == written

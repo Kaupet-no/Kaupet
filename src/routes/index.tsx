@@ -34,7 +34,7 @@ import { useLandingResultCount } from "@/features/landing/use-landing-result-cou
 import { useCategoryFeed, type CategoryFeedSort } from "@/features/landing/use-category-feed";
 import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
-import { submitSearch } from "@/features/listing-search/submit-search";
+import { interpretedSearchState, submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useAllVehicleBrands, allVehicleBrandsQueryOptions } from "@/lib/vehicle/vehicle-brands";
 import { categoriesQueryOptions } from "@/hooks/use-categories";
@@ -315,7 +315,8 @@ function WebLanding({
         categories: categories ?? [],
         vehicleBrands: brands,
         allFilters: allFilters ?? [],
-        commit: (search) => navigate({ to: "/annonser", search }),
+        commit: (search, criteria) =>
+          navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
       });
     })();
   };

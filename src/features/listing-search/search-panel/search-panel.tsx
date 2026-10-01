@@ -42,7 +42,11 @@ import {
 } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import type { AppliedSearchState } from "@/features/listing-search/search-schema";
-import { resolveAppliedSearch, submitSearch } from "@/features/listing-search/submit-search";
+import {
+  resolveAppliedSearch,
+  interpretedSearchState,
+  submitSearch,
+} from "@/features/listing-search/submit-search";
 import {
   useSearchSuggestions,
   type ListingSuggestion,
@@ -438,7 +442,8 @@ export function SearchPanel({
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters,
-      commit: (search) => navigate({ to: "/annonser", search }),
+      commit: (search, criteria) =>
+        navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
     });
     setSubmitting(false);
     close("apply");
@@ -471,7 +476,8 @@ export function SearchPanel({
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters,
-      commit: (search) => navigate({ to: "/annonser", search }),
+      commit: (search, criteria) =>
+        navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
     });
     setSubmitting(false);
     close();
@@ -503,7 +509,8 @@ export function SearchPanel({
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters,
-      commit: (search) => navigate({ to: "/annonser", search }),
+      commit: (search, criteria) =>
+        navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
     });
     setSubmitting(false);
     close("apply");

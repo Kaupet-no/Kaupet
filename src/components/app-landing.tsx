@@ -33,7 +33,7 @@ import {
   searchStartRowClass,
   useSavedSearchesWithUnread,
 } from "@/features/listing-search/use-saved-searches-with-unread";
-import { submitSearch } from "@/features/listing-search/submit-search";
+import { interpretedSearchState, submitSearch } from "@/features/listing-search/submit-search";
 import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/hooks/use-category-filters";
@@ -350,7 +350,8 @@ export function AppLanding({
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters: allFilters ?? [],
-      commit: (search) => navigate({ to: "/annonser", search }),
+      commit: (search, criteria) =>
+        navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
     });
   };
   const hasLocation = savedLocation.lat != null && savedLocation.lng != null;
@@ -378,7 +379,8 @@ export function AppLanding({
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters: allFilters ?? [],
-      commit: (search) => navigate({ to: "/annonser", search }),
+      commit: (search, criteria) =>
+        navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
     });
 
   return (

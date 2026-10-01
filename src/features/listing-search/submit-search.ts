@@ -66,8 +66,22 @@ export async function resolveAppliedSearch({
 }
 
 type SubmitSearchParams = SearchResolutionParams & {
-  commit: (search: SearchParams) => void;
+  /** `criteria` er tolkningen av søketeksten — send den med
+   * via `interpretedSearchState`, så /annonser kan vise «Tolket som».
+   * Utelatt når det ikke er tekst å tolke. */
+  commit: (search: SearchParams, criteria?: InterpretedCriterion[]) => void;
 };
+
+/** Router-state som tar med tolkningen til /annonser (samme mønster som
+ * `fromSearch` i result-list.tsx). */
+export function interpretedSearchState(criteria: InterpretedCriterion[] = []) {
+  return { interpretedCriteria: criteria } as never;
+}
+
+export function readInterpretedSearchState(state: unknown): InterpretedCriterion[] {
+  const criteria = (state as { interpretedCriteria?: unknown } | undefined)?.interpretedCriteria;
+  return Array.isArray(criteria) ? (criteria as InterpretedCriterion[]) : [];
+}
 
 /** Resolves optional text and commits the complete applied search to the URL once. */
 export async function submitSearch({ commit, ...params }: SubmitSearchParams): Promise<void> {
@@ -76,6 +90,6 @@ export async function submitSearch({ commit, ...params }: SubmitSearchParams): P
     commit(writeAppliedSearchState(applied));
     return;
   }
-  const { applied } = await resolveAppliedSearch(params);
-  commit(writeAppliedSearchState(applied));
+  const { applied, criteria } = await resolveAppliedSearch(params);
+  commit(writeAppliedSearchState(applied), criteria);
 }

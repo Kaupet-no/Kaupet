@@ -58,7 +58,8 @@ esac
     (temp / 'bunx').write_text('''#!/bin/bash
 set -eu
 [[ "$1 $2 $3" == "wrangler secret bulk" && "$5 $6" == "--name kaupet-no-staging" ]]
-jq -e 'keys == ["IMAGE_JOBS_SECRET", "MISTRAL_API_KEY", "PUSH_DISPATCH_SECRET", "R2_CLEANUP_SECRET", "RATE_LIMIT_HMAC_SECRET", "RESEND_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "VAPID_PRIVATE_KEY"]' "$4" >/dev/null
+jq -e 'keys == ["IMAGE_JOBS_SECRET", "MISTRAL_API_KEY", "PUSH_DISPATCH_SECRET", "R2_ACCESS_KEY_ID", "R2_CLEANUP_SECRET", "R2_SECRET_ACCESS_KEY", "RATE_LIMIT_HMAC_SECRET", "RESEND_API_KEY", "STATENS_VEGVESEN_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "TURNSTILE_SECRET_KEY", "VAPID_PRIVATE_KEY", "VIPPS_ENVIRONMENT", "VIPPS_TEST_CLIENT_ID", "VIPPS_TEST_CLIENT_SECRET", "VIPPS_TEST_MSN", "VIPPS_TEST_SUBSCRIPTION_KEY", "VIPPS_TEST_WEBHOOK_SECRET"]' "$4" >/dev/null
+jq -e '.VIPPS_ENVIRONMENT == "test"' "$4" >/dev/null
 touch "$MARKER"
 ''')
     for command in ('curl', 'bunx'):
@@ -73,6 +74,8 @@ touch "$MARKER"
     pair = json.loads(subprocess.check_output(['node', '-e', 'const c=require("node:crypto");const e=c.createECDH("prime256v1");e.generateKeys();process.stdout.write(JSON.stringify({private:e.getPrivateKey().toString("base64url"),public:e.getPublicKey().toString("base64url")}));']))
     env.update(HIDE_AUTH='0', FAIL_AUTH_POST='0', AUTH_DATABASE=str(temp / 'auth-database'), GITHUB_ENV=str(temp / 'github-env'), VITE_VAPID_PUBLIC_KEY=pair['public'], CLEANUP_URL='https://staging.kaupet.no/api/public/r2/cleanup', CLEANUP_DATABASE=str(temp / 'cleanup-database'), FAIL_CLEANUP_POST='0', CLEANUP_BAD_STATUS='401')
     valid = {'CLOUDFLARE_API_TOKEN':'fake-cf', 'SUPABASE_ACCESS_TOKEN':'fake-pat', 'RESEND_API_KEY':'re_fake', 'TURNSTILE_SECRET_KEY':'fake-turnstile', 'MISTRAL_API_KEY': 'fake-key', 'IMAGE_JOBS_SECRET': 'fake-secret', 'PUSH_DISPATCH_SECRET': 'fake-push', 'PUSH_DISPATCH_SECRET_PREVIOUS': 'old-push', 'SUPABASE_SERVICE_ROLE_KEY': 'fake-service-role', 'R2_CLEANUP_SECRET': 'fake-cleanup', 'RATE_LIMIT_HMAC_SECRET': 'fake-hmac', 'VAPID_PRIVATE_KEY': pair['private'], 'EXTRA': 'excluded'}
+    valid.update({'R2_ACCESS_KEY_ID':'fake-r2-id','R2_SECRET_ACCESS_KEY':'fake-r2-secret'})
+    valid.update({'VIPPS_TEST_CLIENT_ID': 'fake-vipps_test_client_id', 'VIPPS_TEST_CLIENT_SECRET': 'fake-vipps_test_client_secret', 'VIPPS_TEST_SUBSCRIPTION_KEY': 'fake-vipps_test_subscription_key', 'VIPPS_TEST_MSN': 'fake-vipps_test_msn', 'VIPPS_TEST_WEBHOOK_SECRET': 'fake-vipps_test_webhook_secret', 'STATENS_VEGVESEN_API_KEY': 'fake-statens_vegvesen_api_key'})
     cases = [(valid, {}, True, True)]
     for invalid in (None, '', 42, 'line\nbreak'):
         cases.append((dict(valid, IMAGE_JOBS_SECRET=invalid), {}, False, False))
@@ -96,7 +99,7 @@ touch "$MARKER"
               (valid, {'OPERATION': 'verify', 'PUSH_BAD_STATUS': '400'}, False, False),
               (dict(valid, PUSH_DISPATCH_SECRET_PREVIOUS=''), {'OPERATION': 'verify'}, True, False),
               (dict(valid, PUSH_DISPATCH_SECRET_PREVIOUS='fake-push'), {'OPERATION': 'verify'}, False, False)]
-    for key in ('RESEND_API_KEY', 'TURNSTILE_SECRET_KEY', 'SUPABASE_ACCESS_TOKEN', 'CLOUDFLARE_API_TOKEN', 'R2_CLEANUP_SECRET', 'RATE_LIMIT_HMAC_SECRET', 'VAPID_PRIVATE_KEY'):
+    for key in ('R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'VIPPS_TEST_CLIENT_ID', 'VIPPS_TEST_CLIENT_SECRET', 'VIPPS_TEST_SUBSCRIPTION_KEY', 'VIPPS_TEST_MSN', 'VIPPS_TEST_WEBHOOK_SECRET', 'STATENS_VEGVESEN_API_KEY', 'RESEND_API_KEY', 'TURNSTILE_SECRET_KEY', 'SUPABASE_ACCESS_TOKEN', 'CLOUDFLARE_API_TOKEN', 'R2_CLEANUP_SECRET', 'RATE_LIMIT_HMAC_SECRET', 'VAPID_PRIVATE_KEY'):
         for invalid in (None, '', 42, 'line\nbreak'):
             cases.append((dict(valid, **{key: invalid}), {}, False, False))
     cases += [(valid, {'CLEANUP_URL': 'https://example.invalid'}, False, False),
@@ -123,3 +126,6 @@ print(f'{len(cases)} Doppler-staging checks passed')
 staging_deploy = (root / '.github/workflows/ci.yml').read_text().split('  deploy-staging:', 1)[1]
 assert 'secrets.R2_CLEANUP_SECRET' not in staging_deploy
 assert 'scripts/doppler-staging.sh' in staging_deploy
+
+assert 'secrets.R2_ACCESS_KEY_ID' not in staging_deploy
+assert 'secrets.R2_SECRET_ACCESS_KEY' not in staging_deploy

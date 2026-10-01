@@ -96,10 +96,14 @@ export function FavoriteButton({
       void hapticImpact("light");
       showSuccessToast(nowFav ? "Lagt til i favoritter" : "Fjernet fra favoritter");
     },
-    onError: (e: Error) => {
-      if (e.message !== "not-authenticated") {
-        showErrorToast("Kunne ikke oppdatere favoritter");
-      }
+    onError: (e: Error & { code?: string }) => {
+      if (e.message === "not-authenticated") return;
+      // RLS avviser egne annonser (se migrasjonen favorites_not_own_listing).
+      showErrorToast(
+        e.code === "42501"
+          ? "Du kan ikke lagre din egen annonse som favoritt"
+          : "Kunne ikke oppdatere favoritter",
+      );
     },
   });
 

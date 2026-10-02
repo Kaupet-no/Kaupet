@@ -119,7 +119,7 @@ function LightboxLoadingFallback() {
  * would show up on an unrelated listing (see F12). */
 function BackToSearchLink() {
   const fromSearch = useLocation({
-    select: (l) => Boolean((l.state as unknown as Record<string, unknown>).fromSearch),
+    select: (l) => Boolean(l.state.fromSearch),
   });
   const ctx = readLastSearchContext();
   if (!fromSearch || !ctx) return null;

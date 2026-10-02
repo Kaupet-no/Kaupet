@@ -1,3 +1,4 @@
+import type { HistoryState } from "@tanstack/react-router";
 import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
@@ -72,15 +73,16 @@ type SubmitSearchParams = SearchResolutionParams & {
   commit: (search: SearchParams, criteria?: InterpretedCriterion[]) => void;
 };
 
-/** Router-state som tar med tolkningen til /annonser (samme mønster som
- * `fromSearch` i result-list.tsx). */
-export function interpretedSearchState(criteria: InterpretedCriterion[] = []) {
-  return { interpretedCriteria: criteria } as never;
+/** Router-state som tar med tolkningen til /annonser (se HistoryState i
+ * router.tsx). */
+export function interpretedSearchState(criteria: InterpretedCriterion[] = []): HistoryState {
+  return { interpretedCriteria: criteria };
 }
 
-export function readInterpretedSearchState(state: unknown): InterpretedCriterion[] {
-  const criteria = (state as { interpretedCriteria?: unknown } | undefined)?.interpretedCriteria;
-  return Array.isArray(criteria) ? (criteria as InterpretedCriterion[]) : [];
+export function readInterpretedSearchState(
+  state: HistoryState | undefined,
+): InterpretedCriterion[] {
+  return state?.interpretedCriteria ?? [];
 }
 
 /** Resolves optional text and commits the complete applied search to the URL once. */

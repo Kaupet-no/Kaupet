@@ -695,7 +695,7 @@ function PopupCard({ listing }: { listing: MapListing }) {
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
-        state={{ fromSearch: true } as never}
+        state={{ fromSearch: true }}
         className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
       >
         Se annonse →
@@ -714,7 +714,7 @@ function SelectedListingCard({ listing, onClose }: { listing: MapListing; onClos
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
-        state={{ fromSearch: true } as never}
+        state={{ fromSearch: true }}
         className="flex min-w-0 flex-1 items-center gap-3"
       >
         <span className="size-20 shrink-0 overflow-hidden rounded-xl bg-muted">

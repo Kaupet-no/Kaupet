@@ -654,7 +654,13 @@ function BrowsePage() {
               criteria={interpretedCriteria}
               categories={categories ?? []}
               filters={attrFilters.length > 0 ? attrFilters : (allFilters ?? [])}
-              onCategoryChange={() => undefined}
+              onCategoryChange={() => {
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "category"),
+                );
+                setDismissedMatchText(categoryMatch?.matchedText ?? null);
+                updateSearch({ category: "", categories: [] });
+              }}
               onAttributeChange={(key) => {
                 const criterion = interpretedCriteria.find(
                   (item) => item.kind === "attribute" && item.key === key,

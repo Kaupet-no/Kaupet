@@ -106,20 +106,30 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
   // Turnstile-tokens er engangs, og widgeten deles av bildeforslaget og
   // tittelens KI-kategoriforslag (ny-annonse.tsx). Ett token deles ut om
   // gangen, og widgeten nullstilles straks, så to samtidige kall aldri får
-  // samme token. Uten token (avkrysning gjenstår) står widgeten urørt.
+  // samme token. Uten token (avkrysning gjenstår) står widgeten urørt. Har
+  // kalleren gitt opp (timeoutMs), brukes ikke tokenet som kommer senere —
+  // widgeten nullstilles ikke, så neste kall får det ubrukte tokenet.
   const tokenQueue = useRef<Promise<unknown>>(Promise.resolve());
   function takeVerifiedToken(timeoutMs?: number): Promise<string | null> {
+    let abandoned = false;
     const turn = tokenQueue.current.then(async () => {
       const token = await getVerifiedToken();
-      if (token) turnstileRef.current?.reset();
+      if (!token || abandoned) return null;
+      turnstileRef.current?.reset();
       return token;
     });
     tokenQueue.current = turn;
     if (timeoutMs === undefined) return turn;
+    let timer: number | undefined;
     return Promise.race([
       turn,
-      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), timeoutMs)),
-    ]);
+      new Promise<null>((resolve) => {
+        timer = window.setTimeout(() => {
+          abandoned = true;
+          resolve(null);
+        }, timeoutMs);
+      }),
+    ]).finally(() => window.clearTimeout(timer));
   }
 
   // Trykket på knappen er samtykket: hjelpeteksten under den forklarer KI-

@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Database } from "@/integrations/supabase/types";
-import { lastConversationMessages } from "./conversation-messages";
+import { lastConversationMessages, messagePreview } from "./conversation-messages";
 
 it("henter én siste melding per samtale og beholder tomme samtaler uten melding", async () => {
   const message = {
@@ -47,4 +47,16 @@ it("feilgjetting: nettverksfeil blir ikke tolket som tomme samtaler", async () =
 
 it("nedre grense: en tom samtaleliste trenger ingen spørring", async () => {
   expect(await lastConversationMessages([])).toEqual(new Map());
+});
+
+describe("messagePreview", () => {
+  it("viser bilde for vedlegg uten tekst og skjuler slettede meldinger", () => {
+    expect(messagePreview({ body: "", deleted_at: null, attachment_path: "a/b.jpg" })).toBe(
+      "📷 Bilde",
+    );
+    expect(messagePreview({ body: "hei", deleted_at: "x", attachment_path: null })).toBe(
+      "Melding slettet",
+    );
+    expect(messagePreview({ body: "hei", deleted_at: null, attachment_path: null })).toBe("hei");
+  });
 });

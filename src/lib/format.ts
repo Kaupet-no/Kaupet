@@ -32,8 +32,8 @@ export function formatNokNumber(n: number): string {
 
 /** Makspris på en ønskes kjøpt-annonse. 0 betyr «bare gratis» i matchingen
  * (`l.is_free OR l.price_nok <= 0`), så «0 kr» ville vært misvisende. */
-export function formatWtbMaxPrice(n: number): string {
-  return n === 0 ? "Kun gratis" : `${formatNokNumber(n)} kr`;
+export function formatWtbMaxPrice(n: number, prefix = ""): string {
+  return n === 0 ? "Kun gratis" : `${prefix}${formatNok(n)}`;
 }
 
 /** Standard beløpsvisning i appen — `1234` → `"1 234 kr"`. */

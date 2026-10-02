@@ -46,11 +46,11 @@ export function UsageLabel({
   );
 }
 
+export const SOLD_PRICE_LABEL = "SOLGT";
+
 /** Solgte annonser vises en kort stund i søket (se migrasjonen
  * sold_listings_visibility) — merket må synes før man åpner annonsen.
  * Diagonalt hjørnebånd; forelderen må være `relative overflow-hidden`. */
-export const SOLD_PRICE_LABEL = "SOLGT";
-
 export function SoldBanner({ compact }: { compact: boolean }) {
   return (
     <span

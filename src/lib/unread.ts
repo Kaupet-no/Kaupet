@@ -17,14 +17,3 @@ export function isUnread(
   if (!myLastReadAt) return true;
   return new Date(lastMessageAt).getTime() > new Date(myLastReadAt).getTime();
 }
-
-/** Forhåndsvisning av siste melding i innbokslister. */
-export function messagePreview(m: {
-  body: string;
-  deleted_at: string | null;
-  attachment_path: string | null;
-}): string {
-  if (m.deleted_at) return "Melding slettet";
-  if (!m.body.trim() && m.attachment_path) return "📷 Bilde";
-  return m.body;
-}

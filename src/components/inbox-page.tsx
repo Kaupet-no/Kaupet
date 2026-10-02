@@ -27,8 +27,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
-import { isUnread, messagePreview } from "@/lib/unread";
-import { lastConversationMessages } from "@/lib/conversation-messages";
+import { isUnread } from "@/lib/unread";
+import { lastConversationMessages, messagePreview } from "@/lib/conversation-messages";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
 type ConversationRow = {

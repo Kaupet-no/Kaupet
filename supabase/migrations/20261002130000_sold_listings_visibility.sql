@@ -95,7 +95,8 @@ DECLARE
   _prefilter_terms text[];
   _prefilter_query tsquery;
 BEGIN
-  -- Unionen av alle inkluderingstermer, uten NULL-er (se hodekommentaren).
+  -- Unionen av alle inkluderingstermer, uten NULL-er (se hodekommentaren i
+  -- 20260921120000_search_listings_indexable_prefilter.sql).
   SELECT array_agg(DISTINCT term) INTO _prefilter_terms
   FROM jsonb_array_elements(COALESCE(_include_groups, '[]'::jsonb)) AS groups(group_value)
   CROSS JOIN LATERAL jsonb_array_elements_text(group_value->'terms') AS terms(term)
@@ -162,8 +163,9 @@ BEGIN
       )
     )
       -- INDEKSERBART FORHÅNDSFILTER. Supersett av den eksakte logikken under;
-      -- se hodekommentaren. Når søket ikke har termer er _prefilter_terms
-      -- NULL, og hele leddet foldes bort av custom-planen.
+      -- se hodekommentaren i 20260921120000_search_listings_indexable_prefilter.sql.
+      -- Når søket ikke har termer er _prefilter_terms NULL, og hele leddet
+      -- foldes bort av custom-planen.
       AND (
         _prefilter_terms IS NULL
         OR l.search_vector @@ _prefilter_query

@@ -9,6 +9,7 @@ import {
   canRun,
   PASSWORD,
   createTestCategory,
+  createRlsUser,
   signInWithRetry,
   grantAdmin,
   registerCategoryCleanup,
@@ -944,4 +945,123 @@ describe.skipIf(!canRun)("RLS: listing-image upload authorization (K-2)", () => 
 
 // Deletes the categories created by createTestCategory() above. Registered last so
 // it runs after the block-local afterAll hooks (see rls-test-helpers.ts).
+describe.skipIf(!canRun)("RLS: solgte annonser — 30 dager via lenke, 2 dager i søket", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = `sold-${Date.now()}`;
+  const sellerEmail = `rls-sold-seller-${suffix}@example.com`;
+  const userIds: string[] = [];
+  let categoryId: string;
+  let activeId: string;
+  let soldNowId: string;
+  let sold3dId: string;
+  let sold31dId: string;
+
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
+  beforeAll(async () => {
+    const sellerId = await createRlsUser(admin, sellerEmail, userIds);
+    categoryId = await createTestCategory(admin, suffix);
+    const mk = async (status: "active" | "sold", soldAt?: string) => {
+      const { data, error } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          category_id: categoryId,
+          title: `RLS solgt ${status}`,
+          price_nok: 100,
+          status,
+          ...(soldAt ? { sold_at: soldAt } : {}),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const { error: imageError } = await admin
+        .from("listing_images")
+        .insert({ listing_id: data.id, storage_path: `${data.id}/${crypto.randomUUID()}.webp` });
+      if (imageError) throw imageError;
+      return data.id as string;
+    };
+    activeId = await mk("active");
+    soldNowId = await mk("sold");
+    sold3dId = await mk("sold", daysAgo(3));
+    sold31dId = await mk("sold", daysAgo(31));
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("listings").delete().in("id", [activeId, soldNowId, sold3dId, sold31dId]);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("viser solgte annonser og bildene deres via lenke i 30 dager, også for anonyme", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const ids = [activeId, soldNowId, sold3dId, sold31dId];
+    const { data: listings } = await anon.from("listings").select("id").in("id", ids);
+    expect(new Set(listings?.map((l) => l.id))).toEqual(new Set([activeId, soldNowId, sold3dId]));
+    const { data: images } = await anon
+      .from("listing_images")
+      .select("listing_id")
+      .in("listing_id", ids);
+    expect(new Set(images?.map((i) => i.listing_id))).toEqual(
+      new Set([activeId, soldNowId, sold3dId]),
+    );
+  });
+
+  it("tar med solgte annonser i søket bare de to første dagene, og bare på forespørsel", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const search = (includeSold?: boolean) =>
+      anon.rpc("search_listings_page", {
+        _category_ids: [categoryId],
+        _limit: 10,
+        ...(includeSold === undefined ? {} : { _include_recently_sold: includeSold }),
+      });
+
+    const withSold = await search(true);
+    expect(withSold.error).toBeNull();
+    const rows = withSold.data as { id: string; sold_at: string | null; total_count: number }[];
+    expect(new Set(rows.map((r) => r.id))).toEqual(new Set([activeId, soldNowId]));
+    expect(rows.find((r) => r.id === soldNowId)?.sold_at).not.toBeNull();
+    expect(rows.find((r) => r.id === activeId)?.sold_at).toBeNull();
+    expect(rows[0].total_count).toBe(2);
+
+    const withoutSold = await search();
+    expect(withoutSold.error).toBeNull();
+    expect((withoutSold.data as { id: string }[]).map((r) => r.id)).toEqual([activeId]);
+  });
+
+  it("lar ikke selgeren flytte salgstidspunktet for å holde annonsen synlig", async () => {
+    const seller = await signInWithRetry(sellerEmail);
+    await seller.from("listings").update({ sold_at: new Date().toISOString() }).eq("id", sold31dId);
+    const { data } = await admin.from("listings").select("sold_at").eq("id", sold31dId).single();
+    expect(new Date(data!.sold_at).getTime()).toBeLessThan(Date.now() - 30 * 86_400_000);
+  });
+
+  it("setter salgstidspunktet når annonsen blir solgt og fjerner det ved ny publisering", async () => {
+    // Statusendringer går via serverfunksjoner (service-rollen), ikke klienten.
+    const { error: soldError } = await admin
+      .from("listings")
+      .update({ status: "sold" })
+      .eq("id", activeId);
+    expect(soldError).toBeNull();
+    const { data: sold } = await admin
+      .from("listings")
+      .select("sold_at")
+      .eq("id", activeId)
+      .single();
+    expect(Date.now() - new Date(sold!.sold_at).getTime()).toBeLessThan(60_000);
+
+    const { error: activeError } = await admin
+      .from("listings")
+      .update({ status: "active" })
+      .eq("id", activeId);
+    expect(activeError).toBeNull();
+    const { data: active } = await admin
+      .from("listings")
+      .select("sold_at")
+      .eq("id", activeId)
+      .single();
+    expect(active!.sold_at).toBeNull();
+  });
+});
+
 registerCategoryCleanup();

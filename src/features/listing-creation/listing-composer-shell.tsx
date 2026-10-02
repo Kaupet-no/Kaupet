@@ -301,7 +301,7 @@ export function ListingComposerShell({
                         {previewLabel}
                       </SheetTitle>
                     </SheetHeader>
-                    <PhoneFrame className="mx-auto min-h-0 w-full max-w-[20rem] flex-1">
+                    <PhoneFrame className="mx-auto min-h-0 w-full max-h-[46rem] max-w-[20rem] flex-1">
                       {preview}
                     </PhoneFrame>
                   </SheetContent>

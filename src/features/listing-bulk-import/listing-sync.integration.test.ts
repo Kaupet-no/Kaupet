@@ -244,4 +244,185 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
       .maybeSingle();
     expect(listing).toBeNull();
   });
+
+  it("reserverer nye annonser atomisk og lar ikke sletting nullstille kvoten", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { error: seedError } = await admin.from("organization_daily_quotas").upsert({
+      organization_id: organizationId,
+      usage_date: today,
+      new_listings: 999,
+      new_images: 0,
+    });
+    expect(seedError).toBeNull();
+
+    const create = (ref: string, dryRun = false) =>
+      admin.rpc("upsert_listing_from_external", {
+        _organization_id: organizationId,
+        _user_id: userIds[0],
+        _location_id: locationId,
+        _import_id: crypto.randomUUID(),
+        _source: "api",
+        _external_ref: ref,
+        _listing: {
+          title: "Kvoteannonse",
+          description: "x",
+          category_id: categoryId,
+          price_nok: 100,
+        },
+        _mode: "create",
+        _dry_run: dryRun,
+      });
+
+    const concurrent = await Promise.all([
+      create(`quota-a-${suffix}`),
+      create(`quota-b-${suffix}`),
+    ]);
+    expect(concurrent.every(({ error }) => !error)).toBe(true);
+    const responses = concurrent.map(
+      ({ data }) => data as { status: string; error_code?: string; listing_id?: string },
+    );
+    expect(responses.filter(({ status }) => status === "created")).toHaveLength(1);
+    expect(responses.filter(({ error_code }) => error_code === "daily_listing_quota")).toHaveLength(
+      1,
+    );
+    const created = responses.find(({ status }) => status === "created")!;
+    const ref = created.listing_id
+      ? (await admin.from("listings").select("external_ref").eq("id", created.listing_id).single())
+          .data!.external_ref!
+      : "";
+
+    const update = await admin.rpc("upsert_listing_from_external", {
+      _organization_id: organizationId,
+      _user_id: userIds[0],
+      _location_id: locationId,
+      _import_id: crypto.randomUUID(),
+      _source: "api",
+      _external_ref: ref,
+      _listing: {
+        title: "Kvoteannonse endret",
+        description: "x",
+        category_id: categoryId,
+        price_nok: 200,
+      },
+      _mode: "upsert",
+    });
+    expect(update.error).toBeNull();
+    expect(update.data).toMatchObject({ status: "updated" });
+
+    const dryRun = await create(`quota-dry-${suffix}`, true);
+    expect(dryRun.data).toMatchObject({ status: "created" });
+    const { error: deleteError } = await admin
+      .from("listings")
+      .delete()
+      .eq("id", created.listing_id!);
+    expect(deleteError).toBeNull();
+    const recreated = await create(`quota-recreated-${suffix}`);
+    expect(recreated.data).toMatchObject({ status: "failed", error_code: "daily_listing_quota" });
+    const { data: quota } = await admin
+      .from("organization_daily_quotas")
+      .select("new_listings")
+      .eq("organization_id", organizationId)
+      .single();
+    expect(quota?.new_listings).toBe(1000);
+  });
+
+  it("belaster bare nye bildejobber og ruller tilbake bildesett ved manglende kvote", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { error: initialSeedError } = await admin.from("organization_daily_quotas").upsert({
+      organization_id: organizationId,
+      usage_date: today,
+      new_listings: 0,
+      new_images: 0,
+    });
+    expect(initialSeedError).toBeNull();
+    const listing = await admin.rpc("upsert_listing_from_external", {
+      _organization_id: organizationId,
+      _user_id: userIds[0],
+      _location_id: locationId,
+      _import_id: crypto.randomUUID(),
+      _source: "api",
+      _external_ref: `image-quota-${suffix}`,
+      _listing: { title: "Bildekvote", description: "x", category_id: categoryId, price_nok: 100 },
+      _mode: "create",
+    });
+    const listingId = (listing.data as { listing_id: string }).listing_id;
+    const { error: seedError } = await admin.from("organization_daily_quotas").upsert({
+      organization_id: organizationId,
+      usage_date: today,
+      new_listings: 1,
+      new_images: 1999,
+    });
+    expect(seedError).toBeNull();
+
+    const [first, second] = await Promise.all([
+      admin.rpc("enqueue_listing_image_jobs", {
+        _organization_id: organizationId,
+        _listing_id: listingId,
+        _urls: [`https://example.com/image-a-${suffix}.jpg`],
+        _replace: false,
+      }),
+      admin.rpc("enqueue_listing_image_jobs", {
+        _organization_id: organizationId,
+        _listing_id: listingId,
+        _urls: [`https://example.com/image-b-${suffix}.jpg`],
+        _replace: false,
+      }),
+    ]);
+    const inserted = [first, second].find(({ error }) => !error)!;
+    const rejected = [first, second].find(({ error }) => error)!;
+    expect(inserted.error).toBeNull();
+    expect(rejected.error?.message).toContain("organization_new_images_daily_quota_exceeded");
+
+    const { data: jobsBefore } = await admin
+      .from("listing_image_jobs")
+      .select("source_url")
+      .eq("listing_id", listingId);
+    const chargedUrl = jobsBefore![0].source_url;
+    const storagePath = `${listingId}/${crypto.randomUUID()}.jpg`;
+    const { error: imageSeedError } = await admin.from("listing_images").insert({
+      listing_id: listingId,
+      storage_path: storagePath,
+      source_url: chargedUrl,
+      sort_order: 0,
+    });
+    expect(imageSeedError).toBeNull();
+    const reorder = await admin.rpc("enqueue_listing_image_jobs", {
+      _organization_id: organizationId,
+      _listing_id: listingId,
+      _urls: [chargedUrl],
+      _replace: true,
+    });
+    expect(reorder.error).toBeNull();
+    const replace = await admin.rpc("enqueue_listing_image_jobs", {
+      _organization_id: organizationId,
+      _listing_id: listingId,
+      _urls: [`https://example.com/replacement-${suffix}.jpg`],
+      _replace: true,
+    });
+    expect(replace.error?.message).toContain("organization_new_images_daily_quota_exceeded");
+    const { data: jobsAfter } = await admin
+      .from("listing_image_jobs")
+      .select("source_url")
+      .eq("listing_id", listingId);
+    expect(jobsAfter).toEqual([{ source_url: chargedUrl }]);
+    const { data: imagesAfter } = await admin
+      .from("listing_images")
+      .select("storage_path")
+      .eq("listing_id", listingId);
+    expect(imagesAfter).toEqual([{ storage_path: storagePath }]);
+    const { data: queuedDeletes } = await admin
+      .from("r2_delete_queue")
+      .select("prefix")
+      .in("prefix", [storagePath, storagePath.replace(/\.jpg$/i, "-thumb.jpg")]);
+    expect(queuedDeletes).toEqual([]);
+
+    await admin.from("listing_image_jobs").delete().eq("listing_id", listingId);
+    const recreated = await admin.rpc("enqueue_listing_image_jobs", {
+      _organization_id: organizationId,
+      _listing_id: listingId,
+      _urls: [chargedUrl],
+      _replace: false,
+    });
+    expect(recreated.error?.message).toContain("organization_new_images_daily_quota_exceeded");
+  });
 });

@@ -1,10 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const sendNotification = vi.fn().mockResolvedValue(undefined);
+const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
 const setVapidDetails = vi.fn();
+const generateRequestDetails = vi.fn((subscription: { endpoint: string }, payload: string) => ({
+  method: "POST" as const,
+  headers: new Headers(),
+  body: Buffer.from(payload),
+  endpoint: subscription.endpoint,
+}));
 
 vi.mock("web-push", () => ({
-  default: { setVapidDetails, sendNotification },
+  default: { setVapidDetails, generateRequestDetails },
 }));
 
 const sendNotificationEmail = vi.fn().mockResolvedValue(undefined);
@@ -55,7 +61,14 @@ function buildAdmin(opts: {
         return { select: () => ({ eq: () => single(opts.prefs ?? null) }) };
       case "push_subscriptions":
         return {
-          select: () => ({ eq: async () => ({ data: opts.subs ?? [] }) }),
+          select: () => {
+            const query = {
+              eq: () => query,
+              order: () => query,
+              limit: async () => ({ data: opts.subs ?? [] }),
+            };
+            return query;
+          },
           update: (_payload: unknown) => ({
             eq: (_col: string, id: string) => {
               updatedSubIds.push(id);
@@ -120,19 +133,26 @@ async function postPayload(body: unknown, secret = "test-secret") {
 const SUB = {
   id: "sub-1",
   platform: "web",
-  endpoint: "https://push.example/ep1",
-  p256dh: "p256dh",
-  auth: "auth",
+  endpoint: "https://fcm.googleapis.com/fcm/send/ep1?token=opaque",
+  p256dh: Buffer.from(
+    "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+    "hex",
+  ).toString("base64url"),
+  auth: Buffer.alloc(16, 1).toString("base64url"),
 };
 
 beforeEach(() => {
   vi.resetModules();
-  sendNotification.mockClear().mockResolvedValue(undefined);
+  fetchMock.mockClear().mockResolvedValue(new Response(null, { status: 201 }));
+  vi.stubGlobal("fetch", fetchMock);
+  generateRequestDetails.mockClear();
   setVapidDetails.mockClear();
   sendNotificationEmail.mockClear().mockResolvedValue(undefined);
   process.env.PUSH_DISPATCH_SECRET = "test-secret";
   process.env.VAPID_PRIVATE_KEY = "test-private-key";
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("push dispatch endpoint", () => {
   it("rejects requests without the correct dispatch secret", async () => {
@@ -142,7 +162,7 @@ describe("push dispatch endpoint", () => {
       "wrong",
     );
     expect(res.status).toBe(401);
-    expect(sendNotification).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends a push notification when the recipient gets a new chat message", async () => {
@@ -171,10 +191,129 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sendNotification).toHaveBeenCalledTimes(1);
-    const payload = JSON.parse(sendNotification.mock.calls[0][1]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ redirect: "manual" });
+    const payload = JSON.parse(Buffer.from(generateRequestDetails.mock.calls[0][1]).toString());
     expect(payload.title).toContain("Kari Selger");
     expect(payload.url).toBe("/meldinger/conv-1");
+  });
+
+  it("does not wait for a provider response body to finish", async () => {
+    const cancelBody = vi.fn(() => new Promise<void>(() => {}));
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1]));
+          },
+          cancel: cancelBody,
+        }),
+        { status: 201 },
+      ),
+    );
+    const admin = buildAdmin({
+      message: {
+        id: "m1",
+        sender_id: "seller-1",
+        conversation_id: "conv-1",
+        body: "Er den fortsatt til salgs?",
+      },
+      conversation: { buyer_id: "buyer-1", seller_id: "seller-1" },
+      prefs: { web_push_messages: true },
+      subs: [SUB],
+    });
+    setAdmin(admin);
+
+    const res = await postPayload({
+      type: "message",
+      message_id: "11111111-1111-1111-1111-111111111111",
+    });
+
+    expect(res.status).toBe(200);
+    expect(cancelBody).toHaveBeenCalledTimes(1);
+    expect(admin.updatedSubIds).toEqual(["sub-1"]);
+  });
+
+  it("does not follow a Web Push redirect", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, { status: 307, headers: { location: "https://127.0.0.1/redirect" } }),
+    );
+    const admin = buildAdmin({
+      message: {
+        id: "m1",
+        sender_id: "seller-1",
+        conversation_id: "conv-1",
+        body: "Er den fortsatt til salgs?",
+      },
+      conversation: { buyer_id: "buyer-1", seller_id: "seller-1" },
+      prefs: { web_push_messages: true },
+      subs: [SUB],
+    });
+    setAdmin(admin);
+
+    await postPayload({ type: "message", message_id: "11111111-1111-1111-1111-111111111111" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ redirect: "manual" });
+    expect(admin.updatedSubIds).toEqual([]);
+  });
+
+  it("times out a Web Push request that ignores AbortSignal", async () => {
+    vi.useFakeTimers();
+    let requestStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      requestStarted = resolve;
+    });
+    fetchMock.mockImplementationOnce(() => {
+      requestStarted();
+      return new Promise(() => {});
+    });
+    const admin = buildAdmin({
+      message: {
+        id: "m1",
+        sender_id: "seller-1",
+        conversation_id: "conv-1",
+        body: "Er den fortsatt til salgs?",
+      },
+      conversation: { buyer_id: "buyer-1", seller_id: "seller-1" },
+      prefs: { web_push_messages: true },
+      subs: [SUB],
+    });
+    setAdmin(admin);
+    const pending = postPayload({
+      type: "message",
+      message_id: "11111111-1111-1111-1111-111111111111",
+    });
+    await started;
+    await vi.advanceTimersByTimeAsync(15_000);
+    const res = await pending;
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(admin.updatedSubIds).toEqual([]);
+  });
+
+  it("skips stored web subscriptions with an untrusted destination", async () => {
+    setAdmin(
+      buildAdmin({
+        message: {
+          id: "11111111-1111-1111-1111-111111111111",
+          sender_id: "sender",
+          conversation_id: "22222222-2222-2222-2222-222222222222",
+          body: "hei",
+        },
+        conversation: { buyer_id: "buyer", seller_id: "recipient" },
+        prefs: { web_push_messages: true },
+        subs: [{ ...SUB, endpoint: "https://127.0.0.1/latest" }],
+      }),
+    );
+    const res = await postPayload({
+      type: "message",
+      message_id: "11111111-1111-1111-1111-111111111111",
+    });
+    expect(res.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends a push notification when a saved search gets a new match", async () => {
@@ -198,8 +337,8 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sendNotification).toHaveBeenCalledTimes(1);
-    const payload = JSON.parse(sendNotification.mock.calls[0][1]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(Buffer.from(generateRequestDetails.mock.calls[0][1]).toString());
     expect(payload.title).toContain("iPhone i Oslo");
     expect(payload.body).toBe("iPhone 15 Pro");
     expect(payload.url).toBe("/annonse/listing-1");
@@ -231,8 +370,8 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sendNotification).toHaveBeenCalledTimes(1);
-    const payload = JSON.parse(sendNotification.mock.calls[0][1]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(Buffer.from(generateRequestDetails.mock.calls[0][1]).toString());
     expect(payload.title).toContain("Prisfall");
     expect(payload.body).toContain("20%");
   });
@@ -258,8 +397,8 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sendNotification).toHaveBeenCalledTimes(1);
-    const payload = JSON.parse(sendNotification.mock.calls[0][1]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(Buffer.from(generateRequestDetails.mock.calls[0][1]).toString());
     expect(payload.title).toContain("solgt");
     expect(payload.body).toContain("iPhone 15 Pro");
     expect(payload.url).toBe("/annonse/listing-1");
@@ -281,7 +420,7 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(204);
-    expect(sendNotification).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("does not send a notification when the user disabled that notification type", async () => {
@@ -310,12 +449,11 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(204);
-    expect(sendNotification).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("removes a subscription that the push service reports as gone (410)", async () => {
-    const err = Object.assign(new Error("gone"), { statusCode: 410 });
-    sendNotification.mockRejectedValueOnce(err);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 410 }));
 
     const admin = buildAdmin({
       priceDrop: {
@@ -356,7 +494,7 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sendNotification).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(sendNotificationEmail).toHaveBeenCalledTimes(1);
     expect(sendNotificationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "buyer@example.com", url: "/annonse/listing-1" }),
@@ -380,7 +518,7 @@ describe("push dispatch endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(sendNotificationEmail).toHaveBeenCalledTimes(1);
   });
 

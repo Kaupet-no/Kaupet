@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
+import { DEFAULT_SEARCH_RADIUS_KM, type AdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 
 export const stringArray = z.preprocess((v) => {
@@ -42,6 +42,9 @@ export const searchSchema = z.object({
   // search parameters (e.g. Bil's "hestekrefter"), see category-filters.ts
   // and encodeAttrFilters/decodeAttrFilters below for the wire format.
   attrs: z.string().optional().default(""),
+  // Valgt resultatfane. Utelates av writeAppliedSearchState, så et nytt søk
+  // alltid starter på «Til salgs».
+  results: z.enum(["wtb"]).optional(),
 });
 
 export type AppliedSearchState = {
@@ -164,7 +167,7 @@ export function readAppliedSearchState(search: SearchParams): AppliedSearchState
       location: {
         lat: search.lat ?? null,
         lng: search.lng ?? null,
-        radius: search.radius ?? 10,
+        radius: search.radius ?? DEFAULT_SEARCH_RADIUS_KM,
         label: search.loc ?? "",
       },
     },
@@ -207,6 +210,7 @@ export type SearchListing = {
   cover_path: string | null;
   category_slug: string | null;
   attributes: Record<string, unknown> | null;
+  sold_at?: string | null;
 };
 
 export type ListingsPage = {

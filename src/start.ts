@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
 import { getRequest, setResponseHeader, setResponseStatus } from "@tanstack/react-start/server";
@@ -8,6 +9,7 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requestBodyExceedsLimit } from "@/lib/request-size.server";
 import { buildSecurityHeaders } from "@/lib/security-headers";
 import { ClientError, isAlreadyLogged } from "@/lib/to-client-error";
+import { describeSafeError } from "@/lib/safe-error";
 
 const cspNonceMiddleware = createMiddleware().server(async ({ next }) => {
   const nonce = crypto.randomUUID().replaceAll("-", "");
@@ -35,23 +37,13 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }
-    console.error(error);
+    console.error("[request] unhandled error", describeSafeError(error));
     return new Response(renderErrorPage(), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
   }
 });
-
-// Bare felt som ikke bærer brukerdata havner i Workers-loggen (personvern.tsx,
-// «Feilsøkingslogger»): ZodError-meldinger kan gjengi innsendte verdier, og
-// hele feilobjekter kan ha f.eks. Supabase-`details` med radinnhold.
-function describeError(error: unknown) {
-  if (error instanceof ZodError) return error.issues.map((i) => `${i.path.join(".")}: ${i.code}`);
-  if (error instanceof ClientError) return error.message;
-  const { name, message, code, stack } = (error ?? {}) as Record<string, unknown>;
-  return { name, message, code, stack };
-}
 
 // TanStack Start fanger kast fra serverfunksjoner i middleware-kjeden og
 // serialiserer dem som et vanlig 200-svar — `console.error("Server Fn Error!")`
@@ -66,8 +58,8 @@ const serverFnErrorLogMiddleware = createMiddleware({ type: "function" }).server
         const status =
           error instanceof ClientError ? error.status : error instanceof ZodError ? 400 : 500;
         const label = `[serverFn] ${serverFnMeta.name} (${serverFnMeta.filename}) ${status}`;
-        if (status < 500) console.warn(label, describeError(error));
-        else if (!isAlreadyLogged(error)) console.error(label, describeError(error));
+        if (status < 500) console.warn(label, describeSafeError(error));
+        else if (!isAlreadyLogged(error)) console.error(label, describeSafeError(error));
         // Bare for RPC-kall fra nettleseren: in-process-kall under SSR deler
         // sidens respons, og en loader som håndterer feilen skal ikke gi 500.
         if (getRequest()?.headers.get("x-tsr-serverFn") === "true") setResponseStatus(status);
@@ -80,6 +72,7 @@ const serverFnErrorLogMiddleware = createMiddleware({ type: "function" }).server
 // In-memory cache to avoid hitting the DB on every request.
 const ipCache = new Map<string, { banned: boolean; expires: number }>();
 const IP_CACHE_TTL_MS = 60_000;
+const IP_CACHE_MAX = 10_000;
 
 function extractIp(headers: Headers): string | null {
   const cf = headers.get("cf-connecting-ip");
@@ -122,15 +115,14 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
     if (cached && cached.expires > now) {
       banned = cached.banned;
     } else {
-      const { createClient } = await import("@supabase/supabase-js");
-      const url = process.env.SUPABASE_URL;
-      const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (url && key) {
-        const admin = createClient(url, key, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
+      ipCache.delete(ip);
+      // Without env (local/test) the check is skipped, as before; client.server would throw.
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const admin = await getSupabaseAdmin();
         const { data } = await admin.rpc("is_ip_banned", { _ip: ip });
         banned = data === true;
+        // ponytail: hard cap, clear() instead of LRU; cache just refills from the DB
+        if (ipCache.size >= IP_CACHE_MAX) ipCache.clear();
         ipCache.set(ip, { banned, expires: now + IP_CACHE_TTL_MS });
       }
     }
@@ -142,7 +134,7 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
       });
     }
   } catch (err) {
-    console.error("[ip-ban-middleware]", err);
+    console.error("[ip-ban-middleware]", describeSafeError(err));
   }
   return next();
 });

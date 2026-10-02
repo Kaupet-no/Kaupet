@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import {
   ArrowUpDown,
   Expand,
@@ -8,11 +9,13 @@ import {
   Map as MapIcon,
   SearchX,
   X,
+  List,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ClientOnly } from "@tanstack/react-router";
+import { CatchBoundary, ClientOnly, type ErrorComponentProps } from "@tanstack/react-router";
 
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { ListingCardExpanded } from "@/components/listing-card-expanded";
 import { ListingCardImages } from "@/components/listing-card-images";
 import { Button } from "@/components/ui/button";
@@ -37,6 +40,35 @@ import { useListingFavorites } from "@/hooks/use-listing-favorites";
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
 );
+
+// Etter en deploy finnes ikke lenger kartchunken fra forrige bygg, så bare en
+// sidelasting hjelper. Chrome/Firefox: «Failed to fetch dynamically imported
+// module», Safari: «Importing a module script failed».
+const isChunkLoadError = (error: unknown) =>
+  error instanceof Error &&
+  /dynamically imported module|Importing a module script failed/i.test(error.message);
+
+function MapErrorFallback({ error, reset }: ErrorComponentProps) {
+  const reload = isChunkLoadError(error);
+  return (
+    <div
+      role="alert"
+      className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-surface p-6 text-center"
+    >
+      <MapIcon className="size-8 text-muted-foreground" aria-hidden />
+      <p className="text-sm font-medium">Kunne ikke laste kartet</p>
+      <p className="text-xs text-muted-foreground">Resten av søket fungerer som vanlig.</p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={reload ? () => window.location.reload() : reset}
+      >
+        {reload ? "Last inn siden på nytt" : "Prøv på nytt"}
+      </Button>
+    </div>
+  );
+}
 
 // Konstant referanse — unngår at kortene under (memoiserte) får et nytt
 // linkState-objekt hver rendring, som ville nullstilt memoiseringen.
@@ -84,6 +116,8 @@ type Props = {
    * er den viktigste kontrollen på en smal skjerm og skal ikke kunne skyves
    * utenfor kanten av visningsvalg/sortering/kart, som `toolbarExtra` gjør. */
   toolbarLead?: ReactNode;
+  /** Native resultatflater med brikkerad har sorteringen der i stedet. */
+  hideSort?: boolean;
 };
 
 /**
@@ -119,6 +153,7 @@ export function ResultList({
   onSortChange,
   toolbarExtra,
   toolbarLead,
+  hideSort = false,
 }: Props) {
   const formFactor = useFormFactor();
   const nativePhone = isNative && formFactor === "phone";
@@ -191,27 +226,31 @@ export function ResultList({
     }
   };
 
+  const mapResetKey = `${mapCenter?.lat ?? ""},${mapCenter?.lng ?? ""},${radiusKm},${mapListings.length}`;
+
   const renderMap = () => (
-    <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
-      <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
-        <ListingsMap
-          center={mapCenter}
-          radiusKm={radiusKm}
-          listings={mapListings}
-          hoveredId={hoveredId}
-          activeId={activeId}
-          onMarkerHover={setHoveredId}
-          onMarkerSelect={setActiveId}
-          onApplyViewport={applyMapViewport}
-          onClearLocation={onMapClearLocation}
-          viewportApplying={viewportApplying}
-          deferViewport={isNative}
-          edgeToEdge={nativePhone}
-          compactTouchControls={nativePhone}
-          className="h-full w-full"
-        />
-      </Suspense>
-    </ClientOnly>
+    <CatchBoundary getResetKey={() => mapResetKey} errorComponent={MapErrorFallback}>
+      <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
+        <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
+          <ListingsMap
+            center={mapCenter}
+            radiusKm={radiusKm}
+            listings={mapListings}
+            hoveredId={hoveredId}
+            activeId={activeId}
+            onMarkerHover={setHoveredId}
+            onMarkerSelect={setActiveId}
+            onApplyViewport={applyMapViewport}
+            onClearLocation={onMapClearLocation}
+            viewportApplying={viewportApplying}
+            deferViewport={isNative}
+            edgeToEdge={nativePhone}
+            compactTouchControls={nativePhone}
+            className="h-full w-full"
+          />
+        </Suspense>
+      </ClientOnly>
+    </CatchBoundary>
   );
   const expansionOptions =
     zeroResultExpansions.length > 0
@@ -230,48 +269,53 @@ export function ResultList({
           <span role="status" aria-live="polite" aria-atomic="true">
             {isLoading
               ? "Søker…"
-              : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
+              : `${formatNokNumber(totalCount ?? cards.length)} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
           {toolbarLead}
         </div>
         <div className="flex items-center gap-2">
           {isNative ? (
             <>
+              {toolbarExtra}
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 shadow-none"
+                variant="ghost"
+                size="icon"
+                className="native-touch-target size-9 shadow-none"
                 aria-expanded={viewModeOpen}
+                aria-label={`Visning: ${viewModeLabel}`}
                 onClick={() => setViewModeOpen(true)}
               >
-                <ViewModeIcon className="size-4" /> {viewModeLabel}
+                <ViewModeIcon className="size-5" />
               </Button>
               <NativeChoiceSheet
                 open={viewModeOpen}
                 onOpenChange={setViewModeOpen}
                 title="Visning"
-                options={[
-                  { value: "grid", label: "Fliser" },
-                  { value: "list", label: "Liste" },
-                ]}
-                value={[viewMode === "grid" || viewMode === "list" ? viewMode : "grid"]}
+                options={(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map(
+                  (mode) => ({ value: mode, label: VIEW_MODE_META[mode].label }),
+                )}
+                value={[viewMode]}
                 onChange={(next) => {
                   const mode = next[0];
-                  if (mode === "grid" || mode === "list") changeViewMode(mode);
+                  if (mode && mode in VIEW_MODE_META) {
+                    changeViewMode(mode as keyof typeof VIEW_MODE_META);
+                  }
                   setViewModeOpen(false);
                 }}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 shadow-none"
-                aria-expanded={sortOpen}
-                onClick={() => setSortOpen(true)}
-              >
-                <ArrowUpDown className="size-4" /> {sortLabel}
-              </Button>
+              {!hideSort && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 shadow-none"
+                  aria-expanded={sortOpen}
+                  onClick={() => setSortOpen(true)}
+                >
+                  <ArrowUpDown className="size-4" /> {sortLabel}
+                </Button>
+              )}
               <NativeChoiceSheet
                 open={sortOpen}
                 onOpenChange={setSortOpen}
@@ -351,14 +395,14 @@ export function ResultList({
               onOpenChange={setMobileMapOpen}
               title="Kart"
               titleVisible
-              className="h-[88vh] p-4"
+              className="grid h-[88vh] grid-rows-[auto_minmax(0,1fr)] p-4"
               trigger={
                 <Button type="button" variant="outline" size="sm" className="gap-1.5">
                   <MapIcon className="size-4" /> Kart
                 </Button>
               }
             >
-              <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
+              <div className="min-h-0">{mobileMapOpen ? renderMap() : null}</div>
             </NativeSheet>
           )}
           {(isDesktop || nativeTablet) && (
@@ -375,18 +419,18 @@ export function ResultList({
               <MapIcon className="size-4" /> {desktopMapVisible ? "Skjul kart" : "Vis kart"}
             </Button>
           )}
-          {toolbarExtra}
+          {!isNative && toolbarExtra}
         </div>
       </div>
 
       <div
         // Signal til SearchResultsBody (:has) om at kartet tar plass, slik at
         // filterkolonnen vikes unna på skjermer under 2xl.
-        data-map-visible={isDesktop && desktopMapVisible && cards.length > 0 ? "" : undefined}
+        data-map-visible={isDesktop && desktopMapVisible ? "" : undefined}
         className={`mt-4 grid gap-6 ${
-          isDesktop && desktopMapVisible && cards.length > 0
+          isDesktop && desktopMapVisible
             ? "lg:grid-cols-[1fr_420px]"
-            : nativeTablet && desktopMapVisible && cards.length > 0
+            : nativeTablet && desktopMapVisible
               ? "grid-cols-[minmax(320px,1fr)_minmax(320px,0.8fr)]"
               : ""
         }`}
@@ -441,7 +485,7 @@ export function ResultList({
                         variant="outline"
                         onClick={() => onApplyZeroResultExpansion(option)}
                       >
-                        Vis {option.count.toLocaleString("nb-NO")} treff uten «{option.label}»
+                        Vis {formatNokNumber(option.count)} treff uten «{option.label}»
                       </Button>
                     ))
                   ) : zeroResultExpansionPending ? (
@@ -520,7 +564,7 @@ export function ResultList({
           )}
         </div>
 
-        {(isDesktop || nativeTablet) && desktopMapVisible && cards.length > 0 && (
+        {(isDesktop || nativeTablet) && desktopMapVisible && (
           <aside>
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
@@ -564,26 +608,25 @@ export function ResultList({
         <>
           <FullscreenOverlay open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
             <FullscreenOverlayContent title="Kart over søkeresultater" edgeToEdge>
-              <div className="flex h-full flex-col bg-background">
-                <div className="pt-safe flex shrink-0 items-center justify-between border-b border-border px-4 pb-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Kart</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {mapListings.length} mulige treff
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="native-touch-target"
-                    onClick={() => setMobileMapOpen(false)}
-                    aria-label="Lukk kart"
-                  >
-                    <X className="size-5" />
-                  </Button>
-                </div>
-                <div className="min-h-0 flex-1">{mobileMapOpen ? renderMap() : null}</div>
+              {/* Kartet går kant til kant; samme søk som listen, bare en
+                  annen visning. «Liste»-pillen står der «Kart»-pillen stod. */}
+              <div className="relative h-full bg-background">
+                {mobileMapOpen ? renderMap() : null}
+                <p
+                  className="pointer-events-none absolute right-4 top-[calc(var(--safe-top)+1rem)] z-[450] rounded-full bg-card px-3 py-1.5 text-xs font-medium shadow-md"
+                  role="status"
+                >
+                  {mapListings.length} {mapListings.length === 1 ? "annonse" : "annonser"} i kartet
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => setMobileMapOpen(false)}
+                  aria-label="Lukk kart og vis liste"
+                  className="absolute bottom-[max(1rem,var(--safe-bottom))] left-1/2 z-[450] h-12 -translate-x-1/2 gap-2 rounded-full bg-foreground px-5 text-background shadow-lg hover:bg-foreground/90"
+                >
+                  <List className="size-4" aria-hidden />
+                  Liste
+                </Button>
               </div>
             </FullscreenOverlayContent>
           </FullscreenOverlay>
@@ -593,20 +636,13 @@ export function ResultList({
               void hapticImpact("medium");
               setMobileMapOpen(true);
             }}
-            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition active:scale-95"
+            className="native-touch-target fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] left-1/2 z-50 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background shadow-lg transition active:scale-95"
             aria-label={
               mapListings.length > 0 ? `Vis kart, ${mapListings.length} treff` : "Vis kart"
             }
           >
-            <MapIcon className="size-6" />
-            {mapListings.length > 0 && (
-              <span
-                className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-brand text-2xs font-bold text-brand-foreground"
-                aria-hidden="true"
-              >
-                {mapListings.length > 99 ? "99+" : mapListings.length}
-              </span>
-            )}
+            <MapIcon className="size-4" aria-hidden />
+            Kart
           </button>
         </>
       )}

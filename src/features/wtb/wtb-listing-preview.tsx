@@ -1,3 +1,4 @@
+import { formatWtbMaxPrice } from "@/lib/format";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
@@ -93,7 +94,7 @@ export function WtbListingPreview({
         onEdit={onEdit}
       >
         {maxPriceNok != null ? (
-          <p>{maxPriceNok.toLocaleString("nb-NO")} kr</p>
+          <p>{formatWtbMaxPrice(maxPriceNok)}</p>
         ) : (
           empty("Ikke satt", "w-1/4")
         )}

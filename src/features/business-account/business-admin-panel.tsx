@@ -14,9 +14,9 @@ import type {
 } from "@/features/business-account/use-business-membership";
 import {
   createOrganizationLocation,
-  updateOrganizationBillingEmail,
   updateOrganizationLocation,
-} from "@/lib/business.functions";
+} from "@/lib/business/locations.functions";
+import { updateOrganizationBillingEmail } from "@/lib/business/organization.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import {
   LOCATION_FIELDS,

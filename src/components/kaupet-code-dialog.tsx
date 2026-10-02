@@ -74,7 +74,12 @@ export function KaupetCodeForm({
           placeholder="12345678"
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          className="text-center font-mono text-lg tracking-[0.4em]"
+          // Skuffens scroll-wrapper (vaul) klipper alt som tegnes utenfor
+          // boksen (overflow-y-auto klipper også horisontalt), så en ytre
+          // fokusring blir kuttet i sidene på native. Inset-ringen tegnes
+          // inne i feltet og får alltid plass — samme mønster som
+          // business-console og listing-card-expanded.
+          className="text-center font-mono text-lg tracking-[0.4em] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         />
       </div>
       <Button type="submit" disabled={code.length !== 8} className="sm:w-auto">

@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { formatNokNumber } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ChevronLeft,
   ChevronRight,
   Eye,
   EyeOff,
@@ -19,31 +21,46 @@ import { NativeSheet } from "@/components/ui/native-sheet";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CategorySlugPicker } from "@/components/advanced-search-sheet";
-import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { TermGroupRow } from "@/components/term-group-editor";
-import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
-import { describeAttrValue } from "@/components/active-filters";
+import { Switch } from "@/components/ui/switch";
+import { CategorySlugPicker } from "@/features/listing-search/filters/advanced-search-sheet";
+import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
+import { TermGroupRow } from "@/features/listing-search/filters/term-group-editor";
+import { SecondaryCategoryFilters } from "@/features/listing-search/filters/attribute-filter-chips";
+import { CategoryFilterFields } from "@/features/listing-search/filters/category-filter-fields";
+import { describeAttrValue } from "@/features/listing-search/filters/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS, type RangeBounds } from "@/lib/filter-range-bounds";
-import { conditionOptionsFor, type AdvancedSearchValue } from "@/components/advanced-search-value";
+import {
+  bucketPrices,
+  priceQuickRanges,
+  priceScaleMax,
+  underPrice,
+  type PriceQuickRange,
+} from "@/lib/price-histogram";
+import {
+  conditionOptionsFor,
+  DEFAULT_SEARCH_RADIUS_KM,
+  type AdvancedSearchValue,
+} from "@/lib/advanced-search-value";
 import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
 import {
+  searchFilterDependencyMet,
   splitPrimaryFilters,
+  SEARCH_MULTISELECT_KEYS,
   type AttributeFilterValue,
   type CategoryFilter,
 } from "@/lib/category-filters";
 import { rankSearchFilters } from "@/features/listing-search/rank-search-filters";
 import { hapticImpact } from "@/lib/haptics";
 import type { ActiveFilterItem } from "./active-filter-items";
+import { EQUIPMENT_GROUP_LABEL, groupFilterRows } from "./filter-rows";
 
 /** Section keys, kept from the old tab strip (fase 9) — now scroll targets
  * inside one continuous list instead of separate tab panels (fase 12). */
-export type SearchFilterSection = "search" | "categories" | "price" | "location" | "attributes";
+export type SearchFilterSection =
+  "search" | "categories" | "price" | "location" | "conditions" | "attributes";
 
 type Props = {
   value: AdvancedSearchValue;
@@ -86,6 +103,19 @@ type Props = {
   activeItems?: ActiveFilterItem[];
   /** Native-søket viser disse valgene ved søkefeltet i stedet. */
   hideSearchOptions?: boolean;
+  /** Navn på filtre som ble fjernet ved siste kategoribytte — vises som en
+   * statuslinje over kategoriens egenskaper, så bortfallet ikke skjer i det
+   * stille utenfor skjermen. */
+  categoryNotice?: string[];
+  /** Kategorifilteret som åpnes direkte når `section` er «attributes». */
+  initialAttributeKey?: string;
+  /** Viser «Avansert søk» nederst i telefonlisten; kallstedet eier regelflaten. */
+  onOpenSearchRules?: () => void;
+  /** Priser i søket, for fordelingen og hurtigvalgene i telefonens prisfelt. */
+  priceSample?: number[];
+  /** Meldes når telefonflaten bytter mellom oversikt og ett filter, så
+   * skuffens topp kan vise «Pris» og nullstille bare det filteret. */
+  onViewChange?: (view: { title: string; reset?: () => void } | null) => void;
 };
 
 /**
@@ -115,16 +145,29 @@ export function SearchFilterSections({
   hideCategory = false,
   activeItems,
   hideSearchOptions = false,
+  categoryNotice,
+  initialAttributeKey,
+  onOpenSearchRules,
+  priceSample,
+  onViewChange,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
   const [conditionsOpen, setConditionsOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
+  // Arbeidsflaten åpner på oversikten, med mindre brikkeraden ba om ett filter.
   const [overviewOpen, setOverviewOpen] = useState(
-    layout === "workspace" || section === "categories",
+    section === "categories" ||
+      (layout === "workspace" &&
+        section !== "price" &&
+        section !== "location" &&
+        section !== "conditions" &&
+        section !== "attributes"),
   );
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
-  const [activeAttributeKey, setActiveAttributeKey] = useState<string | null>(null);
-  const [mobileGroup, setMobileGroup] = useState<"basis" | "details" | "more">("basis");
+  const [activeAttributeKeys, setActiveAttributeKeys] = useState<string[] | null>(
+    initialAttributeKey ? [initialAttributeKey] : null,
+  );
+  const [showAllAttributes, setShowAllAttributes] = useState(false);
   // Sidekolonnen: alltid åpen så lenge ingen kategori er valgt (også etter
   // «Nullstill»), ellers bare når brukeren selv har trykket «Endre».
   const [categoryEditOpen, setCategoryEditOpen] = useState(false);
@@ -134,7 +177,7 @@ export function SearchFilterSections({
   /** I sidekolonnen står alt åpent; i skuffen vises én seksjon om gangen. */
   const showSection = (key: SearchFilterSection) => {
     if (hideSearchOptions && key === "search") return false;
-    if (workspace && overviewOpen) return mobileGroup === "basis" && key === "price";
+    if (workspace && overviewOpen) return key === "price";
     if (!expanded) return activeSection === key;
     if (!desktopGroup) return true;
     if (desktopGroup === "basis") return key === "location" || key === "price";
@@ -168,15 +211,6 @@ export function SearchFilterSections({
   const primaryFilters = attributeFilters
     ? rankSearchFilters({
         filters: splitPrimaryFilters(attributeFilters).primary,
-        activeValues: attributeValues,
-        queryText: queryText ?? v.terms.join(" "),
-        facetCounts: attributeCounts,
-        limit: 6,
-      })
-    : [];
-  const secondaryFilters = attributeFilters
-    ? rankSearchFilters({
-        filters: splitPrimaryFilters(attributeFilters).secondary,
         activeValues: attributeValues,
         queryText: queryText ?? v.terms.join(" "),
         facetCounts: attributeCounts,
@@ -235,11 +269,59 @@ export function SearchFilterSections({
     setV((prev) => ({ ...prev, extraGroups: prev.extraGroups.filter((g) => g.id !== id) }));
   };
 
-  const openSection = (next: SearchFilterSection, attributeKey?: string) => {
-    setActiveAttributeKey(attributeKey ?? null);
+  const openSection = (next: SearchFilterSection, attributeKeys?: string | string[]) => {
+    setActiveAttributeKeys(
+      attributeKeys == null ? null : Array.isArray(attributeKeys) ? attributeKeys : [attributeKeys],
+    );
     setActiveSection(next);
     setOverviewOpen(false);
   };
+
+  /* Skuffens topp følger det som vises: «Filtre» i oversikten, filterets navn
+     når ett filter står alene — og «Nullstill» nullstiller da bare det. */
+  const attributeKeysKey = activeAttributeKeys?.join("\0") ?? "";
+  useEffect(() => {
+    if (!onViewChange) return;
+    if (expanded || overviewOpen) {
+      onViewChange(null);
+      return;
+    }
+    const keys = activeAttributeKeys ?? [];
+    const views: Record<SearchFilterSection, { title: string; reset?: () => void }> = {
+      price: {
+        title: "Pris",
+        reset: () => setV((previous) => ({ ...previous, min: null, max: null, includeFree: true })),
+      },
+      location: {
+        title: "Sted",
+        reset: () =>
+          onLocationChange({ lat: null, lng: null, radius: DEFAULT_SEARCH_RADIUS_KM, label: "" }),
+      },
+      conditions: {
+        title: "Tilstand",
+        reset: () => setV((previous) => ({ ...previous, conditions: [] })),
+      },
+      categories: {
+        title: "Kategori",
+        reset: () => setV((previous) => ({ ...previous, categories: [] })),
+      },
+      attributes: {
+        title:
+          keys.length === 1
+            ? (attributeFilters?.find((filter) => filter.key === keys[0])?.label_nb ?? "Filtre")
+            : keys.length > 1
+              ? EQUIPMENT_GROUP_LABEL
+              : "Filtre",
+        reset: keys.length
+          ? () => keys.forEach((key) => onAttributeChange?.(key, undefined))
+          : undefined,
+      },
+      search: { title: "Søkeregler" },
+    };
+    onViewChange(views[activeSection]);
+    // Bare når visningen skifter; tilbakestillingene leser siste utkast selv.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, overviewOpen, activeSection, attributeKeysKey]);
 
   const overview = (
     <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+var(--safe-bottom))]">
@@ -356,7 +438,24 @@ export function SearchFilterSections({
         </section>
       )}
 
-      {showSection("price") && (
+      {showSection("price") && !expanded && (
+        <section data-section="price" className={`${sectionClass} space-y-4`}>
+          {/* I oversikten trenger prisen en egen tittel; alene i skuffen
+              står «Pris» allerede i skuffens topp. */}
+          {overviewOpen && <Label className={labelClass}>Pris</Label>}
+          <NativePriceFields
+            min={v.min}
+            max={v.max}
+            includeFree={v.includeFree}
+            bounds={priceBounds}
+            prices={priceSample}
+            revealHistogramOnDrag={overviewOpen}
+            onChange={(patch) => setV((previous) => ({ ...previous, ...patch }))}
+          />
+        </section>
+      )}
+
+      {showSection("price") && expanded && (
         <section data-section="price" className={`${sectionClass} space-y-6`}>
           <div className="space-y-3">
             {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
@@ -382,12 +481,12 @@ export function SearchFilterSections({
                     className={`${desktopGroup ? "h-9" : "min-h-12 rounded-full"} flex-1 px-3 text-xs`}
                     disabled={v.min != null && max < v.min}
                     onClick={() => setV((previous) => ({ ...previous, max }))}
-                    aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
+                    aria-label={`Inntil ${formatNokNumber(max)}`}
                     aria-pressed={v.max === max}
                   >
                     {/* Sidekolonnen er smal — «≤» i stedet for «Inntil». */}
                     {expanded ? "≤ " : "Inntil "}
-                    {max.toLocaleString("nb-NO")}
+                    {formatNokNumber(max)}
                   </Button>
                 ))}
             </div>
@@ -416,8 +515,11 @@ export function SearchFilterSections({
       {showSection("attributes") && (
         <section data-section="attributes" className={`${sectionClass} space-y-4`}>
           <Label className={labelClass}>
-            {activeAttributeKey
-              ? attributeFilters?.find((filter) => filter.key === activeAttributeKey)?.label_nb
+            {activeAttributeKeys
+              ? activeAttributeKeys.length === 1
+                ? attributeFilters?.find((filter) => filter.key === activeAttributeKeys[0])
+                    ?.label_nb
+                : EQUIPMENT_GROUP_LABEL
               : desktopGroup === "details"
                 ? "Om kategorien"
                 : desktopGroup === "more"
@@ -425,9 +527,11 @@ export function SearchFilterSections({
                   : "Alle filtre"}
           </Label>
           {hasAttributeFilters && v.categories.length > 0 ? (
-            activeAttributeKey ? (
+            activeAttributeKeys ? (
               <CategoryFilterFields
-                filters={attributeFilters!.filter((filter) => filter.key === activeAttributeKey)}
+                filters={attributeFilters!.filter((filter) =>
+                  activeAttributeKeys.includes(filter.key),
+                )}
                 brandLookupFilters={attributeFilters}
                 values={attributeValues!}
                 onChange={onAttributeChange!}
@@ -670,147 +774,152 @@ export function SearchFilterSections({
     </section>
   );
 
+  /* Telefonens filterark: én liste i fast rekkefølge (admin sin sort_order),
+     ingen faner. Kategorien står øverst fordi den bestemmer egenskapene under.
+     Rangering etter søketekst hører til der plassen er knapp, ikke her der
+     alt står synlig — ellers flytter radene seg mellom hver gang. */
+  const visibleAttributeFilters = (attributeFilters ?? []).filter((filter) =>
+    searchFilterDependencyMet(filter, attributeValues ?? {}, attributeFilters ?? []),
+  );
+  const { primary: primaryRows, secondary: secondaryRows } = (() => {
+    const split = splitPrimaryFilters(visibleAttributeFilters);
+    // Uten hovedfiltre er det ingenting å folde bort bak «Vis flere».
+    if (split.primary.length === 0) return { primary: split.secondary, secondary: [] };
+    return split;
+  })();
+  const secondaryActive = secondaryRows.some((filter) => attributeValues?.[filter.key] != null);
+  const renderAttributeRows = (filters: CategoryFilter[]) =>
+    groupFilterRows(filters).map((row) =>
+      row.kind === "inline" ? (
+        <InlineChoiceFilter
+          key={row.filter.id}
+          filter={row.filter}
+          value={attributeValues?.[row.filter.key]}
+          counts={attributeCounts?.[row.filter.key]}
+          onChange={(next) => onAttributeChange?.(row.filter.key, next)}
+        />
+      ) : (
+        <FilterOverviewRow
+          key={row.id}
+          label={row.label}
+          value={
+            row.filters.length === 1
+              ? attributeSummary(row.filters[0])
+              : summarizeGroup(row.filters, attributeValues)
+          }
+          onClick={() =>
+            openSection(
+              "attributes",
+              row.filters.map((filter) => filter.key),
+            )
+          }
+          active={row.filters.some((filter) => attributeValues?.[filter.key] != null)}
+          quiet
+        />
+      ),
+    );
+
   const workspaceOverview = (
     <div
       className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6"
       data-testid="filter-workspace"
     >
-      <Tabs
-        value={mobileGroup}
-        onValueChange={(next) => setMobileGroup(next as typeof mobileGroup)}
-      >
-        <TabsList className="sticky top-0 z-10 grid h-auto w-full grid-cols-3 gap-1 rounded-none border-b border-border bg-background py-2">
-          <TabsTrigger
-            value="basis"
-            className="min-h-12 rounded-lg text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-          >
-            Basis
-          </TabsTrigger>
-          <TabsTrigger
-            value="details"
-            className="min-h-12 rounded-lg text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-          >
-            Detaljer
-          </TabsTrigger>
-          <TabsTrigger
-            value="more"
-            className="min-h-12 rounded-lg text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-          >
-            Mer
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value={mobileGroup} className="mt-0">
-          <div className="mt-4 rounded-xl bg-primary/5 p-3 text-sm">
-            <p className="font-semibold">Søket ditt</p>
-            <p className="mt-1 text-muted-foreground">
-              {[
-                v.categories.length ? categorySummary : null,
-                ...(activeItems ?? []).map((item) => item.label),
-                v.min != null || v.max != null ? priceSummary : null,
-                ...v.conditions.map(
-                  (condition) =>
-                    conditionOptions.find((option) => option.value === condition)?.label ??
-                    condition,
-                ),
-                !v.includeFree ? "Uten gratisannonser" : null,
-                v.qMode === "any" ? "Minst ett ord" : null,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "Ingen filtre valgt"}
-            </p>
-          </div>
-          <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-primary">
-            {mobileGroup === "basis" ? "Basis" : mobileGroup === "details" ? "Detaljer" : "Mer"}
-          </p>
-          <h3 className="mt-1 font-display text-2xl tracking-tight">
-            {mobileGroup === "basis"
-              ? "Start bredt, snevre inn"
-              : mobileGroup === "details"
-                ? "Om kategorien"
-                : "Spesifikke behov"}
-          </h3>
-          {mobileGroup === "basis" ? (
-            <>
-              <div className="mt-3">
-                {!hideCategory && (
-                  <FilterOverviewRow
-                    label="Kategori"
-                    value={categorySummary}
-                    onClick={() => openSection("categories")}
-                    icon={FolderOpen}
-                    active={v.categories.length > 0}
-                    quiet
-                  />
-                )}
-                <FilterOverviewRow
-                  label="Sted"
-                  value={locationSummary}
-                  onClick={() => openSection("location")}
-                  icon={MapPin}
-                  active={locationActive}
-                  quiet
-                />
-              </div>
-              <div className="mt-5">{sectionFields}</div>
-              <div className="mt-5">{conditionsField}</div>
-            </>
-          ) : mobileGroup === "details" ? (
-            <div className="mt-3">
-              {primaryFilters.length ? (
-                primaryFilters.map((filter) => (
-                  <FilterOverviewRow
-                    key={filter.id}
-                    label={filter.label_nb}
-                    value={attributeSummary(filter)}
-                    onClick={() => openSection("attributes", filter.key)}
-                    active={attributeValues?.[filter.key] != null}
-                    quiet
-                  />
-                ))
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openSection("categories")}
-                  className="native-touch-target mt-2 flex min-h-14 w-full items-center justify-between rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground"
-                >
-                  Velg kategori for å se detaljfiltre
-                  <ChevronRight className="size-4" aria-hidden />
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="mt-3">
-              {secondaryFilters.map((filter) => (
-                <FilterOverviewRow
-                  key={filter.id}
-                  label={filter.label_nb}
-                  value={attributeSummary(filter)}
-                  onClick={() => openSection("attributes", filter.key)}
-                  active={attributeValues?.[filter.key] != null}
-                  quiet
-                />
-              ))}
-              <FilterOverviewRow
-                label="Alle filtre"
-                value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}
-                onClick={() => openSection("attributes")}
-                icon={SlidersHorizontal}
-                active={advancedFilterCount > 0}
-                quiet
-              />
-              {!hideSearchOptions && (
-                <FilterOverviewRow
-                  label="Flere søkevalg"
-                  value={advancedSearchSummary || "Ingen"}
-                  onClick={() => openSection("search")}
-                  active={Boolean(advancedSearchSummary)}
-                  quiet
-                />
-              )}
-            </div>
+      <section aria-labelledby="filter-basics-heading" className="pt-4">
+        <h3 id="filter-basics-heading" className="font-display text-lg tracking-tight">
+          Grunnleggende
+        </h3>
+        <div className="mt-1">
+          {!hideCategory && (
+            <FilterOverviewRow
+              label="Kategori"
+              value={categorySummary}
+              onClick={() => openSection("categories")}
+              icon={FolderOpen}
+              active={v.categories.length > 0}
+              quiet
+            />
           )}
-        </TabsContent>
-      </Tabs>
+          <FilterOverviewRow
+            label="Sted"
+            value={locationSummary}
+            onClick={() => openSection("location")}
+            icon={MapPin}
+            active={locationActive}
+            quiet
+          />
+        </div>
+        <div className="mt-5">{sectionFields}</div>
+        <div className="mt-5">{conditionsField}</div>
+      </section>
+
+      {hasAttributeFilters && (
+        <section aria-labelledby="filter-category-heading" className="mt-8">
+          <h3 id="filter-category-heading" className="font-display text-lg tracking-tight">
+            {v.categories.length > 0 ? `Egenskaper for ${categorySummary}` : "Egenskaper"}
+          </h3>
+          {categoryNotice && categoryNotice.length > 0 && (
+            <p role="status" className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">
+              {formatDroppedNotice(categoryNotice, v.categories.length > 0)}
+            </p>
+          )}
+          {v.categories.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => openSection("categories")}
+              className="native-touch-target mt-2 flex min-h-14 w-full items-center justify-between rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground"
+            >
+              Velg kategori for å se filtre som merke, størrelse og type
+              <ChevronRight className="size-4 shrink-0" aria-hidden />
+            </button>
+          ) : primaryRows.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {v.categories.length > 1
+                ? "Kategoriene du har valgt, har ingen egenskaper felles. Velg én kategori for flere filtre."
+                : "Denne kategorien har ingen egne filtre."}
+            </p>
+          ) : (
+            <>
+              {v.categories.length > 1 && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Viser filtrene kategoriene har felles. Velg én kategori for flere.
+                </p>
+              )}
+              <div className="mt-1">{renderAttributeRows(primaryRows)}</div>
+              {secondaryRows.length > 0 &&
+                (showAllAttributes || secondaryActive ? (
+                  <div>{renderAttributeRows(secondaryRows)}</div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAttributes(true)}
+                    className="native-touch-target flex min-h-14 w-full items-center justify-between py-3 text-left text-sm font-medium text-primary"
+                  >
+                    Vis {groupFilterRows(secondaryRows).length} flere filtre
+                    <ChevronRight className="size-4 shrink-0 rotate-90" aria-hidden />
+                  </button>
+                ))}
+            </>
+          )}
+        </section>
+      )}
+
+      {onOpenSearchRules && (
+        <section aria-labelledby="filter-advanced-heading" className="mt-8">
+          <h3 id="filter-advanced-heading" className="font-display text-lg tracking-tight">
+            Avansert søk
+          </h3>
+          <FilterOverviewRow
+            label="Søkeregler"
+            value={advancedSearchSummary || "Av"}
+            onClick={onOpenSearchRules}
+            active={Boolean(advancedSearchSummary)}
+            quiet
+          />
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ord annonsen må inneholde, kan inneholde eller ikke skal inneholde.
+          </p>
+        </section>
+      )}
     </div>
   );
 
@@ -843,9 +952,11 @@ export function SearchFilterSections({
           <button
             type="button"
             onClick={() => setOverviewOpen(true)}
-            className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
+            aria-label="Tilbake til filteroversikt"
+            className="native-touch-target -ml-1 mb-4 flex items-center gap-1 px-1 text-sm font-medium text-primary"
           >
-            Tilbake til filteroversikt
+            <ChevronLeft className="size-4" aria-hidden />
+            Alle filtre
           </button>
           <h2 className="mb-4 font-display text-2xl tracking-tight">Velg kategori</h2>
           <CategorySlugPicker
@@ -854,6 +965,7 @@ export function SearchFilterSections({
             onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
             variant="icons"
             showLabel={false}
+            single
           />
         </div>
       ) : (
@@ -861,11 +973,14 @@ export function SearchFilterSections({
           <button
             type="button"
             onClick={() => setOverviewOpen(true)}
-            className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
+            aria-label="Tilbake til filteroversikt"
+            className="native-touch-target -ml-1 mb-4 flex items-center gap-1 px-1 text-sm font-medium text-primary"
           >
-            Tilbake til filteroversikt
+            <ChevronLeft className="size-4" aria-hidden />
+            Alle filtre
           </button>
           {sectionFields}
+          {activeSection === "conditions" && conditionsField}
         </div>
       )}
 
@@ -914,6 +1029,194 @@ export function SearchFilterSections({
         onSave={saveGroup}
       />
     </>
+  );
+}
+
+function summarizeGroup(
+  filters: CategoryFilter[],
+  values: Record<string, AttributeFilterValue> | undefined,
+): string {
+  const active = filters.filter((filter) => values?.[filter.key] != null).length;
+  return active ? `${active} valgt` : "Alle";
+}
+
+function formatDroppedNotice(labels: string[], hasCategory: boolean): string {
+  const list =
+    labels.length === 1
+      ? labels[0]
+      : `${labels.slice(0, -1).join(", ")} og ${labels[labels.length - 1]}`;
+  return hasCategory
+    ? `${list} gjelder ikke for den nye kategorien og ble fjernet.`
+    : `${list} ble fjernet fordi ingen kategori er valgt.`;
+}
+
+/** Ja/nei som bryter, 2–5 alternativer som brikker. Alternativer uten treff
+ * gråes ut i stedet for å skjules, så listen ikke endrer form. */
+function InlineChoiceFilter({
+  filter,
+  value,
+  counts,
+  onChange,
+}: {
+  filter: CategoryFilter;
+  value: AttributeFilterValue | undefined;
+  counts?: Record<string, number>;
+  onChange: (value: AttributeFilterValue | undefined) => void;
+}) {
+  const labelId = `inline-filter-${filter.id}`;
+  if (filter.type === "boolean") {
+    const checked = value?.kind === "boolean" && value.value;
+    return (
+      <label className="flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 border-b border-border py-3 text-sm font-medium">
+        {filter.label_nb}
+        <Switch
+          checked={checked}
+          onCheckedChange={(next) => onChange(next ? { kind: "boolean", value: true } : undefined)}
+        />
+      </label>
+    );
+  }
+  const multiple = filter.type === "multiselect" || SEARCH_MULTISELECT_KEYS.includes(filter.key);
+  const selected =
+    value?.kind === "multiselect" ? value.values : value?.kind === "select" ? [value.value] : [];
+  const toggle = (option: string) => {
+    if (!multiple) {
+      onChange(selected.includes(option) ? undefined : { kind: "select", value: option });
+      return;
+    }
+    const next = selected.includes(option)
+      ? selected.filter((entry) => entry !== option)
+      : [...selected, option];
+    onChange(next.length ? { kind: "multiselect", values: next } : undefined);
+  };
+  return (
+    <div className="space-y-2 border-b border-border py-3">
+      <p id={labelId} className="text-sm font-medium">
+        {filter.label_nb}
+      </p>
+      <div className="flex flex-wrap gap-2" role="group" aria-labelledby={labelId}>
+        {(filter.options ?? []).map((option) => {
+          const isSelected = selected.includes(option.value);
+          const count = counts?.[option.value];
+          const empty = counts != null && !count && !isSelected;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={isSelected}
+              disabled={empty}
+              onClick={() => toggle(option.value)}
+              className={`min-h-12 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}
+            >
+              {option.label_nb}
+              {count != null && <span className="ml-1 opacity-70">{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Faste hurtigvalg når søket har for få priser til å lage egne. */
+const FALLBACK_PRICE_RANGES: PriceQuickRange[] = [50_000, 100_000, 250_000].map(underPrice);
+
+/**
+ * Telefonens prisfelt: fordelingen over slideren viser hvor annonsene faktisk
+ * ligger, Fra/Til er presis inntasting, og hurtigvalgene kommer fra prisene i
+ * søket. «Bare gratis» og bryteren for gratisannonser dekker de to vanligste
+ * spørsmålene om gratis.
+ */
+function NativePriceFields({
+  min,
+  max,
+  includeFree,
+  bounds,
+  prices,
+  revealHistogramOnDrag = false,
+  onChange,
+}: {
+  min: number | null;
+  max: number | null;
+  includeFree: boolean;
+  bounds: RangeBounds;
+  prices?: number[];
+  /** I filterlisten vises fordelingen først når slideren tas i bruk. */
+  revealHistogramOnDrag?: boolean;
+  onChange: (patch: { min?: number | null; max?: number | null; includeFree?: boolean }) => void;
+}) {
+  const scaledBounds = prices?.length
+    ? { ...bounds, max: priceScaleMax(prices, bounds.max, max) }
+    : bounds;
+  const histogram = prices?.length ? bucketPrices(prices, scaledBounds) : undefined;
+  const fromData = prices ? priceQuickRanges(prices) : [];
+  const ranges = (fromData.length ? fromData : FALLBACK_PRICE_RANGES).filter(
+    (range) => (range.max ?? 0) <= bounds.max,
+  );
+  const onlyFree = max === 0 && min == null;
+  const chipClass = (active: boolean) =>
+    `min-h-12 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"
+    }`;
+
+  return (
+    <div className="space-y-4">
+      <RangeFilterField
+        label="Pris"
+        variant="sheet"
+        histogram={histogram}
+        revealHistogramOnDrag={revealHistogramOnDrag}
+        bounds={scaledBounds}
+        inputMax={bounds.max}
+        value={{ min: min ?? undefined, max: onlyFree ? undefined : (max ?? undefined) }}
+        onChange={(next) => onChange({ min: next.min ?? null, max: next.max ?? null })}
+      />
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Raske prisvalg">
+        {ranges.map((range) => {
+          const active = (range.min ?? null) === min && range.max === max;
+          return (
+            <button
+              key={range.label}
+              type="button"
+              aria-pressed={active}
+              disabled={min != null && range.max != null && range.max < min}
+              className={`${chipClass(active)} disabled:opacity-40`}
+              onClick={() => {
+                void hapticImpact("light");
+                onChange(
+                  active
+                    ? { min: null, max: null }
+                    : { min: range.min ?? null, max: range.max ?? null },
+                );
+              }}
+            >
+              {range.label}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-pressed={onlyFree}
+          className={chipClass(onlyFree)}
+          onClick={() => {
+            void hapticImpact("light");
+            onChange(
+              onlyFree ? { min: null, max: null } : { min: null, max: 0, includeFree: true },
+            );
+          }}
+        >
+          Bare gratis
+        </button>
+      </div>
+      <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 text-base">
+        Ta med gratis-annonser
+        <Switch
+          checked={includeFree}
+          disabled={onlyFree}
+          onCheckedChange={(checked) => onChange({ includeFree: checked })}
+        />
+      </label>
+    </div>
   );
 }
 

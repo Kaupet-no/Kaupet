@@ -4,6 +4,7 @@
  * REST-endepunktene som bruker `authenticateApiKey` kommer i en senere fase;
  * denne modulen er kun auth-/genereringslaget.
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { sha256Hex } from "@/lib/request-ip.server";
 
 /** Prefiks på hver klartekstnøkkel, slik at den er gjenkjennelig i logger og
@@ -104,7 +105,7 @@ export async function authenticateApiKey(request: Request): Promise<Authenticate
   }
 
   const hash = await sha256Hex(token);
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .rpc("resolve_organization_api_key", { _key_hash: hash })
     .single();

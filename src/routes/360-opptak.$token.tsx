@@ -4,6 +4,7 @@ import { getVehicle360CaptureSession } from "@/lib/vehicle/vehicle-360.functions
 import { Vehicle360CaptureFlow } from "@/features/vehicle-360-capture/capture-flow";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
+import { describeSafeError } from "@/lib/safe-error";
 
 export const Route = createFileRoute("/360-opptak/$token")({
   loader: async ({ params }) => {
@@ -30,7 +31,7 @@ function CapturePage() {
 }
 
 function CaptureError({ error }: ErrorComponentProps) {
-  console.error(error);
+  console.error("[capture route] error", describeSafeError(error));
   return (
     <div className="mx-auto max-w-md px-6 py-20 text-center">
       <h1 className="font-display text-xl">Kunne ikke starte opptaket</h1>

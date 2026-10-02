@@ -1,3 +1,4 @@
+import { formatDayMonth } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -41,7 +42,7 @@ function formatRelativeTime(iso: string | null): string {
   if (hours < 24) return `${hours} t siden`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days} d siden`;
-  return new Date(iso).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+  return formatDayMonth(iso);
 }
 
 export function NotificationsSection() {

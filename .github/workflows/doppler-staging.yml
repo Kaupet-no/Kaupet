@@ -2,6 +2,13 @@ name: Doppler-pilot (staging)
 
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Kontroll uten synk, eller distribusjon av nye verdier
+        type: choice
+        options: [verify, sync]
+        default: verify
+        required: true
 
 permissions:
   contents: read
@@ -11,8 +18,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sync-mistral:
-    name: Synk Mistral-nøkkel til staging
+  sync-pilot:
+    name: Kontroller eller synk pilothemmeligheter til staging
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 10
@@ -26,36 +33,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Hent pilotnøkkelen og oppdater staging-Workeren
+      - name: Hent og verifiser pilothemmelighetene
         shell: bash
         env:
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          OPERATION: ${{ inputs.operation }}
+          OLD_IMAGE_JOBS_SECRET: ${{ secrets.IMAGE_JOBS_SECRET }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          : "${DOPPLER_TOKEN:?DOPPLER_TOKEN mangler i staging}"
-          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN mangler i staging}"
-          : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID mangler i staging}"
-          umask 077
-          response=$(mktemp)
-          payload=$(mktemp)
-          trap 'rm -f "$response" "$payload"' EXIT
-
-          curl --fail --silent --show-error --max-time 30 \
-            --header "Authorization: Bearer $DOPPLER_TOKEN" \
-            --get 'https://api.doppler.com/v3/configs/config/secrets/download' \
-            --data-urlencode 'project=kaupet' \
-            --data-urlencode 'config=stg' \
-            --data-urlencode 'format=json' \
-            --data-urlencode 'secrets=MISTRAL_API_KEY' \
-            --output "$response"
-
-          jq -e '
-            .MISTRAL_API_KEY | select(type == "string") |
-            select(length > 0 and (test("[\\r\\n]") | not)) |
-            {MISTRAL_API_KEY: .}
-          ' "$response" > "$payload"
-          echo "::add-mask::$(jq -r '.MISTRAL_API_KEY' "$payload")"
-          bunx wrangler secret bulk "$payload" --name kaupet-no-staging
-          echo 'MISTRAL_API_KEY er distribuert til kaupet-no-staging. Test KI-kategoriforslag i staging.' >> "$GITHUB_STEP_SUMMARY"
+        run: bash scripts/doppler-staging.sh

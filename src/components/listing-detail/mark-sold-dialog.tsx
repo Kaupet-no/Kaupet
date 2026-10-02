@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { lastConversationMessages } from "@/lib/conversation-messages";
 import { confirmBuyer } from "@/lib/sales.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { updateListingStatus } from "@/lib/listings.functions";
@@ -42,7 +43,11 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
   const confirmBuyerFn = useServerFn(confirmBuyer);
   const updateStatusFn = useServerFn(updateListingStatus);
 
-  const { data: contacts, isLoading } = useQuery({
+  const {
+    data: contacts,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["listing-contacts", listingId],
     enabled: open,
     queryFn: async (): Promise<Contact[]> => {
@@ -66,12 +71,14 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
           .select("id, display_name, avatar_url")
           .in("id", buyerIds);
         const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
-        return (convs ?? []).map((c) => ({
-          conversationId: c.id,
-          buyerId: c.buyer_id,
-          displayName: pmap.get(c.buyer_id)?.display_name ?? "Ukjent bruker",
-          avatarUrl: pmap.get(c.buyer_id)?.avatar_url ?? null,
-        }));
+        return onlyStartedConversations(
+          (convs ?? []).map((c) => ({
+            conversationId: c.id,
+            buyerId: c.buyer_id,
+            displayName: pmap.get(c.buyer_id)?.display_name ?? "Ukjent bruker",
+            avatarUrl: pmap.get(c.buyer_id)?.avatar_url ?? null,
+          })),
+        );
       }
       type Row = {
         id: string;
@@ -81,15 +88,17 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
           | { display_name: string; avatar_url: string | null }[]
           | null;
       };
-      return ((data ?? []) as unknown as Row[]).map((c) => {
-        const buyer = Array.isArray(c.buyer) ? c.buyer[0] : c.buyer;
-        return {
-          conversationId: c.id,
-          buyerId: c.buyer_id,
-          displayName: buyer?.display_name ?? "Ukjent bruker",
-          avatarUrl: buyer?.avatar_url ?? null,
-        };
-      });
+      return onlyStartedConversations(
+        ((data ?? []) as unknown as Row[]).map((c) => {
+          const buyer = Array.isArray(c.buyer) ? c.buyer[0] : c.buyer;
+          return {
+            conversationId: c.id,
+            buyerId: c.buyer_id,
+            displayName: buyer?.display_name ?? "Ukjent bruker",
+            avatarUrl: buyer?.avatar_url ?? null,
+          };
+        }),
+      );
     },
   });
 
@@ -124,9 +133,11 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>Er du sikker på at du vil sette annonsen som solgt?</AlertDialogTitle>
           <AlertDialogDescription>
-            {contacts && contacts.length > 0
-              ? "Velg hvem du valgte å selge til."
-              : "Ingen har tatt kontakt om denne annonsen ennå."}
+            {isError
+              ? "Kunne ikke hente hvem som har tatt kontakt. Du kan likevel merke annonsen som solgt."
+              : contacts && contacts.length > 0
+                ? "Velg hvem du solgte til, eller merk den som solgt uten å velge kjøper."
+                : "Ingen har tatt kontakt om denne annonsen ennå."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -179,8 +190,28 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
               )
             )}
           </div>
+          {/* Solgt utenfor Kaupet, eller til noen som ikke står i lista. */}
+          {contacts && contacts.length > 0 && (
+            <Button
+              variant="link"
+              className="self-end px-0"
+              disabled={isPending}
+              onClick={() => markSoldWithoutBuyerMut.mutate()}
+            >
+              {markSoldWithoutBuyerMut.isPending && <Loader2 className="size-4 animate-spin" />}
+              Merk som solgt uten å velge kjøper
+            </Button>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+/** Bare samtaler med minst én melding kan bli et salg — en samtale kjøperen
+ * bare har åpnet, er ingen kontakt. */
+async function onlyStartedConversations(contacts: Contact[]): Promise<Contact[]> {
+  if (contacts.length === 0) return contacts;
+  const started = await lastConversationMessages(contacts.map((c) => c.conversationId));
+  return contacts.filter((c) => started.has(c.conversationId));
 }

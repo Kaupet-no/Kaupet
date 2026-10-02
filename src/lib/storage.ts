@@ -12,7 +12,7 @@ import {
 } from "@/lib/storage.functions";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
-export const MAX_LISTING_IMAGES = 20;
+export const MAX_LISTING_IMAGES = 100;
 // Må matche `.max(...)` på `paths` i signMessageAttachmentUrls-validatoren i
 // storage.functions.ts.
 export const MAX_ATTACHMENT_PATHS_PER_REQUEST = 100;

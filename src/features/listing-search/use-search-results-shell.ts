@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { z } from "zod";
-import type { ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import type { MapListing } from "@/components/listings-map";
 import { resolveCategoryIds, type Category, type CatTree } from "@/lib/categories";
 import type { CategoryFilter } from "@/lib/category-filters";
@@ -222,6 +222,7 @@ export function useSearchResultsShell({
     cover_path: l.cover_path,
     category_slug: l.category_slug,
     attributes: l.attributes,
+    sold_at: l.sold_at,
   }));
 
   const mapListings: MapListing[] = (listings ?? [])
@@ -235,6 +236,7 @@ export function useSearchResultsShell({
       lat: l.lat,
       lng: l.lng,
       cover_path: l.cover_path,
+      sold_at: l.sold_at,
     }));
 
   const mapCenter =

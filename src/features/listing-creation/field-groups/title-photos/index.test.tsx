@@ -27,8 +27,7 @@ const noopPhotoSuggestionProps = {
   photoSuggestionStatus: "idle" as const,
   analyzePhotos: vi.fn(),
   photoTitleSuggestion: null,
-  dismissPhotoTitleSuggestion: vi.fn(),
-  photoCategorySuggestions: [],
+  applyPhotoTitleSuggestion: vi.fn(),
 };
 
 describe("PhotosGroup", () => {
@@ -103,9 +102,25 @@ describe("PhotosGroup", () => {
     expect(screen.getByText(/Legg til minst ett bilde først/)).toBeTruthy();
   });
 
+  it("ber om Cloudflare-verifisering uten å kalle det en bildefeil", () => {
+    render(
+      <PhotosGroup
+        images={[image]}
+        setImages={vi.fn()}
+        uploadProgress={null}
+        noImageConfirmPending={false}
+        {...noopPhotoSuggestionProps}
+        photoSuggestionEnabled
+        photoSuggestionStatus="verification-required"
+      />,
+    );
+    expect(screen.getByText(/Bekreft Cloudflare-sjekken/).getAttribute("role")).toBe("status");
+    expect(screen.queryByText(/Vi fikk dessverre ikke til å analysere bildene/)).toBeNull();
+  });
+
   it("fyller en tom tittel direkte med forslaget fra bildene", () => {
     const setValue = vi.fn();
-    const dismissPhotoTitleSuggestion = vi.fn();
+    const applyPhotoTitleSuggestion = vi.fn();
     render(
       <PhotosGroup
         images={[image]}
@@ -115,31 +130,12 @@ describe("PhotosGroup", () => {
         {...noopPhotoSuggestionProps}
         photoSuggestionEnabled
         setValue={setValue}
-        dismissPhotoTitleSuggestion={dismissPhotoTitleSuggestion}
+        applyPhotoTitleSuggestion={applyPhotoTitleSuggestion}
         photoTitleSuggestion="Grå sofa i stoff"
       />,
     );
     expect(setValue).toHaveBeenCalledWith("title", "Grå sofa i stoff", { shouldValidate: true });
-    expect(dismissPhotoTitleSuggestion).toHaveBeenCalled();
-  });
-
-  it("viser kategoriforslaget fra bildene", () => {
-    render(
-      <PhotosGroup
-        images={[image]}
-        setImages={vi.fn()}
-        uploadProgress={null}
-        noImageConfirmPending={false}
-        {...noopPhotoSuggestionProps}
-        photoSuggestionEnabled
-        photoCategorySuggestions={[
-          { category_id: "c", parent_id: "p", name_nb: "Sofaer", parent_name_nb: "Møbler" },
-        ]}
-      />,
-    );
-    expect(screen.getByTestId("photo-category-suggestion").textContent).toContain(
-      "Møbler › Sofaer",
-    );
+    expect(applyPhotoTitleSuggestion).toHaveBeenCalledWith("Grå sofa i stoff");
   });
 });
 

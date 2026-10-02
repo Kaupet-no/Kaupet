@@ -1,4 +1,5 @@
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import type { HistoryState } from "@tanstack/react-router";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
 import { resolveTextToFilters, type InterpretedCriterion } from "./resolve-text-to-filters";
@@ -66,8 +67,23 @@ export async function resolveAppliedSearch({
 }
 
 type SubmitSearchParams = SearchResolutionParams & {
-  commit: (search: SearchParams) => void;
+  /** `criteria` er tolkningen av søketeksten — send den med
+   * via `interpretedSearchState`, så /annonser kan vise «Tolket som».
+   * Utelatt når det ikke er tekst å tolke. */
+  commit: (search: SearchParams, criteria?: InterpretedCriterion[]) => void;
 };
+
+/** Router-state som tar med tolkningen til /annonser (se HistoryState i
+ * router.tsx). */
+export function interpretedSearchState(criteria: InterpretedCriterion[] = []): HistoryState {
+  return { interpretedCriteria: criteria };
+}
+
+export function readInterpretedSearchState(
+  state: HistoryState | undefined,
+): InterpretedCriterion[] {
+  return state?.interpretedCriteria ?? [];
+}
 
 /** Resolves optional text and commits the complete applied search to the URL once. */
 export async function submitSearch({ commit, ...params }: SubmitSearchParams): Promise<void> {
@@ -76,6 +92,6 @@ export async function submitSearch({ commit, ...params }: SubmitSearchParams): P
     commit(writeAppliedSearchState(applied));
     return;
   }
-  const { applied } = await resolveAppliedSearch(params);
-  commit(writeAppliedSearchState(applied));
+  const { applied, criteria } = await resolveAppliedSearch(params);
+  commit(writeAppliedSearchState(applied), criteria);
 }

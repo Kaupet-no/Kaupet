@@ -61,10 +61,10 @@ import { IntegrationsPanel } from "@/features/business-account/integrations-pane
 import { MemberManagement } from "@/features/business-account/member-management";
 import {
   getBusinessListingStats,
-  setBusinessPlan,
   type BusinessListingStat,
   type BusinessListingStats,
-} from "@/lib/business.functions";
+} from "@/lib/business/organization.functions";
+import { setBusinessPlan } from "@/lib/business/plans.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
 import { formatErrorMessage } from "@/lib/errors";
 import { formatNokNumber } from "@/lib/format";

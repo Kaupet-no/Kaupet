@@ -31,11 +31,19 @@ test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
   await page.goto("/?forcenative=1");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
-  await page.getByRole("button", { name: "Søk", exact: true }).last().click();
-  await expect(page).toHaveURL(/\/\?forcenative=1/);
-  await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).toBeVisible();
-  await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toBeVisible();
+  // Søk-fanen er et sted: den går til resultatsiden, ikke en skuff over forsiden.
+  const searchTab = page.getByRole("button", { name: "Søk", exact: true }).last();
+  await searchTab.click();
+  await expect(page).toHaveURL(/\/annonser/);
+  await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).not.toBeVisible();
+  // Ingen vent på inputen: trykket rett etter ruting skal tåle at siden ikke er montert ennå.
+  const searchbox = page.locator('main input[name="q"]');
+  await expect(searchTab).toHaveAttribute("aria-current", "page");
   await expect(page.locator("html")).toHaveClass(/native/);
+
+  // Nytt trykk på aktiv fane øverst på siden setter fokus i søkefeltet.
+  await searchTab.click();
+  await expect(searchbox).toBeFocused();
 });
 test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -45,13 +53,13 @@ test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }
   await page.goto("/?forcenative=1");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
-  await page.getByRole("button", { name: "Åpne søk i annonser" }).click();
+  // Forsiden har et ekte søkefelt: Enter sender søket rett til /annonser.
   const input = page.getByRole("searchbox", { name: "Søk i annonser" });
   await input.fill("sykkel");
-  await page.getByRole("button", { name: "Søk etter «sykkel»" }).click();
+  await input.press("Enter");
 
   await expect(page).toHaveURL(/\/annonser\?.*q=sykkel/);
-  await expect(page.getByRole("button", { name: /sykkel/ })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toHaveValue("sykkel");
 });
 test("søker i nytt kartområde uten å endre URL før eksplisitt handling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -96,7 +104,7 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await page.goto(`/annonser?forcenative&q=${filterFixture.query}&sort=new`);
   await page.waitForLoadState("networkidle");
 
-  const filterButton = page.getByRole("button", { name: /Filtrer/ });
+  const filterButton = page.getByRole("button", { name: /Alle filtre/ });
   await expectNativeTouchTarget(filterButton);
   await filterButton.click();
 
@@ -117,7 +125,7 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await expect(page.getByRole("button", { name: "Bil og MC" })).toBeVisible();
   await page.getByRole("button", { name: "Tilbake til filteroversikt" }).click();
 
-  await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
+  await page.getByRole("switch", { name: "Ta med gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
   await expect(
     page.getByRole("status").filter({ hasText: "Beregner nytt antall treff" }),

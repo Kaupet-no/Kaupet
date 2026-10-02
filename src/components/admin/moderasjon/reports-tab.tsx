@@ -1,3 +1,4 @@
+import { formatDateShort } from "@/lib/format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle, ExternalLink, Flag, Loader2 } from "lucide-react";
@@ -146,11 +147,7 @@ function ReportsTable({
           {reports.map((r) => (
             <TableRow key={r.id}>
               <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                {new Date(r.created_at).toLocaleDateString("nb-NO", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+                {formatDateShort(r.created_at)}
               </TableCell>
               <TableCell className="text-sm">{r.reporter_name ?? "Ukjent"}</TableCell>
               <TableCell className="max-w-xs text-sm">

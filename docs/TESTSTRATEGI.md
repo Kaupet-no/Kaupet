@@ -71,15 +71,15 @@ ISTQB-nivåene mappet konkret til dette repoet:
 **Nivåvalgstabell.** Slå opp raden som passer og bruk nivået den gir. Ikke
 vurder — slå opp. Passer flere rader, velg den øverste.
 
-| Det du tester                                                  | Nivå      | Filnavn                           | Kommando                                           |
-| -------------------------------------------------------------- | --------- | --------------------------------- | -------------------------------------------------- |
-| Ren funksjon, domeneregel, parser, validator, formatering      | Unit      | `<modul>.test.ts`                 | `bun run test -- <sti>`                            |
-| Hook uten DOM                                                  | Unit      | `<hook>.test.ts`                  | `bun run test -- <sti>`                            |
-| Fokus, ARIA, etikett, tastatur, betinget rendering, tilstander | Komponent | `<komponent>.test.tsx`            | `bun run test -- <sti>`                            |
-| Hvem får lese/skrive rad X                                     | RLS       | `src/lib/rls.integration.test.ts` | `bun run test:rls`                                 |
-| Serverfunksjon: autorisasjon, validering, idempotens           | Unit      | `<modul>.test.ts`                 | `bun run test -- <sti>`                            |
-| Flere sider, navigasjon, ekte publisering, innlogging          | E2E       | `e2e/<flyt>.spec.ts`              | `bunx playwright test <fil> --project=desktop-web` |
-| Layout/visuell kontrakt på avtalt milepælsflate                | Visuell   | `e2e/<flyt>.visual.spec.ts`       | `bunx playwright test <fil> --project=visual-web`  |
+| Det du tester                                                  | Nivå      | Filnavn                             | Kommando                                           |
+| -------------------------------------------------------------- | --------- | ----------------------------------- | -------------------------------------------------- |
+| Ren funksjon, domeneregel, parser, validator, formatering      | Unit      | `<modul>.test.ts`                   | `bun run test -- <sti>`                            |
+| Hook uten DOM                                                  | Unit      | `<hook>.test.ts`                    | `bun run test -- <sti>`                            |
+| Fokus, ARIA, etikett, tastatur, betinget rendering, tilstander | Komponent | `<komponent>.test.tsx`              | `bun run test -- <sti>`                            |
+| Hvem får lese/skrive rad X                                     | RLS       | `src/lib/rls/*.integration.test.ts` | `bun run test:rls`                                 |
+| Serverfunksjon: autorisasjon, validering, idempotens           | Unit      | `<modul>.test.ts`                   | `bun run test -- <sti>`                            |
+| Flere sider, navigasjon, ekte publisering, innlogging          | E2E       | `e2e/<flyt>.spec.ts`                | `bunx playwright test <fil> --project=desktop-web` |
+| Layout/visuell kontrakt på avtalt milepælsflate                | Visuell   | `e2e/<flyt>.visual.spec.ts`         | `bunx playwright test <fil> --project=visual-web`  |
 
 Å skrive en E2E-test for noe en unit-test kan bevise er en feil, ikke
 grundighet. Finner du ingen rad som passer: **stopp og eskaler** (§ 16.3).
@@ -210,7 +210,7 @@ Foreslått testnivå for regresjonsvern: unit|component|rls|e2e
 ```
 
 **Dekningsratchet.** Terskelen i `vitest.config.ts` står i dag på
-statements 9 / branches 6 / functions 5 / lines 9. Den er et _gulv_, ikke et
+statements 36 / branches 31 / functions 31 / lines 38. Den er et _gulv_, ikke et
 mål. Ratchet-regel: når en modul får ny testdekning, hev terskelen til
 nærmeste hele prosent under målt verdi i samme PR. Terskelen skal aldri
 senkes; en senking krever eksplisitt godkjenning fra testleder i PR-teksten.
@@ -319,7 +319,7 @@ Hver playbook er selvstendig. En agent som får en oppgave skal:
 
 ```
 1. Krever lokal stack: supabase start (Docker). Testene ligger i
-   src/lib/rls.integration.test.ts.
+   src/lib/rls/*.integration.test.ts (hjelpere i src/lib/rls-test-helpers.ts).
 2. For hver tabell som eksponeres skal minst tre roller testes:
    eier, annen innlogget bruker, anonym. Der relevant også: moderator,
    admin, utestengt/suspendert bruker.
@@ -415,19 +415,19 @@ tilgang til implementasjonen.
 
 ### 11.1 Autentisering og konto
 
-| ID      | Nivå | P   | Tittel                                                      | Forventet resultat                                                                                                    |
-| ------- | ---- | --- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| AUTH-01 | U    | P0  | Passordstyrke-regler (`password-strength.ts`)               | Grenseverdier for lengde/kompleksitet gir riktig styrkenivå; tom streng gir laveste nivå uten unntak                  |
-| AUTH-02 | U    | P0  | Auth-skjemavalidering (`auth-schemas.ts`)                   | Ugyldig e-post, for kort passord og manglende felt gir feltspesifikke feil, ikke generisk feil                        |
-| AUTH-03 | U    | P0  | `auth-return.ts` returnerer bare til interne stier          | Absolutte eksterne URL-er, `//evil.no` og `javascript:` avvises → open redirect umulig                                |
-| AUTH-04 | U    | P1  | `pending-auth-intent.ts` lagrer og henter intensjon én gang | `take…` tømmer lageret; utløpt/ugyldig payload gir `null` uten kast                                                   |
-| AUTH-05 | E    | P0  | Innlogging og redirect tilbake til opprinnelig side         | Bruker som klikket «favoritt» anonymt havner tilbake på samme annonse, med handlingen fullført                        |
-| AUTH-06 | E    | P0  | Beskyttede ruter krever sesjon                              | Anonym på `/mine-annonser`, `/meldinger`, `/ny-annonse` sendes til auth, ikke til feilside                            |
-| AUTH-07 | E    | P1  | Passordtilbakestilling                                      | Ugyldig/utløpt token gir forklarende melding, ikke stack trace; gyldig token setter nytt passord og logger inn        |
-| AUTH-08 | R    | P0  | Utestengt bruker (`user_bans`)                              | Kan ikke opprette annonse, melding eller anmeldelse; eksisterende data er fortsatt skjult/vist etter policy           |
-| AUTH-09 | R    | P0  | Suspendert bruker (`user_suspensions`)                      | Skrivetilgang blokkert i suspensjonsperioden, gjenopprettes automatisk etter utløp                                    |
-| AUTH-10 | E+R  | P1  | Kontosletting (`account_deletions`)                         | Sletting fjerner/anonymiserer eierdata etter policy; samtalepartner ser konsistent tilstand, ikke ødelagte referanser |
-| AUTH-11 | M    | P1  | Sesjonsutløp midt i en flyt                                 | Bruker mister ikke utfylte data; blir bedt om å logge inn og returneres til samme sted                                |
+| ID      | Nivå | P   | Tittel                                                      | Forventet resultat                                                                                                                                            |
+| ------- | ---- | --- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-01 | U    | P0  | Passordstyrke-regler (`password-strength.ts`)               | Grenseverdier for lengde/kompleksitet gir riktig styrkenivå; tom streng gir laveste nivå uten unntak                                                          |
+| AUTH-02 | U    | P0  | Auth-skjemavalidering (`auth-schemas.ts`)                   | `emailSchema`: tom → «Fyll inn e-postadressen din», ugyldig → «Skriv inn en gyldig e-postadresse»; `passwordSchema`: 9 tegn → «Minst 10 tegn», 10 tegn godtas |
+| AUTH-03 | U    | P0  | `auth-return.ts` returnerer bare til interne stier          | Absolutte eksterne URL-er, `//evil.no` og `javascript:` avvises → open redirect umulig                                                                        |
+| AUTH-04 | U    | P1  | `pending-auth-intent.ts` lagrer og henter intensjon én gang | `take…` tømmer lageret; utløpt/ugyldig payload gir `null` uten kast                                                                                           |
+| AUTH-05 | E    | P0  | Innlogging og redirect tilbake til opprinnelig side         | Bruker som klikket «favoritt» anonymt havner tilbake på samme annonse, med handlingen fullført                                                                |
+| AUTH-06 | E    | P0  | Beskyttede ruter krever sesjon                              | Anonym på `/mine-annonser`, `/meldinger`, `/ny-annonse` sendes til auth, ikke til feilside                                                                    |
+| AUTH-07 | E    | P1  | Passordtilbakestilling                                      | Ugyldig/utløpt token gir forklarende melding, ikke stack trace; gyldig token setter nytt passord og logger inn                                                |
+| AUTH-08 | R    | P0  | Utestengt bruker (`user_bans`)                              | Kan ikke opprette annonse, melding eller anmeldelse; eksisterende data er fortsatt skjult/vist etter policy                                                   |
+| AUTH-09 | R    | P0  | Suspendert bruker (`user_suspensions`)                      | Skrivetilgang blokkert i suspensjonsperioden, gjenopprettes automatisk etter utløp                                                                            |
+| AUTH-10 | E+R  | P1  | Kontosletting (`account_deletions`)                         | Sletting fjerner/anonymiserer eierdata etter policy; samtalepartner ser konsistent tilstand, ikke ødelagte referanser                                         |
+| AUTH-11 | M    | P1  | Sesjonsutløp midt i en flyt                                 | Bruker mister ikke utfylte data; blir bedt om å logge inn og returneres til samme sted                                                                        |
 
 #### 11.1.1 Bedriftskontoer, Proff og prøveperiode — R1/R4
 
@@ -678,7 +678,7 @@ eller mot mock.
 
 ### 11.12 Data, migrasjoner og RLS — R1
 
-Gjennomføres etter PB-4. `src/lib/rls.integration.test.ts` dekker i dag ~35
+Gjennomføres etter PB-4. `src/lib/rls/*.integration.test.ts` dekker i dag ~35
 tabeller/scenarioer. Kravet er _fullstendig_ dekning av tabellene under.
 
 | ID    | Nivå    | P   | Tittel                                                                                     | Forventet resultat                                                                                                                   |
@@ -867,18 +867,16 @@ Anbefaling: release / release med forbehold / ikke release
 Nåtilstand målt mot denne strategien. Rekkefølgen er anbefalt
 gjennomføringsrekkefølge for agenter.
 
-| #   | Gap                                                                         | Caser                          | Innsats |
-| --- | --------------------------------------------------------------------------- | ------------------------------ | ------- |
-| 1   | Ingen mekanisme som fanger tabeller uten RLS-case                           | DB-01, DB-02                   | S       |
-| 2   | Serverfunksjoner mangler systematisk autorisasjons-/valideringstest         | ADM-03, SEC-06, SEC-07         | L       |
-| 3   | Vipps-flyten har unit-tester på signatur, men ikke på idempotens/avstemming | PAY-03, PAY-05, PAY-07, PAY-08 | M       |
-| 4   | Ingen automatisert IDOR-/hemmelighetssonde                                  | SEC-02, SEC-08                 | M       |
-| 5   | Ingen målte Web Vitals; kun bundle-budsjett                                 | PERF-02, PERF-03               | M       |
-| 6   | A11y dekket av én semantisk E2E-spec; mangler feltnivå-assertions           | A11Y-02, A11Y-03, A11Y-04      | M       |
-| 7   | Dekningsterskel på 9 % gir svakt regresjonsvern                             | § 9 ratchet                    | L       |
-| 8   | E2E kjører ikke på PR mot `staging`, kun mot `main`                         | COMP-01                        | S       |
-| 9   | Ingen testdekning av varselutsending og dedupe                              | NOTIF-03, NOTIF-06, NOTIF-07   | M       |
-| 10  | Polish-sjekklisten er ikke knyttet til PR-malen                             | § 11.17                        | S       |
+| #   | Gap                                                                                                                 | Caser                        | Innsats |
+| --- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
+| 1   | Serverfunksjoner mangler systematisk autorisasjons-/valideringstest                                                 | ADM-03, SEC-06, SEC-07       | L       |
+| 2   | Vipps har tester for konkurrerende checkout og webhook-retry, men mangler samtidige webhook-kall og full avstemming | PAY-05, PAY-07, PAY-08       | M       |
+| 3   | Ingen automatisert IDOR-/hemmelighetssonde                                                                          | SEC-02, SEC-08               | M       |
+| 4   | Ingen målte Web Vitals; kun bundle-budsjett                                                                         | PERF-02, PERF-03             | M       |
+| 5   | A11y dekket av én semantisk E2E-spec; mangler feltnivå-assertions                                                   | A11Y-02, A11Y-03, A11Y-04    | M       |
+| 6   | Dekningsterskel på 9 % gir svakt regresjonsvern                                                                     | § 9 ratchet                  | L       |
+| 7   | Ingen testdekning av varselutsending og dedupe                                                                      | NOTIF-03, NOTIF-06, NOTIF-07 | M       |
+| 8   | Polish-sjekklisten er ikke knyttet til PR-malen                                                                     | § 11.17                      | S       |
 
 ## 15. Oppgavemal for tildeling til AI-agent
 

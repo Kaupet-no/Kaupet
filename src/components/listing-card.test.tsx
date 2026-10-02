@@ -3,8 +3,10 @@
 import type { ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ListingCard, type ListingCardData } from "./listing-card";
+import { ListingCard } from "./listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { ListingCardExpanded } from "./listing-card-expanded";
+import { ListingCardImages } from "./listing-card-images";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
@@ -74,5 +76,22 @@ describe("offentlige annonsekort", () => {
     );
 
     expect(screen.getByText("Selger oppgir 1 kompatibel bilmodell")).toBeTruthy();
+  });
+
+  it("viser Solgt-merke og Solgt som pris for nylig solgte annonser", () => {
+    const sold = { ...listing, sold_at: "2026-10-01T12:00:00Z" };
+    render(
+      <>
+        <ListingCard listing={sold} />
+        <ListingCard listing={sold} compact />
+        <ListingCardExpanded listing={sold} />
+        <ListingCardImages listing={sold} />
+      </>,
+    );
+
+    // Båndet og prisen: «Solgt» i DOM-en, store bokstaver bare via CSS.
+    expect(screen.getAllByText("Solgt")).toHaveLength(8);
+    expect(screen.queryByText("SOLGT")).toBeNull();
+    expect(screen.queryByText("250 000 kr")).toBeNull();
   });
 });

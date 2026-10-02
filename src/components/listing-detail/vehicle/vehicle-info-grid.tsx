@@ -11,6 +11,7 @@
   Palette,
 } from "lucide-react";
 
+import { formatDateShort, formatNokNumber } from "@/lib/format";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import {
   BODY_TYPE_LABEL_NB,
@@ -39,15 +40,7 @@ const attrNum = (attributes: Attrs, key: string): number | null => {
 type Attrs = Record<string, unknown>;
 
 function formatMileage(mileageKm: number): string {
-  return `${mileageKm.toLocaleString("nb-NO")} km`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("nb-NO", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return `${formatNokNumber(mileageKm)} km`;
 }
 
 type SpecItem = {
@@ -140,7 +133,7 @@ export function VehicleInfoGrid({
         key: "eu_control",
         icon: CalendarCheck,
         label: "Frist EU-kontroll",
-        value: formatDate(nextEuControl),
+        value: formatDateShort(nextEuControl),
       });
     }
   }
@@ -149,7 +142,7 @@ export function VehicleInfoGrid({
       key: "first_registration",
       icon: CalendarDays,
       label: "1. gang registrert",
-      value: formatDate(vehicleLookup.first_registration_date),
+      value: formatDateShort(vehicleLookup.first_registration_date),
     });
   }
   const color = vehicleLookup?.color ?? attrStr(attrs, "color");

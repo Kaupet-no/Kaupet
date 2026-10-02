@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
@@ -604,7 +605,7 @@ export function BulkListingImport({
                               <TableCell>{row.externalId}</TableCell>
                               <TableCell>{row.category}</TableCell>
                               <TableCell>{row.title}</TableCell>
-                              <TableCell>{row.priceNok.toLocaleString("nb-NO")} kr</TableCell>
+                              <TableCell>{formatNokNumber(row.priceNok)} kr</TableCell>
                               <TableCell>
                                 {previewResult ? (
                                   <span

@@ -1,4 +1,5 @@
-import { toClientError } from "@/lib/to-client-error";
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { ClientError, markLogged, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -10,7 +11,7 @@ export const adminListPromotionPricing = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from("promotion_pricing")
       .select("id, duration_days, price_nok, active, updated_at")
@@ -34,7 +35,7 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { error } = await supabaseAdmin.from("promotion_pricing").upsert(
       {
         duration_days: data.duration_days,
@@ -63,7 +64,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     let q = supabaseAdmin
       .from("listing_promotions")
       .select(
@@ -109,7 +110,7 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
       .select("id, status, price_nok, vipps_reference, vipps_mode, is_gift")
@@ -118,27 +119,30 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke fremheving");
+    if (!promo) throw new ClientError("Fant ikke fremheving", 404);
     if (promo.is_gift || !promo.vipps_reference) {
       return { hasVipps: false as const };
     }
-    const { getVippsPayment } = await import("@/lib/vipps.server");
+    const { getVippsPayment, vippsPaymentStatus } = await import("@/lib/vipps.server");
     const { getRequest } = await import("@tanstack/react-start/server");
     const host = getRequest().headers.get("host");
     const mode = promo.vipps_mode as "test" | "production";
     try {
       const result = await getVippsPayment(promo.vipps_reference, host, mode);
-      const captured = result.state === "CAPTURED" || result.state === "AUTHORIZED";
-      const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED", "FAILED"];
+      // Vipps sin `state` blir stående på AUTHORIZED etter capture/refusjon;
+      // vis og sammenlign den utledede statusen.
+      const status = vippsPaymentStatus(result);
+      const paid = status === "CAPTURED" || status === "AUTHORIZED";
+      const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED"];
       const mismatch =
-        (captured && (promo.status === "pending" || promo.status === "failed")) ||
-        (result.state === "REFUNDED" && promo.status !== "refunded") ||
-        (failedStates.includes(result.state) && promo.status === "active");
+        (paid && (promo.status === "pending" || promo.status === "failed")) ||
+        (status === "REFUNDED" && promo.status !== "refunded") ||
+        (failedStates.includes(status) && promo.status === "active");
       return {
         hasVipps: true as const,
         mode,
         reference: promo.vipps_reference,
-        state: result.state,
+        state: status,
         pspReference: result.pspReference,
         amountNok: result.amount ? result.amount.value / 100 : undefined,
         mismatch,
@@ -158,7 +162,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
       .select("id, price_nok, vipps_reference, vipps_mode, status, is_gift")
@@ -167,10 +171,10 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke fremheving");
-    if (promo.is_gift) throw new Error("Gratis fremheving kan ikke refunderes");
-    if (!promo.vipps_reference) throw new Error("Mangler Vipps-referanse");
-    if (promo.status === "refunded") throw new Error("Allerede refundert");
+    if (!promo) throw new ClientError("Fant ikke fremheving", 404);
+    if (promo.is_gift) throw new ClientError("Gratis fremheving kan ikke refunderes", 409);
+    if (!promo.vipps_reference) throw new ClientError("Mangler Vipps-referanse", 409);
+    if (promo.status === "refunded") throw new ClientError("Allerede refundert", 400);
 
     const { refundVippsPayment } = await import("@/lib/vipps.server");
     const { getRequest } = await import("@tanstack/react-start/server");
@@ -178,7 +182,10 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     await refundVippsPayment(
       promo.vipps_reference,
       promo.price_nok,
-      `r-${promo.id.replace(/-/g, "")}-${Date.now().toString(36)}`,
+      // Stabil nøkkel per fremheving: et dobbeltklikk eller et nytt forsøk
+      // før status er satt til refunded gir samme Vipps-operasjon, ikke to
+      // refusjoner. Vi refunderer alltid hele beløpet, så én nøkkel holder.
+      `r-${promo.id.replace(/-/g, "")}`,
       host,
       promo.vipps_mode as "test" | "production",
     );
@@ -189,6 +196,14 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       .eq("id", promo.id);
     if (refundErr) {
       await logServerError("refundPromotion.updateStatus", refundErr, { promotion_id: promo.id });
+      // Pengene er refundert, men raden står som active: si fra til admin.
+      // Nytt forsøk er trygt (stabil idempotency-nøkkel).
+      throw markLogged(
+        new ClientError(
+          "Refusjonen er gjennomført i Vipps, men statusen kunne ikke lagres. Prøv igjen – pengene refunderes ikke to ganger.",
+          500,
+        ),
+      );
     }
 
     const { error: logErr } = await supabaseAdmin.from("admin_moderation_log").insert({
@@ -216,7 +231,7 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: listing, error: lerr } = await supabaseAdmin
       .from("listings")
@@ -226,8 +241,8 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
     if (lerr) {
       throw await toClientError("database", lerr);
     }
-    if (!listing) throw new Error("Annonsen finnes ikke");
-    if (listing.status !== "active") throw new Error("Annonsen må være aktiv");
+    if (!listing) throw new ClientError("Annonsen finnes ikke", 404);
+    if (listing.status !== "active") throw new ClientError("Annonsen må være aktiv", 409);
 
     const { data: existing } = await supabaseAdmin
       .from("listing_promotions")
@@ -235,7 +250,7 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
       .eq("listing_id", data.listing_id)
       .in("status", ["active", "pending", "gifted"])
       .maybeSingle();
-    if (existing) throw new Error("Annonsen har allerede en aktiv fremheving");
+    if (existing) throw new ClientError("Annonsen har allerede en aktiv fremheving", 409);
 
     const now = new Date();
     const expires = new Date(now.getTime() + data.duration_days * 24 * 60 * 60 * 1000);
@@ -276,7 +291,7 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ q: z.string().trim().min(1).max(120) }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: rows, error } = await supabaseAdmin
       .from("listings")
       .select("id, title, city, status, seller_id")

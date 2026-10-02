@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import { Fragment, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ClientOnly, Link, useLocation } from "@tanstack/react-router";
 import { ChevronLeft, Expand, Loader2, MapPin, Maximize2, Shrink } from "lucide-react";
@@ -118,7 +119,7 @@ function LightboxLoadingFallback() {
  * would show up on an unrelated listing (see F12). */
 function BackToSearchLink() {
   const fromSearch = useLocation({
-    select: (l) => Boolean((l.state as unknown as Record<string, unknown>).fromSearch),
+    select: (l) => Boolean(l.state.fromSearch),
   });
   const ctx = readLastSearchContext();
   if (!fromSearch || !ctx) return null;
@@ -366,7 +367,7 @@ export function ListingDetailView({
   const priceLabel = isFree
     ? "Gis bort"
     : displayPriceKr != null
-      ? `${displayPriceKr.toLocaleString("nb-NO")} kr`
+      ? `${formatNokNumber(displayPriceKr)} kr`
       : phonePreview
         ? ""
         : "Pris ved henvendelse";
@@ -392,7 +393,7 @@ export function ListingDetailView({
           {v.isFree ? (
             "Gis bort"
           ) : v.priceNok != null ? (
-            `${(buyerPaysAvgift ? v.priceNok + omregistreringsavgiftKr! : v.priceNok).toLocaleString("nb-NO")} kr`
+            `${formatNokNumber(buyerPaysAvgift ? v.priceNok + omregistreringsavgiftKr! : v.priceNok)} kr`
           ) : phonePreview ? (
             <PlaceholderLine className="my-3 w-2/5" />
           ) : (
@@ -935,14 +936,12 @@ function ListingDetailViewBody({
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-muted-foreground">Selgers pris</dt>
                   <dd className="font-medium">
-                    {avgiftBreakdown.sellerPriceKr.toLocaleString("nb-NO")} kr
+                    {formatNokNumber(avgiftBreakdown.sellerPriceKr)} kr
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-muted-foreground">Omregistreringsavgift</dt>
-                  <dd className="font-medium">
-                    {avgiftBreakdown.avgiftKr.toLocaleString("nb-NO")} kr
-                  </dd>
+                  <dd className="font-medium">{formatNokNumber(avgiftBreakdown.avgiftKr)} kr</dd>
                 </div>
                 <p className="pt-1 text-xs leading-snug text-muted-foreground">
                   Avgiften betales av kjøper ved eierskifte.

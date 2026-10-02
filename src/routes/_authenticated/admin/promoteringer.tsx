@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -331,12 +332,11 @@ function AdminPromotionsPage() {
                       </TableCell>
                       <TableCell>{p.profiles?.display_name ?? "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {new Date(p.created_at).toLocaleString("nb-NO")}
+                        {formatDateTime(p.created_at)}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {p.starts_at ? new Date(p.starts_at).toLocaleDateString("nb-NO") : "—"} —{" "}
-                        {p.expires_at ? new Date(p.expires_at).toLocaleDateString("nb-NO") : "—"} (
-                        {p.duration_days} d)
+                        {p.starts_at ? formatDate(p.starts_at) : "—"} —{" "}
+                        {p.expires_at ? formatDate(p.expires_at) : "—"} ({p.duration_days} d)
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {p.is_gift ? "Gratis" : `${p.price_nok} kr`}
@@ -547,16 +547,10 @@ function DetailDialog({
                 value={promo.is_gift ? "Gratis (gave)" : `${promo.price_nok} kr`}
               />
               <DetailField label="Varighet" value={`${promo.duration_days} dager`} />
-              <DetailField
-                label="Opprettet"
-                value={new Date(promo.created_at).toLocaleString("nb-NO")}
-              />
+              <DetailField label="Opprettet" value={formatDateTime(promo.created_at)} />
               <DetailField label="Intern status" value={<StatusBadge status={promo.status} />} />
               {promo.refunded_at && (
-                <DetailField
-                  label="Refundert"
-                  value={new Date(promo.refunded_at).toLocaleString("nb-NO")}
-                />
+                <DetailField label="Refundert" value={formatDateTime(promo.refunded_at)} />
               )}
             </div>
 

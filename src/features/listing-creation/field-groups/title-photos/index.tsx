@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useEffectEvent, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Sparkles } from "lucide-react";
 
@@ -31,11 +31,13 @@ export function VehicleTitleFields({
 }: Pick<WizardSharedProps, "setValue" | "errors" | "title" | "attributes">) {
   const computedTitle = computeVehicleTitle(attributes);
 
-  useEffect(() => {
-    if (computedTitle && computedTitle !== title) {
-      setValue("title", computedTitle, { shouldValidate: true });
+  const syncTitle = useEffectEvent((next: string) => {
+    if (next && next !== title) {
+      setValue("title", next, { shouldValidate: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    syncTitle(computedTitle);
   }, [computedTitle]);
 
   return (
@@ -132,8 +134,7 @@ export function PhotosGroup({
   photoSuggestionStatus,
   analyzePhotos,
   photoTitleSuggestion,
-  dismissPhotoTitleSuggestion,
-  photoCategorySuggestions,
+  applyPhotoTitleSuggestion,
 }: Pick<
   WizardSharedProps,
   | "images"
@@ -146,18 +147,18 @@ export function PhotosGroup({
   | "photoSuggestionStatus"
   | "analyzePhotos"
   | "photoTitleSuggestion"
-  | "dismissPhotoTitleSuggestion"
-  | "photoCategorySuggestions"
+  | "applyPhotoTitleSuggestion"
 >) {
-  const photoCategory = photoCategorySuggestions[0];
   // Brukeren ba om å få tittelen fylt ut: er feltet tomt, brukes forslaget
   // direkte. Har de skrevet noe selv, får de heller velge med "Bruk" under.
-  useEffect(() => {
-    if (photoTitleSuggestion && !title.trim()) {
-      setValue("title", photoTitleSuggestion, { shouldValidate: true });
-      dismissPhotoTitleSuggestion();
+  const fillTitleFromSuggestion = useEffectEvent((suggestion: typeof photoTitleSuggestion) => {
+    if (suggestion && !title.trim()) {
+      setValue("title", suggestion, { shouldValidate: true });
+      applyPhotoTitleSuggestion(suggestion);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    fillTitleFromSuggestion(photoTitleSuggestion);
   }, [photoTitleSuggestion]);
 
   return (
@@ -181,7 +182,11 @@ export function PhotosGroup({
               data-testid="photo-suggestion-button"
               className="native-touch-target h-12 w-full gap-2 rounded-xl border-brand/40 text-brand-text hover:text-brand-text"
               onClick={analyzePhotos}
-              disabled={images.length === 0 || photoSuggestionStatus === "analyzing"}
+              disabled={
+                images.length === 0 ||
+                photoSuggestionStatus === "analyzing" ||
+                photoSuggestionStatus === "verifying"
+              }
               aria-describedby="photo-suggestion-help"
             >
               <Sparkles className="size-4 shrink-0" aria-hidden />
@@ -206,6 +211,12 @@ export function PhotosGroup({
               Analyserer bildene …
             </p>
           )}
+          {(photoSuggestionStatus === "verifying" ||
+            photoSuggestionStatus === "verification-required") && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Bekreft Cloudflare-sjekken for å analysere bildene.
+            </p>
+          )}
           {photoSuggestionStatus === "unavailable" && (
             <p className="text-sm text-muted-foreground">
               Vi fikk dessverre ikke til å analysere bildene nå. Du må fylle ut selv.
@@ -223,29 +234,12 @@ export function PhotosGroup({
                 className="native-touch-target"
                 onClick={() => {
                   setValue("title", photoTitleSuggestion, { shouldValidate: true });
-                  dismissPhotoTitleSuggestion();
+                  applyPhotoTitleSuggestion(photoTitleSuggestion);
                 }}
               >
                 Bruk
               </Button>
             </div>
-          )}
-          {/* Settes ikke her: kategorien kan bytte sidesettet (kjøretøy/båt),
-              så den bekreftes med chippen på "Om tingen". */}
-          {photoCategory && (
-            <p
-              data-testid="photo-category-suggestion"
-              className="flex flex-wrap items-center gap-1 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm"
-            >
-              <span className="inline-flex items-center gap-1 font-medium text-brand-text">
-                <Sparkles className="size-4 shrink-0" aria-hidden />
-                Kaupet foreslår kategori:
-              </span>
-              {photoCategory.parent_name_nb
-                ? `${photoCategory.parent_name_nb} › ${photoCategory.name_nb}`
-                : photoCategory.name_nb}
-              <span className="text-muted-foreground">(bekreftes på neste steg)</span>
-            </p>
           )}
         </>
       )}

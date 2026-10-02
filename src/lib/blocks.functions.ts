@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -34,13 +34,13 @@ export const createBlock = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (data.targetUserId === userId) {
-      throw new Error("Du kan ikke blokkere deg selv");
+      throw new ClientError("Du kan ikke blokkere deg selv", 400);
     }
 
     let listingId: string | null = null;
     if (data.scope === "conversation") {
       if (!data.conversationId) {
-        throw new Error("conversationId kreves for samtale-blokk");
+        throw new ClientError("conversationId kreves for samtale-blokk", 400);
       }
       const { data: conv, error: convErr } = await supabase
         .from("conversations")
@@ -50,13 +50,13 @@ export const createBlock = createServerFn({ method: "POST" })
       if (convErr) {
         throw await toClientError("database", convErr);
       }
-      if (!conv) throw new Error("Samtalen finnes ikke");
+      if (!conv) throw new ClientError("Samtalen finnes ikke", 404);
       if (conv.buyer_id !== userId && conv.seller_id !== userId) {
-        throw new Error("Du er ikke deltaker i denne samtalen");
+        throw new ClientError("Du er ikke deltaker i denne samtalen", 403);
       }
       const otherId = conv.buyer_id === userId ? conv.seller_id : conv.buyer_id;
       if (otherId !== data.targetUserId) {
-        throw new Error("Mottakeren stemmer ikke med samtalen");
+        throw new ClientError("Mottakeren stemmer ikke med samtalen", 400);
       }
       listingId = conv.listing_id;
     }

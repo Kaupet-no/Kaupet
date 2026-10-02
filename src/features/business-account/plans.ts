@@ -70,12 +70,12 @@ export const BUSINESS_PLANS = {
       {
         label: "Opprett flere annonser om gangen med Excel/CSV",
         included: false,
-        note: "Tilgjengelig med Proff. Kommer senere.",
+        note: "Tilgjengelig med Proff.",
       },
       {
         label: "API-integrasjon",
         included: false,
-        note: "Tilgjengelig med Proff. Kommer senere.",
+        note: "Tilgjengelig med Proff.",
       },
       { label: "Prioritert support", included: false, note: "Tilgjengelig med Proff." },
     ],
@@ -94,9 +94,8 @@ export const BUSINESS_PLANS = {
       {
         label: "Opprett flere annonser om gangen med Excel/CSV",
         included: true,
-        note: "Kommer senere.",
       },
-      { label: "API-integrasjon", included: true, note: "Kommer senere." },
+      { label: "API-integrasjon", included: true },
       { label: "Prioritert support", included: true },
     ],
   },

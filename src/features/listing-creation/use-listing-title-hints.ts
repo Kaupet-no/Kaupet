@@ -107,6 +107,8 @@ export function useListingTitleHints(params: {
    * vertical-agnostic: it only merges in whatever the caller already
    * resolved, it never decides what a "vehicle" title looks like itself. */
   clientCategoryHint?: CategorySuggestion | null;
+  /** Se useTitleCategorySuggestion — KI-forslag når stemmene ikke finner noe. */
+  aiFallback?: { enabled: boolean; getToken: () => Promise<string | null> };
 }) {
   const {
     title,
@@ -121,13 +123,15 @@ export function useListingTitleHints(params: {
     attributes,
     setValue,
     clientCategoryHint,
+    aiFallback,
   } = params;
 
-  const { categorySuggestions, categorySuggestionLoading, setSuggestionDismissed } =
+  const { categorySuggestions, categorySuggestionPending, setSuggestionDismissed } =
     useTitleCategorySuggestion({
       title,
       muted: categoryTouchedManually,
       clientCategoryHint,
+      aiFallback,
     });
 
   /** `suggestedCategoryId` må være en av `categorySuggestions` sine id-er —
@@ -232,7 +236,7 @@ export function useListingTitleHints(params: {
 
   return {
     categorySuggestions,
-    categorySuggestionLoading,
+    categorySuggestionLoading: categorySuggestionPending,
     setSuggestionDismissed,
     applyCategorySuggestion,
     similarListings,

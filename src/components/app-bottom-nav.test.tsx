@@ -59,6 +59,14 @@ describe("UserAvatarButton", () => {
     expect(hapticImpact).toHaveBeenCalledOnce();
     expect(hapticImpact).toHaveBeenCalledWith("light");
   });
+
+  it("navigerer også ved trykk på «Meg»-etiketten, ikke bare avataren", () => {
+    render(<UserAvatarButton userId="user-1" email="kari@eksempel.no" />);
+
+    fireEvent.click(screen.getByText("Meg"));
+
+    expect(navigateMock).toHaveBeenCalledWith({ to: "/meg" });
+  });
 });
 
 describe("AuthPendingButton", () => {

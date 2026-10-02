@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/native", () => ({
   isNative: () => false,
-  pickNativePhoto: vi.fn(),
+  pickNativePhotos: vi.fn(),
 }));
 
 import { ImageUploader } from "./image-uploader";

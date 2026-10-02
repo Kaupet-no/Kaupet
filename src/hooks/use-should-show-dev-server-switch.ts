@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { isNative } from "@/lib/native";
 
 export const STAGING_HOST = "staging.kaupet.no";
@@ -13,16 +13,18 @@ function isPrivateNetworkHost(host: string): boolean {
   );
 }
 
+const subscribe = () => () => {};
+const getSnapshot = () => {
+  const host = window.location.host;
+  return isNative() && (host === STAGING_HOST || isPrivateNetworkHost(host));
+};
+const getServerSnapshot = () => false;
+
 /**
  * Viser DevServerSwitch kun i den native staging-appen — enten koblet mot
  * staging.kaupet.no eller allerede mot en lokal dev-server. SSR-safe: false
  * til etter mount, samme mønster som useIsNative/useIsTestEnv.
  */
 export function useShouldShowDevServerSwitch(): boolean {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const host = window.location.host;
-    setShow(isNative() && (host === STAGING_HOST || isPrivateNetworkHost(host)));
-  }, []);
-  return show;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

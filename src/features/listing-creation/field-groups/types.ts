@@ -243,10 +243,11 @@ export type WizardSharedProps = {
   // usePhotoSuggestion() instance shared by the photos and category-
   // attributes steps — see use-photo-suggestion.ts.
   photoSuggestionEnabled: boolean;
-  photoSuggestionStatus: "idle" | "analyzing" | "ok" | "unavailable";
+  photoSuggestionStatus:
+    "idle" | "analyzing" | "verifying" | "verification-required" | "ok" | "unavailable";
   analyzePhotos: () => void;
   /** 0-2 candidates from the photo `identify` call, same shape as
-   * `categorySuggestions` — merged into the category-attributes chip ahead
+   * `categorySuggestions` — merged on the dedicated category-confirm step ahead
    * of the title-based suggestions when present. */
   photoCategorySuggestions: {
     category_id: string;
@@ -255,7 +256,10 @@ export type WizardSharedProps = {
     parent_name_nb: string | null;
   }[];
   photoTitleSuggestion: string | null;
-  dismissPhotoTitleSuggestion: () => void;
+  /** Melder at tittelforslaget er skrevet inn i skjemaet (auto-utfylling av
+   * tomt felt eller «Bruk»): hooken registrerer tittelendringen som egen
+   * utfylling, slik at kategoriforslaget og samtykket ikke nullstilles. */
+  applyPhotoTitleSuggestion: (value: string) => void;
   /** True once consent covers the images+title currently on the form — the
    * gate for offering "Foreslå detaljer fra bildene" once a category is
    * confirmed. */

@@ -2,9 +2,10 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import { loadStagingEnv } from "./staging-env.mjs";
 
 const LOCAL_ENV_FILE = ".env";
-const STAGING_ENV_FILE = ".env.staging.local";
+const STAGING_ENV_FILE = "Doppler kaupet/stg";
 const LOCAL_ONLY_EMAIL = "dev-seller@local.kaupet.test";
 const DELETE_BATCH_SIZE = 100;
 const PAGE_SIZE = 1000;
@@ -250,7 +251,7 @@ async function main() {
   }
 
   const localEnv = parseDotenv(LOCAL_ENV_FILE);
-  const stagingEnv = parseDotenv(STAGING_ENV_FILE);
+  const stagingEnv = loadStagingEnv(["SUPABASE_SERVICE_ROLE_KEY"]);
   const localUrl = required(localEnv, "SUPABASE_URL", LOCAL_ENV_FILE);
   const localKey = required(localEnv, "SUPABASE_SERVICE_ROLE_KEY", LOCAL_ENV_FILE);
   const stagingUrl = required(stagingEnv, "SUPABASE_URL", STAGING_ENV_FILE);

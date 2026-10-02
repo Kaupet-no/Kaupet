@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ConvSummary } from "@/hooks/use-unread";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowLeft, Paperclip, Send, User as UserIcon, X } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
@@ -27,7 +27,7 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
-import { displayPriceNok } from "@/lib/format";
+import { displayPriceNok, formatNokNumber } from "@/lib/format";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { InboxPage } from "@/components/inbox-page";
@@ -201,8 +201,8 @@ function ConversationPage() {
   });
 
   // Signerte URL-er for meldingsvedlegg (privat bucket, samme mønster som annonsebilder).
-  useEffect(() => {
-    const paths = (messages ?? [])
+  const signMissingAttachments = useEffectEvent((msgs: typeof messages) => {
+    const paths = (msgs ?? [])
       .map((m) => m.attachment_path)
       .filter((p): p is string => !!p && !attachmentUrls[p]);
     if (paths.length === 0) return;
@@ -212,7 +212,9 @@ function ConversationPage() {
         // Best-effort — feiler signeringen, vises vedlegget bare uten
         // forhåndsvisning fremfor å knekke resten av samtalen.
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    signMissingAttachments(messages);
   }, [messages]);
 
   // Bilde av annonsen
@@ -344,6 +346,10 @@ function ConversationPage() {
     queryClient.invalidateQueries({ queryKey: ["conversation", id] });
   }, !!user);
 
+  const markRead = useEffectEvent((vars: Parameters<typeof markReadMutation.mutate>[0]) =>
+    markReadMutation.mutate(vars),
+  );
+
   // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {
     if (scrollRef.current) {
@@ -358,10 +364,9 @@ function ConversationPage() {
         messages.length > 0 ? messages[messages.length - 1].created_at : new Date().toISOString();
       if (!(lastMarkedRef.current && readAt <= lastMarkedRef.current)) {
         lastMarkedRef.current = readAt;
-        markReadMutation.mutate({ readAt, conv, user });
+        markRead({ readAt, conv, user });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, id, conv, user]);
 
   const sendMessageFn = useServerFn(sendMessage);
@@ -519,7 +524,7 @@ function ConversationPage() {
   const priceLabel = conv?.listing?.is_free
     ? "Gis bort"
     : conversationPriceKr != null
-      ? `${conversationPriceKr.toLocaleString("nb-NO")} kr`
+      ? `${formatNokNumber(conversationPriceKr)} kr`
       : "Pris ved henvendelse";
   const isBusinessSeller = !!conv?.isBusinessSeller;
   const otherId = conv
@@ -723,6 +728,7 @@ function ConversationPage() {
         {conv && !(native && keyboardVisible) && !personalSellerControlsDisabled && (
           <SalePanel
             isSeller={isSeller}
+            hasMessages={(messages ?? []).length > 0}
             sale={sale ?? null}
             saleIsForThisConversation={saleIsForThisConversation}
             saleConfirmedForOtherBuyer={saleConfirmedForOtherBuyer}

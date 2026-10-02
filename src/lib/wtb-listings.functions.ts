@@ -1,3 +1,5 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -5,6 +7,14 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabase } from "@/integrations/supabase/client";
 import { attributesSchema } from "@/lib/category-filters";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
+
+const WTB_CREATE_LIMIT_MESSAGE =
+  "Du har opprettet for mange ønskes kjøpt-annonser den siste timen. Prøv igjen senere.";
+
+async function assertWtbCreationAllowed(userId: string) {
+  await assertUserNotRateLimited(userId, "wtb_creation", 10, 3600, WTB_CREATE_LIMIT_MESSAGE);
+}
 
 /** WTB criteria value shapes (see src/features/wtb/wtb-criteria-types.ts):
  * multi-value selects (string[]), from–to ranges ({min,max}), earliest-date
@@ -44,7 +54,16 @@ export type WtbListing = {
   expires_at: string;
 };
 
-export type WtbListingWithProfile = WtbListing & {
+/** Offentlig liste: bare feltene WtbListingCard leser. Aldri `*` — da lekker
+ * notify_matches, draft_expiry_notified_at m.fl. til alle. user_id trengs for
+ * «din annonse» og for å starte samtale (buyer_id). */
+const WTB_PUBLIC_LIST_COLUMNS =
+  "id, user_id, title, subtitle, description, max_price_nok, created_at, profiles(display_name, avatar_url), categories(name_nb, slug)";
+
+export type WtbListingWithProfile = Pick<
+  WtbListing,
+  "id" | "user_id" | "title" | "subtitle" | "description" | "max_price_nok" | "created_at"
+> & {
   profiles: { display_name: string | null; avatar_url: string | null } | null;
   categories: { name_nb: string; slug: string } | null;
 };
@@ -95,7 +114,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => wtbInputSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const fields = {
@@ -124,17 +143,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
       return { id: row.id as string };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("wtb_listings")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", oneHourAgo);
-    if ((count ?? 0) >= 10) {
-      throw new Error(
-        "Du har opprettet for mange ønskes kjøpt-annonser den siste timen. Prøv igjen senere.",
-      );
-    }
+    await assertWtbCreationAllowed(userId);
 
     const { data: row, error } = await supabaseAdmin
       .from("wtb_listings")
@@ -161,7 +170,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const fields = {
       title: data.title,
       subtitle: data.subtitle ?? null,
@@ -191,14 +200,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       return { id: row.id as string };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("wtb_listings")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", context.userId)
-      .eq("status", "draft")
-      .gte("created_at", oneHourAgo);
-    if ((count ?? 0) >= 10) throw new Error("For mange utkast. Prøv igjen senere.");
+    await assertWtbCreationAllowed(context.userId);
 
     const { data: row, error } = await supabaseAdmin
       .from("wtb_listings")
@@ -214,7 +216,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
 export const getLatestWtbDraft = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from("wtb_listings")
       .select(
@@ -235,7 +237,7 @@ export const discardWtbDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { error } = await supabaseAdmin
       .from("wtb_listings")
       .delete()
@@ -267,7 +269,7 @@ export const updateWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => wtbUpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const fields = {
@@ -295,7 +297,7 @@ export const deleteWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const { error } = await supabaseAdmin
@@ -345,7 +347,7 @@ const listWtbSchema = z.object({
 export const listWtbListings = createServerFn({ method: "GET" })
   .validator((input: unknown) => listWtbSchema.parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const q = data.q?.trim() || undefined;
 
     // websearch_to_tsquery('norwegian', …) stemmer ikke sammensatte norske
@@ -371,7 +373,7 @@ export const listWtbListings = createServerFn({ method: "GET" })
     const ids = matches.map((m) => m.id);
     const { data: rows, error } = await supabaseAdmin
       .from("wtb_listings")
-      .select("*, profiles(display_name, avatar_url), categories(name_nb, slug)")
+      .select(WTB_PUBLIC_LIST_COLUMNS)
       .in("id", ids);
     if (error) {
       throw await toClientError("database", error);
@@ -392,7 +394,7 @@ export const countWtbListings = createServerFn({ method: "GET" })
     z.object({ q: z.string().optional(), categories: z.array(z.string()).optional() }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: count, error } = await supabaseAdmin.rpc("wtb_listings_match_count", {
       _q: data.q?.trim() || undefined,
       _category_ids: data.categories?.length ? data.categories : undefined,
@@ -426,7 +428,9 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("match-wtb-for-listing", 60, 300);
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: rows, error } = await supabaseAdmin.rpc("wtb_match_count", {
       _category_id: data.category_id ?? null,
@@ -469,7 +473,10 @@ export const matchListingsForWtb = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<{ count: number; listings: WtbExistingMatch[] }> => {
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("match-listings-for-wtb", 60, 300);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
+    // Valgfri innlogging (gjester kan også lage kjøpsønske): egne
+    // salgsannonser er aldri et relevant treff.
+    const { data: claims } = await getSupabaseServerClient().auth.getClaims();
 
     const { data: page, error } = await supabaseAdmin.rpc("listings_matching_wtb", {
       _category_id: data.category_id,
@@ -479,6 +486,7 @@ export const matchListingsForWtb = createServerFn({ method: "GET" })
       _lng: data.lng ?? null,
       _radius_km: data.radius_km ?? null,
       _limit: data.limit ?? 5,
+      _exclude_seller_id: claims?.claims?.sub ?? null,
     } as never);
     if (error) {
       throw await toClientError("database", error);

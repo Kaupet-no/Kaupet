@@ -46,6 +46,7 @@
  * eller ukjent verktøynavn.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { describeSafeError } from "@/lib/safe-error";
 
 const JSONRPC_VERSION = "2.0";
 /** Versjonen vi selv snakker — sendes tilbake uendret når klienten ber om
@@ -194,7 +195,7 @@ async function handleToolsCall(
     if (isBusinessError(error)) {
       return attachHeaders(jsonRpcResult(id, toolErrorResult(businessErrorText(error))));
     }
-    console.error(`[api/mcp] Uventet feil i verktøyet «${tool.name}»`, error);
+    console.error("[api/mcp] Uventet feil i verktøy", describeSafeError(error));
     return attachHeaders(
       jsonRpcResult(id, toolErrorResult("En intern feil oppstod på serveren. Prøv igjen senere.")),
     );
@@ -220,7 +221,7 @@ export const Route = createFileRoute("/api/mcp")({
             response.headers.set("WWW-Authenticate", "Bearer");
             return response;
           }
-          console.error("[api/mcp] Uventet autentiseringsfeil", error);
+          console.error("[api/mcp] Uventet autentiseringsfeil", describeSafeError(error));
           return apiError(
             500,
             "internal_error",

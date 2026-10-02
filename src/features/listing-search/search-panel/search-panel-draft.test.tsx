@@ -3,8 +3,8 @@ import type { HTMLAttributes, ReactNode, SetStateAction } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import type { AdvancedSearchValue } from "@/lib/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { submitSearch } from "@/features/listing-search/submit-search";
 import { SearchPanel } from "./search-panel";
 
@@ -18,7 +18,9 @@ vi.mock("vaul", () => ({
   },
 }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
-vi.mock("@/components/advanced-search-sheet", () => ({ SaveSearchDialog: () => null }));
+vi.mock("@/features/listing-search/filters/advanced-search-sheet", () => ({
+  SaveSearchDialog: () => null,
+}));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/hooks/use-form-factor", () => ({
   useFormFactor: () => "phone",
@@ -40,6 +42,9 @@ vi.mock("@/hooks/use-sheet-drag-gate", () => ({
 vi.mock("@/lib/vehicle/vehicle-brands", () => ({ useAllVehicleBrands: () => ({ data: [] }) }));
 vi.mock("@/features/listing-search/use-draft-result-count", () => ({
   useDraftResultCount: () => ({ count: 7, isPending: false }),
+}));
+vi.mock("@/features/listing-search/use-price-sample", () => ({
+  usePriceSample: () => ({ data: undefined }),
 }));
 vi.mock("@/features/listing-search/submit-search", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/features/listing-search/submit-search")>();

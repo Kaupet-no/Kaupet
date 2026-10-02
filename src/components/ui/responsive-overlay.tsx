@@ -2,7 +2,6 @@ import * as React from "react";
 
 import { useIsNarrow } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
-import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent, type SheetContentProps } from "@/components/ui/sheet";
 
@@ -69,7 +68,7 @@ export function ResponsiveOverlayContent({
     return (
       <SheetContent
         side="bottom"
-        className={cn("rounded-t-2xl", className)}
+        className={className}
         expandable={expandable}
         initialSnapPoint={initialSnapPoint}
         {...focusProps}

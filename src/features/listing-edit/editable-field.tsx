@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type Context, type ReactNode } from "react";
+import { useContext, useRef, useState, type Context, type ReactNode } from "react";
 import { Loader2, Check, AlertCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -57,9 +57,11 @@ export function EditableField<T, C extends BaseEditContextValue = BaseEditContex
   const [error, setError] = useState<string | null>(null);
   const savingRef = useRef(false);
 
-  useEffect(() => {
+  const [prevSync, setPrevSync] = useState({ value, active });
+  if (!Object.is(prevSync.value, value) || prevSync.active !== active) {
+    setPrevSync({ value, active });
     if (!active) setDraft(value);
-  }, [value, active]);
+  }
 
   if (!ctx || !ctx.editMode) {
     return <>{render(value)}</>;

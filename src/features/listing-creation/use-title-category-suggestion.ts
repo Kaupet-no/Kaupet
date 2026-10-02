@@ -80,7 +80,10 @@ export function useTitleCategorySuggestion(params: {
     retry: false,
     queryFn: async (): Promise<CategorySuggestion[]> => {
       const turnstileToken = await aiFallback!.getToken();
-      if (!turnstileToken) return [];
+      // Kast i stedet for å returnere []: et tomt svar ville blitt cachet
+      // (staleTime: Infinity), og samme tittel ville aldri prøvd igjen. En
+      // feilet spørring hentes på nytt neste gang reserven slås på.
+      if (!turnstileToken) throw new Error("Mangler Turnstile-token");
       const result = await suggestCategoryForTitleWithAi({
         data: { title: debouncedTitle, turnstileToken },
       });

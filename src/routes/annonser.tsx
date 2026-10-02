@@ -1,21 +1,23 @@
+import { formatNokNumber } from "@/lib/format";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderOpen, Save, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Bell, FolderOpen, Save, X } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { Button } from "@/components/ui/button";
-import { SearchBar } from "@/components/search-bar";
-import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import { ActiveFilters } from "@/components/active-filters";
+import { SearchBar } from "@/features/listing-search/filters/search-bar";
+import { SaveSearchDialog } from "@/features/listing-search/filters/advanced-search-sheet";
+import { ActiveFilters } from "@/features/listing-search/filters/active-filters";
 import { ResultList } from "@/components/result-list";
 import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
 import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
+import { SearchFilterChipRow } from "@/features/listing-search/search-panel/search-filter-chip-row";
 import { saveLastSearchContext } from "@/lib/last-search-context";
-import { summarizeCriteria } from "@/lib/saved-searches";
+import { summarizeCriteria, type SavedSearch } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
@@ -51,9 +53,21 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryBreadcrumb } from "@/components/category-hero";
+import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
-import { breadcrumbPath, resolveHeroCategory } from "@/lib/categories";
+import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
+import { useSearchInterpretation } from "@/features/listing-search/use-search-interpretation";
+import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
+import { SearchStart } from "@/features/listing-search/search-start";
+import { criteriaToValue, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
+
+const noopSubscribe = () => () => {};
+
+/** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
+function blurActiveElement() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -108,12 +122,29 @@ function BrowsePage() {
   const navigate = useNavigate({ from: "/annonser" });
   const { user } = useAuth();
   const [qDraft, setQDraft] = useState(search.q);
-  const [mounted, setMounted] = useState(false);
+  // false i SSR og under hydrering, true ellers — også ved første render
+  // på klientnavigasjon, så skjelettet ikke blinker da.
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
   const isDesktop = useIsDesktop();
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const { open: searchPanelOpen, openPanel } = useSearchPanel();
-  const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
-  const [interpretedCriteria, setInterpretedCriteria] = useState<InterpretedCriterion[]>([]);
+  // I URL-en, så tilbake-knappen og delte lenker beholder fanen. Hvilken fane
+  // som faktisk vises, avgjøres under (activeTab) — uten ØK-treff faller den
+  // tilbake til «Til salgs», ellers ville fanelinja forsvinne med ØK-visningen.
+  const requestedTab = search.results ?? "listings";
+  const setActiveTab = (tab: "listings" | "wtb") =>
+    navigate({
+      search: (prev) => ({ ...prev, results: tab === "wtb" ? "wtb" : undefined }),
+      replace: true,
+    });
+  // Søk fra forsiden/landingssiden tar med tolkningen i router-state, så
+  // «Tolket som» viser hva Kaupet la til (f.eks. kategori) i stedet for at
+  // filteret dukker opp uforklart.
+  const [interpretedCriteria, setInterpretedCriteria] = useSearchInterpretation();
   const [ignoredInterpretations, setIgnoredInterpretations] = useState<Set<string>>(new Set());
 
   const { refreshing, pullDistance } = usePullToRefresh({
@@ -123,8 +154,11 @@ function BrowsePage() {
     },
   });
 
-  useEffect(() => setMounted(true), []);
-  useEffect(() => setQDraft(search.q), [search.q]);
+  const [prevQ, setPrevQ] = useState(search.q);
+  if (search.q !== prevQ) {
+    setPrevQ(search.q);
+    setQDraft(search.q);
+  }
 
   const { data: allCategoriesRaw } = useCategories();
   const categories = useMemo(
@@ -201,6 +235,13 @@ function BrowsePage() {
     () => (hero ? breadcrumbPath(hero.main, categoryTree) : []),
     [hero, categoryTree],
   );
+  const categoryTokenLabel = useMemo(() => {
+    const names = effectiveCategories
+      .map((slug: string) => categoryTree.bySlug.get(slug)?.name_nb)
+      .filter((name: string | undefined): name is string => !!name);
+    if (names.length === 0) return null;
+    return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+  }, [effectiveCategories, categoryTree]);
   const interpretedKeys = useMemo(
     () =>
       new Set(
@@ -247,11 +288,11 @@ function BrowsePage() {
     search.qMode === "any" || search.extraGroups.some((group) => group.terms.length > 0);
   const ordinaryFilterCount = Math.max(0, activeFilterCount - advancedSearchCount);
   const { data: vehicleBrands } = useAllVehicleBrands();
-  const submitQuery = () => {
+  const submitQuery = (text = qDraft) => {
     void hapticImpact("medium");
     void submitSearch({
       applied: appliedSearch,
-      query: qDraft,
+      query: text,
       categories: categories ?? [],
       vehicleBrands: vehicleBrands ?? [],
       allFilters: allFilters ?? [],
@@ -261,6 +302,38 @@ function BrowsePage() {
       },
     });
   };
+  // Valg fra forslagslaget og Søk-fanens startflate.
+  const pickQuery = (text: string) => {
+    blurActiveElement();
+    setQDraft(text);
+    submitQuery(text);
+  };
+  const pickCategory = (category: Category) => {
+    blurActiveElement();
+    const needle = category.name_nb.toLocaleLowerCase();
+    const nextQ = qDraft.toLocaleLowerCase().trim() === needle ? "" : qDraft;
+    setQDraft(nextQ);
+    updateSearch({ category: "", categories: [category.slug], q: nextQ });
+  };
+  const pickSavedSearch = (saved: SavedSearch) => {
+    blurActiveElement();
+    void submitSearch({
+      applied: {
+        value: criteriaToValue(saved.criteria),
+        attributes: saved.criteria.attributes ?? {},
+      },
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (next) => {
+        setQDraft(next.q);
+        navigate({ search: next });
+      },
+    });
+  };
+  // Uten kriterier er dette Søk-fanens startflate på native.
+  const showSearchStart =
+    isNative && !search.q && effectiveCategories.length === 0 && activeFilterCount === 0;
   const rawCategoryMatch = useMemo(() => {
     const m =
       matchCategoryPhrase(qDraft, categories ?? []) ??
@@ -362,9 +435,9 @@ function BrowsePage() {
       const filter = attrFilters.find((candidate) => candidate.key === match.filterKey);
       const value =
         match.min != null && match.max != null
-          ? `${match.min.toLocaleString("nb-NO")}–${match.max.toLocaleString("nb-NO")}`
+          ? `${formatNokNumber(match.min)}–${formatNokNumber(match.max)}`
           : match.min != null
-            ? `fra ${match.min.toLocaleString("nb-NO")}`
+            ? `fra ${formatNokNumber(match.min)}`
             : `opptil ${match.max?.toLocaleString("nb-NO") ?? ""}`;
       return {
         id: `${match.filterKey}:${match.matchedText}`,
@@ -400,12 +473,19 @@ function BrowsePage() {
     });
   }, [hero, attrValues, allFilters, categoryTree]);
 
-  const { selectHeroCategory } = useHeroCategoryActions({
-    hero,
+  const { selectHeroCategory, toggleChildCategory, isChildActive } = useHeroCategoryActions({
     categoryTree,
     effectiveCategories,
     updateSearch,
   });
+
+  // Underkategoriene til det valgte hero-nivået — brikkene native brukeren
+  // får tilbudt etter å ha valgt en hovedkategori, slik at valget kan
+  // snevres inn videre uten å åpne filterpanelet.
+  const heroSubcategories = useMemo(
+    () => (hero ? (categoryTree.childrenByParent.get(hero.selected.id) ?? []) : []),
+    [hero, categoryTree],
+  );
 
   useEffect(() => {
     if (!mounted) return;
@@ -427,13 +507,14 @@ function BrowsePage() {
     q: search.q,
     effectiveCategories,
     categories,
-    activeTab,
+    activeTab: requestedTab,
   });
-
-  // Reset to listings tab when search criteria change
-  useEffect(() => {
-    setActiveTab("listings");
-  }, [search.q, search.category, search.categories]);
+  const activeTab =
+    requestedTab === "wtb" &&
+    hasSearchCriteria &&
+    (wtbLoading || wtbCount > 0 || wtbListings.length > 0)
+      ? "wtb"
+      : "listings";
 
   /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
      trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.
@@ -462,7 +543,8 @@ function BrowsePage() {
             brukeren er. Rendres i samme slot som "Annonser"-tittelen (i stedet
             for som en egen rad over) så valg av hovedkategori ikke skyver
             resten av siden nedover. */}
-        {hero ? (
+        {/* Native viser kategorien som en brikke i søkefeltet i stedet. */}
+        {hero && !isNative ? (
           <CategoryBreadcrumb
             breadcrumbEntries={heroBreadcrumb}
             extraSegments={heroExtraSegments}
@@ -482,16 +564,30 @@ function BrowsePage() {
                 <SearchSummaryPill
                   q={qDraft}
                   filterCount={ordinaryFilterCount}
-                  searchRuleCount={hasExtraSearchRules ? 1 : 0}
-                  onOpenQuery={() => {
-                    openPanel("query");
+                  onQChange={(q) => {
+                    setInterpretedCriteria([]);
+                    setIgnoredInterpretations(new Set());
+                    setQDraft(q);
                   }}
-                  onOpenRules={() => {
-                    openPanel("search");
-                  }}
-                  onOpenFilters={() => {
-                    openPanel("categories");
-                  }}
+                  onSubmitQ={() => submitQuery()}
+                  suggestions={
+                    <SearchSuggestionsLayer
+                      q={qDraft}
+                      categories={categories ?? []}
+                      currentCategorySlugs={effectiveCategories}
+                      onSubmitQuery={pickQuery}
+                      onPickCategory={pickCategory}
+                      onPickSavedSearch={pickSavedSearch}
+                    />
+                  }
+                  categoryToken={
+                    categoryTokenLabel
+                      ? {
+                          label: categoryTokenLabel,
+                          onRemove: () => updateSearch({ category: "", categories: [] }),
+                        }
+                      : undefined
+                  }
                 />
               ) : (
                 <>
@@ -502,7 +598,7 @@ function BrowsePage() {
                       setIgnoredInterpretations(new Set());
                       setQDraft(q);
                     }}
-                    onSubmitQ={submitQuery}
+                    onSubmitQ={() => submitQuery()}
                     qMode={search.qMode}
                     onQModeChange={(m) => updateSearch({ qMode: m })}
                     showQMode={isDesktop}
@@ -533,13 +629,35 @@ function BrowsePage() {
             </div>
           </div>
         </div>
+        {isNative && (
+          <SearchFilterChipRow
+            min={search.min}
+            max={search.max}
+            includeFree={search.includeFree}
+            conditions={search.conditions ?? []}
+            categorySlugs={effectiveCategories}
+            location={location}
+            sort={search.sort}
+            onSortChange={(sort) => updateSearch({ sort })}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            queryText={qDraft}
+            filterCount={ordinaryFilterCount}
+          />
+        )}
         {interpretedCriteria.length > 0 && (
           <div className="rounded-lg border border-border/70 bg-card/50 px-3 py-2">
             <SearchInterpretation
               criteria={interpretedCriteria}
               categories={categories ?? []}
               filters={attrFilters.length > 0 ? attrFilters : (allFilters ?? [])}
-              onCategoryChange={() => undefined}
+              onCategoryChange={() => {
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "category"),
+                );
+                setDismissedMatchText(categoryMatch?.matchedText ?? null);
+                updateSearch({ category: "", categories: [] });
+              }}
               onAttributeChange={(key) => {
                 const criterion = interpretedCriteria.find(
                   (item) => item.kind === "attribute" && item.key === key,
@@ -629,6 +747,50 @@ function BrowsePage() {
             criteria={currentCriteria}
             onSaved={() => setSaveSearchOpen(false)}
           />
+        )}
+
+        {showSearchStart && (
+          <SearchStart
+            categories={categories ?? []}
+            onSubmitQuery={pickQuery}
+            onPickCategory={pickCategory}
+            onPickSavedSearch={pickSavedSearch}
+          />
+        )}
+
+        {/* Native: når en hovedkategori er valgt (fra startflaten eller
+            kategoriforslag), treffer SearchStart-betingelsen over ikke lenger
+            — i stedet får brukeren brikker for hero-nivåets underkategorier,
+            slik at valget kan snevres inn videre uten filterpanelet. */}
+        {isNative && hero && heroSubcategories.length > 0 && (
+          <section className="mt-4" aria-labelledby="annonser-subcategories-heading">
+            <h2
+              id="annonser-subcategories-heading"
+              className="mb-2 font-display text-base tracking-tight"
+            >
+              Underkategorier
+            </h2>
+            <ScrollArrowRow>
+              {heroSubcategories.map((category) => {
+                const active = isChildActive(hero.selected, category);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleChildCategory(hero.selected, category)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {category.name_nb}
+                  </button>
+                );
+              })}
+            </ScrollArrowRow>
+          </section>
         )}
 
         {/* Desktop: filtrene står permanent til venstre for treffene i stedet
@@ -730,7 +892,7 @@ function BrowsePage() {
                 }}
                 mapListings={mapListings}
                 mapCenter={mapCenter}
-                radiusKm={search.radius ?? 10}
+                radiusKm={search.radius ?? DEFAULT_SEARCH_RADIUS_KM}
                 onMapClearLocation={() =>
                   updateSearch({
                     lat: undefined,
@@ -744,19 +906,22 @@ function BrowsePage() {
                 }
                 sort={search.sort}
                 onSortChange={(s) => updateSearch({ sort: s })}
-                // Native (fase 12): "Lagre søk" flyttet inn i søkepanelet.
+                // Native har sorteringen i brikkeraden.
+                hideSort={isNative}
                 toolbarLead={mobileFilterButton}
                 toolbarExtra={
-                  // Desktop har «Lagre søk» nederst i filterkolonnen.
-                  user && !isNative && !isDesktop && hasSearchCriteria ? (
+                  // Desktop har «Lagre søk» nederst i filterkolonnen. Ellers
+                  // står det ved antall treff, der interessen for søket oppstår.
+                  user && !isDesktop && hasSearchCriteria ? (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant={isNative ? "secondary" : "outline"}
                       size="sm"
                       onClick={() => setSaveSearchOpen(true)}
-                      className="gap-1.5"
+                      className={isNative ? "gap-1.5 rounded-full text-primary" : "gap-1.5"}
                     >
-                      <Save className="size-4" /> Lagre søk
+                      {isNative ? <Bell className="size-4" /> : <Save className="size-4" />} Lagre
+                      søk
                     </Button>
                   ) : undefined
                 }

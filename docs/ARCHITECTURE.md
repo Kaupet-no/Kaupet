@@ -70,6 +70,12 @@ minst to reelle konsumenter trenger samme kontrakt.
 - Same-origin serverfunksjoner skal beskyttes av TanStack Starts CSRF-
   middleware. Ikke deaktiver rammeverkets advarsel uten en dokumentert,
   testet alternativ mekanisme.
+- Cloudflare Images brukes kun til serverimport av bilder (API/MCP/Excel).
+  Vanlige opplastinger og 360-opptak komprimeres/transformeres klient-side
+  før R2-opplasting; ikke legg inn betalt Images-behandling i disse flytene.
+  Klientkomprimering erstatter ikke serverens tilgangskontroll, størrelses-
+  og kvotegrenser eller filsignaturkontroll. Signaturkontroll er ikke full
+  dekoding eller re-enkoding av filinnholdet.
 - Ikke logg fritekst, registreringsnummer, adresse, token eller andre
   personopplysninger i analyse eller generelle feillogger.
 - Kall mot eksterne tredjeparts-API-er (f.eks. Mistral API for AI-basert

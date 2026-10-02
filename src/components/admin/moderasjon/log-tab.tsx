@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { ClipboardList, Loader2 } from "lucide-react";
 
@@ -82,7 +83,7 @@ export function LogTab() {
               ).map((l) => (
                 <TableRow key={l.id}>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {new Date(l.created_at).toLocaleString("nb-NO")}
+                    {formatDateTime(l.created_at)}
                   </TableCell>
                   <TableCell>{l.admin_name ?? "—"}</TableCell>
                   <TableCell>

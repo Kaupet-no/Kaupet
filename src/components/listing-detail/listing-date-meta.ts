@@ -1,11 +1,11 @@
+import { formatDateLong } from "@/lib/format";
 export function getListingDateMeta(
   listingStatus: string | null | undefined,
   publishedAt: string | null,
   createdAt: string,
   updatedAt: string | null,
 ) {
-  const fmt = (s: string) =>
-    new Date(s).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+  const fmt = (s: string) => formatDateLong(s);
   if (listingStatus === "draft") return { label: "Opprettet", dateStr: fmt(createdAt) };
   const publishedDate = publishedAt ? new Date(publishedAt) : new Date(createdAt);
   const updatedDate = updatedAt ? new Date(updatedAt) : null;

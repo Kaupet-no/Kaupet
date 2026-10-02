@@ -2,35 +2,34 @@
  * Logger feil fra server-funksjoner til konsoll og til `error_log`-tabellen,
  * slik at en admin kan inspisere dem i admin-UI. Kaster aldri selv.
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import type { Json } from "@/integrations/supabase/types";
+import { describeSafeError, safeErrorContext } from "@/lib/safe-error";
 
 export async function logServerError(
   functionName: string,
   error: unknown,
   context?: Record<string, unknown>,
 ): Promise<void> {
-  const message =
-    error instanceof Error
-      ? error.message
-      : error && typeof error === "object" && "message" in error
-        ? String((error as { message?: unknown }).message)
-        : String(error);
-  const code =
-    error && typeof error === "object" && "code" in error
-      ? String((error as { code?: unknown }).code)
-      : undefined;
-
-  console.error(`[${functionName}]`, { error: message, context });
+  const descriptor = describeSafeError(error);
+  const safeFunctionName = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(functionName)
+    ? functionName
+    : "serverFunction";
+  const safeContext = safeErrorContext(context);
+  console.error(`[${safeFunctionName}]`, descriptor, safeContext);
 
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     await supabaseAdmin.from("error_log").insert({
-      function_name: functionName,
-      error_message: message,
-      error_code: code ?? null,
-      context: context ? (JSON.parse(JSON.stringify(context)) as Json) : null,
+      function_name: safeFunctionName,
+      error_message: descriptor.type,
+      error_code: descriptor.code ?? null,
+      context: {
+        ...(safeContext ?? {}),
+        ...(descriptor.status === undefined ? {} : { status: descriptor.status }),
+      } as Json,
     });
   } catch (logError) {
-    console.error("[logServerError] failed to write to error_log", logError);
+    console.error("[logServerError] failed to write to error_log", describeSafeError(logError));
   }
 }

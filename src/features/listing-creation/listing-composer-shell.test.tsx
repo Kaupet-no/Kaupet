@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ListingComposerShell } from "./listing-composer-shell";
 
 vi.mock("@/components/native-page-header", () => ({
-  NativePageHeader: ({ right }: { right?: ReactNode }) => (
+  NativePageHeader: ({ right, center }: { right?: ReactNode; center?: ReactNode }) => (
     <header>
-      Ny annonse
+      {center ?? "Ny annonse"}
       {right}
     </header>
   ),
@@ -83,6 +83,37 @@ describe("ListingComposerShell", () => {
     requestAnimationFrame.mockRestore();
   });
 
+  it("flytter fremdriftsviseren inn i headeren når native-kortet scrolles", () => {
+    render(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="title"
+        pageTitle="Tittel"
+        native
+        onCancel={vi.fn()}
+        progress={<span>Steg 2 av 5</span>}
+        footer={null}
+        firstStep={false}
+      >
+        Innhold
+      </ListingComposerShell>,
+    );
+    const header = screen.getByRole("banner");
+    const card = screen.getByTestId("composer-page-title");
+    expect(header.textContent).not.toContain("Steg 2 av 5");
+
+    card.scrollTop = 40;
+    fireEvent.scroll(card);
+    expect(header.textContent).toContain("Steg 2 av 5");
+    expect(header.textContent).not.toContain("Ny annonse");
+    expect(screen.getAllByText("Steg 2 av 5")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Avbryt annonseopprettelse" })).toBeTruthy();
+
+    card.scrollTop = 0;
+    fireEvent.scroll(card);
+    expect(header.textContent).toContain("Ny annonse");
+  });
+
   it("skjuler Forrige på første native steg", () => {
     const { container } = renderShell({ firstStep: true });
     expect(container.querySelector('button[aria-hidden="true"]')?.getAttribute("tabindex")).toBe(
@@ -97,6 +128,29 @@ describe("ListingComposerShell", () => {
     expect(onBack).toHaveBeenCalledOnce();
     expect(onCancel).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
+  });
+
+  it("holder Turnstile-utfordringen i rulleområdet og Neste i footeren", () => {
+    const { container } = render(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="photos"
+        pageTitle="Bilder"
+        native
+        onCancel={vi.fn()}
+        footer={<button type="button">Neste</button>}
+        challenge={<div role="group" aria-label="Cloudflare-verifisering" />}
+        firstStep={false}
+      >
+        Bilder
+      </ListingComposerShell>,
+    );
+    const scroll = container.querySelector('[data-composer-scroll="true"]');
+    const footer = container.querySelector('[data-composer-footer="native"]');
+    expect(scroll?.contains(screen.getByRole("group", { name: "Cloudflare-verifisering" }))).toBe(
+      true,
+    );
+    expect(footer?.contains(screen.getByRole("button", { name: "Neste" }))).toBe(true);
   });
 
   it("gir ett lett valgsignal når native-kortet skifter", () => {

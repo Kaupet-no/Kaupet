@@ -4,6 +4,7 @@
 // admin-panelet (src/routes/_authenticated/admin/kategorier.tsx) for å vise
 // synk-status og gjøre selve synken. Se supabase/migrations/20260804090000_
 // category_sync_status.sql for skjema og RPC.
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -20,6 +21,7 @@ type FilterSynonymRow = Tables<"filter_synonyms">;
 function assertProductionEnvironment() {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_URL === process.env.STAGING_SUPABASE_URL) {
     throw new Error(
+      // eslint-disable-next-line no-restricted-syntax -- miljøvakt for admin-verktøy, ikke en brukerfeil
       "Staging-synk kan ikke kjøres fra staging selv — dette miljøet er allerede staging.",
     );
   }
@@ -71,7 +73,7 @@ export const getCategorySyncStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { stagingAdmin } = await import("@/integrations/supabase/staging-client.server");
 
     const [staging, status] = await Promise.all([
@@ -198,7 +200,7 @@ export const getCategorySyncDiff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { stagingAdmin } = await import("@/integrations/supabase/staging-client.server");
 
     const [staging, prod] = await Promise.all([
@@ -255,7 +257,7 @@ export const syncCategoriesFromStaging = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
     assertProductionEnvironment();
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { stagingAdmin } = await import("@/integrations/supabase/staging-client.server");
 
     const staging = await fetchCategorySyncTables(stagingAdmin);

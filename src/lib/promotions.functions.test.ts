@@ -4,6 +4,8 @@ const state = vi.hoisted(() => ({
   getRequestHost: vi.fn(),
   getVippsMode: vi.fn(),
   createVippsPayment: vi.fn(),
+  getVippsPayment: vi.fn(),
+  captureVippsPayment: vi.fn(),
   supabaseAdmin: { from: vi.fn() },
   context: undefined as unknown,
 }));
@@ -38,12 +40,17 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: state.supabaseAdmin }));
-vi.mock("@/lib/vipps.server", () => ({
+vi.mock("@/lib/vipps.server", async (importActual) => ({
+  vippsPaymentStatus: (await importActual<typeof import("@/lib/vipps.server")>())
+    .vippsPaymentStatus,
   getVippsMode: state.getVippsMode,
   createVippsPayment: state.createVippsPayment,
+  getVippsPayment: state.getVippsPayment,
+  captureVippsPayment: state.captureVippsPayment,
+  releaseSupersededPromotionPayment: vi.fn(),
 }));
 
-import { createPromotionCheckout } from "./promotions.functions";
+import { createPromotionCheckout, reconcilePromotionPayment } from "./promotions.functions";
 
 const listingId = "11111111-1111-4111-8111-111111111111";
 const promotionId = "22222222-2222-4222-8222-222222222222";
@@ -81,11 +88,145 @@ function setup(roleRows: { role: string }[]) {
   return { supabase, supabaseAdmin: state.supabaseAdmin };
 }
 
+// ePayment beholder `state: "AUTHORIZED"` etter capture/refusjon/kansellering;
+// hva som er gjort står i `aggregate`.
+const nok = (value: number) => ({ value, currency: "NOK" });
+
 beforeEach(() => {
   state.supabaseAdmin.from.mockReset();
   state.getRequestHost.mockReturnValue("test.kaupet.no");
   state.getVippsMode.mockReturnValue("test");
   state.createVippsPayment.mockResolvedValue({ redirectUrl: "https://vipps.test/redirect" });
+  state.getVippsPayment.mockReset();
+  state.captureVippsPayment.mockReset();
+});
+
+describe("reconcilePromotionPayment", () => {
+  const pendingPromotion = {
+    id: promotionId,
+    user_id: "user-1",
+    status: "pending",
+    duration_days: 7,
+    price_nok: 10,
+    vipps_reference: "promo-ref",
+    vipps_mode: "test",
+    expires_at: null,
+  };
+
+  it("PAY-05/PAY-07: capturer autorisert betaling med stabil nøkkel og aktiverer bare én gang", async () => {
+    state.context = { userId: "user-1" };
+    state.getVippsPayment.mockResolvedValue({ state: "AUTHORIZED", pspReference: "psp-1" });
+    state.supabaseAdmin.from
+      .mockReturnValueOnce(query({ data: pendingPromotion, error: null }))
+      .mockReturnValueOnce(
+        query({ data: { status: "active", expires_at: "tomorrow" }, error: null }),
+      )
+      .mockReturnValueOnce(
+        query({
+          data: { ...pendingPromotion, status: "active", expires_at: "tomorrow" },
+          error: null,
+        }),
+      );
+
+    await expect(
+      reconcilePromotionPayment({ data: { promotion_id: promotionId } }),
+    ).resolves.toEqual({ status: "active", expires_at: "tomorrow" });
+    await expect(
+      reconcilePromotionPayment({ data: { promotion_id: promotionId } }),
+    ).resolves.toEqual({ status: "active", expires_at: "tomorrow" });
+    expect(state.captureVippsPayment).toHaveBeenCalledExactlyOnceWith(
+      "promo-ref",
+      10,
+      `capture-${promotionId}`,
+      null,
+      "test",
+    );
+    expect(state.getVippsPayment).toHaveBeenCalledOnce();
+  });
+
+  it("PAY-07: aktiverer allerede captured betaling uten ny capture", async () => {
+    state.context = { userId: "user-1" };
+    state.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
+    state.supabaseAdmin.from
+      .mockReturnValueOnce(query({ data: pendingPromotion, error: null }))
+      .mockReturnValueOnce(
+        query({ data: { status: "active", expires_at: "tomorrow" }, error: null }),
+      );
+    await expect(
+      reconcilePromotionPayment({ data: { promotion_id: promotionId } }),
+    ).resolves.toMatchObject({ status: "active" });
+    expect(state.captureVippsPayment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["kansellert", { state: "AUTHORIZED", aggregate: { cancelledAmount: nok(4900) } }],
+    ["EXPIRED", { state: "EXPIRED" }],
+    ["TERMINATED", { state: "TERMINATED" }],
+    ["ABORTED", { state: "ABORTED" }],
+  ])("PAY-07: markerer %s som feilet uten capture", async (_label, payment) => {
+    state.context = { userId: "user-1" };
+    state.getVippsPayment.mockResolvedValue(payment);
+    state.supabaseAdmin.from
+      .mockReturnValueOnce(query({ data: pendingPromotion, error: null }))
+      .mockReturnValueOnce({
+        update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+      });
+    await expect(
+      reconcilePromotionPayment({ data: { promotion_id: promotionId } }),
+    ).resolves.toEqual({ status: "failed", expires_at: null });
+    expect(state.captureVippsPayment).not.toHaveBeenCalled();
+  });
+
+  it("PAY-07: avstemmer refundert betaling uten capture", async () => {
+    state.context = { userId: "user-1" };
+    state.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900), refundedAmount: nok(4900) },
+    });
+    state.supabaseAdmin.from
+      .mockReturnValueOnce(query({ data: pendingPromotion, error: null }))
+      .mockReturnValueOnce({
+        update: () => ({ eq: () => ({ neq: async () => ({ error: null }) }) }),
+      });
+    await expect(
+      reconcilePromotionPayment({ data: { promotion_id: promotionId } }),
+    ).resolves.toEqual({ status: "refunded", expires_at: null });
+    expect(state.captureVippsPayment).not.toHaveBeenCalled();
+  });
+
+  it("returnerer lagret status når webhooken rekker å oppdatere raden først", async () => {
+    state.context = { userId: "user-1" };
+    state.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { capturedAmount: nok(4900) },
+    });
+    state.supabaseAdmin.from
+      .mockReturnValueOnce(
+        query({
+          data: {
+            id: promotionId,
+            user_id: "user-1",
+            status: "pending",
+            duration_days: 7,
+            price_nok: 10,
+            vipps_reference: "promo-ref",
+            vipps_mode: "test",
+            expires_at: null,
+          },
+          error: null,
+        }),
+      )
+      .mockReturnValueOnce(query({ data: null, error: null }))
+      .mockReturnValueOnce(query({ data: { status: "refunded", expires_at: null }, error: null }));
+
+    await expect(
+      reconcilePromotionPayment({ data: { promotion_id: promotionId } }),
+    ).resolves.toEqual({ status: "refunded", expires_at: null });
+    expect(state.captureVippsPayment).not.toHaveBeenCalled();
+  });
 });
 
 describe("createPromotionCheckout", () => {
@@ -125,5 +266,24 @@ describe("createPromotionCheckout", () => {
         data: { listing_id: listingId, duration_days: 7 },
       }),
     ).resolves.toMatchObject({ promotion_id: promotionId });
+  });
+
+  it("starter ikke Vipps-betaling når et konkurrerende forsøk vinner databaseinnsettingen", async () => {
+    state.getVippsMode.mockReturnValue("production");
+    setup([]);
+    const promotionsQuery = state.supabaseAdmin.from("listing_promotions");
+    const conflict = { data: null, error: { code: "23505", message: "unique constraint" } };
+    promotionsQuery.insert
+      .mockReturnValueOnce(query({ data: { id: promotionId }, error: null }))
+      .mockReturnValueOnce(query(conflict));
+
+    await expect(
+      createPromotionCheckout({ data: { listing_id: listingId, duration_days: 7 } }),
+    ).resolves.toMatchObject({ promotion_id: promotionId });
+    await expect(
+      createPromotionCheckout({ data: { listing_id: listingId, duration_days: 7 } }),
+    ).rejects.toThrow("Finnes allerede.");
+    expect(promotionsQuery.insert).toHaveBeenCalledTimes(2);
+    expect(state.createVippsPayment).toHaveBeenCalledOnce();
   });
 });

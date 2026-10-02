@@ -92,7 +92,7 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     analyzePhotos: vi.fn(),
     photoCategorySuggestions: [],
     photoTitleSuggestion: null,
-    dismissPhotoTitleSuggestion: vi.fn(),
+    applyPhotoTitleSuggestion: vi.fn(),
     photoAttributesAvailable: false,
     photoAttributeSuggestionLoading: false,
     requestPhotoAttributeSuggestions: vi.fn(async () => []),

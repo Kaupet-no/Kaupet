@@ -1,4 +1,5 @@
-import { toClientError } from "@/lib/to-client-error";
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { ClientError, markLogged, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -10,7 +11,7 @@ import { logServerError } from "@/lib/server-error-log";
 import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
 
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("promotion_pricing")
     .select("duration_days, price_nok")
@@ -34,7 +35,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const host = (() => {
       try {
@@ -56,9 +57,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (lerr) {
       throw await toClientError("database", lerr);
     }
-    if (!listing) throw new Error("Annonsen finnes ikke");
-    if (listing.seller_id !== userId) throw new Error("Du eier ikke denne annonsen");
-    if (listing.status !== "active") throw new Error("Annonsen må være aktiv for å fremheves");
+    if (!listing) throw new ClientError("Annonsen finnes ikke", 404);
+    if (listing.seller_id !== userId) throw new ClientError("Du eier ikke denne annonsen", 403);
+    if (listing.status !== "active")
+      throw new ClientError("Annonsen må være aktiv for å fremheves", 409);
 
     // Get price
     const { data: pricing, error: perr } = await supabaseAdmin
@@ -70,7 +72,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (perr) {
       throw await toClientError("createPromotionCheckout.getPricing", perr);
     }
-    if (!pricing) throw new Error("Ugyldig pakkevarighet");
+    if (!pricing) throw new ClientError("Ugyldig pakkevarighet", 400);
 
     // Block if an active or pending promotion exists
     const { data: existing } = await supabaseAdmin
@@ -80,7 +82,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .in("status", ["active", "pending", "gifted"])
       .maybeSingle();
     if (existing) {
-      throw new Error("Denne annonsen har allerede en aktiv eller ventende fremheving");
+      throw new ClientError("Denne annonsen har allerede en aktiv eller ventende fremheving", 409);
     }
 
     // Create pending row — vipps_mode is fixed at creation and reused for
@@ -108,14 +110,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
     const returnUrl = `${origin}/bekrefter/${promo.id}`;
 
-    console.log("[promotions] createPromotionCheckout", {
-      promotion_id: promo.id,
-      duration_days: data.duration_days,
-      price_nok: pricing.price_nok,
-      vipps_mode: vippsMode,
-      host,
-      reference,
-    });
+    console.log("[promotions] createPromotionCheckout", { promotion_id: promo.id });
 
     try {
       const result = await createVippsPayment({
@@ -140,19 +135,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
           });
         }
       }
-      console.log("[promotions] createPromotionCheckout ok", {
-        promotion_id: promo.id,
-        vipps_mode: vippsMode,
-        psp_reference: result.pspReference ?? null,
-      });
+      console.log("[promotions] createPromotionCheckout ok", { promotion_id: promo.id });
       return { promotion_id: promo.id, redirect_url: result.redirectUrl };
     } catch (err) {
-      console.error("[promotions] createPromotionCheckout failed", {
-        promotion_id: promo.id,
-        vipps_mode: vippsMode,
-        host,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      console.error("[promotions] createPromotionCheckout failed", { promotion_id: promo.id });
       const { error: failErr } = await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "failed" })
@@ -181,8 +167,8 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke kvittering");
-    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+    if (!promo) throw new ClientError("Fant ikke kvittering", 404);
+    if (promo.user_id !== userId) throw new ClientError("Ikke tilgang", 403);
     const listing = Array.isArray(promo.listings) ? promo.listings[0] : promo.listings;
     return {
       id: promo.id,
@@ -206,22 +192,22 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
       .select(
-        "id, user_id, status, duration_days, price_nok, vipps_reference, vipps_mode, expires_at",
+        "id, user_id, listing_id, status, duration_days, price_nok, vipps_reference, vipps_mode, expires_at",
       )
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!promo) throw new Error("Fant ikke fremheving");
-    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+    if (!promo) throw new ClientError("Fant ikke fremheving", 404);
+    if (promo.user_id !== userId) throw new ClientError("Ikke tilgang", 403);
 
-    if (promo.status !== "pending") {
+    if (promo.status !== "pending" && promo.status !== "failed") {
       return { status: promo.status, expires_at: promo.expires_at };
     }
     if (!promo.vipps_reference) {
@@ -236,12 +222,68 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       }
     })();
 
-    const { getVippsPayment, captureVippsPayment } = await import("@/lib/vipps.server");
+    const {
+      getVippsPayment,
+      captureVippsPayment,
+      vippsPaymentStatus,
+      releaseSupersededPromotionPayment,
+    } = await import("@/lib/vipps.server");
     const vippsMode = promo.vipps_mode as "test" | "production";
-    const payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
+    let payment;
+    try {
+      payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
+    } catch (e) {
+      await logServerError("reconcilePromotionPayment.getPayment", e, {
+        promotion_id: promo.id,
+      });
+      throw markLogged(
+        new ClientError("Kunne ikke hente betalingsstatus fra Vipps. Prøv igjen om litt.", 503),
+      );
+    }
 
-    if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
-      if (payment.state === "AUTHORIZED") {
+    const status = vippsPaymentStatus(payment);
+
+    // Refusjon/kansellering av betaling som ikke kan aktiveres. Ved feil
+    // blir raden `failed`; webhooken tar nytt forsøk.
+    const release = async (captured: boolean) => {
+      try {
+        await releaseSupersededPromotionPayment({
+          promotionId: promo.id,
+          reference: promo.vipps_reference!,
+          amountNok: promo.price_nok,
+          captured,
+          host,
+          mode: vippsMode,
+        });
+        return { status: captured ? ("refunded" as const) : ("failed" as const), expires_at: null };
+      } catch (e) {
+        await logServerError("reconcilePromotionPayment.releaseSupersededPayment", e, {
+          promotion_id: promo.id,
+        });
+        return { status: "failed" as const, expires_at: null };
+      }
+    };
+
+    if (status === "AUTHORIZED" || status === "CAPTURED") {
+      // Se webhooken: en failed-rad som er erstattet av en ny fremheving på
+      // samme annonse kan ikke aktiveres: gi kunden pengene tilbake.
+      if (promo.status === "failed") {
+        const { data: live, error: liveErr } = await supabaseAdmin
+          .from("listing_promotions")
+          .select("id")
+          .eq("listing_id", promo.listing_id)
+          .in("status", ["active", "pending", "gifted"])
+          .neq("id", promo.id)
+          .limit(1);
+        if (liveErr) throw await toClientError("database", liveErr);
+        if (live?.length) {
+          await logServerError("reconcilePromotionPayment.paidSupersededPromotion", status, {
+            promotion_id: promo.id,
+          });
+          return release(status === "CAPTURED");
+        }
+      }
+      if (status === "AUTHORIZED") {
         try {
           await captureVippsPayment(
             promo.vipps_reference,
@@ -254,15 +296,17 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           await logServerError("reconcilePromotionPayment.capture", e, {
             promotion_id: promo.id,
           });
-          throw new Error("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.", {
-            cause: e,
-          });
+          throw markLogged(
+            new ClientError("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.", 503, {
+              cause: e,
+            }),
+          );
         }
       }
 
       const now = new Date();
       const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
-      const { error: uerr } = await supabaseAdmin
+      const { data: updated, error: uerr } = await supabaseAdmin
         .from("listing_promotions")
         .update({
           status: "active",
@@ -271,19 +315,38 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
           vipps_psp_reference: payment.pspReference ?? null,
         })
         .eq("id", promo.id)
-        .eq("status", "pending");
+        .in("status", ["pending", "failed"])
+        .select("status, expires_at")
+        .maybeSingle();
+      if (uerr?.code === "23505") {
+        // Kappløp med en ny fremheving på samme annonse etter sjekken over.
+        await logServerError("reconcilePromotionPayment.paidSupersededPromotion", uerr, {
+          promotion_id: promo.id,
+        });
+        // AUTHORIZED ble capturet like over, så betalingen er belastet.
+        return release(true);
+      }
       if (uerr) {
         throw await toClientError("database", uerr);
       }
-      return { status: "active" as const, expires_at: expires.toISOString() };
+      if (updated) return { status: updated.status, expires_at: updated.expires_at };
+
+      // The webhook may have changed this row after our initial read.
+      const { data: current, error: currentErr } = await supabaseAdmin
+        .from("listing_promotions")
+        .select("status, expires_at")
+        .eq("id", promo.id)
+        .maybeSingle();
+      if (currentErr) throw await toClientError("database", currentErr);
+      if (!current) throw new ClientError("Fant ikke fremheving", 404);
+      return { status: current.status, expires_at: current.expires_at };
     }
 
     if (
-      payment.state === "CANCELLED" ||
-      payment.state === "EXPIRED" ||
-      payment.state === "TERMINATED" ||
-      payment.state === "ABORTED" ||
-      payment.state === "FAILED"
+      status === "CANCELLED" ||
+      status === "EXPIRED" ||
+      status === "TERMINATED" ||
+      status === "ABORTED"
     ) {
       const { error: failErr } = await supabaseAdmin
         .from("listing_promotions")
@@ -298,11 +361,12 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       return { status: "failed" as const, expires_at: null };
     }
 
-    if (payment.state === "REFUNDED") {
+    if (status === "REFUNDED") {
       const { error: refundErr } = await supabaseAdmin
         .from("listing_promotions")
-        .update({ status: "refunded" })
-        .eq("id", promo.id);
+        .update({ status: "refunded", refunded_at: new Date().toISOString() })
+        .eq("id", promo.id)
+        .neq("status", "refunded");
       if (refundErr) {
         await logServerError("reconcilePromotionPayment.markRefunded", refundErr, {
           promotion_id: promo.id,
@@ -311,7 +375,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       return { status: "refunded" as const, expires_at: promo.expires_at };
     }
 
-    // CREATED — Vipps har ikke autorisert ennå.
+    // CREATED — Vipps har ikke autorisert ennå. PARTIALLY_REFUNDED kan ikke
+    // skje her: delvis refusjon krever en belastet, altså aktivert, fremheving.
     return { status: "pending" as const, expires_at: promo.expires_at };
   });
 
@@ -340,7 +405,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: idRows, error: idErr } = await supabaseAdmin.rpc("get_featured_listing_ids", {
       _category_slug: data.category_slug ?? undefined,
       _limit: data.limit ?? 2,

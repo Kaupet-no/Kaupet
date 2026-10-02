@@ -1,3 +1,4 @@
+import { formatDateLongPadded } from "@/lib/format";
 import { createFileRoute, type ErrorComponentProps, Link, useRouter } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useQuery } from "@tanstack/react-query";
@@ -66,13 +67,9 @@ const nokFormatter = new Intl.NumberFormat("nb-NO", {
   maximumFractionDigits: 0,
 });
 
-function formatDate(iso: string | null | undefined) {
+function formatDateOrDash(iso: string | null | undefined) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("nb-NO", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLongPadded(iso);
 }
 
 function ReceiptPage() {
@@ -124,7 +121,10 @@ function ReceiptPage() {
         <p className="mt-2 text-muted-foreground">
           {isActive && "Annonsen din er nå fremhevet."}
           {isPending2 && "Betalingen er mottatt og bekreftes om noen sekunder."}
-          {isFailed && "Betalingen ble ikke fullført. Du har ikke blitt belastet."}
+          {isFailed &&
+            (data.status === "refunded"
+              ? "Betalingen er refundert til deg via Vipps."
+              : "Betalingen ble ikke fullført. Du har ikke blitt belastet.")}
         </p>
       </div>
 
@@ -134,8 +134,8 @@ function ReceiptPage() {
           <Row label="Annonse" value={data.listing.title || "—"} />
           <Row label="Varighet" value={`${data.duration_days} dager`} />
           <Row label="Beløp" value={nokFormatter.format(data.price_nok)} />
-          <Row label="Kjøpsdato" value={formatDate(data.created_at)} />
-          {isActive && <Row label="Fremhevet til" value={formatDate(data.expires_at)} />}
+          <Row label="Kjøpsdato" value={formatDateOrDash(data.created_at)} />
+          {isActive && <Row label="Fremhevet til" value={formatDateOrDash(data.expires_at)} />}
           <Row
             label="Status"
             value={

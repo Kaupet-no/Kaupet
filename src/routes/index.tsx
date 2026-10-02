@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { setAttributeFilterValue } from "@/lib/category-filters";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { AttributeFilterChips } from "@/features/listing-search/filters/attribute-filter-chips";
 import { DeferredPopularCarousel } from "@/components/deferred-popular-carousel";
 import { HowItWorksSection, OpenSourceCtaSection } from "@/components/landing-static-sections";
 import { ListingCard } from "@/components/listing-card";
@@ -34,8 +34,8 @@ import { useLandingResultCount } from "@/features/landing/use-landing-result-cou
 import { useCategoryFeed, type CategoryFeedSort } from "@/features/landing/use-category-feed";
 import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
-import { submitSearch } from "@/features/listing-search/submit-search";
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { interpretedSearchState, submitSearch } from "@/features/listing-search/submit-search";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useAllVehicleBrands, allVehicleBrandsQueryOptions } from "@/lib/vehicle/vehicle-brands";
 import { categoriesQueryOptions } from "@/hooks/use-categories";
 
@@ -78,6 +78,7 @@ export const Route = createFileRoute("/")({
           "Norges åpne markedsplass for brukte ting. Finn møbler, elektronikk, klær og mer fra naboer over hele landet.",
       },
     ],
+    links: [{ rel: "canonical", href: "https://kaupet.no/" }],
   }),
   component: LandingPage,
 });
@@ -221,7 +222,11 @@ function WebLanding({
   // nedenfor når en kategori er valgt. Nullstilles til default hver gang
   // brukeren bytter til en annen rotkategori, i tråd med filter-resetten over.
   const [feedSort, setFeedSort] = useState<CategoryFeedSort>("popular");
-  useEffect(() => setFeedSort("popular"), [activeCategory?.id]);
+  const [prevFeedCategoryId, setPrevFeedCategoryId] = useState(activeCategory?.id);
+  if (activeCategory?.id !== prevFeedCategoryId) {
+    setPrevFeedCategoryId(activeCategory?.id);
+    setFeedSort("popular");
+  }
   const {
     data: feedPages,
     isError: feedIsError,
@@ -311,7 +316,8 @@ function WebLanding({
         categories: categories ?? [],
         vehicleBrands: brands,
         allFilters: allFilters ?? [],
-        commit: (search) => navigate({ to: "/annonser", search }),
+        commit: (search, criteria) =>
+          navigate({ to: "/annonser", search, state: interpretedSearchState(criteria) }),
       });
     })();
   };

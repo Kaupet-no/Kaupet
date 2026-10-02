@@ -30,3 +30,14 @@ it("fjerner ikke-sifre, fokuserer når den åpnes og går til annonsen med 8 sif
     params: { kaupetCode: "12345678" },
   });
 });
+
+it("tegner fokusringen inne i feltet, slik den ikke klippes av skuffens scroll-wrapper", () => {
+  render(<KaupetCodeForm onDone={vi.fn()} />);
+  const input = screen.getByLabelText("Kaupet-kode");
+  // Skuffens wrapper på native klipper ytre ring i sidene; inset-ring er
+  // det etablerte mønsteret for felter i klippende kontekster.
+  expect(input.className).toContain("focus-visible:ring-inset");
+  expect(input.className).toContain("focus-visible:ring-2");
+  // twMerge erstatter basisens tynne ytre ring (ring-1).
+  expect(input.className).not.toContain("focus-visible:ring-1");
+});

@@ -10,13 +10,9 @@ import {
   requestLocationPermission,
 } from "@/lib/native";
 import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
+import type { LocationValue } from "@/lib/advanced-search-value";
 
-export type LocationValue = {
-  lat: number | null;
-  lng: number | null;
-  radius: number;
-  label?: string;
-};
+export type { LocationValue } from "@/lib/advanced-search-value";
 
 type LocationPickerProps = {
   value: LocationValue;
@@ -38,9 +34,11 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
     });
   }, []);
 
-  useEffect(() => {
+  const [prevLabel, setPrevLabel] = useState(value.label);
+  if (value.label !== prevLabel) {
+    setPrevLabel(value.label);
     setQuery(value.label ?? "");
-  }, [value.label]);
+  }
 
   const pick = (r: NominatimResult) => {
     onChange({

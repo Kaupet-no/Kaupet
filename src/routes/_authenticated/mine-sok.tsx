@@ -51,13 +51,13 @@ import {
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AdvancedSearchSheet } from "@/components/advanced-search-sheet";
-import { NativeAdvancedSearch } from "@/components/native-advanced-search";
+import { AdvancedSearchSheet } from "@/features/listing-search/filters/advanced-search-sheet";
+import { NativeAdvancedSearch } from "@/features/listing-search/filters/native-advanced-search";
 import {
   criteriaToValue,
   valueToCriteria,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+} from "@/lib/advanced-search-value";
 import {
   deleteSavedSearch,
   listSavedSearches,

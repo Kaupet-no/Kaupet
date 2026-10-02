@@ -363,25 +363,6 @@ async function getListingImagesStatus(
   });
 }
 
-async function assertImageQuota(
-  supabaseAdmin: SupabaseAdmin,
-  organizationId: string,
-  needed: number,
-): Promise<void> {
-  if (needed <= 0) return;
-  const { startOfUtcDayIso } = await loadDeps();
-  const { count, error } = await supabaseAdmin
-    .from("listing_image_jobs")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .gte("created_at", startOfUtcDayIso());
-  if (error) throw error;
-  const remaining = Math.max(0, INTEGRATION_LIMITS.organization.newImagesPerDay - (count ?? 0));
-  if (remaining < needed) {
-    throw new ListingApiError(422, "validation_error", newImagesPerDayLimitMessage(), "images");
-  }
-}
-
 function assertImageUrls(urls: unknown): string[] {
   if (!Array.isArray(urls)) {
     throw new ListingApiError(
@@ -637,15 +618,18 @@ export async function replaceListingImagesApi(params: {
   if (!listing)
     throw new ListingApiError(404, "not_found", "Fant ingen annonse med denne referansen.");
 
-  await assertImageQuota(supabaseAdmin, auth.organizationId, urls.length);
-
   const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
     _organization_id: auth.organizationId,
     _listing_id: listing.id,
     _urls: urls,
     _replace: true,
   });
-  if (enqueueError) throw enqueueError;
+  if (enqueueError) {
+    if (enqueueError.message.includes("organization_new_images_daily_quota_exceeded")) {
+      throw new ListingApiError(422, "validation_error", newImagesPerDayLimitMessage(), "images");
+    }
+    throw enqueueError;
+  }
 
   const images = await getListingImagesStatus(supabaseAdmin, listing.id);
   return { externalRef, images };

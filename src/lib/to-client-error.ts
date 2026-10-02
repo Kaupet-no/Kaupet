@@ -21,14 +21,21 @@ export class ClientError extends Error {
   constructor(
     message: string,
     readonly status = 400,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
   }
 }
 
-// Feil toClientError allerede har logget med den opprinnelige årsaken, slik at
-// serverfunksjons-middlewaren ikke logger den rensede kopien én gang til.
+// Feil som allerede er logget med den opprinnelige årsaken (toClientError, eller
+// et kall til markLogged etter logServerError), slik at serverfunksjons-
+// middlewaren ikke logger dem én gang til.
 const loggedErrors = new WeakSet<object>();
+
+export function markLogged<T extends object>(error: T): T {
+  loggedErrors.add(error);
+  return error;
+}
 
 export function isAlreadyLogged(error: unknown): boolean {
   return typeof error === "object" && error !== null && loggedErrors.has(error);
@@ -39,8 +46,6 @@ export const toClientError = createIsomorphicFn()
   .server(async (functionName: string, error: unknown, context?: Record<string, unknown>) => {
     const { logServerError } = await import("@/lib/server-error-log");
     await logServerError(functionName, error, context);
-    const clientError = sanitizeClientError(error);
-    loggedErrors.add(clientError);
-    return clientError;
+    return markLogged(sanitizeClientError(error));
   })
   .client((_functionName: string, error: unknown) => sanitizeClientError(error));

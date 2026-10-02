@@ -165,7 +165,7 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
 - **Orientering:** telefon er låst til portrett ved oppstart, nettbrett roterer fritt (`src/lib/orientation.ts`). Trenger en flate landskap, kall `unlockOrientation()` ved mount og `lockPortraitOnPhone()` ved unmount — se `image-lightbox.tsx`, som er eneste unntak i dag. Ikke fjern landskap fra `Info.plist`: låsen styres i kjøretid, og plisten er det som gjør unntaket mulig i det hele tatt.
 - **Native-only CSS:** `setupNative()` setter klassen `.native` på `<html>`. Bruk den som gate for regler som kun skal gjelde i appen (tap-highlight, `user-select`, `overscroll-behavior` — se `styles.css`). Native scroll skal beholde WebView-ens plattformfeedback (iOS-bounce og Android edge-stretch/glow); bruk `overscroll-behavior: contain` på en konkret overlay-scrollregion når scroll ikke skal lekke til flaten bak. Merk at `user-select: none` bevisst er begrenset til interaktive elementer: brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.
 - **Bunn-sheets kan dras ned for å lukkes** (`vaul` i `ui/sheet.tsx`, kun `side="bottom"`). Håndtaket rendres automatisk — ikke legg til ditt eget. Lange paneler bruker `expandable` (og eventuelt `initialSnapPoint`) på `SheetContent`/`NativeSheet`: første oppoverscroll utvider panelet til full høyde før innholdet ruller, mens nedoverdrag ved listetoppen bruker Vauls motstand, snap-back og lukkegrense. Merk sliders og andre kontroller som tar sin egen gest med `data-vaul-no-drag`.
-- **Søk på native går gjennom ett panel.** `SearchPanel` (`src/features/listing-search/search-panel/`) er den eneste native søkeflaten. Hjem og bunnavigasjon åpner panelets `query`-modus uten å navigere først. På telefon er panelet en dratt `vaul`-skuff med 60 %/fullskjerm-detents; på nettbrett er det en `ResponsiveOverlay`/dialog. Uten `results` er det en søkelansering med fritekst, historikk, forslag, lokasjon og kategorier. Med `results` redigerer det et lokalt filterutkast over resultatflaten. Resultatflatene viser `SearchSummaryPill` med separate query- og filterhandlinger. Ikke legg til en tredje native søkeflate ved siden av — utvid panelet. `NativeAdvancedSearch` er kun redigering av lagrede søk (`mine-sok.tsx`); begge rendrer de samme `SearchFilterSections`.
+- **Søk på native er et sted, filtre er et panel.** Søk-fanen i bunnmenyen går til `/annonser` med siste søk i behold (`readLastSearchContext`); uten kriterier viser siden startflaten `SearchStart` (lagrede og nylige søk, kategorier, nye annonser). Trykk på aktiv fane ruller til toppen, og neste trykk setter fokus i søkefeltet i selve trykket, slik WKWebView krever for å vise tastaturet. Fritekst skrives i ekte søkefelt på forsiden og resultatsiden, med `SearchSuggestionsLayer` under. `SearchPanel` (`src/features/listing-search/search-panel/`) er filterflaten: på telefon en dratt `vaul`-skuff med 60 %/fullskjerm-detents, på nettbrett en `ResponsiveOverlay`/dialog. Med `results` redigerer det et lokalt filterutkast over resultatflaten; uten brukes det bare for stedsvalget fra forsiden. Ikke legg til flere søkeflater ved siden av. `NativeAdvancedSearch` er kun redigering av lagrede søk (`mine-sok.tsx`); begge rendrer de samme `SearchFilterSections`.
 - Query-submit skjer kun ved Enter/keyboard Search, en eksplisitt søkerad eller en tydelig primærknapp — aldri ved blur. Kategori-, attributt- og annonseforslag endrer utkastet; URL og resultater endres først ved eksplisitt anvendelse, bortsett fra en direkte launch-handling som navigerer til resultatlisten. Tolkede kriterier skal vises gjennom `SearchInterpretation` og kunne fjernes.
 - `vaul` brukes av alle bunn-sheets gjennom `SheetContent`; den ytre Radix-roten beholdes for felles dialogkontekst og API. `SearchPanel` bruker `Drawer.Root` kun på telefon fordi det har søkespesifikke detents. På nettbrett skal filterpanelet bruke dialogpresentasjonen og resultatflaten kan bruke delt treff-/kartlayout.
 - **Haptikk:** kall bare wrapperne i `src/lib/haptics.ts`, aldri Capacitor-pluginen direkte. Wrapperne normaliserer impact, selection og notification til én lett touch slik at handlinger ikke gir lange vibrasjonsmønstre på Android. Haptikk brukes på tilstandsendringer brukeren ikke ser (pull-to-refresh utløst, sveip-terskel passert, feil) — ikke på vanlige knappetrykk; `src/lib/toast.ts` fyrer den derfor kun for `error`/`warning`, ikke `success`/`info`.
@@ -178,6 +178,47 @@ Native søk og filtrering bruker én `SearchPanel`-flyt. Queryfeltet er første 
 for fritekstsøk; filterikonet åpner en oversikt over valgt tilstand. En
 detaljkontroll åpnes på egen flate. Ikke legg søketreff, flere dropdown-lister,
 checkboksmatriser eller flere slidere i oversikten samtidig.
+
+### Resultatflaten på telefon
+
+- Søkefeltet er et ekte input. Mens det har fokus vises forslag
+  (`SearchSuggestionsLayer`): kategorien først, så fritekst og annonser; tomt
+  felt viser lagrede søk med nye treff og nylige søk. Samme lag brukes på
+  forsiden.
+- En valgt kategori står som en brikke med X i søkefeltet, ikke som brødsmule.
+- Under feltet står brikkeraden (`SearchFilterChipRow`): Filtre, Sortering,
+  Pris, Sted, Tilstand og inntil tre av kategoriens hovedfiltre. Hver brikke
+  åpner søkepanelet rett på sitt filter (`openPanel(section, q, key)`), i halv
+  høyde når filteret får plass. En aktiv brikke er fylt og viser verdien.
+  Ikke legg egne filter- eller regelknapper i søkefeltet ved siden av.
+- Antall treff, «Lagre søk» og visningsvalget (ikonknapp) står på én linje.
+- Kartet åpnes fra en sentrert «Kart»-pille og lukkes med «Liste» på samme
+  sted. På telefon viser kartet prislapper, og valgt lapp gir et annonsekort
+  nederst i stedet for en popup.
+
+### Filterlisten på telefon
+
+Filterarket over resultatene er én liste uten faner. Faner passer desktopens
+sidekolonne, men på telefon skjuler de filtre bak ekstra trykk.
+
+- Rekkefølge: «Grunnleggende» (kategori, sted, pris, tilstand), deretter
+  «Egenskaper for <kategori>». Kategorien står øverst fordi den bestemmer
+  egenskapene under; uten kategori vises en rad som ber om å velge en.
+- Egenskapene følger admin-rekkefølgen (`sort_order`). Rangering etter
+  søketekst (`rankSearchFilters`) brukes bare der plassen er knapp, ikke i
+  listen der alt er synlig — ellers flytter radene seg mellom hver gang.
+- Hovedfiltre (`is_primary`) står åpent; resten ligger bak «Vis N flere
+  filtre», som står åpent så lenge et av dem er aktivt.
+- Ja/nei er en bryter og 2–5 alternativer er brikker direkte i listen;
+  lengre valg og tallområder er en rad med egen underside. Alternativer uten
+  treff gråes ut, de skjules ikke. Kjøretøyets utstyrsgrupper samles i én
+  «Utstyr»-rad.
+- Avhengige filtre (`depends_on_*`, Modell under Merke) vises først når de
+  gjelder, og tømmes når filteret de avhenger av tømmes
+  (`retainSearchAttributes`).
+- Én kategori om gangen på telefon (`CategorySlugPicker single`). Ved
+  kategoribytte beholdes verdier den nye kategorien også har; resten navngis
+  i en statuslinje over egenskapene.
 
 ### Tetthet, rader og handlinger
 
@@ -270,8 +311,25 @@ text-primary`, og metadata under tittelen; ikke vis selgerinterne
   Kaupet». Ikke bruk en generell trygghetsbadge.
 - Kategoriens farge er en lokal aksent på valgt ikon eller overskrift. Den skal
   ikke fargelegge hele heroen eller resultatflaten.
-- Nativeforsiden skal vise søk og første troverdige annonsekort innen første
-  skjermbilde. Behold luft, men ikke bruk hero-høyde som dekorasjon.
+- Nativeforsiden eies av Kaupet-logoen, søkefeltet og kategorivelgeren rett
+  under søkefeltet, midt på det første skjermbildet og litt forskjøvet
+  oppover — rolig, med lite som konkurrerer om oppmerksomheten. Populære
+  annonser kommer under skjermbildet, og populære annonser hentes først når
+  brukeren scroller. Heroen står i ro mens innholdet scroller opp bak den;
+  søkefeltet og kategorivelgeren tones ut med hver sin målte fade-lengde,
+  slik at kategorivelgeren forsvinner først og deretter søkefeltet — ingen
+  del er synlig når innholdet kommer over den. Logoen tones ikke ut: den
+  står fast til «Populært nå»-seksjonen er ca midt på skjermen, og scroller
+  deretter oppover i lavere tempo enn siden (parallaks) — men holder følge
+  med innholdets hastighet idet det nærmer seg, slik at innholdet alltid
+  scroller forbi under den, og tilbake til hjem-posisjonen ved scroll i
+  motsatt retning. Søkefeltet holdes fullt synlig mens det er i
+  fokus eller tastaturet er oppe, og swiping i kategorivelgeren viser den
+  fullt igjen i tre sekunder — eller til brukeren scroller siden — før den
+  går tilbake til den scroll-avhengige faden. Mens søkeforslagene er åpne,
+  ligger heroen over innholdet (men under bunnnaven), slik at
+  forslagsvinduet aldri dekkes av annonsekort som har scrollet opp ved
+  siden av. Behold luft, men ikke bruk hero-høyde som dekorasjon.
 
 ## Skjemavalidering
 

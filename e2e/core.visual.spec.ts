@@ -88,7 +88,7 @@ test("forsiden holder visuell kontrakt", async ({ page }, testInfo) => {
 test("det native søkepanelet holder visuell kontrakt", async ({ page }) => {
   await page.goto("/annonser?sort=price_asc&forcenative=1");
   await waitForHydration(page);
-  await page.getByRole("button", { name: "Filtrer", exact: true }).click();
+  await page.getByRole("button", { name: "Alle filtre", exact: true }).click();
   await page.getByRole("heading", { name: "Søk og filtrer" }).waitFor();
   await expect(page).toHaveScreenshot("search-panel.png", {
     animations: "disabled",

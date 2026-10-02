@@ -11,8 +11,9 @@ test("mobil toppsøk fokuserer sidesøket på annonser", async ({ page }, testIn
   await page.goto("/annonser");
   await waitForHydration(page);
 
+  const input = page.locator("#annonser-search-input");
   await page.getByRole("button", { name: "Åpne søk" }).click();
-  await expect(page.locator("#annonser-search-input")).toBeFocused();
+  await expect(input).toBeFocused();
 });
 
 test("søkeforslag har strukturert type og tilgjengelig tilkobling", async ({ page }) => {
@@ -36,7 +37,7 @@ test("native søkepanel viser tilgjengelig live-handling", async ({ page }) => {
   await page.goto("/annonser?forcenative");
   await waitForHydration(page);
 
-  await page.getByRole("button", { name: /Filtrer/ }).click();
+  await page.getByRole("button", { name: /Alle filtre/ }).click();
   const applyButton = page.getByTestId("search-filter-apply-button");
   await expect(applyButton).toBeVisible();
   await expect(applyButton).toHaveText(/Vis \d+ annonser?/);

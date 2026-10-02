@@ -1,3 +1,4 @@
+import { initials } from "@/lib/format";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -43,13 +44,6 @@ import {
 const NewListingDialog = lazy(() =>
   import("@/components/new-listing-dialog").then((m) => ({ default: m.NewListingDialog })),
 );
-
-function initials(name: string | null | undefined, fallback: string) {
-  const source = (name ?? fallback).trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/u).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
-}
 
 export function UserMenu({ userId, email }: { userId: string; email: string | null }) {
   const navigate = useNavigate();

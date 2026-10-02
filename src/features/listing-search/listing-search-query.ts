@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
 import type { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -15,9 +16,12 @@ type SearchRequestInput = {
   terms: string[];
   limit: number;
   offset: number;
+  /** Ta med annonser solgt de siste to dagene (vises med Solgt-merke). Bare
+   * for resultatlisten og treffantallet — ikke prisstatistikk. */
+  includeRecentlySold?: boolean;
 };
 
-type SearchScopeInput = Omit<SearchRequestInput, "limit" | "offset">;
+type SearchScopeInput = Omit<SearchRequestInput, "limit" | "offset" | "includeRecentlySold">;
 
 /**
  * Om kategorilista er klar til å slå opp slugs i. Den lastes asynkront, og
@@ -43,6 +47,7 @@ export function buildListingsSearchRpcArgs({
   terms,
   limit,
   offset,
+  includeRecentlySold = false,
 }: SearchRequestInput) {
   const extraGroups = search.extraGroups ?? [];
   const primaryMode = search.qMode ?? "all";
@@ -93,10 +98,11 @@ export function buildListingsSearchRpcArgs({
     _attribute_filters: queryAttrFilters as Json,
     _center_lat: search.lat ?? null,
     _center_lng: search.lng ?? null,
-    _radius_km: search.radius ?? 10,
+    _radius_km: search.radius ?? DEFAULT_SEARCH_RADIUS_KM,
     _sort: search.sort,
     _limit: limit,
     _offset: offset,
+    _include_recently_sold: includeRecentlySold,
   };
 }
 

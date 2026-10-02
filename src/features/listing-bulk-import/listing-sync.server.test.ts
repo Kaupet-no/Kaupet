@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  INTEGRATION_LIMITS,
   newImagesPerDayLimitMessage,
   newListingsPerDayLimitMessage,
 } from "@/lib/integration-limits";
@@ -45,18 +44,12 @@ function makeContext(): SyncContext {
   };
 }
 
-/** Bygger en `supabaseAdmin`-dobbel som dekker akkurat spørringene
- * `syncListings` gjør: forhåndsoppslag av eksisterende `external_ref`-er,
- * dagens opptelling av nye annonser, og kaupet_code-oppslag per batch. */
+/** Bygger en `supabaseAdmin`-dobbel for ref- og kaupet_code-oppslag. */
 function makeSupabaseAdmin({
   existingRefs = [] as string[],
-  createdToday = 0,
-  imagesCreatedToday = 0,
   rpcImpl,
 }: {
   existingRefs?: string[];
-  createdToday?: number;
-  imagesCreatedToday?: number;
   rpcImpl: (name: string, args: Record<string, unknown>) => unknown;
 }) {
   const from = vi.fn((table: string) => {
@@ -75,11 +68,7 @@ function makeSupabaseAdmin({
                 data: [{ id: "listing-1", kaupet_code: "12345678" }],
                 error: null,
               }
-            : table === "organization_listing_imports"
-              ? { data: null, count: createdToday, error: null }
-              : table === "listing_image_jobs"
-                ? { data: null, count: imagesCreatedToday, error: null }
-                : { data: null, error: null },
+            : { data: null, error: null },
       ).then(resolve, reject);
     return chain;
   });
@@ -152,7 +141,7 @@ describe("syncListings", () => {
     ]);
   });
 
-  it("dry_run sender _dry_run: true og teller ikke mot dagens grense", async () => {
+  it("dry_run sender _dry_run: true og skriver ikke kvote", async () => {
     const rpc = vi.fn();
     const supabaseAdmin = makeSupabaseAdmin({
       rpcImpl: (_name, args) => {
@@ -168,29 +157,26 @@ describe("syncListings", () => {
     });
     expect(results[0]).toMatchObject({ status: "created" });
     expect(rpc).toHaveBeenCalledWith(expect.objectContaining({ _dry_run: true }));
-    // Ingen opptelling av dagens grense skal skje for dry-run.
-    expect(supabaseAdmin.from).not.toHaveBeenCalledWith("organization_listing_imports");
+    expect(supabaseAdmin.from).not.toHaveBeenCalledWith("organization_daily_quotas");
   });
 
-  it("håndhever dagens grense for nye annonser uten å ringe RPC-en for raden som overskrider", async () => {
+  it("viser stabil databasekvotefeil med kundemeldingen", async () => {
     const rpc = vi.fn((_args: unknown) => undefined);
     const supabaseAdmin = makeSupabaseAdmin({
-      createdToday: INTEGRATION_LIMITS.organization.newListingsPerDay - 1,
       rpcImpl: (_name, args) => {
         rpc(args);
-        return { data: { status: "created", listing_id: "listing-1" }, error: null };
+        return {
+          data: { status: "failed", error_code: "daily_listing_quota" },
+          error: null,
+        };
       },
     });
     const results = await syncListings(supabaseAdmin, makeContext(), {
       importId,
-      rows: [
-        makeRow({ rowNumber: 2, externalId: "ref-n" }),
-        makeRow({ rowNumber: 3, externalId: "ref-n-plus-1" }),
-      ],
+      rows: [makeRow({ rowNumber: 2, externalId: "ref-n" })],
       mode: "create",
     });
-    expect(results[0]).toMatchObject({ status: "created" });
-    expect(results[1]).toMatchObject({ status: "failed", error: newListingsPerDayLimitMessage() });
+    expect(results[0]).toMatchObject({ status: "failed", error: newListingsPerDayLimitMessage() });
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
@@ -198,7 +184,6 @@ describe("syncListings", () => {
     const rpc = vi.fn((_args: unknown) => undefined);
     const supabaseAdmin = makeSupabaseAdmin({
       existingRefs: ["existing-ref"],
-      createdToday: INTEGRATION_LIMITS.organization.newListingsPerDay,
       rpcImpl: (_name, args) => {
         rpc(args);
         return { data: { status: "updated", listing_id: "listing-1" }, error: null };
@@ -391,12 +376,14 @@ describe("syncListings", () => {
     expect(supabaseAdmin.from).not.toHaveBeenCalledWith("listing_image_jobs");
   });
 
-  it("håndhever døgngrensen for nye bilder: annonsen lagres, bildene hoppes over med en advarsel", async () => {
+  it("viser stabil databasekvotefeil for bilder som advarsel", async () => {
     const calls: string[] = [];
     const supabaseAdmin = makeSupabaseAdmin({
-      imagesCreatedToday: INTEGRATION_LIMITS.organization.newImagesPerDay - 1,
       rpcImpl: (name) => {
         calls.push(name);
+        if (name === "enqueue_listing_image_jobs") {
+          return { data: null, error: new Error("organization_new_images_daily_quota_exceeded") };
+        }
         return { data: { status: "created", listing_id: "listing-1" }, error: null };
       },
     });
@@ -405,13 +392,13 @@ describe("syncListings", () => {
       rows: [
         makeRow({
           externalId: "with-images",
-          imageUrls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
+          imageUrls: ["https://example.com/a.jpg"],
         }),
       ],
       mode: "create",
     });
     expect(results[0]).toMatchObject({ status: "created", warning: newImagesPerDayLimitMessage() });
-    expect(calls).toEqual(["upsert_listing_from_external"]);
+    expect(calls).toEqual(["upsert_listing_from_external", "enqueue_listing_image_jobs"]);
   });
 
   it("maskerer interne feil (kastet unntak) fra RPC-kallet", async () => {

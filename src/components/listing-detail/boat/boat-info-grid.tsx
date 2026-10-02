@@ -1,3 +1,4 @@
+import { formatNokNumber } from "@/lib/format";
 import {
   Anchor,
   BedDouble,
@@ -125,7 +126,7 @@ export function BoatInfoGrid({ attributes }: { attributes: Attrs }) {
       key: "engine_hours",
       icon: Gauge,
       label: "Driftstimer",
-      value: `${engineHours.toLocaleString("nb-NO")} t`,
+      value: `${formatNokNumber(engineHours)} t`,
     });
   }
   if (seats != null && seats > 0) {
@@ -193,7 +194,7 @@ export function BoatExtraInfo({ attributes }: { attributes: Attrs }) {
   const depth = num(attributes.depth_cm);
   if (depth != null) rows.push({ label: "Dybde", value: `${depth} cm` });
   const weight = num(attributes.weight_kg);
-  if (weight != null) rows.push({ label: "Vekt", value: `${weight.toLocaleString("nb-NO")} kg` });
+  if (weight != null) rows.push({ label: "Vekt", value: `${formatNokNumber(weight)} kg` });
   const regNr = str(attributes.registration_number);
   if (regNr) rows.push({ label: "Registreringsnummer", value: regNr });
 

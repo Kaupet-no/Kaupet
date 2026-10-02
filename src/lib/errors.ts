@@ -140,6 +140,16 @@ function looksTechnical(s: string): boolean {
   );
 }
 
+// Engelske meldinger fra biblioteker, tredjeparter eller serverkode
+// («Unauthorized: …», «Load failed», «Internal Server Error») skal aldri vises
+// brukeren. ponytail: ordliste, ikke språkdeteksjon — utvid ved nye funn.
+const ENGLISH_WORDS =
+  /\b(the|is|are|not|failed|invalid|unauthorized|forbidden|error|could|cannot|can't|must|missing|provided|found|denied|required|unexpected|unknown|exceeded|timeout|timed|too|please|unable|only|supported|available|already|exists|internal|server|request|response)\b/i;
+
+function looksEnglish(s: string): boolean {
+  return ENGLISH_WORDS.test(s);
+}
+
 function fromPostgresCode(code: string | undefined, fallback: string): string {
   switch (code) {
     case "23505":
@@ -247,7 +257,7 @@ export function formatErrorMessage(err: AnyError, fallback: string): string {
   }
 
   if (typeof err === "string") {
-    if (!err || looksLikeJson(err) || looksTechnical(err)) return fallback;
+    if (!err || looksLikeJson(err) || looksTechnical(err) || looksEnglish(err)) return fallback;
     return err;
   }
 
@@ -265,7 +275,7 @@ export function formatErrorMessage(err: AnyError, fallback: string): string {
       }
       return fallback;
     }
-    if (looksTechnical(message)) return fallback;
+    if (looksTechnical(message) || looksEnglish(message)) return fallback;
     return message;
   }
 

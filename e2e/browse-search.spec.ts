@@ -30,3 +30,25 @@ test("søker fra forsiden og lander på annonser-siden med treff", async ({ page
       .first(),
   ).toBeVisible({ timeout: 15_000 });
 });
+
+test("kan fjerne kategorien som ble tolket fra forsidesøket", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+  const main = page.getByRole("main");
+  await main.getByRole("textbox", { name: "Søk i annonser" }).fill("volvo");
+  await main.getByRole("button", { name: "Søk", exact: true }).click();
+  await expect(page).toHaveURL(/\/annonser\?/);
+
+  const interpretation = page.getByRole("group", { name: "Slik tolket Kaupet søket" });
+  await interpretation.getByRole("button", { name: /^Fjern Bil(?: og MC)? fra søket$/ }).click();
+  await expect(interpretation).not.toBeVisible();
+  await expect(page.getByPlaceholder("Hva leter du etter?")).toHaveValue("volvo");
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return [url.searchParams.get("category"), url.searchParams.get("categories")].every(
+        (value) => !value || value === "[]",
+      );
+    })
+    .toBe(true);
+});

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { showErrorToast } from "@/lib/toast";
@@ -46,7 +46,7 @@ export function useInlineListingImages(params: {
 }): InlineListingImages {
   const { listingId, images, imgUrls } = params;
   const queryClient = useQueryClient();
-  const [items, setItems] = useState<InlineImageItem[]>(() =>
+  const toItems = (): InlineImageItem[] =>
     images
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -55,8 +55,8 @@ export function useInlineListingImages(params: {
         storage_path: img.storage_path,
         sort_order: img.sort_order,
         caption: img.caption ?? null,
-      })),
-  );
+      }));
+  const [items, setItems] = useState<InlineImageItem[]>(toItems);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const captionTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -64,20 +64,12 @@ export function useInlineListingImages(params: {
   // invalidation from another field's save), unless a local mutation is
   // still in flight for images specifically — simplest safe approach given
   // uploads/removals are already optimistic below.
-  useEffect(() => {
-    setItems(
-      images
-        .slice()
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((img) => ({
-          id: null,
-          storage_path: img.storage_path,
-          sort_order: img.sort_order,
-          caption: img.caption ?? null,
-        })),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [images.map((i) => i.storage_path).join("|")]);
+  const sourceKey = images.map((i) => i.storage_path).join("|");
+  const [prevSourceKey, setPrevSourceKey] = useState(sourceKey);
+  if (prevSourceKey !== sourceKey) {
+    setPrevSourceKey(sourceKey);
+    setItems(toItems());
+  }
 
   function invalidate() {
     // Prefix match — invalidates every ["listing", ...] query (the detail

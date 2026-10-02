@@ -20,7 +20,7 @@ import {
 } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
-import { isNative, pickNativePhoto } from "@/lib/native";
+import { isNative, pickNativePhotos } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 
 export type PendingImage = {
@@ -184,8 +184,13 @@ export function ImageUploader({
 
   const pickNative = async (source: "camera" | "gallery") => {
     try {
-      const file = await pickNativePhoto(source);
-      if (file) await addFiles([file]);
+      const remaining = MAX_LISTING_IMAGES - images.length;
+      if (remaining <= 0) {
+        showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
+        return;
+      }
+      const files = await pickNativePhotos(source, remaining);
+      if (files.length) await addFiles(files);
     } catch (e: unknown) {
       showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
     }

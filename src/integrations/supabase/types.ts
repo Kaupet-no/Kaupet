@@ -1158,6 +1158,7 @@ export type Database = {
           search_vector: unknown
           seller_id: string
           show_visiting_address: boolean
+          sold_at: string | null
           status: Database["public"]["Enums"]["listing_status"]
           subtitle: string | null
           title: string
@@ -1197,6 +1198,7 @@ export type Database = {
           search_vector?: unknown
           seller_id: string
           show_visiting_address?: boolean
+          sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title: string
@@ -1236,6 +1238,7 @@ export type Database = {
           search_vector?: unknown
           seller_id?: string
           show_visiting_address?: boolean
+          sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title?: string
@@ -1353,6 +1356,35 @@ export type Database = {
           web_push_wtb_matches?: boolean
         }
         Relationships: []
+      }
+      organization_daily_quotas: {
+        Row: {
+          new_images: number
+          new_listings: number
+          organization_id: string
+          usage_date: string
+        }
+        Insert: {
+          new_images?: number
+          new_listings?: number
+          organization_id: string
+          usage_date: string
+        }
+        Update: {
+          new_images?: number
+          new_listings?: number
+          organization_id?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_daily_quotas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_api_keys: {
         Row: {
@@ -2165,6 +2197,39 @@ export type Database = {
           last_error?: string | null
           prefix?: string
           requested_at?: string
+        }
+        Relationships: []
+      }
+      standard_upload_objects: {
+        Row: {
+          attempts: number
+          bucket: string
+          claimed_at: string | null
+          created_at: string
+          id: number
+          last_error: string | null
+          object_key: string
+          state: string
+        }
+        Insert: {
+          attempts?: number
+          bucket: string
+          claimed_at?: string | null
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          object_key: string
+          state?: string
+        }
+        Update: {
+          attempts?: number
+          bucket?: string
+          claimed_at?: string | null
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          object_key?: string
+          state?: string
         }
         Relationships: []
       }
@@ -3498,6 +3563,7 @@ export type Database = {
         Args: {
           _attributes: Json
           _category_id: string
+          _exclude_seller_id?: string
           _lat: number
           _limit?: number
           _lng: number
@@ -3548,7 +3614,7 @@ export type Database = {
         }
       }
       match_listing_to_saved_searches: {
-        Args: { _listing_id: string }
+        Args: { _listing_id: string; _previous?: Json }
         Returns: undefined
       }
       match_listing_to_wtb_listings: {
@@ -3638,6 +3704,22 @@ export type Database = {
       }
       purge_expired_accounts: { Args: never; Returns: number }
       purge_expired_personal_data: { Args: never; Returns: Json }
+      reserve_standard_upload_quota: {
+        Args: { _bytes: number; _user_id: string }
+        Returns: boolean
+      }
+      register_standard_upload_object: {
+        Args: { _bucket: string; _key: string }
+        Returns: undefined
+      }
+      claim_orphan_standard_uploads: {
+        Args: { _limit: number }
+        Returns: { attempts: number; bucket: string; id: number; object_key: string }[]
+      }
+      finish_orphan_standard_upload: {
+        Args: { _deleted: boolean; _error?: string; _id: number }
+        Returns: undefined
+      }
       remove_organization_location_member: {
         Args: { _location_id: string; _user_id: string }
         Returns: undefined
@@ -3692,6 +3774,16 @@ export type Database = {
           sender_id: string
         }
       }
+      saved_search_basic_match: {
+        Args: {
+          _cat_slug: string
+          _condition: string
+          _is_free: boolean
+          _price_nok: number
+          c: Json
+        }
+        Returns: boolean
+      }
       saved_search_unread_counts: {
         Args: never
         Returns: {
@@ -3721,6 +3813,7 @@ export type Database = {
           _exclude_any_terms?: string[]
           _include_free?: boolean
           _include_groups?: Json
+          _include_recently_sold?: boolean
           _limit?: number
           _max_price?: number
           _min_price?: number
@@ -3741,6 +3834,7 @@ export type Database = {
           kaupet_code: string
           price_nok: number
           relevance: number
+          sold_at: string | null
           subtitle: string
           title: string
           total_count: number

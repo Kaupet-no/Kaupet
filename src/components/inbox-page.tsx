@@ -1,3 +1,4 @@
+import { formatDayMonth } from "@/lib/format";
 import { Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
@@ -12,8 +13,6 @@ import {
   BellRing,
   Loader2,
   X,
-  ShieldAlert,
-  ChevronUp,
   Trash2,
   RotateCcw,
 } from "lucide-react";
@@ -29,8 +28,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { isUnread } from "@/lib/unread";
+import { lastConversationMessages, messagePreview } from "@/lib/conversation-messages";
 import { usePushStatus } from "@/hooks/use-push-status";
-import { useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { formatErrorMessage } from "@/lib/errors";
 type ConversationRow = {
   id: string;
@@ -100,30 +99,27 @@ type RawConv = {
   seller?: RawProfile | RawProfile[] | null;
 };
 
-type SystemMessage = {
-  id: string;
-  body: string;
-  created_at: string;
-  read_at: string | null;
-};
-
 export function InboxPage() {
   const native = useIsNative();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [view, setView] = useState<"inbox" | "trash">("inbox");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [systemOpen, setSystemOpen] = useState(true);
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: native,
     onRefresh: async () => {
       await qc.resetQueries({ queryKey: ["my-conversations"] });
-      await qc.resetQueries({ queryKey: ["system-messages"] });
     },
   });
 
-  const { data: conversations, isLoading } = useQuery({
+  const {
+    data: conversations,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["my-conversations", user?.id, view],
     enabled: !!user,
     queryFn: async (): Promise<ConversationRow[]> => {
@@ -165,7 +161,7 @@ export function InboxPage() {
           buyer: pmap.get(c.buyer_id) ?? null,
           seller: pmap.get(c.seller_id) ?? null,
         }));
-        return await attachLastMessage(enriched);
+        return hideUnstartedForCounterpart(await attachLastMessage(enriched), user!.id);
       }
       const normalised = ((data ?? []) as unknown as RawConv[]).map((c) => ({
         ...c,
@@ -173,36 +169,10 @@ export function InboxPage() {
         buyer: (Array.isArray(c.buyer) ? c.buyer[0] : c.buyer) ?? null,
         seller: (Array.isArray(c.seller) ? c.seller[0] : c.seller) ?? null,
       }));
-      return await attachLastMessage(normalised);
+      return hideUnstartedForCounterpart(await attachLastMessage(normalised), user!.id);
     },
   });
 
-  const { data: systemMessages } = useQuery({
-    queryKey: ["system-messages", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("system_messages")
-        .select("id, body, created_at, read_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SystemMessage[];
-    },
-  });
-
-  const markReadMut = useMutation({
-    mutationFn: async (id: string) => {
-      await supabase
-        .from("system_messages")
-        .update({ read_at: new Date().toISOString() })
-        .eq("id", id)
-        .is("read_at", null);
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["system-messages"] });
-      void qc.invalidateQueries({ queryKey: ["system-messages-unread"] });
-    },
-  });
   const trashMut = useMutation({
     mutationFn: async ({ row, restore }: { row: ConversationRow; restore: boolean }) => {
       if (!user) throw new Error("Ikke innlogget");
@@ -225,8 +195,6 @@ export function InboxPage() {
     onError: (error: Error) =>
       showErrorToast(formatErrorMessage(error, "Kunne ikke oppdatere samtalen")),
   });
-
-  const unreadSystemCount = useUnreadSystemMessagesCount();
 
   // Bilde-URLer for omslagsbilder
   const imgUrls = useMemo(() => {
@@ -310,47 +278,6 @@ export function InboxPage() {
           Samtaler i papirkurven tømmes automatisk etter 14 dager.
         </p>
 
-        <TabsContent value="inbox">
-          {systemMessages && systemMessages.length > 0 && (
-            <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
-              <button
-                type="button"
-                onClick={() => setSystemOpen((o) => !o)}
-                className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <ShieldAlert className="size-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">Kaupet-teamet</p>
-                  <p className="text-xs text-muted-foreground">
-                    {systemMessages.length} {systemMessages.length === 1 ? "melding" : "meldinger"}
-                  </p>
-                </div>
-                {unreadSystemCount > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground">
-                    {unreadSystemCount}
-                  </span>
-                )}
-                {systemOpen ? (
-                  <ChevronUp className="size-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="size-4 text-muted-foreground" />
-                )}
-              </button>
-              {systemOpen && (
-                <ul className="divide-y divide-border border-t border-border">
-                  {systemMessages.map((msg) => (
-                    <li key={msg.id}>
-                      <SystemMessageRow msg={msg} onRead={() => markReadMut.mutate(msg.id)} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </TabsContent>
-
         {view === "inbox" && <PushHintForMessages />}
 
         <TabsContent value={view}>
@@ -361,6 +288,13 @@ export function InboxPage() {
                   <Skeleton key={i} className="h-20" />
                 ))}
               </div>
+            ) : isError ? (
+              <EmptyState
+                icon={MessageCircle}
+                title="Kunne ikke hente samtalene"
+                description={formatErrorMessage(error, "Prøv igjen om litt.")}
+                action={<Button onClick={() => void refetch()}>Prøv igjen</Button>}
+              />
             ) : groups.length === 0 ? (
               <EmptyState
                 icon={view === "trash" ? Trash2 : MessageCircle}
@@ -551,48 +485,6 @@ export function InboxPage() {
   );
 }
 
-function SystemMessageRow({ msg, onRead }: { msg: SystemMessage; onRead: () => void }) {
-  const [open, setOpen] = useState(false);
-
-  const handleOpen = () => {
-    setOpen(true);
-    if (!msg.read_at) onRead();
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className={`flex w-full items-start gap-3 p-3 text-left hover:bg-muted/40 ${!msg.read_at ? "bg-brand/5" : ""}`}
-      >
-        <div className="min-w-0 flex-1 pl-1">
-          <p className={`truncate text-sm ${!msg.read_at ? "font-semibold" : "font-medium"}`}>
-            {msg.body.slice(0, 80)}
-            {msg.body.length > 80 ? "…" : ""}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{formatRelative(msg.created_at)}</p>
-        </div>
-        {!msg.read_at && (
-          <span className="mt-1 size-2 shrink-0 rounded-full bg-brand" aria-label="Ulest" />
-        )}
-      </button>
-      {open && (
-        <div className="border-t border-border bg-muted/30 px-4 py-3">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.body}</p>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="mt-2 text-xs text-muted-foreground underline underline-offset-2"
-          >
-            Skjul
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
 const PUSH_HINT_DISMISS_KEY = "kaupet_push_msg_hint_dismissed_v1";
 
 function PushHintForMessages() {
@@ -689,26 +581,27 @@ function PushHintForMessages() {
   );
 }
 
+/** En samtale kjøperen bare har åpnet (ingen meldinger ennå) vises ikke for
+ * selgeren — se #3 i docs/test/staging-gjennomgang-2026-10-01.md. */
+function hideUnstartedForCounterpart(rows: ConversationRow[], myId: string): ConversationRow[] {
+  return rows.filter((c) => c.last_message || c.buyer_id === myId);
+}
+
 async function attachLastMessage(
   convs: Omit<ConversationRow, "last_message">[],
 ): Promise<ConversationRow[]> {
   if (convs.length === 0) return [];
-  const ids = convs.map((c) => c.id);
-  const { data } = await supabase
-    .from("messages")
-    .select("conversation_id, body, created_at, sender_id, deleted_at")
-    .in("conversation_id", ids)
-    .order("created_at", { ascending: false });
-  const lastByConv = new Map<string, { body: string; created_at: string; sender_id: string }>();
-  for (const m of data ?? []) {
-    if (!lastByConv.has(m.conversation_id)) {
-      lastByConv.set(m.conversation_id, {
-        body: m.deleted_at ? "Melding slettet" : m.body,
-        created_at: m.created_at,
-        sender_id: m.sender_id,
-      });
-    }
-  }
+  const messages = await lastConversationMessages(convs.map((c) => c.id));
+  const lastByConv = new Map(
+    [...messages].map(([id, message]) => [
+      id,
+      {
+        body: messagePreview(message),
+        created_at: message.created_at,
+        sender_id: message.sender_id,
+      },
+    ]),
+  );
   return convs.map((c) => ({ ...c, last_message: lastByConv.get(c.id) ?? null }));
 }
 
@@ -723,5 +616,5 @@ function formatRelative(iso: string): string {
   if (hours < 24) return `${hours} t`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days} d`;
-  return d.toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+  return formatDayMonth(iso);
 }

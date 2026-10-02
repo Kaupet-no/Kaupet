@@ -6,6 +6,7 @@ import {
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
+  retainSearchAttributes,
   NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
   type AttributeFilterValue,
@@ -268,5 +269,55 @@ describe("applyAttributeFilters", () => {
         args: ["attributes", { part_fitment_vehicle_ids: ["model-1"] }],
       },
     ]);
+  });
+});
+
+describe("retainSearchAttributes", () => {
+  const brand = f({ category_id: "main", key: "brand", type: "brand_select" });
+  const model = f({ category_id: "main", key: "model", type: "model_select" });
+  const motor = f({ category_id: "main", key: "motor", type: "select" });
+  const hp = f({
+    category_id: "main",
+    key: "hp",
+    type: "range",
+    depends_on_key: "motor",
+    depends_on_not_value: "uten_motor",
+  });
+  const color = f({ category_id: "main", key: "color" });
+  const filters = [brand, model, motor, hp, color];
+  const range: AttributeFilterValue = { kind: "range", min: 100 };
+
+  it("drops Modell once Merke is cleared", () => {
+    const { kept, dropped } = retainSearchAttributes(
+      { model: { kind: "multiselect", values: ["V70"] } },
+      filters,
+    );
+    expect(kept).toEqual({});
+    expect(dropped).toEqual(["model"]);
+  });
+
+  it("drops a value whose explicit dependency no longer holds", () => {
+    const { kept } = retainSearchAttributes(
+      { motor: { kind: "select", value: "uten_motor" }, hp: range },
+      filters,
+    );
+    expect(Object.keys(kept)).toEqual(["motor"]);
+  });
+
+  it("keeps unknown keys unless dropUnknown is set", () => {
+    const values = { part_number: { kind: "text", value: "123" } as AttributeFilterValue };
+    expect(retainSearchAttributes(values, filters).kept).toEqual(values);
+    expect(retainSearchAttributes(values, filters, { dropUnknown: true }).dropped).toEqual([
+      "part_number",
+    ]);
+  });
+
+  it("keeps values shared by the new category's filters", () => {
+    const { kept } = retainSearchAttributes(
+      { color: { kind: "select", value: "rod" }, frame: { kind: "select", value: "M" } },
+      [color],
+      { dropUnknown: true },
+    );
+    expect(Object.keys(kept)).toEqual(["color"]);
   });
 });

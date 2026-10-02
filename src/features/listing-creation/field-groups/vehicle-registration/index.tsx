@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -242,14 +242,16 @@ export function VehicleRegistration(props: WizardSharedProps) {
    * MC"-roten (via category-confirms "Nei"-fallback). Kjøres én gang,
    * akkurat som tittel-prefillen under. */
   const fallbackAppliedRef = useRef(false);
+  const selectFallbackCategory = useEffectEvent((id: string, parentId: string) =>
+    onCategorySelect(id, parentId),
+  );
   useEffect(() => {
     if (fallbackAppliedRef.current) return;
     if (!bilOgMcCategoryId || categoryId !== bilOgMcCategoryId) return;
     const fallback = leafBySlug.get("bil") ?? [...leafBySlug.values()][0];
     if (!fallback) return;
     fallbackAppliedRef.current = true;
-    onCategorySelect(fallback.id, fallback.parent_id ?? bilOgMcCategoryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    selectFallbackCategory(fallback.id, fallback.parent_id ?? bilOgMcCategoryId);
   }, [categoryId, bilOgMcCategoryId, leafBySlug]);
 
   function selectSubcategory(leaf: { id: string; parent_id: string | null; slug: string }) {
@@ -266,10 +268,12 @@ export function VehicleRegistration(props: WizardSharedProps) {
   /** Oppslaget avgjør underkategorien: velg den SVV fant, så brukeren bare
    * trenger å rette den hvis den er feil. */
   const detectedLeafSlug = vehicleClassification?.slug ?? null;
-  useEffect(() => {
-    const leaf = detectedLeafSlug && leafBySlug.get(detectedLeafSlug as VehicleLeafSlug);
+  const applyDetectedLeaf = useEffectEvent((slug: string | null) => {
+    const leaf = slug && leafBySlug.get(slug as VehicleLeafSlug);
     if (leaf && leaf.id !== categoryId) selectSubcategory(leaf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    applyDetectedLeaf(detectedLeafSlug);
   }, [detectedLeafSlug]);
 
   const brand = typeof attributes.brand === "string" ? attributes.brand : undefined;
@@ -286,6 +290,13 @@ export function VehicleRegistration(props: WizardSharedProps) {
    * nytt, riktig scopet forsøk, i stedet for å forbli stille på gruppen
    * som gjaldt da denne siden først ble vist. */
   const prefilledForGroupRef = useRef<string | null>(null);
+  const applyBrandMatch = useEffectEvent(
+    (match: NonNullable<ReturnType<typeof matchBrandAndModelInTitle>>) => {
+      const next: typeof attributes = { ...attributes, brand: match.brand };
+      if (match.model) next.model = match.model;
+      onAttributesChange(next);
+    },
+  );
   useEffect(() => {
     if (brand || !title.trim()) return;
     if (prefilledForGroupRef.current === categoryGroup) return;
@@ -297,10 +308,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
     );
     prefilledForGroupRef.current = categoryGroup;
     if (!match) return;
-    const next: typeof attributes = { ...attributes, brand: match.brand };
-    if (match.model) next.model = match.model;
-    onAttributesChange(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    applyBrandMatch(match);
   }, [allBrands, allModels, categoryGroup, title, brand]);
 
   const setAttribute = (key: "brand" | "model", value: string | undefined) => {
@@ -328,15 +336,17 @@ export function VehicleRegistration(props: WizardSharedProps) {
 
   /** Tittelen i forhåndsvisningen følger SVV straks oppslaget er gjort — den
    * samme tittelen VehicleTitleFields ellers ville satt på vehicle-facts. */
-  useEffect(() => {
-    if (!lookup?.brand || !lookup.model) return;
+  const syncTitleFromLookup = useEffectEvent((result: typeof lookup) => {
+    if (!result?.brand || !result.model) return;
     const next = computeVehicleTitle({
-      brand: lookup.brand,
-      model: lookup.model,
-      ...(lookup.year ? { year: lookup.year } : {}),
+      brand: result.brand,
+      model: result.model,
+      ...(result.year ? { year: result.year } : {}),
     });
     if (next !== title) setValue("title", next, { shouldValidate: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    syncTitleFromLookup(lookup);
   }, [lookup]);
   const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
 

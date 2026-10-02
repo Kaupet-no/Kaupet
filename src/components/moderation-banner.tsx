@@ -1,16 +1,7 @@
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatDateTimeLong } from "@/lib/format";
 import { useMyModerationStatus } from "@/hooks/use-my-moderation-status";
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("nb-NO", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export function ModerationBanner() {
   const { data } = useMyModerationStatus();
@@ -45,7 +36,7 @@ export function ModerationBanner() {
           <AlertTitle>Kontoen din er midlertidig svartelistet</AlertTitle>
           <AlertDescription>
             Du kan ikke opprette nye annonser eller sende meldinger frem til{" "}
-            <span className="font-medium">{formatDate(data.suspension_expires_at)}</span>.
+            <span className="font-medium">{formatDateTimeLong(data.suspension_expires_at)}</span>.
             {data.suspension_reason ? ` Begrunnelse: ${data.suspension_reason}` : ""}
           </AlertDescription>
         </div>

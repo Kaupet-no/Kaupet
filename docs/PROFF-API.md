@@ -1,11 +1,9 @@
 # Kaupet Proff-API (v1)
 
-Dette er utviklerdokumentasjonen for Proff-kunders REST-API mot Kaupet:
-opprette, oppdatere, fornye og lese status på annonser maskinelt — fra et
-lagersystem, en nettbutikk eller et eget skript. Samme tjenestelag som denne
+Dette er utviklerdokumentasjonen for REST-API mot Kaupet, tilgjengelig for Proff-kunder.
+API-et støtter å opprette, oppdatere, fornye og lese status på annonser maskinelt. Samme tjenestelag som denne
 dokumentasjonen beskriver brukes også av Excel/CSV-importen i
-bedriftskonsollet, så oppførselen (idempotens, valideringsregler,
-bildekomprimering) er identisk uansett kanal.
+bedriftskonsollet, så funksjonalitet er identisk for alle kanaler.
 
 Maskinlesbar spesifikasjon: **`GET /api/v1/openapi.json`** (OpenAPI 3.1, ingen
 autentisering nødvendig).
@@ -17,12 +15,11 @@ autentisering nødvendig).
 2. Opprett en API-nøkkel: gi den et navn, velg lokasjon (brukes som
    standardlokasjon for annonser du oppretter via API-et), scope
    (`listings:read`/`listings:write`) og varighet.
-3. **Kopier nøkkelen med det samme** — den vises kun denne ene gangen og kan
+3. **Kopier nøkkelen med det samme** — den vises kun en gang ved opprettelse og kan
    aldri hentes frem igjen. Lagre den et sted appen/skriptet ditt kan lese den
-   fra (miljøvariabel, secret manager), aldri i kildekode som committes.
+   fra (miljøvariabel, secret manager), **aldri** hardkodet direkte i kildekode.
 4. En organisasjon kan ha maks 2 aktive nøkler samtidig. Roter ved å opprette
-   en ny nøkkel **før** du tilbakekaller den gamle, slik at integrasjonen ikke
-   får nedetid.
+   en ny nøkkel **før** du tilbakekaller den gamle, for å unngå nedetid av integrasjonen. En nøkkel har inntil 365 dagers levetid.
 
 ## Autentisering
 
@@ -49,9 +46,9 @@ Hvert kall krever ett av to scope, satt på nøkkelen ved opprettelse:
 ## Grenser
 
 Grensene skal verne mot løpske integrasjoner og misbruk, ikke begrense vanlig
-lagersynk — normal bruk er få, store kall. De faktiske tallene står i
+lagersynk. Normal bruk er få og store kall. De faktiske tallene står i
 **Bedriftskonsoll → Integrasjoner**, under samme nøkkel, sammen med ditt
-forbruk akkurat nå (så tallene her aldri kan bli utdaterte i praksis):
+forbruk akkurat nå (slik at tallene aldri skal bli utdaterte):
 
 - **Lesekall** (`GET`) — grense per time, per nøkkel.
 - **Skrivekall** (`PUT`/`POST` på én annonse: opprett/oppdater/status/bilder)
@@ -78,7 +75,7 @@ Maks antall rader i ett `POST /listings/batch`-kall og maks antall
 ## Idempotens og `externalRef`
 
 Hver annonse identifiseres av en **`externalRef`** du velger selv (varenummer,
-SKU eller lager-ID) — unik i din organisasjon. `PUT /listings/{externalRef}`
+SKU, lager-ID, registreringsnummer etc.) som er unik i din organisasjon. `PUT /listings/{externalRef}`
 er idempotent: samme kall sendt på nytt med samme innhold gir `unchanged`, et
 endret felt gir `updated`, og en referanse som ikke finnes fra før gir
 `created`. En annonse kan ikke opprettes direkte som `sold`/`archived` — den
@@ -86,7 +83,7 @@ må finnes fra før.
 
 ## Fornyelse (annonser utløper etter 30 dager)
 
-Som i wizarden utløper en aktiv annonse automatisk 30 dager etter siste
+Som for alle andre annonser på Kaupet, utløper en aktiv annonse automatisk 30 dager etter siste
 aktivering. Hvert vellykkede maskinelle kall som berører en annonse (upsert,
 batch, `renew`) forlenger `expires_at` med nye 30 dager — også når innholdet
 er uendret. En utløpt annonse som fortsatt sendes inn som aktiv,
@@ -108,10 +105,7 @@ Send bilde-URL-er (`images`/`urls`), ikke filer — Kaupet henter dem selv.
 Hver URL må være `https://`, peke til et faktisk bilde (jpeg/png/webp/jxl,
 maks 20 MB opplastet), og behandles asynkront i en kø:
 
-- Bildet komprimeres på **akkurat samme måte som i veiviseren**: WebP, EXIF-
-  retting, maks 1600 px / 0,6 MB for hovedbildet og maks 480 px / 0,1 MB for
-  miniatyrbildet. Målstørrelsen er et mål, ikke et krav — et bilde som ikke
-  når den etter noen forsøk lagres likevel, akkurat som i veiviseren.
+- Bildet komprimeres av Kaupet ved opplasting.
 - `GET /listings/{externalRef}` og svaret fra
   `PUT /listings/{externalRef}/images` viser status per bilde-URL:
   - **`pending`/`processing`** — «Behandles». Dette dekker også feil Kaupet
@@ -179,7 +173,7 @@ Full spesifikasjon: `GET /api/v1/openapi.json`. Kort oversikt:
 
 `GET /listings`/`GET /listings/{externalRef}` viser kun annonser som har en
 `externalRef` — altså annonser opprettet/synket via Excel, API eller MCP.
-Annonser opprettet av en ansatt gjennom veiviseren i Kaupet har ikke dette
+Annonser opprettet manuelt av en av bedriftens brukere gjennom veiviseren på Kaupet.no har ikke dette
 feltet og vises derfor ikke her.
 
 ## Eksempler (curl)
@@ -257,7 +251,7 @@ curl "https://kaupet.no/api/v1/listings/SKU-1042" \
 Context Protocol) over samme tjenestelag som REST-API-et over — samme
 API-nøkkel, samme scope/rategrenser, samme forretningsregler (idempotens,
 kategorivalidering, fornyelse, bildekø). Bruk denne når en LLM-klient
-(Claude Desktop, Claude Code, andre MCP-verktøy) skal opprette/vedlikeholde
+(Claude Desktop, Claude Code, ChatGPT og andre MCP-verktøy) skal opprette/vedlikeholde
 annonser på vegne av deg, i stedet for å implementere REST-kallene selv.
 
 - **Transport**: «Streamable HTTP», **stateless** — ingen sesjon

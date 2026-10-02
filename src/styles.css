@@ -479,6 +479,17 @@ html.native body::before {
   padding-left: var(--app-nav-rail-w);
 }
 
+/* Kategorivelgeren på nativeforsiden (CategoryRail i app-landing.tsx):
+   sentrerer raden når alle flisene får plass på skjermen. `safe` beholder
+   venstrejustering — og scrolles fra start — når raden flyter over; uten
+   den ville starten av en full rad blitt uscrollbar. Motorer uten
+   `safe`-støtte forkaster erklæringen og beholder vanlig start.
+   (Tailwind v4 genererer ikke justify-[safe_center], derfor bor regelen
+   her.) */
+.category-rail-scroll {
+  justify-content: safe center;
+}
+
 /* Annonsesiden på native-telefon: annonsebaren (pris + «Send melding») tar
    bunnpillens plass, se NativeContactBar i listing-detail-view.tsx.
    --app-bottom-nav-h beholdes — baren er like høy, så pb-bottom-nav og

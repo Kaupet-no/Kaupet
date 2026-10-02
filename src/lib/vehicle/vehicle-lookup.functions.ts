@@ -1,14 +1,30 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getRequest } from "@tanstack/react-start/server";
+import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
 import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
+import { assertNotRateLimited, assertUserNotRateLimited } from "@/lib/rate-limit.server";
 
 const MAX_LOOKUPS_PER_HOUR = 20;
+const LOOKUP_LIMIT_MESSAGE =
+  "For mange kjøretøyoppslag den siste timen. Fyll inn kjøretøyopplysningene manuelt i mellomtiden.";
+
+/** Innlogget bruker hvis det finnes en sesjon, ellers null. Gjester skal kunne
+ * påbegynne en annonse (og slå opp skiltet) før de blir bedt om å logge inn
+ * ved publisering. Bearer-headeren (attachSupabaseAuth, også native) går
+ * foran kapselsesjonen. */
+async function getOptionalUserId(): Promise<string | null> {
+  const token = getRequest()
+    ?.headers.get("authorization")
+    ?.replace(/^Bearer /, "");
+  const { data } = await getSupabaseServerClient().auth.getClaims(token || undefined);
+  return data?.claims?.sub ?? null;
+}
 
 export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
     z
       .object({
@@ -35,28 +51,29 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { lookupVehicle, formatRetryClockNorway } =
-      await import("@/lib/vehicle/vehicle-lookup.server");
+  .handler(async ({ data }) => {
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { lookupVehicle } = await import("@/lib/vehicle/vehicle-lookup.server");
     const { matchVehicleBrandAndModel } =
       await import("@/lib/vehicle/vehicle-brand-match.functions");
-    const { userId } = context;
+    const userId = await getOptionalUserId();
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: recentLookups, count } = await supabaseAdmin
-      .from("vehicle_lookup_log")
-      .select("created_at", { count: "exact" })
-      .eq("user_id", userId)
-      .gte("created_at", oneHourAgo)
-      .order("created_at", { ascending: true });
-    if ((count ?? 0) >= MAX_LOOKUPS_PER_HOUR) {
-      const oldest = recentLookups?.[0]?.created_at;
-      const retryAt = oldest
-        ? new Date(new Date(oldest).getTime() + 60 * 60 * 1000)
-        : new Date(Date.now() + 60 * 60 * 1000);
-      throw new Error(
-        `For mange kjøretøyoppslag den siste timen. Prøv igjen ${formatRetryClockNorway(retryAt)}, eller fyll inn kjøretøyopplysningene manuelt i mellomtiden.`,
+    // ponytail: gjester begrenses per IP (CGNAT deler IP). Krev Turnstile for
+    // gjester hvis SVV-kvoten misbrukes.
+    if (userId) {
+      await assertUserNotRateLimited(
+        userId,
+        "vehicle_lookup",
+        MAX_LOOKUPS_PER_HOUR,
+        3600,
+        LOOKUP_LIMIT_MESSAGE,
+      );
+    } else {
+      await assertNotRateLimited(
+        "vehicle_lookup_guest",
+        MAX_LOOKUPS_PER_HOUR,
+        3600,
+        LOOKUP_LIMIT_MESSAGE,
       );
     }
 
@@ -72,7 +89,7 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
     // varsle (mykt, ikke blokkerende) hvis samme bruker har slått opp samme
     // skilt før med en annen utledet kjøretøytype.
     let previousClassificationMismatch: { slug: string | null; lookedUpAt: string } | null = null;
-    if (classification.slug) {
+    if (userId && classification.slug) {
       const { data: previous } = await supabaseAdmin
         .from("vehicle_lookup_log")
         .select("classification_result, created_at")
@@ -88,11 +105,13 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
       }
     }
 
-    await supabaseAdmin.from("vehicle_lookup_log").insert({
-      user_id: userId,
-      registration_number: result.registrationNumber,
-      classification_result: classification,
-    });
+    if (userId) {
+      await supabaseAdmin.from("vehicle_lookup_log").insert({
+        user_id: userId,
+        registration_number: result.registrationNumber,
+        classification_result: classification,
+      });
+    }
 
     let brandMatch: { id: string; name: string } | null = null;
     let modelMatch: { id: string; name: string } | null = null;

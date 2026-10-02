@@ -20,13 +20,14 @@ import { useIsAdmin, useIsModerator } from "@/hooks/use-user-roles";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
+import { describeSafeError } from "@/lib/safe-error";
 import { useAuth } from "@/hooks/use-auth";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { organizationLogoUrl } from "@/lib/organization-logo-url";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
-import { displayPriceNok } from "@/lib/format";
+import { displayPriceNok, formatNokNumber } from "@/lib/format";
 
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
@@ -204,7 +205,7 @@ export const Route = createFileRoute("/$kaupetCode")({
     const priceLabel = l.is_free
       ? "Gis bort gratis"
       : displayPrice != null
-        ? `${displayPrice.toLocaleString("nb-NO")} kr`
+        ? `${formatNokNumber(displayPrice)} kr`
         : "Pris ved henvendelse";
     const place = l.city ? ` i ${l.city}` : "";
     const rawTitle = `${l.title} — ${priceLabel}${place} | Kaupet.no`;
@@ -311,7 +312,7 @@ function RootSlugPage() {
 
 function ListingErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
-  console.error(error);
+  console.error("[listing route] error", describeSafeError(error));
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
@@ -396,7 +397,7 @@ function ListingDetailPage() {
         setTimeout(poll, 1500);
       } catch (e) {
         if (cancelled) return;
-        console.error("[promotion reconcile]", e);
+        console.error("[promotion reconcile]", describeSafeError(e));
         if (attempts >= maxAttempts) {
           showErrorToast("Kunne ikke bekrefte betalingen. Prøv igjen senere.");
           finish();
@@ -684,7 +685,7 @@ function ListingDetailPage() {
   useEffect(() => {
     if (!data?.id || user?.id === data.seller_id) return;
     void logView({ data: { listingId: data.id } }).catch((error: unknown) => {
-      console.warn("[listing_views] log failed", error);
+      console.warn("[listing_views] log failed", describeSafeError(error));
     });
   }, [data?.id, data?.seller_id, logView, user?.id]);
 
@@ -845,6 +846,8 @@ function ListingDetailPage() {
           isLoggedIn={!!user}
           seller={seller ?? null}
           isOwner={isOwner}
+          isSold={data.status === "sold"}
+          sellerId={data.seller_id}
           listingId={data.id}
           kaupetCode={data.kaupet_code}
           title={data.title}
@@ -857,7 +860,7 @@ function ListingDetailPage() {
         />
       }
       stickyContactSlot={
-        !isOwner ? (
+        !isOwner && data.status !== "sold" ? (
           <Button
             size="native"
             className="flex-1 gap-2 sm:flex-none"

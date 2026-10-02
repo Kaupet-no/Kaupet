@@ -1,16 +1,11 @@
 ﻿import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { showErrorToast } from "@/lib/toast";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { createListing } from "@/lib/listings.functions";
-import { uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
-import { geocodeNorwayAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
@@ -22,10 +17,21 @@ import {
   withRuntimeFieldGroups,
   type LandingEntry,
   resolveWizardPages,
-  suggestionNeedsCategoryConfirm,
 } from "@/features/listing-creation/category-flows";
+import {
+  useCategorySelectionActions,
+  useCategorySelectionState,
+} from "@/features/listing-creation/use-category-selection";
+import {
+  usePublishListing,
+  usePublishState,
+} from "@/features/listing-creation/use-publish-listing";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
-import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import { type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import {
+  isReviewEditFinished,
+  useWizardNavigation,
+} from "@/features/listing-creation/use-wizard-navigation";
 import { displayPriceNok, formatPrice } from "@/lib/format";
 import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave";
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
@@ -33,7 +39,12 @@ import { useLocationPicker } from "@/features/listing-creation/use-location-pick
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { usePhotoSuggestion } from "@/features/listing-creation/use-photo-suggestion";
 import { useVehicleTitleCategoryHint } from "@/features/listing-creation/use-vehicle-title-category-hint";
-import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
+import {
+  fieldGroupsForKeys,
+  pageLabel,
+  type FieldGroup,
+  type ValidateCtx,
+} from "@/features/listing-creation/field-groups/registry";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   categoryBreadcrumb,
@@ -48,7 +59,7 @@ import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
 } from "@/lib/vehicle/vehicle-lookup.types";
-import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { Turnstile } from "@marsidev/react-turnstile";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-user-roles";
@@ -66,36 +77,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import { deriveComposerImprovements } from "@/features/listing-creation/field-groups/review-publish/derive-improvements";
 import type {
-  ComposerReviewEditOptions,
   ComposerReviewStatus,
   WizardSharedProps,
 } from "@/features/listing-creation/field-groups/types";
-import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import {
+  buildPreviewDraft as buildPreviewDraftPure,
+  type PreviewDraft,
+} from "@/features/listing-creation/preview-draft-store";
 import {
   EditableListingReview,
   PhoneListingPreview,
 } from "@/features/listing-creation/preview-draft-view";
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
-import { trackProductEvent } from "@/lib/product-analytics";
 import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { blockImplicitSubmit, publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import {
+  FIELD_ERRORS_MESSAGE,
+  visibleErrorSummary,
+} from "@/features/listing-creation/error-summary";
 import { ListingStrengthIndicator } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import {
-  focusComposerField,
   resolvePublishingRequirementLabel,
-  reviewSectionSteps,
   sortComposerRequirements,
   type ComposerRequirementTarget,
   type ComposerNavigationResult,
@@ -194,27 +207,29 @@ const PREVIEW_SECTION_BY_GROUP_KEY: Record<string, string> = {
   delivery: "location",
 };
 
+/** Stegvalidatoren blokkerer fortsatt — CONFIRM_NO_IMAGE er et spørsmål
+ * (fortsette uten bilde?), ikke en feil banneret skal vise. */
+function stillBlocks(result: ReturnType<NonNullable<FieldGroup["validateExtra"]>>) {
+  return result !== null && result !== "CONFIRM_NO_IMAGE";
+}
+
 function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
-  const [publishedId, setPublishedId] = useState<string | null>(null);
-  const [publishedCode, setPublishedCode] = useState<string | null>(null);
-  const [publishedOpen, setPublishedOpen] = useState(false);
-  const [promoteOpen, setPromoteOpen] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(
-    null,
-  );
-  const returnToReviewRef = useRef(false);
-  const reviewSectionLastStepRef = useRef<number | null>(null);
-  const pendingReviewFocusRef = useRef<string | null>(null);
-  /** Set from `ComposerReviewEditOptions.reviewAnchor` when an edit is
-   * started from the Se over-steget (a `data-preview-section` on the listing
-   * page there) — consumed once we land back on review to scroll to that
-   * section, per the "return goes back to where you left" rule (UI-guiden). */
-  const returnFocusAnchorRef = useRef<string | null>(null);
-  const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
-  const pendingRestoreStepKeyRef = useRef<string | null>(null);
+  const publishState = usePublishState();
+  const {
+    publishedId,
+    publishedOpen,
+    setPublishedOpen,
+    promoteOpen,
+    setPromoteOpen,
+    uploadProgress,
+    guestPublishSheetOpen,
+    setGuestPublishSheetOpen,
+    turnstileEnabled,
+    turnstileRef,
+  } = publishState;
   const authResumeHandledRef = useRef(false);
   const bypassNavigationBlockerRef = useRef(false);
   // Inline erstatning for den tidligere no-image-dialog.tsx: første "Neste"
@@ -228,25 +243,14 @@ function NewListingPage() {
   } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
-  const [guestPublishSheetOpen, setGuestPublishSheetOpen] = useState(false);
   const forwardAttemptPendingRef = useRef(false);
-  const publishAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftDiscardConfirmOpen, setDraftDiscardConfirmOpen] = useState(false);
-  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
-  const [pendingCategoryChange, setPendingCategoryChange] = useState<{
-    id: string;
-    parentId: string;
-    via: "wizard" | "sheet";
-    kind: "select" | "deselect";
-  } | null>(null);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
   const { type: typeParam, title: titleParam, start: startParam, resume } = Route.useSearch();
-  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const listingType = typeParam ?? null;
   // Set once from the initial search params (mirrors the useForm defaultValues
   // pattern below — not kept in sync with titleParam afterwards): true when
@@ -263,16 +267,20 @@ function NewListingPage() {
     titleParam?.trim() ? "title" : startParam === "bilder" ? "photos" : null,
   );
   const fromLanding = landingEntry !== null;
-  // True once the user has confirmed a category on the category-confirm step
-  // (suggestion click or manual pick) — removes "category-confirm" from
-  // fieldGroupKeys below for the rest of the session, so the page it occupied
-  // simply disappears: "Neste" from photos never lands on it again, and
-  // "Tilbake" from the page after it goes straight to photos. Never reset to
-  // false — the title-click "Endre kategori" flow (see categoryEditConfirmOpen)
-  // reopens the category picker sheet directly rather than this step.
-  const [categoryConfirmed, setCategoryConfirmed] = useState(false);
-  const [categoryEditConfirmOpen, setCategoryEditConfirmOpen] = useState(false);
-  const [editingCategoryViaTitle, setEditingCategoryViaTitle] = useState(false);
+  const categorySelectionState = useCategorySelectionState();
+  const {
+    categoryPickerOpen,
+    setCategoryPickerOpen,
+    pendingCategoryChange,
+    setPendingCategoryChange,
+    categoryConfirmed,
+    categoryEditConfirmOpen,
+    setCategoryEditConfirmOpen,
+    selectedParentId,
+    setSelectedParentId,
+    categoryTouchedManually,
+    setCategoryTouchedManually,
+  } = categorySelectionState;
 
   const { data: categories } = useCategories();
 
@@ -287,8 +295,6 @@ function NewListingPage() {
     () => (categories ?? []).find((c) => c.slug === "bil-og-mc" && !c.parent_id)?.id ?? null,
     [categories],
   );
-
-  const [selectedParentId, setSelectedParentId] = useState<string>("");
 
   const { data: allFilters } = useAllCategoryFilters();
   const { data: allFlows } = useAllCategoryFlows();
@@ -404,12 +410,6 @@ function NewListingPage() {
     return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
   }, [isVehicle, categoryId, categoriesById]);
 
-  // Hoisted above its natural spot (near the other category-suggestion state)
-  // because useVehicleLookupFlow's confirmVehicleData needs it, and that hook
-  // is called here — before `pages`/`goNext` exist, since `pages` itself
-  // depends on the hook's vehicleLookupResult. See goNextRef below for how
-  // the (real) circular part of that is resolved.
-  const [categoryTouchedManually, setCategoryTouchedManually] = useState(false);
   const goNextRef = useRef<() => void>(() => {});
 
   const {
@@ -435,9 +435,7 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
-  // Hentet opp hit (foran baseFieldGroupKeys) fordi showCategoryConfirm
-  // under trenger å vite om AI-forslaget er kjøretøy/båt før resten av
-  // flyten regnes ut — se suggestionNeedsCategoryConfirm.
+  // Lokalt tittelforslag som siste utvei på kategoristeget.
   const clientCategoryHint = useVehicleTitleCategoryHint({
     title,
     allFilters,
@@ -446,53 +444,33 @@ function NewListingPage() {
     bilOgMcCategoryId,
   });
 
-  const {
-    categorySuggestions,
-    categorySuggestionLoading,
-    setSuggestionDismissed,
-    applyCategorySuggestion,
-    similarListings,
-    wtbMatch,
-    keywordSuggestions,
-    keywordsFetching,
-    appendTagToDescription,
-  } = useListingTitleHints({
-    title,
-    description,
-    categoryId,
-    categoryTouchedManually,
-    setSelectedParentId,
-    setCategoryTouchedManually,
-    priceNok: typeof priceNok === "number" ? priceNok : undefined,
-    isFree,
-    attributes,
-    setValue,
-    clientCategoryHint,
-  });
-
   // Fotoassistert kategori-/egenskapsforslag (salg), se
   // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2. Én
   // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
   // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
   const photoSuggestion = usePhotoSuggestion({ images, title });
+  const photoChallengeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (
+      !photoSuggestion.verificationNeeded ||
+      (photoSuggestion.status !== "analyzing" &&
+        photoSuggestion.status !== "verifying" &&
+        photoSuggestion.status !== "verification-required" &&
+        !photoSuggestion.attributeSuggestionLoading)
+    )
+      return;
+    const frame = requestAnimationFrame(() =>
+      photoChallengeRef.current?.scrollIntoView({ block: "center" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [
+    photoSuggestion.verificationNeeded,
+    photoSuggestion.status,
+    photoSuggestion.attributeSuggestionLoading,
+  ]);
 
-  // category-confirm holdes bare for forslag som gir en annen flyt enn
-  // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
-  // avgjørelsen må stå fast før resten av sidene regnes ut, siden bl.a.
-  // vehicle-registration er en solo-side som forutsetter avklart kategori.
-  // For alle andre forslag vises kategorien i stedet som en endrebar chip
-  // øverst på "Om tingen" (category-attributes) — mens forslaget ennå ikke
-  // er lastet holdes steget midlertidig for å unngå å måtte bytte sidesett
-  // etter at brukeren allerede har bladd forbi det.
-  const suggestionCategoryIds = [
-    ...categorySuggestions.map((s) => s.category_id),
-    ...(clientCategoryHint ? [clientCategoryHint.category_id] : []),
-  ];
-  const showCategoryConfirm =
-    fromLanding &&
-    !categoryConfirmed &&
-    (categorySuggestionLoading ||
-      suggestionNeedsCategoryConfirm(suggestionCategoryIds, allFlows ?? [], categoriesById));
+  // Alle kategorier bekreftes på et eget steg før detaljfeltene vises.
+  const showCategoryConfirm = fromLanding && !categoryConfirmed;
 
   const baseFieldGroupKeys = useMemo(
     () =>
@@ -606,15 +584,56 @@ function NewListingPage() {
     setStep,
     currentPage,
     goNext,
-    goBack: goBackStep,
+    goBack,
     isFirst,
     isLast,
-  } = useListingSteps(pages);
-  // Lengste steg brukeren har nådd. Stegraden viser bare mangler fra steg
-  // brukeren allerede har gått forbi — felt man ennå ikke har sett skal ikke
-  // meldes som feil (flyten guider dit selv).
-  const [furthestStep, setFurthestStep] = useState(step);
-  if (step > furthestStep) setFurthestStep(step);
+    furthestStep,
+    currentStepKey,
+    editReviewSection,
+    setReviewJumpRequested,
+    returnToReviewRef,
+    reviewSectionLastStepRef,
+    pendingReviewFocusRef,
+    pendingRestoreStepKeyRef,
+  } = useWizardNavigation({
+    pages,
+    categoryId,
+    setValidationError,
+    setCategoryEditConfirmOpen,
+  });
+  // Tittelbasert KI-kategoriforslag (samme Turnstile-widget som bildeforslaget)
+  // først når brukeren har gått forbi første steg — ikke per tastetrykk i
+  // tittelen, som i Ønskes kjøpt. Står etter useWizardNavigation fordi den
+  // trenger `step`; forslagene påvirker ikke hvilke sider veiviseren har.
+  const {
+    categorySuggestions,
+    categorySuggestionLoading,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
+    title,
+    description,
+    categoryId,
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    priceNok: typeof priceNok === "number" ? priceNok : undefined,
+    isFree,
+    attributes,
+    setValue,
+    clientCategoryHint,
+    aiFallback: {
+      enabled: step > 1 && photoSuggestion.enabled && !categoryId,
+      // Uten token innen rimelig tid viser steget heller velgeren enn å vente.
+      getToken: () => photoSuggestion.takeVerifiedToken(8_000),
+    },
+  });
+
   // Intentionally kept fresh every render (not in an effect) since
   // useVehicleLookupFlow's goNext callback, constructed above
   // `pages`/`goNext`, must see the latest function the moment it's called,
@@ -633,120 +652,17 @@ function NewListingPage() {
   const vehicleSubcategoryLocked =
     isVehicle && vehicleRegPageIndex >= 0 && step > vehicleRegPageIndex + 1;
 
-  useEffect(() => {
-    if (!reviewJumpRequested) return;
-    const frame = requestAnimationFrame(() => {
-      setStep(pages.length);
-      setReviewJumpRequested(false);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pages.length, reviewJumpRequested, setStep]);
-
-  // Lander vi på Se over med et pending anker (satt av editReviewSection når
-  // redigeringen startet derfra), scroll/fokuser dit i stedet for toppen —
-  // ellers no-op (vanlig ankomst til review har ingen anker satt).
-  useEffect(() => {
-    if (step !== pages.length) return;
-    const anchor = returnFocusAnchorRef.current;
-    if (!anchor) return;
-    returnFocusAnchorRef.current = null;
-    const frame = requestAnimationFrame(() => {
-      document
-        .querySelector(`[data-testid="listing-review"] [data-preview-section="${anchor}"]`)
-        ?.scrollIntoView({ block: "center" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [step, pages.length]);
-
-  const currentStepKey = currentPage?.groups[0]?.key ?? "unknown";
   // Category selection (suggestion click or manual pick) auto-advances the
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
   // so no separate Next/Back controls are needed or wanted here.
   const isCategoryConfirmPage =
     currentPage?.groups.length === 1 && currentPage.groups[0]?.key === "category-confirm";
-  useEffect(() => {}, [currentStepKey, step]);
 
-  function goBack() {
-    // Mirrors the hidden Tilbake/Forrige buttons on category-confirm — this
-    // is the single function behind the footer button, the shell's header
-    // arrow, the native swipe deck, AND the browser/hardware back button (via
-    // useComposerHistoryBack below) — this
-    // is what keeps all four consistent instead of just the visible buttons.
-    returnToReviewRef.current = false;
-    reviewSectionLastStepRef.current = null;
-    pendingReviewFocusRef.current = null;
-    goBackStep();
-  }
   useComposerHistoryBack(isFirst || isCategoryConfirmPage, goBack);
 
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
   );
-  const editReviewSection = (
-    section: "category" | "content" | "details" | "location",
-    options?: ComposerReviewEditOptions,
-  ) => {
-    returnToReviewRef.current = true;
-    pendingReviewFocusRef.current = options?.field ?? null;
-    setValidationError(null);
-    const groupKeys: Record<typeof section, string[]> = {
-      category: ["category-select"],
-      content: ["photos", "title"],
-      details: [
-        "category-attributes",
-        "description-keywords",
-        "price",
-        "boat-facts",
-        "vehicle-facts",
-        "vehicle-price",
-      ],
-      location: ["delivery", "location"],
-    };
-    const target =
-      (options?.groupKey && reviewSectionSteps(pages, [options.groupKey])) ??
-      reviewSectionSteps(pages, groupKeys[section]);
-    if (!target) {
-      pendingReviewFocusRef.current = null;
-      // Landing-flyten har verken category-select eller (etter bekreftelse)
-      // category-confirm igjen som steg, så "Endre kategori" fra
-      // forhåndsvisningen har ingen side å hoppe til — den åpner samme
-      // dialog som kategori-chippen i headeren i stedet.
-      if (section === "category" && categoryId) {
-        reviewSectionLastStepRef.current = null;
-        setCategoryEditConfirmOpen(true);
-        return;
-      }
-      returnToReviewRef.current = false;
-      reviewSectionLastStepRef.current = null;
-      return;
-    }
-    reviewSectionLastStepRef.current = target.last;
-    returnFocusAnchorRef.current = options?.reviewAnchor ?? null;
-    setStep(target.first);
-    if (target.first === step && options?.field) {
-      requestAnimationFrame(() => {
-        focusComposerField(options.field!);
-        pendingReviewFocusRef.current = null;
-      });
-    }
-    window.scrollTo({ top: 0 });
-  };
-
-  useEffect(() => {
-    const field = pendingReviewFocusRef.current;
-    if (!field) return;
-    let secondFrame: number | null = null;
-    const frame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => {
-        focusComposerField(field);
-        pendingReviewFocusRef.current = null;
-      });
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      if (secondFrame !== null) cancelAnimationFrame(secondFrame);
-    };
-  }, [currentStepKey, step]);
   const reviewFieldLabels: Record<string, string> = {
     category_id: "Kategori",
     title: "Tittel",
@@ -837,7 +753,6 @@ function NewListingPage() {
   };
   for (const [field, error] of Object.entries(errors)) {
     if (typeof error?.message === "string") {
-      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
       addPublishingRequirement({
         key: `field-${field}`,
         label: reviewFieldLabels[field] ?? field,
@@ -846,7 +761,6 @@ function NewListingPage() {
     }
   }
   if (extraFieldError) {
-    // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
     addPublishingRequirement({
       key: `field-${extraFieldError.field}`,
       label: reviewFieldLabels[extraFieldError.field] ?? extraFieldError.field,
@@ -872,7 +786,7 @@ function NewListingPage() {
     for (const issue of schemaResult.error.issues) {
       const field = issue.path[0];
       if (typeof field !== "string") continue;
-      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+
       addPublishingRequirement({
         key: `field-${field}`,
         label: reviewFieldLabels[field] ?? field,
@@ -881,7 +795,6 @@ function NewListingPage() {
     }
   }
   for (const filter of missingFilters) {
-    // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
     addPublishingRequirement({
       key: `filter-${filter.key}`,
       label: filter.label_nb,
@@ -921,7 +834,7 @@ function NewListingPage() {
     if (typeof result === "object") {
       const resolved = resolvePublishingRequirementLabel(result, reviewFieldLabels, missingFilters);
       if (resolved.skip) continue;
-      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+
       addPublishingRequirement({
         key: `field-${result.field}`,
         label: resolved.label,
@@ -929,7 +842,6 @@ function NewListingPage() {
         groupKey: group.key,
       });
     } else {
-      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
       addPublishingRequirement({
         key: `group-${group.key}`,
         label: result,
@@ -1066,6 +978,9 @@ function NewListingPage() {
     await discardDraft();
   }
 
+  // (Effekten blir her og ikke i useWizardNavigation: den må kjøre ETTER
+  // auth-resume-effekten over i samme commit, siden den setter
+  // pendingRestoreStepKeyRef.)
   // `pages` only reflects the restored category/attributes once the field
   // updates above have propagated through state, so the step jump has to
   // wait for `pages` to catch up rather than happening inline in
@@ -1078,7 +993,7 @@ function NewListingPage() {
       setStep(pageIndex + 1);
       pendingRestoreStepKeyRef.current = null;
     }
-  }, [pages, setStep]);
+  }, [pages, setStep, pendingRestoreStepKeyRef]);
 
   // Pre-fill location from user's last listing (if no draft)
   useEffect(() => {
@@ -1101,30 +1016,38 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Samme kontekst som stegvalidatorene får ved «Neste» — også brukt til å
+  // kjøre den blokkerende validatoren på nytt, så feilbanneret forsvinner når
+  // brukeren har rettet feilen.
+  const validateCtx: ValidateCtx = {
+    images,
+    attributes,
+    boatFactsActive,
+    missingFilters,
+    isFree,
+    priceNok,
+    categoryId,
+    categories: pickableCategories,
+    bilOgMcCategoryId,
+    vehicleLookupResult,
+    vehicleRegistered,
+    behavior,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    showMileage,
+    canShip,
+  };
+  // Knyttet til meldingen den satte: en senere, annen melding (f.eks. ved
+  // publisering) skal ikke vurderes av denne validatoren.
+  const [blockingValidator, setBlockingValidator] = useState<{
+    message: string;
+    validate: NonNullable<FieldGroup["validateExtra"]>;
+  } | null>(null);
+
   async function goToNextPage(): Promise<ComposerNavigationResult> {
     setValidationError(null);
+    setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
-
-    // Kategorien regnes som valgt idet brukeren går videre fra "Om tingen"
-    // uten å ha trykket forslagschipen eksplisitt — chippen er en tydelig
-    // handling (UI-guiden), ikke en skjult overskriving, men å måtte trykke
-    // "Riktig" før "Neste" i tillegg ville vært dobbeltarbeid når forslaget
-    // uansett er det eneste feltet peker mot. Bildeforslaget vinner, slik
-    // som i chippen (CategoryAttributes' mergedSuggestions).
-    const photoTop = photoSuggestion.categorySuggestions[0];
-    if (
-      groups.some((g) => g.key === "category-attributes") &&
-      !categoryId &&
-      !categoryTouchedManually
-    ) {
-      if (photoTop) {
-        setSelectedParentId(photoTop.parent_id ?? photoTop.category_id);
-        setValue("category_id", photoTop.category_id, { shouldValidate: true });
-        setCategoryTouchedManually(true);
-      } else if (categorySuggestions.length > 0) {
-        applySuggestedCategory(categorySuggestions[0].category_id);
-      }
-    }
 
     // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
     // skrive over stille — hold brukeren på steg 1 til hen har tatt et
@@ -1164,27 +1087,9 @@ function NewListingPage() {
         )
       )
         setAttributesTouched(true);
-      setValidationError("Rett feltene som er markert før du fortsetter.");
+      setValidationError(FIELD_ERRORS_MESSAGE);
       return "blocked";
     }
-    const validateCtx = {
-      images,
-      attributes,
-      boatFactsActive,
-      missingFilters,
-      isFree,
-      priceNok,
-      categoryId,
-      categories: pickableCategories,
-      bilOgMcCategoryId,
-      vehicleLookupResult,
-      vehicleRegistered,
-      behavior,
-      knownIssues,
-      noKnownIssues: !!noKnownIssues,
-      showMileage,
-      canShip,
-    };
     setExtraFieldError(null);
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
@@ -1198,6 +1103,7 @@ function NewListingPage() {
         if (group.key === "category-attributes" || group.key === "boat-facts")
           setAttributesTouched(true);
         setValidationError(result);
+        setBlockingValidator({ message: result, validate: group.validateExtra! });
         return "blocked";
       }
       if (result && typeof result === "object") {
@@ -1210,6 +1116,7 @@ function NewListingPage() {
           setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
+        setBlockingValidator({ message: result.message, validate: group.validateExtra! });
         return "blocked";
       }
     }
@@ -1224,7 +1131,7 @@ function NewListingPage() {
       confirmVehicleData(categoryId, vehicleGroup ?? "bil");
       return "advanced";
     }
-    if (returnToReviewRef.current && step === reviewSectionLastStepRef.current) {
+    if (isReviewEditFinished(returnToReviewRef.current, step, reviewSectionLastStepRef.current)) {
       setReviewJumpRequested(true);
       returnToReviewRef.current = false;
       reviewSectionLastStepRef.current = null;
@@ -1247,135 +1154,18 @@ function NewListingPage() {
     }
   }
 
-  // Etter publisering havner brukeren på annonsen uansett hvordan dialogene
-  // lukkes. /annonse/$listingId slår opp koden hvis svaret manglet den.
-  function goToPublishedListing() {
-    if (publishedCode) navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
-    else if (publishedId)
-      navigate({ to: "/annonse/$listingId", params: { listingId: publishedId } });
-  }
-
-  const mutation = useMutation({
-    mutationFn: async (values: ListingForm) => {
-      const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userData.user) throw new Error("Du må være logget inn.");
-
-      const finalCoords =
-        coords ??
-        (await geocodeNorwayAddress({
-          postal_code: values.postal_code,
-          city: values.city,
-        }));
-
-      // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og
-      // er normalt ferdig lenge før publiseringsklikket. Vi venter på tokenet
-      // her i stedet for å låse Publiser-knappen, slik at en eventuell venting
-      // skjer under den vanlige lastetilstanden.
-      const turnstileToken = turnstileEnabled
-        ? await turnstileRef.current?.getResponsePromise()
-        : null;
-
-      const listing = await createListing({
-        data: {
-          ...(draftId ? { draftId } : {}),
-          title: values.title,
-          subtitle: values.subtitle || null,
-          description: values.description,
-          category_id: values.category_id,
-          condition: fieldGroupKeys.includes("condition") ? (values.condition ?? null) : null,
-          is_free: values.is_free,
-          price_nok: values.is_free
-            ? null
-            : typeof values.price_nok === "number"
-              ? values.price_nok
-              : null,
-          postal_code: values.postal_code || null,
-          city: values.city || null,
-          lat: finalCoords?.lat ?? null,
-          can_ship:
-            fieldGroupKeys.includes("delivery") &&
-            behavior.requiresDeliveryMethod &&
-            values.can_ship != null
-              ? values.can_ship !== "pickup"
-              : null,
-          lng: finalCoords?.lng ?? null,
-          organization_location_id: values.organization_location_id ?? null,
-          known_issues: isVehicle ? values.known_issues || null : null,
-          no_known_issues: isVehicle ? !!values.no_known_issues : null,
-          maintenance_history: isVehicle ? values.maintenance_history || null : null,
-          attributes,
-          turnstileToken,
-        },
-      });
-
-      // Upload images in parallel
-      if (images.length > 0) {
-        setUploadProgress({ done: 0, total: images.length });
-        let done = 0;
-        const thumbFailures: string[] = [];
-        const thumbPromises: Promise<void>[] = [];
-        const results = await Promise.all(
-          images.map(async (img, i) => {
-            const path = await uploadListingImage({ listingId: listing.id, file: img.file });
-            // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
-            // hvis thumbnailen mangler, så en feil her skal ikke stoppe
-            // publiseringen — men samles opp og vises til brukeren etterpå.
-            thumbPromises.push(
-              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
-                console.warn("Kunne ikke laste opp kort-thumbnail", err);
-                thumbFailures.push(img.file.name);
-              }),
-            );
-            done += 1;
-            setUploadProgress({ done, total: images.length });
-            return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
-          }),
-        );
-        await Promise.all(thumbPromises);
-        if (thumbFailures.length > 0) {
-          showErrorToast(`Kunne ikke laste opp forhåndsvisning for: ${thumbFailures.join(", ")}`);
-        }
-        setUploadProgress(null);
-        const { error: imgErr } = await supabase.from("listing_images").insert(
-          results.map((u) => ({
-            listing_id: listing.id,
-            storage_path: u.storage_path,
-            sort_order: u.sort_order,
-            caption: u.caption,
-          })),
-        );
-        if (imgErr) throw imgErr;
-      }
-
-      return listing;
-    },
-    onSuccess: (result) => {
-      publishAttemptPendingRef.current = false;
-      // stopAutosave: the wizard stays mounted behind the success dialog with
-      // the form still populated — without this the next autosave tick would
-      // INSERT the published listing back as a duplicate draft.
-      clearDraftStorage({ stopAutosave: true });
-      void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
-      setPublishedId(result.id);
-      setPublishedCode(result.kaupet_code);
-      setPublishedOpen(true);
-    },
-    onError: (err: Error) => {
-      publishAttemptPendingRef.current = false;
-      trackProductEvent("listing_publish_failed", { kind: "sell", step: currentStepKey });
-      setUploadProgress(null);
-      // Tokenet er engangsbruk — hent et nytt så neste forsøk ikke henger.
-      turnstileRef.current?.reset();
-      void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
-      showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
-    },
+  const { mutation, publishOnce, goToPublishedListing } = usePublishListing({
+    state: publishState,
+    images,
+    attributes,
+    coords,
+    draftId,
+    clearDraftStorage,
+    fieldGroupKeys,
+    behavior,
+    isVehicle,
+    currentStepKey,
   });
-
-  function publishOnce(values: ListingForm) {
-    if (publishAttemptPendingRef.current) return;
-    publishAttemptPendingRef.current = true;
-    mutation.mutate(values);
-  }
 
   // Kjøretøy-tilstandsetiketter (Ny bil/Bruktbil/...) har ingen beskrivelse —
   // selvforklarende, i motsetning til de generiske (Helt ny/Som ny/...).
@@ -1423,35 +1213,28 @@ function NewListingPage() {
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
   function buildPreviewDraft(): PreviewDraft {
-    const categoryNode = categoryId ? categoriesById.get(categoryId) : undefined;
-    return {
+    return buildPreviewDraftPure({
       title,
-      subtitle: subtitle || null,
+      subtitle,
       description,
-      priceNok: isFree ? null : validPriceNok,
       isFree,
-      condition: fieldGroupKeys.includes("condition") ? (condition ?? null) : null,
-      canShip: behavior.requiresDeliveryMethod && canShip != null ? canShip !== "pickup" : null,
+      validPriceNok,
+      fieldGroupKeys,
+      condition,
       requiresDeliveryMethod: behavior.requiresDeliveryMethod,
-      city: city || null,
-      postalCode: postalCode || null,
-      displayLat: coords?.lat ?? null,
-      displayLng: coords?.lng ?? null,
-      knownIssues: isVehicle ? knownIssues || null : null,
-      noKnownIssues: isVehicle ? !!noKnownIssues : null,
-      maintenanceHistory: isVehicle ? maintenanceHistory || null : null,
-      category: categoryNode
-        ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
-        : null,
-      categoryId: categoryId ?? null,
-      images: images.map((img, i) => ({
-        storage_path: String(i),
-        sort_order: i,
-        caption: img.caption?.trim() || null,
-      })),
-      imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
+      canShip,
+      city,
+      postalCode,
+      coords,
+      isVehicle,
+      knownIssues,
+      noKnownIssues,
+      maintenanceHistory,
+      categoryId,
+      categoryNode: categoryId ? categoriesById.get(categoryId) : undefined,
+      images,
       attributes,
-    };
+    });
   }
 
   /** Se over-steget redigerer annonsesiden direkte (eierens redigeringsmodus
@@ -1539,99 +1322,33 @@ function NewListingPage() {
     return null;
   }, [categoryId, categoriesById]);
 
-  const applyCategorySelect = (via: "wizard" | "sheet", id: string, parentId: string) => {
-    setCategoryTouchedManually(true);
-    setSelectedParentId(parentId);
-    setValue("category_id", id, { shouldValidate: true });
-    if (via !== "wizard") return;
-    if (currentPage?.groups?.some((g) => g.key === "category-select")) {
-      goToNextPage();
-    } else if (
-      currentPage?.groups?.some(
-        (g) => g.key === "category-confirm" || g.key === "category-attributes",
-      )
-    ) {
-      setCategoryConfirmed(true);
-    } else if (
-      currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
-      id !== bilOgMcCategoryId
-    ) {
-      // Uregistrert kjøretøy: lagre det som et eget, søkbart attributt (i
-      // stedet for bare transient wizard-state) og rydd bort ev. tidligere
-      // SVV-oppslagsdata, symmetrisk med is_registered: true i
-      // confirmVehicleData. Ikke goNext() her — brukeren skal fylle inn de
-      // samme tekniske feltene manuelt rett under kategorivelgeren på dette
-      // steget før de går videre (se VehicleRegistration).
-      setAttributes((prev) => {
-        const next: AttributeMap = { ...prev, is_registered: false };
-        delete next.registration_number;
-        delete next.vehicle_lookup;
-        return next;
-      });
-    }
-  };
-
-  // Switching to a different category mid-flow discards the category-specific
-  // fields the user already filled — confirm before applying.
-  // Re-opening the collapsed vehicle-registration category grid to pick a
-  // different subcategory discards the same manually-filled fields as an
-  // ordinary category switch, so it goes through the same confirm dialog.
-  // Resets to the "Bil og MC" group itself (not ""), since an empty
-  // category_id falls back to the generic non-vehicle flow/page set
-  // (effectiveFlowForCategory(null, ...)) — that reshapes `pages` under the
-  // wizard's still-current step index and reads as an unwanted jump forward.
-  const requestCategoryDeselect = (parentId: string) => {
-    const resetId = bilOgMcCategoryId ?? "";
-    if (Object.keys(attributes).length > 0) {
-      setPendingCategoryChange({ id: resetId, parentId, via: "wizard", kind: "deselect" });
-      return;
-    }
-    applyCategorySelect("wizard", resetId, parentId);
-  };
-
-  const requestCategorySelect = (via: "wizard" | "sheet", id: string, parentId: string) => {
-    // Picking a different underkategori while still on vehicle-registration
-    // (the new icon grid over Merke/Modell) is deliberately friction-free —
-    // no "may lose data" dialog — since nothing is considered committed
-    // until the user actually leaves this page. See vehicleSubcategoryLocked
-    // below for the (separate) confirm-gated flow once they have left it.
-    const onVehicleRegPage = currentPage?.groups?.some((g) => g.key === "vehicle-registration");
-    if (
-      !onVehicleRegPage &&
-      categoryId &&
-      id !== categoryId &&
-      Object.keys(attributes).length > 0
-    ) {
-      setPendingCategoryChange({ id, parentId, via, kind: "select" });
-      return;
-    }
-    applyCategorySelect(via, id, parentId);
-  };
-
-  const applySuggestedCategory = (id: string) => {
-    applyCategorySuggestion(id);
-    if (currentPage?.groups?.some((group) => group.key === "category-select")) {
-      goToNextPage();
-    } else if (
-      currentPage?.groups?.some(
-        (group) => group.key === "category-confirm" || group.key === "category-attributes",
-      )
-    ) {
-      setCategoryConfirmed(true);
-    }
-  };
-
-  const confirmPendingCategoryChange = () => {
-    if (!pendingCategoryChange) return;
-    setAttributes({});
-    setAttributesTouched(false);
-    applyCategorySelect(
-      pendingCategoryChange.via,
-      pendingCategoryChange.id,
-      pendingCategoryChange.parentId,
-    );
-    setPendingCategoryChange(null);
-  };
+  const {
+    requestCategoryDeselect,
+    requestCategorySelect,
+    applySuggestedCategory,
+    confirmPendingCategoryChange,
+    handleCategoryPickerOpenChange,
+    handleCategoryPickerSelect,
+    cancelCategoryEditConfirm,
+    confirmCategoryEdit,
+  } = useCategorySelectionActions({
+    state: categorySelectionState,
+    categoryId,
+    bilOgMcCategoryId,
+    attributes,
+    setAttributes,
+    setAttributesTouched,
+    setValue,
+    currentPage,
+    goToNextPage,
+    applyCategorySuggestion,
+    returnToReviewRef,
+    reviewSectionLastStepRef,
+    setReviewJumpRequested,
+    setStep,
+    vehicleSubcategoryLocked,
+    vehicleRegPageIndex,
+  });
 
   const sharedProps: WizardSharedProps = {
     native,
@@ -1720,7 +1437,7 @@ function NewListingPage() {
     analyzePhotos: photoSuggestion.analyzePhotos,
     photoCategorySuggestions: photoSuggestion.categorySuggestions,
     photoTitleSuggestion: photoSuggestion.titleSuggestion,
-    dismissPhotoTitleSuggestion: photoSuggestion.dismissTitleSuggestion,
+    applyPhotoTitleSuggestion: photoSuggestion.applyTitleSuggestion,
     photoAttributesAvailable: photoSuggestion.canRequestAttributes,
     photoAttributeSuggestionLoading: photoSuggestion.attributeSuggestionLoading,
     requestPhotoAttributeSuggestions: photoSuggestion.requestAttributeSuggestions,
@@ -1894,19 +1611,28 @@ function NewListingPage() {
       )}
     </>
   );
+  const photoChallenge = photoSuggestion.enabled ? (
+    <div ref={photoChallengeRef} className="mx-auto mt-4 w-fit max-w-full">
+      {photoSuggestion.verificationNeeded && (
+        <p role="status" className="mb-2 text-sm text-foreground">
+          Bekreft Cloudflare-sjekken før vi henter KI-forslag.
+        </p>
+      )}
+      <Turnstile
+        // eslint-disable-next-line react-hooks/refs -- passing the ref to Turnstile, not reading its value
+        ref={photoSuggestion.turnstileRef}
+        siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+        options={{ appearance: "interaction-only", action: "kaupet" }}
+        // eslint-disable-next-line react-hooks/refs -- callback is invoked by Turnstile after render
+        onBeforeInteractive={photoSuggestion.onBeforeInteractive}
+        // eslint-disable-next-line react-hooks/refs -- callback is invoked by Turnstile after render
+        onSuccess={photoSuggestion.onSuccess}
+      />
+    </div>
+  ) : undefined;
 
   return (
     <>
-      {photoSuggestion.enabled && (
-        // Usynlig, montert på veiviser-nivå (ikke i et enkeltsteg) siden
-        // samme token må dekke både bildestegets identify-kall og et senere
-        // attributes-kall fra "Om tingen" — se use-photo-suggestion.ts.
-        <Turnstile
-          ref={photoSuggestion.turnstileRef}
-          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-          options={{ appearance: "interaction-only", action: "kaupet" }}
-        />
-      )}
       <form onSubmit={submitComposer} onKeyDown={blockImplicitSubmit}>
         <ListingComposerShell
           title={title}
@@ -2036,9 +1762,16 @@ function NewListingPage() {
               </p>
             ) : undefined
           }
-          errorSummary={validationError}
+          errorSummary={visibleErrorSummary(validationError, {
+            hasFieldErrors: Object.keys(errors).length > 0,
+            stillInvalid:
+              blockingValidator?.message === validationError
+                ? stillBlocks(blockingValidator.validate(validateCtx))
+                : undefined,
+          })}
           validationAttempt={validationAttempt}
           footer={composerFooter}
+          challenge={photoChallenge}
           firstStep={isFirst}
           // På Se over-steget er hovedkolonnen allerede annonsen (N1), og
           // annonsestyrken vises inline øverst i ReviewPublishGroup — der
@@ -2103,38 +1836,11 @@ function NewListingPage() {
       {/* Category picker bottom sheet */}
       <CategoryPicker
         open={categoryPickerOpen}
-        onOpenChange={(open) => {
-          setCategoryPickerOpen(open);
-          if (!open && editingCategoryViaTitle) {
-            setEditingCategoryViaTitle(false);
-            returnToReviewRef.current = false;
-          }
-        }}
+        onOpenChange={handleCategoryPickerOpenChange}
         categories={pickableCategories}
         selectedId={categoryId}
         allowSelectAny="below-root"
-        onSelect={(id, parentId) => {
-          if (editingCategoryViaTitle) {
-            // Already confirmed via categoryEditConfirmOpen below — apply
-            // directly instead of routing through requestCategorySelect's own
-            // (attribute-count-gated) confirm dialog, which would otherwise
-            // double-prompt the user for the same change. Still discards
-            // category-specific attributes on the way, same as
-            // confirmPendingCategoryChange does for the ordinary mid-flow
-            // category switch — they belonged to the old category and may
-            // not even apply as fields under the new one.
-            setEditingCategoryViaTitle(false);
-            setAttributes({});
-            setAttributesTouched(false);
-            applyCategorySelect("sheet", id, parentId);
-            if (returnToReviewRef.current) {
-              setReviewJumpRequested(true);
-              returnToReviewRef.current = false;
-            }
-            return;
-          }
-          requestCategorySelect("sheet", id, parentId);
-        }}
+        onSelect={handleCategoryPickerSelect}
       />
 
       {/* "Endre kategori" via siden tittelen (kun for intent+title-flyten,
@@ -2153,26 +1859,10 @@ function NewListingPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                returnToReviewRef.current = false;
-                reviewSectionLastStepRef.current = null;
-              }}
-            >
-              Avbryt
-            </AlertDialogCancel>
+            <AlertDialogCancel onClick={cancelCategoryEditConfirm}>Avbryt</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                setCategoryEditConfirmOpen(false);
-                if (vehicleSubcategoryLocked && vehicleRegPageIndex >= 0) {
-                  setStep(vehicleRegPageIndex + 1);
-                  window.scrollTo({ top: 0 });
-                  return;
-                }
-                setEditingCategoryViaTitle(true);
-                setCategoryPickerOpen(true);
-              }}
+              onClick={confirmCategoryEdit}
             >
               {vehicleSubcategoryLocked ? "Ja, bytt underkategori" : "Ja, bytt kategori"}
             </AlertDialogAction>

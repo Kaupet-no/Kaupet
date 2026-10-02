@@ -67,4 +67,26 @@ describe("useTitleCategorySuggestion — KI-reserve", () => {
     expect(off.result.current.categorySuggestions).toEqual([]);
     expect(aiMock).not.toHaveBeenCalled();
   });
+
+  it("prøver igjen neste gang reserven slås på når tokenet uteble", async () => {
+    const getToken = vi.fn().mockResolvedValueOnce(null).mockResolvedValue("token");
+    const { result, rerender } = renderHook(
+      ({ enabled }) =>
+        useTitleCategorySuggestion({
+          title: "Qwxzv plorbnik",
+          muted: false,
+          aiFallback: { enabled, getToken },
+        }),
+      { wrapper, initialProps: { enabled: true } },
+    );
+    await waitFor(() => expect(getToken).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.categorySuggestionPending).toBe(false));
+    expect(result.current.categorySuggestions).toEqual([]);
+    expect(aiMock).not.toHaveBeenCalled();
+
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.categorySuggestions).toEqual([sykkel]));
+    expect(aiMock).toHaveBeenCalledTimes(1);
+  });
 });

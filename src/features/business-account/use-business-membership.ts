@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
-import { getBusinessOrganization } from "@/lib/business.functions";
+import { getBusinessOrganization } from "@/lib/business/organization.functions";
 import { useAuth } from "@/hooks/use-auth";
 import type { BusinessPlan } from "@/features/business-account/plans";
 

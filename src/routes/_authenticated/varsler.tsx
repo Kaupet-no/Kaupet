@@ -2,38 +2,26 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useState } from "react";
-import { CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
+import { CheckCheck, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { SystemMessagesCard } from "@/components/system-messages-card";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { formatDistanceToNow } from "date-fns";
-import { nb } from "date-fns/locale";
 
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { formatNok } from "@/lib/format";
+import { NotificationItemContent } from "@/components/notification-item-content";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
-  listNotifications,
-  listPriceDrops,
+  deleteNotificationItem,
+  invalidateNotificationQueries,
+  listEnrichedNotifications,
   markAllNotificationsRead,
-  markAllPriceDropsRead,
-  markNotificationRead,
-  markPriceDropRead,
-  deleteNotification,
-  deletePriceDrop,
-  type SavedSearchNotification,
-  type PriceDropNotification,
-} from "@/lib/saved-searches";
-import {
-  listWtbMatchNotifications,
-  markAllWtbMatchNotificationsRead,
-  markWtbMatchNotificationRead,
-  deleteWtbMatchNotification,
-  type WtbMatchNotification,
-} from "@/lib/wtb-listings.functions";
+  markNotificationItemRead,
+  notificationHistoryQueryKey,
+  type NotificationItem,
+} from "@/lib/notifications";
 
 export const Route = createFileRoute("/_authenticated/varsler")({
   // Ikke gjennomgått for SSR ennå. Forelderen (_authenticated) har SSR på
@@ -46,25 +34,6 @@ export const Route = createFileRoute("/_authenticated/varsler")({
 
 const PAGE_SIZE = 30;
 
-type SearchItem = SavedSearchNotification & {
-  kind: "search";
-  listing_title: string | null;
-  listing_code: string | null;
-  search_name: string | null;
-};
-type PriceDropItem = PriceDropNotification & {
-  kind: "price_drop";
-  listing_title: string | null;
-  listing_code: string | null;
-};
-type WtbMatchItem = WtbMatchNotification & {
-  kind: "wtb_match";
-  listing_title: string | null;
-  listing_code: string | null;
-  wtb_title: string | null;
-};
-type Item = SearchItem | PriceDropItem | WtbMatchItem;
-
 function VarslerPage() {
   const native = useIsNative();
   const { user } = useAuth();
@@ -73,107 +42,37 @@ function VarslerPage() {
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: native,
-    onRefresh: () => qc.resetQueries({ queryKey: ["notifications-history"] }),
+    onRefresh: async () => {
+      await qc.resetQueries({ queryKey: notificationHistoryQueryKey(user?.id) });
+      await qc.resetQueries({ queryKey: ["system-messages"] });
+    },
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["notifications-history", user?.id, pageSize],
+    queryKey: notificationHistoryQueryKey(user?.id, pageSize),
     enabled: !!user,
-    queryFn: async (): Promise<{ items: Item[]; hasMore: boolean }> => {
-      const [notifs, drops, wtbMatches] = await Promise.all([
-        listNotifications(pageSize, 0),
-        listPriceDrops(pageSize, 0),
-        listWtbMatchNotifications(pageSize, 0),
-      ]);
-      const listingIds = Array.from(
-        new Set([
-          ...notifs.map((n) => n.listing_id),
-          ...drops.map((d) => d.listing_id),
-          ...wtbMatches.map((m) => m.listing_id),
-        ]),
-      );
-      const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
-      const wtbListingIds = Array.from(new Set(wtbMatches.map((m) => m.wtb_listing_id)));
-      const [listingsRes, searchesRes, wtbListingsRes] = await Promise.all([
-        listingIds.length
-          ? supabase.from("listings").select("id, title, kaupet_code").in("id", listingIds)
-          : Promise.resolve({ data: [] as { id: string; title: string; kaupet_code: string }[] }),
-        searchIds.length
-          ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
-          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-        wtbListingIds.length
-          ? supabase.from("wtb_listings").select("id, title").in("id", wtbListingIds)
-          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
-      ]);
-      const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l]));
-      const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
-      const wtbListingMap = new Map((wtbListingsRes.data ?? []).map((w) => [w.id, w.title]));
-
-      const searchItems: SearchItem[] = notifs.map((n) => ({
-        ...n,
-        kind: "search",
-        listing_title: listingMap.get(n.listing_id)?.title ?? null,
-        listing_code: listingMap.get(n.listing_id)?.kaupet_code ?? null,
-        search_name: searchMap.get(n.saved_search_id) ?? null,
-      }));
-      const dropItems: PriceDropItem[] = drops.map((d) => ({
-        ...d,
-        kind: "price_drop",
-        listing_title: listingMap.get(d.listing_id)?.title ?? null,
-        listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
-      }));
-      const wtbMatchItems: WtbMatchItem[] = wtbMatches.map((m) => ({
-        ...m,
-        kind: "wtb_match",
-        listing_title: listingMap.get(m.listing_id)?.title ?? null,
-        listing_code: listingMap.get(m.listing_id)?.kaupet_code ?? null,
-        wtb_title: wtbListingMap.get(m.wtb_listing_id) ?? null,
-      }));
-
-      const items = [...searchItems, ...dropItems, ...wtbMatchItems].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-      return {
-        items,
-        hasMore:
-          notifs.length === pageSize || drops.length === pageSize || wtbMatches.length === pageSize,
-      };
-    },
+    queryFn: () => listEnrichedNotifications(pageSize),
   });
 
   if (!user) return null;
 
-  const items = data?.items ?? [];
+  const items: NotificationItem[] = data?.items ?? [];
   const unread = items.filter((n) => !n.read_at).length;
 
   const handleMarkAllRead = async () => {
-    await Promise.all([
-      markAllNotificationsRead(),
-      markAllPriceDropsRead(),
-      markAllWtbMatchNotificationsRead(),
-    ]);
-    qc.invalidateQueries({ queryKey: ["notifications-history"] });
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-    qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
+    await markAllNotificationsRead();
+    invalidateNotificationQueries(qc);
   };
 
-  const handleClick = async (n: Item) => {
+  const handleClick = async (n: NotificationItem) => {
     if (n.read_at) return;
-    if (n.kind === "search") await markNotificationRead(n.id);
-    else if (n.kind === "price_drop") await markPriceDropRead(n.id);
-    else await markWtbMatchNotificationRead(n.id);
-    qc.invalidateQueries({ queryKey: ["notifications-history"] });
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-    qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
+    await markNotificationItemRead(n);
+    invalidateNotificationQueries(qc);
   };
 
-  const handleDelete = async (n: Item) => {
-    if (n.kind === "search") await deleteNotification(n.id);
-    else if (n.kind === "price_drop") await deletePriceDrop(n.id);
-    else await deleteWtbMatchNotification(n.id);
-    qc.invalidateQueries({ queryKey: ["notifications-history"] });
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-    qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
+  const handleDelete = async (n: NotificationItem) => {
+    await deleteNotificationItem(n);
+    invalidateNotificationQueries(qc);
   };
 
   return (
@@ -187,7 +86,7 @@ function VarslerPage() {
               <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine varsler</h1>
             )}
             <p className="mt-1 text-sm text-muted-foreground">
-              Treff i lagrede søk og prisfall på favoritter.
+              Treff i lagrede søk, prisfall på favoritter og meldinger fra Kaupet-teamet.
             </p>
           </div>
           {unread > 0 && (
@@ -196,6 +95,8 @@ function VarslerPage() {
             </Button>
           )}
         </div>
+
+        <SystemMessagesCard className="mt-6" />
 
         <div className="mt-6">
           {isLoading ? (
@@ -207,7 +108,7 @@ function VarslerPage() {
           ) : items.length === 0 ? (
             <EmptyState
               title="Ingen varsler ennå"
-              description="Lagre et søk for å bli varslet om nye treff."
+              description="Her kommer nye treff i lagrede søk, prisfall og salg av favoritter."
               action={
                 <Link to="/mine-sok">
                   <Button>Gå til mine søk</Button>
@@ -235,35 +136,7 @@ function VarslerPage() {
                           aria-label="Ulest"
                         />
                       )}
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-medium">
-                          {n.kind === "price_drop" && (
-                            <TrendingDown className="mr-1 inline size-3.5 text-brand" />
-                          )}
-                          {n.kind === "wtb_match" && (
-                            <ShoppingBag className="mr-1 inline size-3.5 text-brand" />
-                          )}
-                          {n.listing_title ??
-                            (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
-                        </p>
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
-                          {n.kind === "search" ? (
-                            <>Treff i "{n.search_name ?? "Lagret søk"}"</>
-                          ) : n.kind === "wtb_match" ? (
-                            <>Treff på "{n.wtb_title ?? "Ønskes kjøpt"}"</>
-                          ) : (
-                            <>
-                              Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
-                              {formatNok(n.old_price_nok)} → {formatNok(n.new_price_nok)}
-                            </>
-                          )}{" "}
-                          ·{" "}
-                          {formatDistanceToNow(new Date(n.created_at), {
-                            addSuffix: true,
-                            locale: nb,
-                          })}
-                        </p>
-                      </div>
+                      <NotificationItemContent n={n} />
                     </div>
                   </Link>
                   <button

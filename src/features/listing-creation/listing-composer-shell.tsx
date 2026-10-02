@@ -25,6 +25,7 @@ export function ListingComposerShell({
   errorSummary,
   validationAttempt = 0,
   children,
+  challenge,
   footer,
   firstStep,
   contentClassName,
@@ -60,6 +61,7 @@ export function ListingComposerShell({
   errorSummary?: string | null;
   validationAttempt?: number;
   children: ReactNode;
+  challenge?: ReactNode;
   footer: ReactNode;
   firstStep: boolean;
   contentClassName?: string;
@@ -83,6 +85,10 @@ export function ListingComposerShell({
   const previewFrameRef = useRef<HTMLDivElement>(null);
   const lastEditAtRef = useRef(0);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Native: når kortet er scrollet flytter fremdriftsviseren opp i headeren
+  // (i stedet for tittelen), så lave skjermer får mer plass til skjemaet.
+  const [scrolled, setScrolled] = useState(false);
+  const progressInHeader = native && scrolled && !!progress;
   const [dismissedValidationAttempt, setDismissedValidationAttempt] = useState(0);
   const showValidationFeedback =
     native &&
@@ -225,6 +231,7 @@ export function ListingComposerShell({
         backLabel={backLabel}
         onBack={onBack}
         hideBack={native}
+        center={progressInHeader ? progress : undefined}
         right={
           native ? (
             <Button
@@ -258,8 +265,14 @@ export function ListingComposerShell({
       )}
       {notice}
 
-      {(progress || showToolbar) && (
-        <div className="sticky top-[var(--site-header-h)] z-10 -mx-4 mt-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+      {((progress && !progressInHeader) || showToolbar) && (
+        <div
+          className={cn(
+            "sticky top-[var(--site-header-h)] z-10 -mx-4 mt-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur",
+            native &&
+              "animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none",
+          )}
+        >
           {progress}
           {showToolbar && (
             <div data-composer-toolbar="desktop" className="mt-2 hidden items-center gap-3 lg:flex">
@@ -288,7 +301,7 @@ export function ListingComposerShell({
                         {previewLabel}
                       </SheetTitle>
                     </SheetHeader>
-                    <PhoneFrame className="mx-auto min-h-0 w-full max-w-[20rem] flex-1">
+                    <PhoneFrame className="mx-auto min-h-0 w-full max-h-[46rem] max-w-[20rem] flex-1">
                       {preview}
                     </PhoneFrame>
                   </SheetContent>
@@ -325,6 +338,7 @@ export function ListingComposerShell({
                   : "composer-validation-error-odd"),
               contentClassName,
             )}
+            onScroll={native ? (e) => setScrolled(e.currentTarget.scrollTop > 0) : undefined}
             onAnimationEndCapture={() => {
               setDismissedValidationAttempt(validationAttempt);
             }}
@@ -341,6 +355,7 @@ export function ListingComposerShell({
               {pageTitle}
             </h2>
             {children}
+            {challenge}
           </div>
 
           <div

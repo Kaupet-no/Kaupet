@@ -1,3 +1,4 @@
+import { formatDateLong, formatMonthYear, initials } from "@/lib/format";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -9,8 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRating } from "@/components/star-rating";
+import { describeSafeError } from "@/lib/safe-error";
 
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { AdminUserActions } from "@/components/admin/suspend-user-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -45,7 +48,7 @@ export const Route = createFileRoute("/bruker/$id")({
   pendingMs: 200,
   pendingMinMs: 300,
   errorComponent: ({ error }) => {
-    console.error(error);
+    console.error("[profile route] error", describeSafeError(error));
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         <h1 className="font-display text-2xl">Kunne ikke laste brukerprofilen</h1>
@@ -103,10 +106,7 @@ function PublicProfilePage() {
     },
   });
 
-  const memberSince = new Date(profile.created_at).toLocaleDateString("nb-NO", {
-    month: "long",
-    year: "numeric",
-  });
+  const memberSince = formatMonthYear(profile.created_at);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -117,7 +117,7 @@ function PublicProfilePage() {
             <AvatarImage src={profile.avatar_url} alt={profile.display_name} />
           )}
           <AvatarFallback className="bg-primary/10 text-2xl font-medium text-primary">
-            {profile.display_name?.slice(0, 2).toUpperCase() || "?"}
+            {initials(profile.display_name)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
@@ -192,11 +192,7 @@ function PublicProfilePage() {
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(r.created_at).toLocaleDateString("nb-NO", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      {formatDateLong(r.created_at)}
                       {r.listing && (
                         <>
                           {" · "}

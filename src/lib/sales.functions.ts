@@ -1,4 +1,4 @@
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -42,13 +42,13 @@ export const confirmBuyer = createServerFn({ method: "POST" })
     if (convErr) {
       throw await toClientError("database", convErr);
     }
-    if (!conv) throw new Error("Samtalen finnes ikke");
+    if (!conv) throw new ClientError("Samtalen finnes ikke", 404);
     if (conv.seller_id !== userId) {
-      throw new Error("Bare selger kan markere en kjøper");
+      throw new ClientError("Bare selger kan markere en kjøper", 403);
     }
 
     if (!conv.listing_id)
-      throw new Error("Denne samtalen er ikke knyttet til en annonse til salgs");
+      throw new ClientError("Denne samtalen er ikke knyttet til en annonse til salgs", 400);
     const { error: insErr } = await supabase.from("listing_sales").insert({
       listing_id: conv.listing_id,
       seller_id: conv.seller_id,
@@ -57,7 +57,7 @@ export const confirmBuyer = createServerFn({ method: "POST" })
     });
     if (insErr) {
       if (insErr.code === "23505") {
-        throw new Error("Det finnes allerede en bekreftet kjøper for denne annonsen");
+        throw new ClientError("Det finnes allerede en bekreftet kjøper for denne annonsen", 409);
       }
       throw await toClientError("database", insErr);
     }
@@ -78,9 +78,9 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
       await logServerError("unconfirmBuyer", saleErr, { listingId: data.listingId, userId });
       throw saleErr;
     }
-    if (!sale) throw new Error("Salget finnes ikke");
+    if (!sale) throw new ClientError("Salget finnes ikke", 404);
     if (sale.seller_id !== userId) {
-      throw new Error("Bare selger kan angre salget");
+      throw new ClientError("Bare selger kan angre salget", 403);
     }
 
     const { count } = await supabase
@@ -88,7 +88,7 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
       .select("id", { count: "exact", head: true })
       .eq("listing_id", data.listingId);
     if ((count ?? 0) > 0) {
-      throw new Error("Salget kan ikke angres etter at vurderinger er gitt");
+      throw new ClientError("Salget kan ikke angres etter at vurderinger er gitt", 409);
     }
 
     const { error } = await supabase
@@ -96,6 +96,12 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
       .delete()
       .eq("listing_id", data.listingId);
     if (error) {
+      if (
+        error.code === "23514" &&
+        error.message === "Salget kan ikke angres etter at vurderinger er gitt"
+      ) {
+        throw new ClientError("Salget kan ikke angres etter at vurderinger er gitt", 409);
+      }
       throw await toClientError("database", error);
     }
     return { ok: true };

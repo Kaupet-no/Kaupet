@@ -1,3 +1,4 @@
+import { formatMonthYear, initials } from "@/lib/format";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -139,9 +140,7 @@ export function ProfileSection() {
   }
 
   const displayName = profile?.display_name ?? "";
-  const memberSince = stats
-    ? new Date(stats.created_at).toLocaleDateString("nb-NO", { month: "long", year: "numeric" })
-    : null;
+  const memberSince = stats ? formatMonthYear(stats.created_at) : null;
 
   if (isLoading) {
     return (
@@ -184,7 +183,7 @@ export function ProfileSection() {
                     <AvatarImage src={profile.avatar_url} alt={displayName} />
                   )}
                   <AvatarFallback className="bg-primary/10 text-lg font-medium text-primary">
-                    {displayName?.slice(0, 2).toUpperCase() || "?"}
+                    {initials(displayName)}
                   </AvatarFallback>
                 </Avatar>
                 <input

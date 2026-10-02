@@ -15,16 +15,16 @@ export async function sendInternalEmail(params: {
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error("Missing RESEND_API_KEY, skipping email");
-    return;
+    throw new Error("Missing RESEND_API_KEY");
   }
 
-  await new Resend(apiKey).emails.send({
+  const { error } = await new Resend(apiKey).emails.send({
     from: FROM,
     to: params.to,
     subject: params.subject,
     text: params.text,
   });
+  if (error) throw new Error(`Resend email failed: ${error.message}`);
 }
 
 export async function sendNotificationEmail(params: {
@@ -36,13 +36,12 @@ export async function sendNotificationEmail(params: {
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error("Missing RESEND_API_KEY, skipping email");
-    return;
+    throw new Error("Missing RESEND_API_KEY");
   }
 
   const resend = new Resend(apiKey);
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: params.to,
     subject: params.subject,
@@ -53,4 +52,5 @@ export async function sendNotificationEmail(params: {
       url: params.url,
     }),
   });
+  if (error) throw new Error(`Resend email failed: ${error.message}`);
 }

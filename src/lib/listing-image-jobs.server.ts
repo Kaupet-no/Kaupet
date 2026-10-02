@@ -17,6 +17,7 @@
 //     24 timer totalt (fra jobbens `created_at`) gir vi opp og setter
 //     'failed' med en tydelig, ufarlig kundetekst + logger for drift.
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -27,6 +28,13 @@ import {
   type ImageTransformer,
 } from "@/lib/image-compression.server";
 import { putObject } from "@/lib/r2.server";
+import {
+  cancelResponseBody,
+  HttpDeadlineError,
+  HttpResponseTooLargeError,
+  readResponseBytes,
+  withHttpDeadline,
+} from "@/lib/http-bounded.server";
 import { ALLOWED_MIME, MAX_FILE_BYTES, extFromMime, thumbPathFor } from "@/lib/storage";
 
 export type ListingImageJobRow = Database["public"]["Tables"]["listing_image_jobs"]["Row"];
@@ -36,6 +44,7 @@ const MAX_SOURCE_BYTES = 20 * 1024 * 1024; // 20 MB — inndata kan være størr
 const MAX_REDIRECTS = 5;
 const JOB_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const BACKOFF_MINUTES = [1, 5, 15, 60];
+const SOURCE_POLICY_ENV = "EXTERNAL_IMAGE_ALLOWED_HOSTS";
 
 /** Feil kunden faktisk kan rette (skriv en konkret, norsk melding). */
 export class CustomerImageError extends Error {}
@@ -44,7 +53,105 @@ export class CustomerImageError extends Error {}
  * behandles som intern/retry (kunden skal ikke straffes for en midlertidig
  * feil hos sin egen adresse), men får en annen sluttmelding enn andre
  * interne feil hvis 24-timersgrensen nås. */
-export class SourceFetchError extends Error {}
+export class SourceFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
+class SourcePolicyError extends Error {}
+
+function isPublicHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const labels = host.split(".");
+  return (
+    isIP(host) === 0 &&
+    labels.length >= 2 &&
+    labels.every((label) => /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label)) &&
+    ![
+      "localhost",
+      "local",
+      "internal",
+      "intranet",
+      "lan",
+      "home",
+      "test",
+      "invalid",
+      "private",
+    ].some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+  );
+}
+
+function getAllowedSourceHosts(): Set<string> {
+  const configured = process.env[SOURCE_POLICY_ENV];
+  if (!configured?.trim()) throw new SourcePolicyError(`${SOURCE_POLICY_ENV} is missing`);
+
+  const hosts = configured.split(",").map((entry) => entry.trim());
+  if (hosts.some((host) => !host)) throw new SourcePolicyError(`${SOURCE_POLICY_ENV} is invalid`);
+
+  const normalized = hosts.map((host) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(`https://${host}`);
+    } catch {
+      throw new SourcePolicyError(`${SOURCE_POLICY_ENV} is invalid`);
+    }
+    if (
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      parsed.hostname.toLowerCase() !== host.toLowerCase() ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash ||
+      !isPublicHostname(parsed.hostname)
+    ) {
+      throw new SourcePolicyError(`${SOURCE_POLICY_ENV} is invalid`);
+    }
+    return parsed.hostname.toLowerCase();
+  });
+  return new Set(normalized);
+}
+
+function validateSourceUrl(value: string, allowedHosts: Set<string>, base?: string): string {
+  let parsed: URL;
+  try {
+    if (
+      value.includes("\\") ||
+      value.includes("#") ||
+      value.split("").some((character) => {
+        const code = character.charCodeAt(0);
+        return code < 0x21 || (code >= 0x7f && code <= 0x9f);
+      })
+    ) {
+      throw new Error();
+    }
+    parsed = new URL(value, base);
+    const authority = /^https:\/\//i.test(value)
+      ? value.match(/^https:\/\/([^/?#]*)/i)?.[1]
+      : value.startsWith("//")
+        ? value.match(/^\/\/([^/?#]*)/)?.[1]
+        : undefined;
+    if (authority && (authority.includes("@") || authority.includes("%"))) throw new Error();
+  } catch {
+    throw new CustomerImageError("Adressen svarer ikke med et bilde.");
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    (parsed.port !== "" && parsed.port !== "443") ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.hash !== "" ||
+    !isPublicHostname(parsed.hostname) ||
+    !allowedHosts.has(parsed.hostname.toLowerCase())
+  ) {
+    throw new CustomerImageError("Adressen svarer ikke med et bilde.");
+  }
+  return parsed.toString();
+}
 
 function backoffMinutesFor(attempts: number): number {
   const index = Math.min(Math.max(attempts, 1) - 1, BACKOFF_MINUTES.length - 1);
@@ -88,34 +195,6 @@ function magicBytesMatch(contentType: string, bytes: Uint8Array): boolean {
   }
 }
 
-async function readBodyWithLimit(response: Response, maxBytes: number): Promise<Uint8Array> {
-  if (!response.body) {
-    const buf = await response.arrayBuffer();
-    if (buf.byteLength > maxBytes) throw new CustomerImageError("Bildet er større enn 20 MB.");
-    return new Uint8Array(buf);
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => {});
-      throw new CustomerImageError("Bildet er større enn 20 MB.");
-    }
-    chunks.push(value);
-  }
-  const combined = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return combined;
-}
-
 /** Henter kildebildet: kun https (også etter en eventuell omdirigering),
  * timeout på 15 s, maks 20 MB, og content-type/magiske bytes må stemme med
  * et av de støttede bildeformatene. Kaster `CustomerImageError` for feil
@@ -125,71 +204,78 @@ async function fetchSourceImage(
   url: string,
   fetchImpl: typeof fetch,
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
-  let currentUrl = url;
-  for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
-    if (!currentUrl.startsWith("https://")) {
-      throw new CustomerImageError("Adressen svarer ikke med et bilde.");
-    }
+  const allowedHosts = getAllowedSourceHosts();
+  let currentUrl = validateSourceUrl(url, allowedHosts);
+  try {
+    return await withHttpDeadline(FETCH_TIMEOUT_MS, async (signal) => {
+      for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
+        if (signal.aborted) throw new HttpDeadlineError();
+        let response: Response;
+        try {
+          response = await fetchImpl(currentUrl, { redirect: "manual", signal });
+        } catch {
+          throw new SourceFetchError("Nettverksfeil ved henting av bilde fra kilden");
+        }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await fetchImpl(currentUrl, { redirect: "manual", signal: controller.signal });
-    } catch (cause) {
-      if (controller.signal.aborted) {
-        throw new SourceFetchError(`Tidsavbrudd ved henting av bilde fra ${currentUrl}`);
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get("location");
+          cancelResponseBody(response);
+          if (!location) throw new CustomerImageError("Adressen svarer ikke med et bilde.");
+          currentUrl = validateSourceUrl(location, allowedHosts, currentUrl);
+          continue;
+        }
+        if (response.status === 404 || response.status === 410) {
+          cancelResponseBody(response);
+          throw new CustomerImageError(`Bildet finnes ikke på adressen (HTTP ${response.status}).`);
+        }
+        if (response.status >= 400 && response.status < 500) {
+          cancelResponseBody(response);
+          throw new CustomerImageError(`Adressen svarte med feil (HTTP ${response.status}).`);
+        }
+        if (response.status >= 500) {
+          cancelResponseBody(response);
+          throw new SourceFetchError("Kilden svarte med serverfeil", response.status);
+        }
+        if (!response.ok) {
+          cancelResponseBody(response);
+          throw new SourceFetchError("Uventet HTTP-status fra kilden", response.status);
+        }
+
+        const contentType = (response.headers.get("content-type") ?? "")
+          .split(";")[0]
+          .trim()
+          .toLowerCase();
+        const contentLength = response.headers.get("content-length");
+        if (contentLength && Number(contentLength) > MAX_SOURCE_BYTES) {
+          cancelResponseBody(response);
+          throw new CustomerImageError("Bildet er større enn 20 MB.");
+        }
+
+        let bytes: Uint8Array;
+        try {
+          bytes = await readResponseBytes(response, MAX_SOURCE_BYTES, signal);
+        } catch (cause) {
+          if (cause instanceof HttpResponseTooLargeError) {
+            throw new CustomerImageError("Bildet er større enn 20 MB.");
+          }
+          throw cause;
+        }
+        if (
+          !(ALLOWED_MIME as readonly string[]).includes(contentType) ||
+          !magicBytesMatch(contentType, bytes)
+        ) {
+          throw new CustomerImageError("Adressen svarer ikke med et bilde.");
+        }
+        return { bytes, contentType };
       }
-      throw new SourceFetchError(
-        `Nettverksfeil ved henting av bilde fra ${currentUrl}: ${
-          cause instanceof Error ? cause.message : String(cause)
-        }`,
-      );
-    } finally {
-      clearTimeout(timeout);
+      throw new SourceFetchError("For mange omdirigeringer ved henting av bilde");
+    });
+  } catch (cause) {
+    if (cause instanceof HttpDeadlineError) {
+      throw new SourceFetchError("Tidsavbrudd ved henting av bilde fra kilden");
     }
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) throw new SourceFetchError("Omdirigering uten Location-header");
-      // new URL(..., base) løser relative Location-headere; en absolutt
-      // http://-URL her blir avvist av https-sjekken øverst i neste runde —
-      // det er selve SSRF/protokoll-nedgraderings-forsvaret.
-      currentUrl = new URL(location, currentUrl).toString();
-      continue;
-    }
-    if (response.status === 404 || response.status === 410) {
-      throw new CustomerImageError(`Bildet finnes ikke på adressen (HTTP ${response.status}).`);
-    }
-    if (response.status >= 400 && response.status < 500) {
-      throw new CustomerImageError(`Adressen svarte med feil (HTTP ${response.status}).`);
-    }
-    if (response.status >= 500) {
-      throw new SourceFetchError(`Kilden svarte med serverfeil (HTTP ${response.status})`);
-    }
-    if (!response.ok) {
-      throw new SourceFetchError(`Uventet HTTP-status ${response.status} fra kilden`);
-    }
-
-    const contentType = (response.headers.get("content-type") ?? "")
-      .split(";")[0]
-      .trim()
-      .toLowerCase();
-    const contentLength = response.headers.get("content-length");
-    if (contentLength && Number(contentLength) > MAX_SOURCE_BYTES) {
-      throw new CustomerImageError("Bildet er større enn 20 MB.");
-    }
-
-    const bytes = await readBodyWithLimit(response, MAX_SOURCE_BYTES);
-    if (
-      !(ALLOWED_MIME as readonly string[]).includes(contentType) ||
-      !magicBytesMatch(contentType, bytes)
-    ) {
-      throw new CustomerImageError("Adressen svarer ikke med et bilde.");
-    }
-    return { bytes, contentType };
+    throw cause;
   }
-  throw new SourceFetchError("For mange omdirigeringer ved henting av bilde");
 }
 
 function sha256Hex(bytes: Uint8Array): string {
@@ -248,14 +334,18 @@ export async function processListingImageJob(
 
     const hash = sha256Hex(compressed.main.bytes);
     const key = `${job.listing_id}/${crypto.randomUUID()}.${extFromMime(compressed.main.contentType)}`;
+    const thumbKey = thumbPathFor(key);
+
+    for (const objectKey of [key, thumbKey]) {
+      const { error } = await deps.supabaseAdmin.rpc("register_standard_upload_object", {
+        _bucket: "BILDER",
+        _key: objectKey,
+      });
+      if (error) throw new Error("Kunne ikke registrere R2-opplasting");
+    }
 
     await putObject("BILDER", key, compressed.main.bytes, compressed.main.contentType);
-    await putObject(
-      "BILDER",
-      thumbPathFor(key),
-      compressed.thumb.bytes,
-      compressed.thumb.contentType,
-    );
+    await putObject("BILDER", thumbKey, compressed.thumb.bytes, compressed.thumb.contentType);
 
     const { error: insertError } = await deps.supabaseAdmin.from("listing_images").insert({
       listing_id: job.listing_id,
@@ -288,7 +378,12 @@ export async function processListingImageJob(
       return { outcome: "customer_failed", jobId: job.id, message: cause.message };
     }
 
-    const message = cause instanceof Error ? cause.message : String(cause);
+    const message =
+      cause instanceof SourceFetchError
+        ? cause.status
+          ? `source_http_${cause.status}`
+          : "source_fetch_error"
+        : "internal_processing_error";
     const ageMs = now().getTime() - new Date(job.created_at).getTime();
     const exhausted = ageMs >= JOB_MAX_AGE_MS;
 
@@ -297,7 +392,6 @@ export async function processListingImageJob(
       console.error("[listing-image-jobs] gir opp etter 24 timer", {
         jobId: job.id,
         listingId: job.listing_id,
-        sourceUrl: job.source_url,
         internalError: message,
       });
       await deps.supabaseAdmin
@@ -312,7 +406,6 @@ export async function processListingImageJob(
     console.error("[listing-image-jobs] intern feil, prøver på nytt", {
       jobId: job.id,
       listingId: job.listing_id,
-      sourceUrl: job.source_url,
       internalError: message,
       nextAttemptAt,
     });

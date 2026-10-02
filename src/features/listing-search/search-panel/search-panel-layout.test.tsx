@@ -3,7 +3,7 @@ import { type HTMLAttributes, type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { SearchPanel } from "./search-panel";
@@ -22,9 +22,13 @@ vi.mock("vaul", () => ({
     NestedRoot: ({ children }: { children: ReactNode }) => <>{children}</>,
   },
 }));
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
-vi.mock("@/components/advanced-search-sheet", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/components/advanced-search-sheet")>();
+const navigate = vi.hoisted(() => vi.fn());
+vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
+vi.mock("@/features/listing-search/filters/advanced-search-sheet", async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import("@/features/listing-search/filters/advanced-search-sheet")
+    >();
   return { ...original, SaveSearchDialog: () => null };
 });
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
@@ -58,6 +62,9 @@ vi.mock("@/components/ui/native-sheet", () => ({ NativeSheet: () => null }));
 vi.mock("@/components/ui/native-choice-sheet", () => ({ NativeChoiceSheet: () => null }));
 vi.mock("@/features/listing-search/use-draft-result-count", () => ({
   useDraftResultCount: () => ({ count: 7, isPending: false }),
+}));
+vi.mock("@/features/listing-search/use-price-sample", () => ({
+  usePriceSample: () => ({ data: undefined }),
 }));
 
 // Radix' størrelsesmåling i jsdom.
@@ -139,12 +146,16 @@ describe("SearchPanel filteroppsett", () => {
     expect(sidebar.getByText("Rammestørrelse")).toBeTruthy();
     cleanup();
 
+    // Telefonflaten er én liste uten faner: hovedfiltrene står åpent, resten
+    // bak «Vis flere» — samme rekkefølge som sidekolonnen.
     renderPanel();
-    expect(screen.getByText("Pris (NOK)")).toBeTruthy();
-    expect(screen.getByText("Søket ditt")).toBeTruthy();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Detaljer" }), { button: 0 });
+    expect(screen.queryByRole("tab")).toBeNull();
+    // Telefonens prisfelt har tittelen «Pris» og merkede Fra/Til-felt.
+    expect(screen.getByRole("textbox", { name: "Fra pris" })).toBeTruthy();
+    expect(screen.getByText("Egenskaper for Sykkel")).toBeTruthy();
     expect(screen.getByText("Merke")).toBeTruthy();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
+    expect(screen.queryByText("Rammestørrelse")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Vis 1 flere filtre/ }));
     expect(screen.getByText("Rammestørrelse")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
   });
@@ -168,10 +179,75 @@ describe("SearchPanel filteroppsett", () => {
     vi.mocked(useFormFactor).mockReturnValue("phone");
     renderPanel();
 
-    expect(screen.getByText("Søket ditt")).toBeTruthy();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mer" }), { button: 0 });
+    expect(screen.getByText("Grunnleggende")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByText("Flere søkevalg")).toBeNull();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
+  });
+
+  it("fokuserer ikke søkefeltet når forsiden åpner kategorivalget", () => {
+    vi.useFakeTimers();
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    for (const section of ["categories", "query"] as const) {
+      render(
+        <SearchPanel
+          open
+          onOpenChange={() => {}}
+          categories={categories}
+          allFilters={attributeFilters}
+          initialSection={section}
+        />,
+      );
+      vi.advanceTimersByTime(200);
+      const focused = document.activeElement === screen.getByRole("searchbox");
+      expect(focused).toBe(section === "query");
+      cleanup();
+    }
+    vi.useRealTimers();
+  });
+
+  it("viser snarveier i stedet for kategorirutenettet når et nytt søk startes", () => {
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    render(
+      <SearchPanel
+        open
+        onOpenChange={() => {}}
+        categories={categories}
+        allFilters={attributeFilters}
+        initialSection="query"
+      />,
+    );
+    expect(screen.queryByText("Bla etter kategori")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Bla i kategorier" }));
+    expect(screen.getByText("Bla etter kategori")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sykkel" })).toBeTruthy();
+  });
+
+  it("lar kategoriskuffen velge underkategori før den lukkes", () => {
+    vi.mocked(useFormFactor).mockReturnValue("phone");
+    const withChild = [
+      ...(categories as unknown as object[]),
+      { id: "2", slug: "terrengsykkel", name_nb: "Terrengsykkel", parent_id: "1", sort_order: 1 },
+    ] as never;
+    const onOpenChange = vi.fn();
+    render(
+      <SearchPanel
+        open
+        onOpenChange={onOpenChange}
+        categories={withChild}
+        allFilters={attributeFilters}
+        initialSection="categories"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Terrengsykkel" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sykkel" }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Alt i Sykkel" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Terrengsykkel" }));
+    expect(navigate).toHaveBeenCalledWith(
+      expect.objectContaining({ search: expect.objectContaining({ category: "terrengsykkel" }) }),
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("viser aktive søkeregler ved native-søkefeltet", () => {
@@ -245,8 +321,8 @@ describe("SearchPanel filteroppsett", () => {
     vi.mocked(useFormFactor).mockReturnValue("tablet");
     renderPanel();
 
-    expect(screen.getByText("Søket ditt")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Basis" })).toBeTruthy();
+    expect(screen.getByText("Grunnleggende")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.getByRole("button", { name: "Vis 5 annonser" })).toBeTruthy();
     cleanup();
 

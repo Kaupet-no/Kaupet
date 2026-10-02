@@ -16,7 +16,6 @@ import {
 } from "@/features/listing-creation/category-flows";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
 import {
-  INTEGRATION_LIMITS,
   newImagesPerDayLimitMessage,
   newListingsPerDayLimitMessage,
 } from "@/lib/integration-limits";
@@ -328,16 +327,6 @@ export function validateSyncRow(
   return { ok: true, row: normalized };
 }
 
-/** UTC-midnatt for "i dag". Døgngrensen for nye annonser telles per
- * UTC-døgn, ikke Europe/Oslo: enklere å implementere og verifisere (ingen
- * sommertid-/DST-logikk), og i praksis forskyver det kun grensedøgnet med
- * 1–2 timer i norsk lokaltid, som er akseptabelt for en misbruksgrense. */
-export function startOfUtcDayIso(now = new Date()): string {
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  ).toISOString();
-}
-
 async function callUpsert(
   supabaseAdmin: SupabaseClient<Database>,
   ctx: SyncContext,
@@ -378,7 +367,12 @@ async function callUpsert(
     _dry_run: dryRun,
   });
   if (error) throw error;
-  const result = (data ?? {}) as { status?: string; listing_id?: string; error?: string };
+  const result = (data ?? {}) as {
+    status?: string;
+    listing_id?: string;
+    error?: string;
+    error_code?: string;
+  };
   if (
     result.status === "created" ||
     result.status === "updated" ||
@@ -396,7 +390,10 @@ async function callUpsert(
     rowNumber: row.rowNumber,
     externalId: row.externalId,
     status: "failed",
-    error: result.error ?? "Annonsen kunne ikke opprettes. Kontroller feltene.",
+    error:
+      result.error_code === "daily_listing_quota"
+        ? newListingsPerDayLimitMessage()
+        : (result.error ?? "Annonsen kunne ikke opprettes. Kontroller feltene."),
   };
 }
 
@@ -404,22 +401,8 @@ async function callUpsert(
  * Validerer og synker et sett med rader (opprett eller upsert) mot
  * `upsert_listing_from_external`, batchet á `BATCH_SIZE` som i dag.
  *
- * Døgngrensen for nye annonser (`INTEGRATION_LIMITS.organization.newListingsPerDay`)
- * håndheves uten en ekstra databaserundtur per rad: vi henter (a) hvor mange
- * `external_id`-er i denne innsendingen som allerede finnes som `external_ref`
- * på en annonse i organisasjonen (ett samlet oppslag), og (b) hvor mange
- * annonser organisasjonen allerede har fått opprettet i dag (én telling). En
- * rad uten eksisterende referanse vil opprette en ny annonse og trekker fra
- * den gjenværende kvoten *før* RPC-kallet; når kvoten er brukt opp feiler
- * slike rader lokalt med en norsk feilmelding uten å nå databasen i det hele
- * tatt. Rader som oppdaterer en eksisterende referanse påvirkes aldri.
- * `dryRun` leser ikke kvoten (den skriver ingenting uansett).
- *
- * Merk: to rader i samme innsending med samme (ennå ikke eksisterende)
- * `external_id` telles begge mot kvoten selv om bare én av dem faktisk vil
- * opprette en annonse (den andre blir `duplicate` i databasen) — et bevisst,
- * lite konservativt avvik som unngår ekstra rundturer for et tilfelle
- * (duplikat-ID i samme fil) som uansett er en feil i kildedataene.
+ * Daily quotas are enforced atomically by database triggers on actual inserts;
+ * duplicate refs and dry runs therefore do not consume quota.
  */
 export async function syncListings(
   supabaseAdmin: SupabaseClient<Database>,
@@ -451,43 +434,6 @@ export async function syncListings(
     }
   }
 
-  let remainingNewListings = Number.POSITIVE_INFINITY;
-  // Samme prinsipp for døgngrensen for nye bilder: tell jobber opprettet i
-  // dag for organisasjonen (UTC-døgn, se startOfUtcDayIso), og trekk fra
-  // konservativt (antall URL-er i raden, ikke det faktiske antallet NYE
-  // jobber `enqueue_listing_image_jobs` ender opp med å opprette) *før*
-  // RPC-kallet. Overskrider en rad kvoten, hopper vi over ENQUEUE for den
-  // raden — annonsen lagres uansett (se warning-feltet på ListingSyncResult).
-  let remainingNewImages = Number.POSITIVE_INFINITY;
-  if (!dryRun) {
-    const [
-      { count: listingCount, error: listingCountError },
-      { count: imageCount, error: imageCountError },
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("organization_listing_imports")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", ctx.organizationId)
-        .eq("status", "created")
-        .gte("created_at", startOfUtcDayIso()),
-      supabaseAdmin
-        .from("listing_image_jobs")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", ctx.organizationId)
-        .gte("created_at", startOfUtcDayIso()),
-    ]);
-    if (listingCountError) throw listingCountError;
-    if (imageCountError) throw imageCountError;
-    remainingNewListings = Math.max(
-      0,
-      INTEGRATION_LIMITS.organization.newListingsPerDay - (listingCount ?? 0),
-    );
-    remainingNewImages = Math.max(
-      0,
-      INTEGRATION_LIMITS.organization.newImagesPerDay - (imageCount ?? 0),
-    );
-  }
-
   const results: ListingSyncResult[] = [];
   for (let offset = 0; offset < rows.length; offset += BATCH_SIZE) {
     const batch = rows.slice(offset, offset + BATCH_SIZE);
@@ -508,17 +454,6 @@ export async function syncListings(
             status: "failed",
             error: "En ny annonse kan ikke opprettes som solgt eller arkivert.",
           };
-        }
-        if (wouldCreate && !dryRun) {
-          if (remainingNewListings <= 0) {
-            return {
-              rowNumber,
-              externalId: normalized.externalId,
-              status: "failed",
-              error: newListingsPerDayLimitMessage(),
-            };
-          }
-          remainingNewListings -= 1;
         }
         let result: ListingSyncResult;
         try {
@@ -551,22 +486,24 @@ export async function syncListings(
           result.listingId &&
           normalized.imageUrls.length > 0
         ) {
-          if (remainingNewImages < normalized.imageUrls.length) {
-            result.warning = newImagesPerDayLimitMessage();
-          } else {
-            remainingNewImages -= normalized.imageUrls.length;
-            try {
-              const { error: enqueueError } = await supabaseAdmin.rpc(
-                "enqueue_listing_image_jobs",
-                {
-                  _organization_id: ctx.organizationId,
-                  _listing_id: result.listingId,
-                  _urls: normalized.imageUrls,
-                  _replace: true,
-                },
-              );
-              if (enqueueError) throw enqueueError;
-            } catch (cause) {
+          try {
+            const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
+              _organization_id: ctx.organizationId,
+              _listing_id: result.listingId,
+              _urls: normalized.imageUrls,
+              _replace: true,
+            });
+            if (enqueueError) throw enqueueError;
+          } catch (cause) {
+            if (
+              typeof cause === "object" &&
+              cause !== null &&
+              "message" in cause &&
+              typeof cause.message === "string" &&
+              cause.message.includes("organization_new_images_daily_quota_exceeded")
+            ) {
+              result.warning = newImagesPerDayLimitMessage();
+            } else {
               // Dette er en feil VI eier (kø-innsetting), ikke noe kunden
               // kan rette — annonsen er allerede lagret. Ikke vis den som en
               // radfeil eller -advarsel; logg for drift i stedet. Bildene
@@ -574,7 +511,7 @@ export async function syncListings(
               // igjen, en kjent begrensning (se rapportens usikkerhetsdel).
               console.error("[listing-sync] kunne ikke legge bilder i kø", {
                 listingId: result.listingId,
-                cause: cause instanceof Error ? cause.message : String(cause),
+                errorType: cause instanceof Error ? "error" : "unknown",
               });
             }
           }

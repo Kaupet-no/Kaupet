@@ -4,13 +4,25 @@ Endringer skal ikke testes direkte i produksjon. Push til `staging`-branchen for
 
 Domenet ligger bak [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) — alle besøkende møter en innloggingsside (engangskode på e-post) før de når appen, uavhengig av appens egen autentisering. Kun e-postadresser på allowlisten i Access-policyen "Kaupet team" slipper gjennom. Legg til flere testere via Cloudflare Zero Trust-dashbordet → Access → Applications → Kaupet Staging.
 
-Staging kjører mot et eget Supabase-prosjekt. Konfigurasjonen styres av et GitHub Environment kalt `staging`, med egne `vars` (`VITE_SUPABASE_*`) og `secrets` (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANDROID_GOOGLE_SERVICES_STAGING_JSON`) — se `.env.staging.example` for full liste. Android-secreten skal inneholde hele `google-services.json` fra Firebase-appen for pakken `no.kaupet.app.staging`; CI skriver den til `android/app/google-services.json` kun under staging-bygget. Push til `staging`-branchen trigger CI, som bygger og kjører `bun run deploy` med `CLOUDFLARE_WORKER_NAME=kaupet-no-staging` mot denne separate workeren.
+Staging kjører mot et eget Supabase-prosjekt. Konfigurasjonen styres av et GitHub Environment kalt `staging`, med egne `vars` (`VITE_SUPABASE_*`) og `secrets` (`DOPPLER_TOKEN` som bootstrap og offentlig `CLOUDFLARE_ACCOUNT_ID`; eventuell `ANDROID_GOOGLE_SERVICES_STAGING_JSON` for native-bygg) — se `.env.staging.example` for full liste. Android-secreten skal inneholde hele `google-services.json` fra Firebase-appen for pakken `no.kaupet.app.staging`; CI skriver den til `android/app/google-services.json` kun under staging-bygget. Push til `staging`-branchen trigger CI, som bygger og kjører `bun run deploy` med `CLOUDFLARE_WORKER_NAME=kaupet-no-staging` mot denne separate workeren.
 
-Server-side secrets (`SUPABASE_SERVICE_ROLE_KEY`, Resend API key og avsender, Vipps-test-nøkler inkludert `VIPPS_TEST_WEBHOOK_SECRET`, Turnstile-secret, `RATE_LIMIT_HMAC_SECRET`, FCM service account, VAPID-nøkler og `PUBLIC_SITE_URL`) settes direkte på workeren med `wrangler secret put <NAVN> --name kaupet-no-staging`, siden de ikke bygges inn av CI slik `VITE_*`-variablene gjør. Domenet kobles via `wrangler.jsonc`/Cloudflare Workers custom domains, og Vipps-betalinger i staging skal alltid kjøre mot `VIPPS_ENVIRONMENT=test`. Produksjonens kategori-synk bruker kun `STAGING_SUPABASE_PUBLISHABLE_KEY` for å lese staging-data, aldri staging service-role.
+Migrerte server-hemmeligheter administreres i Doppler `kaupet/stg` og synkes
+av `scripts/doppler-staging.sh` ved deploy. Cloudflare-tilgang hentes også fra
+Doppler; management-tokens distribueres aldri til Workeren. Se
+[migreringsstatus](decisions/2026-10-01-doppler-staging-status.md) for mottakere,
+unntak og verifiseringsbegrensninger. FCM er foreløpig inaktivt i staging.
+Vipps-betalinger bruker alltid `VIPPS_ENVIRONMENT=test`. Produksjonens
+kategori-synk bruker staging publishable key, aldri staging service-role.
+
+Lokal kjøring mot staging bruker `bun run env:staging`, som genererer `.env`
+fra Doppler og offentlige GitHub-vars. Kjør på nytt etter rotasjon. Kommandoen
+krever innlogget Doppler CLI og GitHub CLI. Databaseimport til lokal Supabase
+henter staging service-role direkte fra Doppler; `.env.staging.local` brukes
+ikke lenger.
 
 Produksjon (`main`) bruker fortsatt GitHub Environment `production`, men kategorisynken på produksjons-Workeren har ingen staging service-role-nøkkel. Den bruker en staging publishable key med kun offentlige lesetilganger.
 
-R2-konfigurasjonen for bildelagring bruker egne staging-buckets (`kaupet-bilder-staging`, `kaupet-vedlegg-staging`) og eget bildedomene (`https://bilder.staging.kaupet.no`). Ikke-hemmelige variabler (`R2_ACCOUNT_ID`, `R2_BILDER_BUCKET`, `R2_VEDLEGG_BUCKET`, `R2_PUBLIC_BASE_URL`) legges i GitHub Environment "staging" (`vars`), mens hemmeligheter (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) settes med `wrangler secret put <NAVN> --name kaupet-no-staging`. `VITE_R2_PUBLIC_BASE_URL` (bygges inn i klientbundlen) settes også i GitHub Environment `vars` på samme måte som andre `VITE_*`-variabler.
+R2-konfigurasjonen for bildelagring bruker egne staging-buckets (`kaupet-bilder-staging`, `kaupet-vedlegg-staging`) og eget bildedomene (`https://bilder.staging.kaupet.no`). Ikke-hemmelige variabler (`R2_ACCOUNT_ID`, `R2_BILDER_BUCKET`, `R2_VEDLEGG_BUCKET`, `R2_PUBLIC_BASE_URL`) legges i GitHub Environment "staging" (`vars`), mens hemmeligheter (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) hentes fra Doppler og synkes av deployen. `VITE_R2_PUBLIC_BASE_URL` (bygges inn i klientbundlen) settes også i GitHub Environment `vars` på samme måte som andre `VITE_*`-variabler.
 
 ## Supabase Auth e-post
 
@@ -68,4 +80,4 @@ hvis brukerbasen vokser før policyen får virke.
   supabase start
   bun run test:rls  # leser lokale nøkler automatisk fra `supabase status`
   ```
-  `src/lib/rls.integration.test.ts` dekker ~35 RLS-aktiverte tabeller/scenarioer (96 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.
+  `src/lib/rls/*.integration.test.ts` dekker ~35 RLS-aktiverte tabeller/scenarioer (96 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.

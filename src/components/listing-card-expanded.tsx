@@ -1,17 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { BoatInfoGrid, isBoatAttributes } from "@/components/listing-detail/boat/boat-info-grid";
-import { UsageLabel, type ListingCardData } from "@/components/listing-card";
-import { useListingImageFallback } from "@/hooks/use-listing-image-fallback";
+import { SOLD_PRICE_LABEL, SoldBanner, UsageLabel } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
-import { useListingGalleryImages } from "@/hooks/use-listing-gallery-images";
+import { useListingCardGallery } from "@/hooks/use-listing-card-gallery";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
-import { signListingImageUrls } from "@/lib/storage";
 
 type Props = {
   listing: ListingCardData;
@@ -34,36 +33,12 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
   knownFavorite,
   favoriteStateReady,
 }: Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
-  const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
-
-  useEffect(() => {
-    if (!rootRef.current) return;
-    const el = rootRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "300px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const { images, imgUrls, isLoading } = useListingGalleryImages(listing.id, inView);
-
-  const originalUrl = listing.cover_path
-    ? signListingImageUrls([listing.cover_path])[listing.cover_path]
-    : null;
-  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
-    coverImageUrl ?? null,
-    originalUrl,
-  );
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
+  const { rootRef, images, imgUrls, isLoading, effectiveImageUrl, handleImageError } =
+    useListingCardGallery(listing.id, listing.cover_path, coverImageUrl);
 
   const attributes = listing.attributes ?? {};
   // Samme utledning som listing-detail-view.tsx — kort-visningen skal vise de
@@ -97,7 +72,11 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
           <h3 className="text-lg font-medium leading-snug">{listing.title}</h3>
           {listing.subtitle && <p className="text-sm text-muted-foreground">{listing.subtitle}</p>}
           <div className="mt-1 flex items-baseline justify-between gap-2">
-            <p className="font-display text-xl font-semibold">{priceLabel}</p>
+            <p
+              className={`font-display text-xl font-semibold ${listing.sold_at ? "uppercase" : ""}`}
+            >
+              {priceLabel}
+            </p>
             {typeof listing.mileage_km === "number" ? (
               <UsageLabel value={listing.mileage_km} unit="km" />
             ) : typeof listing.engine_hours === "number" ? (
@@ -113,7 +92,8 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
       </div>
 
       <div className="grid gap-4 p-4 sm:grid-cols-2">
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden rounded-xl" onClick={(e) => e.stopPropagation()}>
+          {listing.sold_at && <SoldBanner compact={false} />}
           {images.length > 0 ? (
             <ImageGallery
               images={images}

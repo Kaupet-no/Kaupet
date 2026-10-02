@@ -61,7 +61,8 @@ function ConfirmPage() {
         if (
           result.status === "active" ||
           result.status === "gifted" ||
-          result.status === "failed"
+          result.status === "failed" ||
+          result.status === "refunded"
         ) {
           goToReceipt();
           return;

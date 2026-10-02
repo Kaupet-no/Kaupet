@@ -25,13 +25,12 @@ export function isTestEnvClient(): boolean {
   return isTestHost(window.location.hostname) || hasTestModeCookie();
 }
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
-/** React hook — returns false on first render (SSR-safe), true after mount if on test host or cookie is set. */
+const subscribe = () => () => {};
+const getServerSnapshot = () => false;
+
+/** React hook — returns false on server/hydration (SSR-safe), true on the client if on test host or cookie is set. */
 export function useIsTestEnv(): boolean {
-  const [isTest, setIsTest] = useState(false);
-  useEffect(() => {
-    setIsTest(isTestEnvClient());
-  }, []);
-  return isTest;
+  return useSyncExternalStore(subscribe, isTestEnvClient, getServerSnapshot);
 }

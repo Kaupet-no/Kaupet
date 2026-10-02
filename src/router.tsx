@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { getGlobalStartContext } from "@tanstack/start-client-core";
 import { routeTree } from "./routeTree.gen";
+import type { InterpretedCriterion } from "@/features/listing-search/resolve-text-to-filters";
 
 export const getRouter = () => {
   const queryClient = new QueryClient({
@@ -37,3 +38,13 @@ export const getRouter = () => {
 
   return router;
 };
+
+// Router-state som sendes med navigasjoner (location.state).
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    /** Satt av annonselenker i søkeresultatet/kartet — viser «Tilbake til søket». */
+    fromSearch?: boolean;
+    /** Tolkningen av søketeksten, så /annonser kan vise «Tolket som». */
+    interpretedCriteria?: InterpretedCriterion[];
+  }
+}

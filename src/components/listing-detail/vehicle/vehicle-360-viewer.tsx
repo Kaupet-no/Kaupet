@@ -1,8 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { RotateCw } from "lucide-react";
 
 const HINT_KEY = "kaupet_360_hint_seen";
 const PX_PER_FRAME = 8;
+
+// localStorage finnes ikke på serveren: serverSnapshot er false, så SSR og
+// hydrering viser ingen hint, og klienten leser den ekte verdien før paint.
+const subscribe = () => () => {};
+const readHintUnseen = () => {
+  try {
+    return !localStorage.getItem(HINT_KEY);
+  } catch {
+    return false;
+  }
+};
+const serverHintUnseen = () => false;
 
 export type Vehicle360Frame = { storage_path: string; frame_order: number };
 
@@ -22,16 +34,10 @@ export function Vehicle360Viewer({
 }) {
   const sorted = frames.slice().sort((a, b) => a.frame_order - b.frame_order);
   const [index, setIndex] = useState(0);
-  const [showHint, setShowHint] = useState(false);
+  const [hintDismissed, setHintDismissed] = useState(false);
+  const showHint =
+    useSyncExternalStore(subscribe, readHintUnseen, serverHintUnseen) && !hintDismissed;
   const dragState = useRef<{ startX: number; startIndex: number } | null>(null);
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem(HINT_KEY)) setShowHint(true);
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
   function dismissHint() {
     try {
@@ -39,7 +45,7 @@ export function Vehicle360Viewer({
     } catch {
       /* ignore */
     }
-    setShowHint(false);
+    setHintDismissed(true);
   }
 
   function onPointerDown(e: React.PointerEvent) {

@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
-import { ActiveFilters } from "@/components/active-filters";
+import { ActiveFilters } from "@/features/listing-search/filters/active-filters";
 import { ResultList } from "@/components/result-list";
 import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
-import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
+import { SearchFilterChipRow } from "@/features/listing-search/search-panel/search-filter-chip-row";
 import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import { vehicleCategoryGroupFor, genericBrandFilterFor } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { SearchBar } from "@/components/search-bar";
+import { SearchBar } from "@/features/listing-search/filters/search-bar";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -61,9 +62,12 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const isDesktop = useIsDesktop();
-  const { openPanel } = useSearchPanel();
 
-  useEffect(() => setQDraft(search.q), [search.q]);
+  const [prevSearchQ, setPrevSearchQ] = useState(search.q);
+  if (prevSearchQ !== search.q) {
+    setPrevSearchQ(search.q);
+    setQDraft(search.q);
+  }
 
   const { data: allCategoriesRaw } = useCategories();
   const categories = useMemo(
@@ -139,6 +143,7 @@ export function CategoryLandingPage({
     mapListings,
     mapCenter,
     searchPanelResults,
+    effectiveCategories,
   } = useSearchResultsShell({
     search: effectiveSearch,
     navigate,
@@ -187,12 +192,28 @@ export function CategoryLandingPage({
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="space-y-2">
           {isNative ? (
-            <SearchSummaryPill
-              q={qDraft}
-              filterCount={activeFilterCount}
-              onOpenQuery={() => openPanel("query")}
-              onOpenFilters={() => openPanel("price")}
-            />
+            <>
+              <SearchSummaryPill
+                q={qDraft}
+                filterCount={activeFilterCount}
+                onQChange={setQDraft}
+                onSubmitQ={() => updateSearch({ q: qDraft })}
+              />
+              <SearchFilterChipRow
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree}
+                conditions={search.conditions ?? []}
+                categorySlugs={effectiveCategories}
+                location={location}
+                sort={search.sort}
+                onSortChange={(sort) => updateSearch({ sort })}
+                attrFilters={attrFilters}
+                attrValues={attrValues}
+                queryText={qDraft}
+                filterCount={activeFilterCount}
+              />
+            </>
           ) : (
             <SearchBar
               q={qDraft}
@@ -254,7 +275,7 @@ export function CategoryLandingPage({
             onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
             mapListings={mapListings}
             mapCenter={mapCenter}
-            radiusKm={search.radius ?? 10}
+            radiusKm={search.radius ?? DEFAULT_SEARCH_RADIUS_KM}
             onMapClearLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
@@ -263,6 +284,7 @@ export function CategoryLandingPage({
             }
             sort={search.sort}
             onSortChange={(s) => updateSearch({ sort: s })}
+            hideSort={isNative}
             /* Samme filterinngang som /annonser: ett panel, ett filtersett.
                Desktop har sidekolonnen, native har SearchSummaryPill. */
             toolbarLead={

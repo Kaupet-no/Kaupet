@@ -2,7 +2,7 @@ import {
   defaultAdvancedSearchValue,
   valueToCriteria,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+} from "@/lib/advanced-search-value";
 import { mergeTermGroups } from "@/lib/term-groups";
 import { summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
 

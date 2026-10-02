@@ -53,6 +53,7 @@
  */
 
 import type { VehicleLookupResult } from "./vehicle-lookup.types";
+import { describeSafeError } from "@/lib/safe-error";
 
 function assertVehicleLookupConfigured() {
   if (!process.env.STATENS_VEGVESEN_API_KEY) {
@@ -269,7 +270,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   } catch (e) {
     // Nettverksfeil (fetch kaster en TypeError med den lite hjelpsomme
     // meldingen "fetch failed") — SVV nede eller utilgjengelig herfra.
-    console.error("SVV-oppslag nådde ikke fram", e);
+    console.error("SVV-oppslag nådde ikke fram", describeSafeError(e));
     throw new Error(SVV_UNAVAILABLE_MESSAGE, { cause: e });
   }
 
@@ -281,7 +282,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     );
   }
   if (!res.ok) {
-    console.error("SVV-oppslag feilet", res.status, await res.text());
+    console.error("SVV-oppslag feilet", res.status);
     throw new Error(SVV_UNAVAILABLE_MESSAGE);
   }
 

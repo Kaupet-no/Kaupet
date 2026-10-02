@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         let listingEntries: SitemapEntry[] = [];
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const supabaseAdmin = await getSupabaseAdmin();
           const { data } = await supabaseAdmin
             .from("listings")
             .select("kaupet_code, updated_at")
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         let categoryEntries: SitemapEntry[] = [];
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const supabaseAdmin = await getSupabaseAdmin();
           const { data } = await supabaseAdmin
             .from("categories")
             .select("id, slug, parent_id, color")

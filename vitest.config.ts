@@ -22,17 +22,17 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/**/*.integration.test.ts",
+        "src/lib/rls-test-helpers.ts",
         "src/integrations/supabase/types.ts",
         "src/routeTree.gen.ts",
         "src/components/ui/**",
       ],
-      // Starting point measured against the current codebase — ratchet up as
-      // routes/components gain coverage (see Fase 3, punkt 9 i code-assessment-planen).
+      // Hev tersklene etter målt dekning, se docs/TESTSTRATEGI.md § 9.
       thresholds: {
-        statements: 31,
-        branches: 26,
-        functions: 26,
-        lines: 32,
+        statements: 40,
+        branches: 34,
+        functions: 33,
+        lines: 41,
       },
     },
   },

@@ -283,8 +283,16 @@ describe("bulk import parser", () => {
     ]);
   });
 
-  it("avviser mer enn 20 bilde-URL-er per rad", async () => {
-    const urls = Array.from({ length: 21 }, (_, index) => `https://example.com/${index}.jpg`).join(
+  it("godtar 100 bilde-URL-er per rad (øvre grense)", async () => {
+    const urls = Array.from({ length: 100 }, (_, index) => `https://example.com/${index}.jpg`);
+    const csv = [`${baseHeader};images`, `${validRow};"${urls.join(";")}"`].join("\n");
+    const parsed = await parseImportFile(file("annonser.csv", csv));
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0].imageUrls).toEqual(urls);
+  });
+
+  it("avviser mer enn 100 bilde-URL-er per rad", async () => {
+    const urls = Array.from({ length: 101 }, (_, index) => `https://example.com/${index}.jpg`).join(
       ";",
     );
     const csv = [`${baseHeader};images`, `${validRow};"${urls}"`].join("\n");
@@ -294,7 +302,7 @@ describe("bulk import parser", () => {
       {
         rowNumber: 2,
         field: "imageUrls",
-        message: "Maks 20 bilder per annonse.",
+        message: "Maks 100 bilder per annonse.",
       },
     ]);
   });

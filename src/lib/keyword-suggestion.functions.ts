@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -10,7 +11,7 @@ export const suggestKeywordsForListing = createServerFn({ method: "GET" })
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("suggest-keywords-for-listing", 60, 300);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: rows, error } = await supabaseAdmin.rpc("suggest_keywords_for_listing", {
       _title: data.title,

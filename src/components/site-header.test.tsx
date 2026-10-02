@@ -35,6 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  useRouterState: () => "/",
 }));
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({ user: headerMocks.user, session: null, loading: headerMocks.loading }),
@@ -122,6 +123,29 @@ describe("SiteHeader", () => {
     expect(nav.className).toContain("md:px-4");
     expect(screen.getByRole("button", { name: "Åpne søk" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Meldinger" })).toBeTruthy();
+  });
+
+  it("«Åpne søk» fokuserer et synlig sidesøk også utenfor /annonser (kategorisider)", () => {
+    const input = document.createElement("input");
+    input.id = "annonser-search-input";
+    input.getClientRects = () => [{}] as unknown as DOMRectList;
+    input.scrollIntoView = vi.fn();
+    document.body.append(input);
+    headerMocks.openPanel.mockClear();
+
+    render(<SiteHeader />);
+    screen.getByRole("button", { name: "Åpne søk" }).click();
+
+    expect(document.activeElement).toBe(input);
+    expect(headerMocks.openPanel).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it("«Åpne søk» åpner søkepanelet når siden ikke har sidesøk", () => {
+    headerMocks.openPanel.mockClear();
+    render(<SiteHeader />);
+    screen.getByRole("button", { name: "Åpne søk" }).click();
+    expect(headerMocks.openPanel).toHaveBeenCalledWith("query");
   });
 
   it("viser Proff basis-logoen for en aktiv bedrift med Proff basis", () => {

@@ -1,6 +1,8 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { describeSafeError } from "@/lib/safe-error";
 
 // Kalles av notify_expiring_organization_api_keys() (pg_cron, daglig, via
 // pg_net) — se supabase/migrations/20260924140000_organization_api_keys.sql.
@@ -43,31 +45,43 @@ export const Route = createFileRoute("/api/public/api-keys/expiry-notify")({
         // Dynamisk import: en statisk import av en .server-modul i
         // src/routes drar den inn i klientgrafen (se
         // scripts/check-server-boundary.mjs).
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
 
         const { data: key } = await supabaseAdmin
           .from("organization_api_keys")
-          .select("id, name, organization_id, expires_at, revoked_at")
+          .select(
+            "id, name, organization_id, expires_at, revoked_at, expiry_notified_14_at, expiry_notified_3_at",
+          )
           .eq("id", payload.api_key_id)
           .maybeSingle();
         // Nøkkelen kan ha blitt tilbakekalt/slettet mellom cron-jobben og
-        // dette kallet — hopp da bare over, uten feil (jobben har allerede
-        // markert expiry_notified_*_at, se migrasjonen).
+        // dette kallet — hopp da bare over, uten feil.
         if (!key || key.revoked_at) {
           return new Response(null, { status: 204 });
         }
 
-        const { data: superusers } = await supabaseAdmin
+        const notifiedField =
+          payload.threshold_days === 14 ? "expiry_notified_14_at" : "expiry_notified_3_at";
+        const expiresAt = new Date(key.expires_at);
+        if (
+          key[notifiedField] ||
+          expiresAt <= new Date() ||
+          expiresAt.getTime() > Date.now() + payload.threshold_days * 86_400_000
+        ) {
+          return new Response(null, { status: 204 });
+        }
+
+        const { data: superusers, error: membersError } = await supabaseAdmin
           .from("organization_members")
           .select("user_id")
           .eq("organization_id", key.organization_id)
           .eq("role", "superuser")
           .eq("status", "active");
+        if (membersError) return new Response("Retry later", { status: 503 });
         if (!superusers || superusers.length === 0) {
           return new Response(null, { status: 204 });
         }
 
-        const expiresAt = new Date(key.expires_at);
         const dateLabel = expiresAt.toLocaleDateString("nb-NO");
         const subject = `API-nøkkelen «${key.name}» utløper om ${payload.threshold_days} dager`;
         const body =
@@ -76,16 +90,34 @@ export const Route = createFileRoute("/api/public/api-keys/expiry-notify")({
         const url = "/bedrift?tab=integrasjoner";
 
         const { sendNotificationEmail } = await import("@/lib/email.server");
+        let sent = 0;
         for (const member of superusers) {
-          const { data: user } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
+          const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(
+            member.user_id,
+          );
+          if (userError) return new Response("Retry later", { status: 503 });
           const to = user?.user?.email;
           if (!to) continue;
           try {
             await sendNotificationEmail({ to, type: "api_key_expiring", subject, body, url });
+            sent += 1;
           } catch (err) {
-            console.error("API key expiry email dispatch error", err);
+            console.error("API key expiry email dispatch error", describeSafeError(err));
+            return new Response("Retry later", { status: 503 });
           }
         }
+
+        if (sent === 0) return new Response(null, { status: 204 });
+        const { error: markError } = await supabaseAdmin
+          .from("organization_api_keys")
+          .update(
+            payload.threshold_days === 14
+              ? { expiry_notified_14_at: new Date().toISOString() }
+              : { expiry_notified_3_at: new Date().toISOString() },
+          )
+          .eq("id", key.id)
+          .is(notifiedField, null);
+        if (markError) return new Response("Retry later", { status: 503 });
 
         return new Response(null, { status: 204 });
       },

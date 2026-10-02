@@ -32,6 +32,12 @@ jobs:
       - name: Server/client boundary
         run: bun run check:server-boundary
 
+      - name: Server function auth
+        run: bun run check:server-fn-auth
+
+      - name: RLS table inventory
+        run: bun run check:rls-coverage
+
       - name: Safe-area boundary
         run: bun run check:safe-area
 
@@ -43,6 +49,9 @@ jobs:
 
       - name: Test (with coverage threshold)
         run: bun run test:coverage
+
+      - name: Local staging configuration
+        run: node --test scripts/staging-env.test.mjs
 
       - name: Build
         run: bun run build
@@ -165,6 +174,7 @@ jobs:
     outputs:
       android: ${{ steps.filter.outputs.android }}
       flavor: ${{ steps.env.outputs.flavor }}
+      built_at: ${{ steps.build_apk.outputs.built_at }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -234,9 +244,12 @@ jobs:
         run: ./gradlew test${{ steps.env.outputs.flavorCap }}DebugUnitTest
 
       - name: Build debug APK
+        id: build_apk
         if: steps.filter.outputs.android == 'true'
         working-directory: android
-        run: ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
+        run: |
+          ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
+          echo "built_at=$(TZ=Europe/Oslo date '+%d.%m.%Y %H:%M %Z')" >> "$GITHUB_OUTPUT"
         env:
           # Gir hver publiserte APK et unikt, økende versionCode — se
           # android/app/build.gradle. github.run_number øker for hver
@@ -252,7 +265,7 @@ jobs:
 
   deploy:
     name: Deploy to Cloudflare Workers
-    needs: [verify, rls, native-android]
+    needs: [verify, rls, native-android, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
@@ -323,35 +336,46 @@ jobs:
       # production Worker must never retain staging's service-role credential.
       - name: Set staging-sync read secrets on the production Worker
         run: |
-          echo "${{ vars.STAGING_SUPABASE_URL }}" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
-          echo "${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
+          printf '%s' "$STAGING_SUPABASE_URL" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
+          printf '%s' "$STAGING_SUPABASE_PUBLISHABLE_KEY" | bunx wrangler secret put STAGING_SUPABASE_PUBLISHABLE_KEY --name kaupet-no
         env:
+          STAGING_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set R2 secrets on the production Worker
         run: |
-          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
-          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
-          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
-          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
-          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
-          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
-          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
+          printf '%s' "$R2_ACCOUNT_ID" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
+          printf '%s' "$R2_ACCESS_KEY_ID" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
+          printf '%s' "$R2_SECRET_ACCESS_KEY" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
+          printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
+          printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
+          printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
+          printf '%s' "$R2_CLEANUP_SECRET" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
           # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
           # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
-          if [ -n "${{ secrets.IMAGE_JOBS_SECRET }}" ]; then
-            echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no
+          if [ -n "$IMAGE_JOBS_SECRET" ]; then
+            printf '%s' "$IMAGE_JOBS_SECRET" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no
           else
             echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
           fi
           # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
-          if [ -n "${{ secrets.API_KEY_EXPIRY_SECRET }}" ]; then
-            echo "${{ secrets.API_KEY_EXPIRY_SECRET }}" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no
+          if [ -n "$API_KEY_EXPIRY_SECRET" ]; then
+            printf '%s' "$API_KEY_EXPIRY_SECRET" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no
           else
             echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
           fi
         env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
+          R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
+          IMAGE_JOBS_SECRET: ${{ secrets.IMAGE_JOBS_SECRET }}
+          API_KEY_EXPIRY_SECRET: ${{ secrets.API_KEY_EXPIRY_SECRET }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -398,6 +422,11 @@ jobs:
             (${{ github.ref_name }}) —
             v${{ steps.app_version.outputs.full }}
             (${{ steps.app_version.outputs.sha }})
+            — ${{ needs.native-android.outputs.built_at }}
+          body: |
+            **APK bygget:** ${{ needs.native-android.outputs.built_at }} (Europe/Oslo)
+
+            [Se CI-kjøringen](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
           prerelease: true
           files: apk/app-${{ needs.native-android.outputs.flavor }}-debug.apk
 
@@ -408,9 +437,7 @@ jobs:
     # PR sier bare at testene var grønne mot PR-ens base. Fem tester lå røde på
     # staging i dagevis før noen oppdaget det (se #275).
     #
-    # Merk at verken `deploy` eller `deploy-staging` har `needs: e2e`, så dette
-    # gater ikke utrulling — det gjør bruddet synlig i kjøringen. Skal E2E
-    # faktisk stoppe en staging-deploy, må e2e legges til i deploy-staging.
+    # Både staging og produksjon venter på E2E før utrulling.
     name: E2E
     needs: [verify, rls, native-android]
     runs-on: ubuntu-latest
@@ -470,7 +497,8 @@ jobs:
           git fetch origin staging
           ok=false
           elapsed=0
-          timeout=720
+          # Staging-deployen venter også på E2E, som starter etter RLS og Android.
+          timeout=1800
           interval=20
 
           while [ "$elapsed" -lt "$timeout" ]; do
@@ -544,10 +572,13 @@ jobs:
 
   deploy-staging:
     name: Deploy to Cloudflare Workers (staging)
-    needs: [verify, rls, native-android]
+    needs: [verify, rls, native-android, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging
+    concurrency:
+      group: doppler-staging
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -562,7 +593,6 @@ jobs:
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i staging-miljøet — hele siden krasjer uten den." >&2
@@ -570,10 +600,6 @@ jobs:
           fi
           if [ -z "$R2_ACCOUNT_ID" ]; then
             echo "R2_ACCOUNT_ID mangler i staging-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
-            exit 1
-          fi
-          if [ -z "$R2_CLEANUP_SECRET" ]; then
-            echo "R2_CLEANUP_SECRET mangler i staging-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
             exit 1
           fi
 
@@ -584,6 +610,7 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
@@ -606,34 +633,42 @@ jobs:
             esac
           done
 
+      - name: Hent staging-tilgang fra Doppler
+        run: bash scripts/doppler-staging.sh
+        env:
+          OPERATION: bootstrap
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
       - name: Deploy
         run: bun run deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set R2 secrets on the staging Worker
         run: |
-          echo "${{ vars.R2_ACCOUNT_ID }}" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
-          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no-staging
-          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no-staging
-          echo "${{ vars.R2_BILDER_BUCKET }}" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
-          echo "${{ vars.R2_VEDLEGG_BUCKET }}" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
-          echo "${{ vars.R2_PUBLIC_BASE_URL }}" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
-          echo "${{ secrets.R2_CLEANUP_SECRET }}" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no-staging
-          # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
-          # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
-          if [ -n "${{ secrets.IMAGE_JOBS_SECRET }}" ]; then
-            echo "${{ secrets.IMAGE_JOBS_SECRET }}" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no-staging
-          else
-            echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
-          fi
+          printf '%s' "$R2_ACCOUNT_ID" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no-staging
+          printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no-staging
+          printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no-staging
+          printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no-staging
+          # IMAGE_JOBS_SECRET administreres av Doppler-pilot (staging).
           # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
-          if [ -n "${{ secrets.API_KEY_EXPIRY_SECRET }}" ]; then
-            echo "${{ secrets.API_KEY_EXPIRY_SECRET }}" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no-staging
+          if [ -n "$API_KEY_EXPIRY_SECRET" ]; then
+            printf '%s' "$API_KEY_EXPIRY_SECRET" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no-staging
           else
             echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
           fi
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
+          R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+          API_KEY_EXPIRY_SECRET: ${{ secrets.API_KEY_EXPIRY_SECRET }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Synk administrerte staging-hemmeligheter fra Doppler
+        run: bash scripts/doppler-staging.sh
+        env:
+          OPERATION: sync
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

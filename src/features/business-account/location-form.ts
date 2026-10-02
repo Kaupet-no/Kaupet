@@ -17,7 +17,7 @@ export const LOCATION_FIELDS = [
   ["city", "Poststed", "Oslo"],
 ] as const;
 
-/** Speiler `locationInputSchema` i business.functions.ts, men med norske
+/** Speiler `locationInputSchema` i business/locations.functions.ts, men med norske
  * meldinger per felt slik at Zod-feilen fra serveren aldri når brukeren.
  * `requireConsent` gjelder bare nye lokasjoner, som utløser fakturering. */
 export function validateLocation(

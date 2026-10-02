@@ -1,4 +1,7 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createFileRoute } from "@tanstack/react-router";
+import { describeSafeError } from "@/lib/safe-error";
+import { logServerError } from "@/lib/server-error-log";
 
 /**
  * Vipps webhook handler — receives payment state changes.
@@ -17,6 +20,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const {
           getVippsWebhookSecret,
           getVippsPayment,
+          vippsPaymentStatus,
           getVippsWebhookEventId,
           isFreshVippsWebhookDate,
           getVippsWebhookRejectionReason,
@@ -47,13 +51,11 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           : null;
         if (!host || rejectionReason) {
           console.warn("[vipps webhook] signature rejected", {
-            reason: host ? rejectionReason : "missing_host",
-            host,
-            pathAndQuery,
+            reason: rejectionReason ?? "missing_host",
             method: request.method,
             hasDateHeader: date !== "",
             hasContentHashHeader: contentHash !== "",
-            authorizationScheme: authorization.split(" ")[0] || null,
+            authorizationScheme: authorization.startsWith("HMAC-SHA256 ") ? "HMAC-SHA256" : "other",
           });
           return new Response("Invalid signature", { status: 401 });
         }
@@ -77,7 +79,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Missing webhook event identity", { status: 400 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const supabaseAdmin = await getSupabaseAdmin();
 
         // Idempotency
         const { data: existing } = await supabaseAdmin
@@ -92,7 +94,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // event so a known Vipps retry remains idempotent even after the
         // freshness window.
         if (!existing && !isFreshVippsWebhookDate(date)) {
-          console.warn("[vipps webhook] stale webhook", { date, host });
+          console.warn("[vipps webhook] stale webhook");
           return new Response("Stale webhook", { status: 401 });
         }
         if (!existing) {
@@ -115,7 +117,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // Look up promotion
         const { data: promo } = await supabaseAdmin
           .from("listing_promotions")
-          .select("id, status, duration_days, price_nok, vipps_mode")
+          .select("id, listing_id, status, duration_days, price_nok, vipps_mode")
           .eq("vipps_reference", reference)
           .maybeSingle();
 
@@ -134,13 +136,61 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         try {
           payment = await getVippsPayment(reference, host, promoMode);
         } catch (err) {
-          console.error("[vipps webhook] state fetch failed", err);
+          console.error("[vipps webhook] state fetch failed", describeSafeError(err));
           return new Response("Retry later", { status: 503 });
         }
+        const status = vippsPaymentStatus(payment);
 
-        if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
-          if (promo.status === "pending") {
-            if (payment.state === "AUTHORIZED") {
+        // Gir kunden pengene tilbake for en betalt fremheving som ikke kan
+        // aktiveres. false = feilet (logget); kalleren svarer 503 så Vipps prøver igjen.
+        const releasePayment = async (captured: boolean) => {
+          try {
+            const { releaseSupersededPromotionPayment } = await import("@/lib/vipps.server");
+            await releaseSupersededPromotionPayment({
+              promotionId: promo.id,
+              reference,
+              amountNok: promo.price_nok,
+              captured,
+              host,
+              mode: promoMode,
+            });
+            return true;
+          } catch (err) {
+            await logServerError("vippsWebhook.releaseSupersededPayment", err, {
+              promotion_id: promo.id,
+            });
+            return false;
+          }
+        };
+
+        if (status === "AUTHORIZED" || status === "CAPTURED") {
+          // `failed` kan være satt av reconcile før Vipps rapporterte betaling.
+          // Har annonsen fått en ny fremheving i mellomtiden, kan denne ikke
+          // aktiveres (uniq_active_promotion_per_listing): ikke aktiver, og gi
+          // pengene tilbake (refusjon/kansellering) i stedet for å feile i retry-løkke.
+          let superseded = false;
+          if (promo.status === "failed") {
+            const { data: live, error: liveError } = await supabaseAdmin
+              .from("listing_promotions")
+              .select("id")
+              .eq("listing_id", promo.listing_id)
+              .in("status", ["active", "pending", "gifted"])
+              .neq("id", promo.id)
+              .limit(1);
+            if (liveError) throw liveError;
+            superseded = (live?.length ?? 0) > 0;
+          }
+          if (superseded) {
+            await logServerError(
+              "vippsWebhook.paidSupersededPromotion",
+              new Error(`Betalt fremheving kan ikke aktiveres (${status})`),
+              { promotion_id: promo.id },
+            );
+            if (!(await releasePayment(status === "CAPTURED"))) {
+              return new Response("Retry later", { status: 503 });
+            }
+          } else if (promo.status === "pending" || promo.status === "failed") {
+            if (status === "AUTHORIZED") {
               try {
                 const { captureVippsPayment } = await import("@/lib/vipps.server");
                 await captureVippsPayment(
@@ -151,7 +201,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
                   promoMode,
                 );
               } catch (err) {
-                console.error("[vipps webhook] capture failed", err);
+                console.error("[vipps webhook] capture failed", describeSafeError(err));
                 // Keep the promotion pending and the event unprocessed. Vipps
                 // or the reconciliation job can safely retry the idempotent
                 // capture instead of granting an unpaid promotion.
@@ -170,15 +220,23 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
                 vipps_psp_reference: payment.pspReference ?? null,
               })
               .eq("id", promo.id)
-              .eq("status", "pending");
-            if (activateError) throw activateError;
+              .in("status", ["pending", "failed"]);
+            if (activateError?.code === "23505") {
+              // Kappløp med en ny fremheving på samme annonse etter sjekken over.
+              await logServerError("vippsWebhook.paidSupersededPromotion", activateError, {
+                promotion_id: promo.id,
+              });
+              // AUTHORIZED ble capturet like over, så betalingen er belastet.
+              if (!(await releasePayment(true))) {
+                return new Response("Retry later", { status: 503 });
+              }
+            } else if (activateError) throw activateError;
           }
         } else if (
-          payment.state === "CANCELLED" ||
-          payment.state === "EXPIRED" ||
-          payment.state === "TERMINATED" ||
-          payment.state === "ABORTED" ||
-          payment.state === "FAILED"
+          status === "CANCELLED" ||
+          status === "EXPIRED" ||
+          status === "TERMINATED" ||
+          status === "ABORTED"
         ) {
           if (promo.status === "pending") {
             const { error: failError } = await supabaseAdmin
@@ -188,13 +246,19 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               .eq("status", "pending");
             if (failError) throw failError;
           }
-        } else if (payment.state === "REFUNDED") {
+        } else if (status === "REFUNDED") {
+          // Også refusjon gjort i Vipps-portalen. Allerede refunderte rader
+          // beholder sin opprinnelige refunded_at.
           const { error: refundError } = await supabaseAdmin
             .from("listing_promotions")
-            .update({ status: "refunded" })
-            .eq("id", promo.id);
+            .update({ status: "refunded", refunded_at: new Date().toISOString() })
+            .eq("id", promo.id)
+            .neq("status", "refunded");
           if (refundError) throw refundError;
-        } else {
+        } else if (status !== "CREATED" && status !== "PARTIALLY_REFUNDED") {
+          // Ukjent tilstand fra Vipps: prøv igjen. CREATED (ikke betalt ennå)
+          // og PARTIALLY_REFUNDED (delvis refusjon beholder fremhevingen)
+          // markeres behandlet uten endring.
           return new Response("Retry later", { status: 503 });
         }
 

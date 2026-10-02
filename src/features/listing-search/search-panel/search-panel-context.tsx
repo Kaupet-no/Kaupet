@@ -20,7 +20,11 @@ const SearchPanelLoader = lazy(() =>
 type Ctx = {
   open: boolean;
   /** Åpner det globale panelet uten å navigere eller anvende et utkast. */
-  openPanel: (section?: SearchPanelSection, queryDraft?: string) => void;
+  /** `attributeKey` åpner ett bestemt kategorifilter, f.eks. fra brikkeraden. */
+  openPanel: (section?: SearchPanelSection, queryDraft?: string, attributeKey?: string) => void;
+  /** Starter et nytt søk: åpner fritekstpanelet uten sidens resultatkontekst,
+   * slik at et søk fra bunnmenyen aldri redigerer søket som allerede vises. */
+  startSearch: () => void;
   closePanel: () => void;
   registerResults: (ctx: SearchPanelResultsContext | null) => void;
   savedLocation: LocationValue;
@@ -39,14 +43,26 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const [panelRequested, setPanelRequested] = useState(false);
   const [section, setSection] = useState<SearchPanelSection>("query");
   const [queryDraft, setQueryDraft] = useState<string>();
+  const [attributeKey, setAttributeKey] = useState<string>();
   const [results, setResults] = useState<SearchPanelResultsContext | null>(null);
+  const [fresh, setFresh] = useState(false);
   const [savedLocation, setSavedLocation] = useSavedLocation();
 
   // Kategori- og filterdata lastes først når brukeren faktisk åpner panelet.
 
-  const openPanel = useCallback((s: SearchPanelSection = "query", q?: string) => {
+  const openPanel = useCallback((s: SearchPanelSection = "query", q?: string, key?: string) => {
     setSection(s);
     setQueryDraft(q);
+    setAttributeKey(key);
+    setFresh(false);
+    setPanelRequested(true);
+    setOpen(true);
+  }, []);
+  const startSearch = useCallback(() => {
+    setSection("query");
+    setQueryDraft(undefined);
+    setAttributeKey(undefined);
+    setFresh(true);
     setPanelRequested(true);
     setOpen(true);
   }, []);
@@ -59,12 +75,13 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
     () => ({
       open,
       openPanel,
+      startSearch,
       closePanel,
       registerResults,
       savedLocation,
       setSavedLocation,
     }),
-    [open, openPanel, closePanel, registerResults, savedLocation, setSavedLocation],
+    [open, openPanel, startSearch, closePanel, registerResults, savedLocation, setSavedLocation],
   );
 
   return (
@@ -77,7 +94,8 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
             onOpenChange={setOpen}
             initialSection={section}
             initialQuery={queryDraft}
-            results={results ?? undefined}
+            initialAttributeKey={attributeKey}
+            results={fresh ? undefined : (results ?? undefined)}
             savedLocation={savedLocation}
             onSavedLocationChange={setSavedLocation}
           />

@@ -24,6 +24,7 @@
 
 import { PRESETS, type CompressPreset } from "@/lib/image-presets";
 import { MAX_FILE_BYTES } from "@/lib/storage";
+import { cancelResponseBody, readResponseBytes, withHttpDeadline } from "@/lib/http-bounded.server";
 
 export type ServerImage = { bytes: Uint8Array; contentType: string };
 
@@ -75,11 +76,9 @@ export interface ImageTransformer {
   transform(input: TransformInput): Promise<ServerImage>;
 }
 
-// Cloudflare Images ruller EXIF-orientering inn i selve transformasjonen
-// (bildet roteres til "opp" og EXIF-taggen fjernes fra resultatet) — dette er
-// standardoppførselen til `input().transform().output()` og krever ingen
-// egen flagg fra oss. Anta at dette gjelder alle støttede kildeformater
-// (jpeg/png/webp/jxl); se test for et EXIF-rotert bilde.
+// Bilder lagres bare når Cloudflare Images har dekodet og re-enkodet dem.
+// Formatstøtte utover leverandørens dokumenterte inputformater er ikke antatt;
+// særlig JPEG XL kan derfor feile lukket med en dekodefeil.
 //
 // Minimal, lokal deklarasjon av `cloudflare:workers`-modulen: `wrangler`s
 // medfølgende typer dekker ikke nødvendigvis Images-bindingen i alle
@@ -105,10 +104,10 @@ type CloudflareImagesBinding = {
   };
 };
 
-/** Produksjonsimplementasjonen: kaller Cloudflare Images-bindingen (`env.IMAGES`,
- * satt opp i wrangler.jsonc). Bindingen finnes kun i selve Worker-runtimet —
- * i dev (Vite uten Nitro), vitest og CI importerer `cloudflare:workers` enten
- * ikke i det hele tatt, eller gir et objekt uten `IMAGES`. Begge tilfeller
+/** Kaller Cloudflare Images-bindingen (`env.IMAGES`, satt opp i wrangler.jsonc).
+ * Lokalt Vite-dev emulerer bindingen via sin dev-plugin; vitest og CI importerer
+ * `cloudflare:workers` enten ikke i det hele tatt, eller gir et objekt uten
+ * `IMAGES`. Begge tilfeller
  * kastes som `ImagesUnavailableError` (intern feil), ALDRI en krasj eller en
  * kundefeil — se klassekommentaren. */
 export class CloudflareImagesTransformer implements ImageTransformer {
@@ -122,34 +121,52 @@ export class CloudflareImagesTransformer implements ImageTransformer {
     }
     if (!images) throw new ImagesUnavailableError();
 
-    let result: CloudflareImageOutputResult;
-    try {
-      const stream = new Blob([input.bytes as BlobPart], { type: input.contentType }).stream();
-      result = await images
-        .input(stream)
-        .transform({
-          width: input.maxWidthOrHeight,
-          height: input.maxWidthOrHeight,
-          fit: "scale-down",
-        })
-        .output({ format: "image/webp", quality: input.quality });
-    } catch (cause) {
-      // Cloudflare Images kaster på ugyldig/skadet input med en melding som
-      // nevner dekoding/ukjent format — se kommentaren på ImageDecodeError.
-      // Antakelse dokumentert her siden vi ikke har en offisiell feilkode å
-      // matche på: alt annet (kvote, indre feil i tjenesten) behandles som
-      // intern feil av kallerkoden uansett, så en for bred match her er
-      // trygg i praksis — den eneste konsekvensen av å bomme er at en ekte
-      // driftsfeil vises som "skadet fil" i stedet for "prøves på nytt",
-      // noe vi ikke har sett eksempler på i Cloudflares dokumentasjon.
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (/decod|unsupported image|invalid image|corrupt/i.test(message)) {
-        throw new ImageDecodeError(message);
+    return withHttpDeadline(15_000, async (signal) => {
+      let response: Response;
+      try {
+        const stream = new Blob([input.bytes as BlobPart], { type: input.contentType }).stream();
+        const result = await images
+          .input(stream)
+          .transform({
+            width: input.maxWidthOrHeight,
+            height: input.maxWidthOrHeight,
+            fit: "scale-down",
+          })
+          .output({ format: "image/webp", quality: input.quality });
+        response = result.response();
+        if (signal.aborted) {
+          cancelResponseBody(response);
+          throw new Error("Cloudflare Images deadline exceeded");
+        }
+      } catch (cause) {
+        const code =
+          typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+        if (typeof code === "number" && [9412, 9413, 9520].includes(code)) {
+          throw new ImageDecodeError();
+        }
+        throw cause instanceof Error ? cause : new Error(String(cause));
       }
-      throw cause instanceof Error ? cause : new Error(message);
-    }
-    const bytes = new Uint8Array(await result.response().arrayBuffer());
-    return { bytes, contentType: "image/webp" };
+      if (!response.ok) {
+        cancelResponseBody(response);
+        throw new Error(`Cloudflare Images svarte med HTTP ${response.status}`);
+      }
+      if (
+        (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase() !==
+        "image/webp"
+      ) {
+        cancelResponseBody(response);
+        throw new Error("Cloudflare Images returnerte ikke WebP");
+      }
+      const bytes = await readResponseBytes(response, MAX_FILE_BYTES, signal);
+      if (
+        bytes.byteLength < 12 ||
+        String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" ||
+        String.fromCharCode(...bytes.subarray(8, 12)) !== "WEBP"
+      ) {
+        throw new Error("Cloudflare Images returnerte ugyldige WebP-data");
+      }
+      return { bytes, contentType: "image/webp" };
+    });
   }
 }
 
@@ -161,8 +178,8 @@ const MAX_ATTEMPTS_THUMB = 1;
 // f.eks. 2, hvis hovedbildet treffer måltørrelsen på første forsøk).
 
 /** Kjør opptil `maxAttempts` transformasjoner for én preset, senk kvaliteten
- * mellom forsøkene, og behold det minste resultatet funnet (inkludert
- * originalen) — akkurat som `browser-image-compression` på klienten.
+ * mellom forsøkene, og behold det minste transformer-resultatet. Originalen
+ * blir aldri lagret uten dekoding og re-enkoding.
  * Kaster videre `ImageDecodeError`/`ImagesUnavailableError` fra det
  * FØRSTE forsøket uendret (input er per definisjon ubrukelig da), men
  * svelger feil på senere forsøk og beholder det beste vi allerede har. */
@@ -174,7 +191,7 @@ async function compressWithPreset(
 ): Promise<{ result: ServerImage; transformations: number }> {
   const cfg = PRESETS[preset];
   const maxBytes = cfg.maxSizeMB * 1024 * 1024;
-  let best = original;
+  let best: ServerImage | undefined;
   let quality = Math.round(cfg.initialQuality * 100);
   let transformations = 0;
 
@@ -192,14 +209,12 @@ async function compressWithPreset(
       break; // Senere forsøk: behold beste kjente resultat i stedet for å feile jobben.
     }
     transformations += 1;
-    if (candidate.bytes.byteLength < best.bytes.byteLength) best = candidate;
+    if (!best || candidate.bytes.byteLength < best.bytes.byteLength) best = candidate;
     if (candidate.bytes.byteLength <= maxBytes) break;
     quality = Math.max(20, quality - 25);
   }
 
-  // "Behold minste av original og komprimert" — hvis ingen transformasjon ga
-  // et resultat mindre enn originalen (svært komprimerte kilder, allerede
-  // WebP o.l.), er `best` fortsatt `original` her.
+  if (!best) throw new Error("Bilde kunne ikke transformeres");
   return { result: best, transformations };
 }
 

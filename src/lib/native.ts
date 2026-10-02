@@ -68,34 +68,40 @@ export function nativePlatform(): "ios" | "android" | "web" {
   return "web";
 }
 
-/**
- * Take or pick a photo on native. Returns a File suitable for upload via
- * the existing web pipeline. Returns null if the user cancels.
- * `source` picks the camera directly or the gallery directly — the two big
- * actions on the bildesteget — rather than the OS's own "camera/gallery"
- * prompt, since that choice is now made in our own UI.
- */
-export async function pickNativePhoto(source: "camera" | "gallery"): Promise<File | null> {
-  if (!isNative()) return null;
+/** Take one camera photo or pick multiple gallery photos for the upload pipeline. */
+export async function pickNativePhotos(
+  source: "camera" | "gallery",
+  limit: number,
+): Promise<File[]> {
+  if (nativePlatform() === "web" || limit <= 0) return [];
   const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
   try {
-    const photo = await Camera.getPhoto({
-      quality: 85,
-      allowEditing: false,
-      resultType: CameraResultType.Uri,
-      source: source === "camera" ? CameraSource.Camera : CameraSource.Photos,
-    });
-    if (!photo.webPath) return null;
-    const res = await fetch(photo.webPath);
-    const blob = await res.blob();
-    const ext = (photo.format ?? "jpg").toLowerCase();
-    const filename = `photo-${Date.now()}.${ext === "jpeg" ? "jpg" : ext}`;
-    const type = blob.type || (ext === "png" ? "image/png" : "image/jpeg");
-    return new File([blob], filename, { type });
+    const photos =
+      source === "gallery"
+        ? (await Camera.pickImages({ quality: 85, limit })).photos
+        : [
+            await Camera.getPhoto({
+              quality: 85,
+              allowEditing: false,
+              resultType: CameraResultType.Uri,
+              source: CameraSource.Camera,
+            }),
+          ];
+    const files: File[] = [];
+    for (const [index, photo] of photos.entries()) {
+      if (!photo.webPath) continue;
+      const res = await fetch(photo.webPath);
+      if (!res.ok) throw new Error("Kunne ikke lese bildet. Prøv igjen.");
+      const blob = await res.blob();
+      const ext = (photo.format ?? "jpg").toLowerCase();
+      const filename = `photo-${Date.now()}-${index}.${ext === "jpeg" ? "jpg" : ext}`;
+      const type = blob.type || (ext === "png" ? "image/png" : "image/jpeg");
+      files.push(new File([blob], filename, { type }));
+    }
+    return files;
   } catch (e: unknown) {
-    // User canceled or denied permission
     const msg = e instanceof Error ? e.message : "";
-    if (msg.toLowerCase().includes("cancel")) return null;
+    if (msg.toLowerCase().includes("cancel")) return [];
     throw e;
   }
 }

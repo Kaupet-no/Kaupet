@@ -43,7 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatErrorMessage } from "@/lib/errors";
-import { formatNok } from "@/lib/format";
+import { formatDate, formatNok } from "@/lib/format";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export const Route = createFileRoute("/_authenticated/admin/proff-abonnement")({
@@ -66,8 +66,8 @@ const STATUS_LABEL: Record<AdminProffOrder["status"], string> = {
   cancelled: "Kansellert",
 };
 
-function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleDateString("nb-NO") : "—";
+function formatDateOrDash(value: string | null) {
+  return value ? formatDate(value) : "—";
 }
 
 function AdminProffOrdersPage() {
@@ -117,7 +117,7 @@ function AdminProffOrdersPage() {
   const pay = useMutation({
     mutationFn: (orderId: string) => markPaid({ data: { orderId } }),
     onSuccess: (result) => {
-      showSuccessToast(`Betalt. Proff er aktiv til ${formatDate(result.periodEnd)}.`);
+      showSuccessToast(`Betalt. Proff er aktiv til ${formatDateOrDash(result.periodEnd)}.`);
       invalidate();
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke registrere betaling")),
@@ -238,7 +238,7 @@ function AdminProffOrdersPage() {
                         )}
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {formatDate(order.organization?.proff_access_until ?? null)}
+                        {formatDateOrDash(order.organization?.proff_access_until ?? null)}
                       </TableCell>
                       <TableCell className="text-right">
                         {order.status === "pending" || order.status === "invoiced" ? (
@@ -276,7 +276,9 @@ function AdminProffOrdersPage() {
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">
-                            {order.period_end ? `Periode til ${formatDate(order.period_end)}` : "—"}
+                            {order.period_end
+                              ? `Periode til ${formatDateOrDash(order.period_end)}`
+                              : "—"}
                           </span>
                         )}
                       </TableCell>
@@ -324,7 +326,8 @@ function AdminProffOrdersPage() {
                       </TableCell>
                       <TableCell>{charge.location_name}</TableCell>
                       <TableCell>
-                        {formatDate(charge.period_start)}–{formatDate(charge.period_end)}
+                        {formatDateOrDash(charge.period_start)}–
+                        {formatDateOrDash(charge.period_end)}
                       </TableCell>
                       <TableCell className="tabular-nums">
                         {formatNok(charge.amount_ex_vat_nok)}

@@ -35,7 +35,10 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 }));
 vi.mock("@/lib/rate-limit.server", () => ({ assertNotRateLimited: vi.fn() }));
 
-import { suggestCategoryForTitle } from "./category-suggestion.functions";
+import {
+  prefetchCategorySuggestion,
+  suggestCategoryForTitle,
+} from "./category-suggestion.functions";
 
 beforeEach(() => {
   rpcMock.mockReset();
@@ -88,5 +91,26 @@ describe("suggestCategoryForTitle", () => {
     await expect(suggestCategoryForTitle({ data: { title: "Volvo" } })).resolves.toEqual({
       suggestions: [expect.objectContaining({ category_id: "bil", confidence: 0.625 })],
     });
+  });
+});
+
+describe("prefetchCategorySuggestion", () => {
+  it("cacher ikke en feilet forespørsel; neste kall prøver på nytt", async () => {
+    const row = {
+      category_id: "bil",
+      slug: "bil",
+      name_nb: "Bil",
+      parent_id: null,
+      parent_name_nb: null,
+      votes: 20,
+    };
+    rpcMock
+      .mockResolvedValueOnce({ data: null, error: { message: "boom" } })
+      .mockResolvedValueOnce({ data: [row], error: null });
+
+    await expect(prefetchCategorySuggestion("Retry-tittel")).resolves.toEqual({ suggestions: [] });
+    const retry = await prefetchCategorySuggestion("Retry-tittel");
+    expect(retry.suggestions).toHaveLength(1);
+    expect(rpcMock).toHaveBeenCalledTimes(2);
   });
 });

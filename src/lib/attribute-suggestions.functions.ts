@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -19,7 +20,7 @@ export const getAttributeValueSuggestions = createServerFn({ method: "GET" })
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("attribute-value-suggestions", 120, 300);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: rows, error } = await supabaseAdmin.rpc("attribute_value_suggestions", {
       cat_id: data.categoryId,
       attr_key: data.key,

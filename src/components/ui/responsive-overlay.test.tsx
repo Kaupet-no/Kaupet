@@ -53,9 +53,15 @@ describe("ResponsiveOverlay", () => {
 
     await findByText("innhold");
     await waitFor(() => {
-      expect(baseElement.querySelector('[class*="rounded-t-2xl"]')).not.toBeNull();
+      expect(baseElement.querySelector("[data-vaul-drawer]")).not.toBeNull();
     });
     expect(baseElement.querySelector('[class*="top-\\[50%\\]"]')).toBeNull();
+    // Firkantet innholdsboks: radius på den scrollende boksen kuttet
+    // toppinnhold (deler av første bokstav i tittelen).
+    expect(baseElement.querySelector('[class*="rounded-t-2xl"]')).toBeNull();
+    // Breddebegrenset innhold sentrerer seg, i stedet for venstrejustert.
+    const scrollBox = baseElement.querySelector('[class*="overscroll-contain"]');
+    expect(scrollBox?.className).toMatch(/mx-auto/);
   });
 
   it("renders as a bottom Sheet on a native phone", async () => {
@@ -69,8 +75,9 @@ describe("ResponsiveOverlay", () => {
 
     await findByText("innhold");
     await waitFor(() => {
-      expect(baseElement.querySelector('[class*="rounded-t-2xl"]')).not.toBeNull();
+      expect(baseElement.querySelector("[data-vaul-drawer]")).not.toBeNull();
     });
+    expect(baseElement.querySelector('[class*="rounded-t-2xl"]')).toBeNull();
   });
 
   it("renders as a centered Dialog on a native tablet", async () => {

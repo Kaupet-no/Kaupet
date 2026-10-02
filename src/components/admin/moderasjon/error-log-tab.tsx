@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { AlertOctagon, Loader2 } from "lucide-react";
 
@@ -72,7 +73,7 @@ export function ErrorLogTab() {
               (data ?? []).map((e) => (
                 <TableRow key={e.id}>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {new Date(e.created_at).toLocaleString("nb-NO")}
+                    {formatDateTime(e.created_at)}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{e.function_name}</Badge>

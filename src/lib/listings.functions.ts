@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -18,6 +19,7 @@ import {
   type CategoryNode,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
 import {
   effectiveFlowForCategory,
   type CategoryFlowRow,
@@ -29,7 +31,10 @@ import {
 } from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const MAX_LISTINGS_PER_HOUR = 5;
+const LISTING_CREATE_LIMIT_MESSAGE =
+  "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.";
+const LISTING_PUBLISH_LIMIT_MESSAGE =
+  "Du har publisert for mange annonser den siste timen. Prøv igjen senere.";
 
 type ListingOwnership = {
   seller_id: string;
@@ -131,6 +136,19 @@ async function resolveListingOwnership(
     }
     if (!assignment) throw new ClientError("Du har ikke tilgang til denne lokasjonen.", 403);
   }
+  const { data: allowed, error: permissionError } = await supabaseAdmin.rpc(
+    "can_create_organization_listing",
+    {
+      _organization_id: membership.organization_id,
+      _location_id: requestedLocationId,
+      _category_id: categoryId,
+      _user_id: userId,
+    },
+  );
+  if (permissionError) {
+    throw await toClientError("database", permissionError);
+  }
+  if (!allowed) throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
   return {
     seller_id: userId,
     organization_id: membership.organization_id,
@@ -171,10 +189,10 @@ async function authorizeListingMutation(
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!listing) throw new Error("Annonsen finnes ikke.");
+  if (!listing) throw new ClientError("Annonsen finnes ikke.", 404);
   if (listing.seller_id === userId && !listing.organization_id) return listing;
   if (!listing.organization_id || !listing.organization_location_id) {
-    throw new Error("Du har ikke tilgang til denne annonsen");
+    throw new ClientError("Du har ikke tilgang til denne annonsen", 403);
   }
   const { data: allowed, error: permissionError } = await supabaseAdmin.rpc(
     "can_update_organization_listing",
@@ -190,24 +208,12 @@ async function authorizeListingMutation(
   if (permissionError) {
     throw await toClientError("database", permissionError);
   }
-  if (!allowed) throw new Error("Du har ikke tilgang til denne annonsen");
+  if (!allowed) throw new ClientError("Du har ikke tilgang til denne annonsen", 403);
   return listing;
 }
 
-async function assertUnderHourlyListingLimit(
-  supabaseAdmin: SupabaseClient,
-  userId: string,
-  errorMessage: string,
-) {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count } = await supabaseAdmin
-    .from("listings")
-    .select("id", { count: "exact", head: true })
-    .eq("seller_id", userId)
-    .gte("created_at", oneHourAgo);
-  if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
-    throw new ClientError(errorMessage, 429);
-  }
+async function assertListingCreationAllowed(userId: string, message: string) {
+  await assertUserNotRateLimited(userId, "listing_creation", 5, 3600, message);
 }
 
 function validatePartFitment(
@@ -223,7 +229,7 @@ function validatePartFitment(
 
   const scope = attributes[PART_FITMENT_SCOPE_KEY];
   if (scope !== "universal" && scope !== "specific" && scope !== "unknown") {
-    throw new Error("Velg hvordan delen passer til kjøretøy.");
+    throw new ClientError("Velg hvordan delen passer til kjøretøy.", 400);
   }
   if (scope !== "specific") return;
 
@@ -233,13 +239,13 @@ function validatePartFitment(
     vehicleIds.length === 0 ||
     vehicleIds.some((id) => !/^[0-9a-f-]{36}$/iu.test(id))
   ) {
-    throw new Error("Legg til minst én gyldig bilmodell.");
+    throw new ClientError("Legg til minst én gyldig bilmodell.", 400);
   }
 
   const yearFrom = attributes[PART_FITMENT_YEAR_FROM_KEY];
   const yearTo = attributes[PART_FITMENT_YEAR_TO_KEY];
   if (typeof yearFrom === "number" && typeof yearTo === "number" && yearFrom > yearTo) {
-    throw new Error("Årsmodell fra kan ikke være høyere enn årsmodell til.");
+    throw new ClientError("Årsmodell fra kan ikke være høyere enn årsmodell til.", 400);
   }
 }
 async function validateExistingListingForPublish(
@@ -247,16 +253,17 @@ async function validateExistingListingForPublish(
   listing: ListingMutationRow,
 ) {
   const titleLength = listing.title?.trim().length ?? 0;
-  if (titleLength < 5) throw new Error("Tittelen må være minst 5 tegn.");
-  if (titleLength > 120) throw new Error("Tittelen kan ikke være lengre enn 120 tegn.");
+  if (titleLength < 5) throw new ClientError("Tittelen må være minst 5 tegn.", 400);
+  if (titleLength > 120) throw new ClientError("Tittelen kan ikke være lengre enn 120 tegn.", 400);
   const descriptionLength = listing.description?.trim().length ?? 0;
-  if (descriptionLength < 20) throw new Error("Beskrivelsen må være minst 20 tegn.");
-  if (descriptionLength > 4000) throw new Error("Beskrivelsen kan ikke være lengre enn 4000 tegn.");
-  if (!listing.category_id) throw new Error("Velg en kategori før annonsen publiseres.");
+  if (descriptionLength < 20) throw new ClientError("Beskrivelsen må være minst 20 tegn.", 400);
+  if (descriptionLength > 4000)
+    throw new ClientError("Beskrivelsen kan ikke være lengre enn 4000 tegn.", 400);
+  if (!listing.category_id) throw new ClientError("Velg en kategori før annonsen publiseres.", 400);
   if (!listing.postal_code || !/^\d{4}$/.test(listing.postal_code)) {
-    throw new Error("Oppgi et gyldig postnummer før annonsen publiseres.");
+    throw new ClientError("Oppgi et gyldig postnummer før annonsen publiseres.", 400);
   }
-  if (!listing.city?.trim()) throw new Error("Oppgi sted før annonsen publiseres.");
+  if (!listing.city?.trim()) throw new ClientError("Oppgi sted før annonsen publiseres.", 400);
   if (
     !listing.is_free &&
     (listing.price_nok == null ||
@@ -264,13 +271,13 @@ async function validateExistingListingForPublish(
       listing.price_nok < 0 ||
       listing.price_nok > 10_000_000)
   ) {
-    throw new Error("Oppgi en gyldig pris før annonsen publiseres.");
+    throw new ClientError("Oppgi en gyldig pris før annonsen publiseres.", 400);
   }
   if (
     listing.condition !== null &&
     !["new", "like_new", "good", "acceptable", "for_parts"].includes(listing.condition)
   ) {
-    throw new Error("Annonsens tilstand er ugyldig.");
+    throw new ClientError("Annonsens tilstand er ugyldig.", 400);
   }
 
   const [
@@ -305,7 +312,7 @@ async function validateExistingListingForPublish(
     isBoatCategory(listing.category_id, normalizedFilters, categoriesById),
   );
   const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
-  if (!attributesResult.success) throw new Error("Annonsens attributter er ugyldige.");
+  if (!attributesResult.success) throw new ClientError("Annonsens attributter er ugyldige.", 400);
   const attributes = attributesResult.data;
 
   if (categoryBehavior.requiresCategoryFilterValues) {
@@ -370,7 +377,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     const fields = {
@@ -449,11 +456,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ownership.organization_id,
       ownership.organization_location_id,
     );
-    await assertUnderHourlyListingLimit(
-      supabaseAdmin,
-      userId,
-      "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.",
-    );
+    await assertListingCreationAllowed(userId, LISTING_CREATE_LIMIT_MESSAGE);
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
@@ -481,7 +484,7 @@ export const discardDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
     const { error } = await supabaseAdmin
       .from("listings")
@@ -533,7 +536,7 @@ export const createListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
@@ -648,11 +651,7 @@ export const createListing = createServerFn({ method: "POST" })
       ownership.organization_id,
       ownership.organization_location_id,
     );
-    await assertUnderHourlyListingLimit(
-      supabaseAdmin,
-      userId,
-      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
-    );
+    await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
@@ -682,7 +681,7 @@ export const republishListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
 
@@ -690,17 +689,18 @@ export const republishListing = createServerFn({ method: "POST" })
     const listing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
 
     if (listing.status === "disabled") {
-      throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
+      throw new ClientError(
+        "Denne annonsen er deaktivert av moderator og kan ikke reaktiveres",
+        409,
+      );
     }
     if (!["draft", "archived", "sold", "expired"].includes(listing.status)) {
-      throw new Error("Annonsen kan ikke publiseres på nytt fra denne statusen.");
+      throw new ClientError("Annonsen kan ikke publiseres på nytt fra denne statusen.", 409);
     }
     await validateExistingListingForPublish(supabaseAdmin, listing);
-    await assertUnderHourlyListingLimit(
-      supabaseAdmin,
-      userId,
-      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
-    );
+    if (listing.status !== "draft") {
+      await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
+    }
 
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -734,13 +734,13 @@ export const updateListingStatus = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const listing = await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
     if (listing.status === "disabled") {
-      throw new Error("Denne annonsen er deaktivert av moderator");
+      throw new ClientError("Denne annonsen er deaktivert av moderator", 409);
     }
     if (listing.status !== "active") {
-      throw new Error("Bare aktive annonser kan endre status.");
+      throw new ClientError("Bare aktive annonser kan endre status.", 409);
     }
     const { data: updated, error } = await supabaseAdmin
       .from("listings")
@@ -758,7 +758,7 @@ export const updateListingStatus = createServerFn({ method: "POST" })
 export const getListingKaupetCodeById = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     // Unauthenticated (legacy /annonse/:id → /$kaupetCode redirect), so this
     // must not use service-role to reveal a draft/disabled listing's code —
     // same visibility RLS gives everyone else. See

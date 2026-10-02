@@ -41,9 +41,8 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await page.goto("/?forcenative=1");
   await waitForHydration(page);
 
-  // Søk og lokasjon er nå egne knapper som åpner det delte søkepanelet
-  // ("Søk og filtrer"), ikke et frittstående søkefelt lenger.
-  const search = page.getByRole("button", { name: "Åpne søk i annonser" });
+  // Søket er et ekte søkefelt; lokasjon åpner det delte søkepanelet.
+  const search = page.getByRole("searchbox", { name: "Søk i annonser" });
   const location = page.getByRole("button", {
     name: "Velg lokasjon: Hele Norge",
   });
@@ -59,25 +58,19 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await page.keyboard.press("Escape");
   await expect(overlay).not.toBeVisible();
   await expect(location).toBeFocused();
-
-  await location.press("Shift+Tab");
-  await expect(search).toBeFocused();
 });
 
 test("native søkepanel returnerer fokus til filterknappen etter Escape", async ({ page }) => {
   await page.goto("/annonser?forcenative=1&q=&category=&sort=new");
   await waitForHydration(page);
 
-  // Søket er en knapp (SearchSummaryPill) på native resultatflater, ikke et
-  // frittstående søkefelt — samme mønster som landingssiden over.
-  const search = page.getByRole("button", { name: "Søk i annonser" });
-  const rules = page.getByRole("button", { name: "Søkeregler" });
-  const filter = page.getByRole("button", { name: "Filtrer", exact: true });
+  // Søkepillen (SearchSummaryPill) har et ekte søkefelt; første brikke i
+  // brikkeraden under er «Filtre», som åpner hele filterlisten.
+  const search = page.getByRole("searchbox", { name: "Søk i annonser" });
+  const filter = page.getByRole("button", { name: "Alle filtre", exact: true });
 
   await search.focus();
   await search.press("Tab");
-  await expect(rules).toBeFocused();
-  await rules.press("Tab");
   await expect(filter).toBeFocused();
 
   await filter.press("Enter");
@@ -89,8 +82,6 @@ test("native søkepanel returnerer fokus til filterknappen etter Escape", async 
   await expect(filter).toBeFocused();
 
   await filter.press("Shift+Tab");
-  await expect(rules).toBeFocused();
-  await rules.press("Shift+Tab");
   await expect(search).toBeFocused();
 });
 

@@ -10,7 +10,8 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import type { ListingCardData } from "@/lib/listing-card-data";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/favoritter")({
 
 type FavoriteRow =
   | { kind: "available"; listing_id: string; card: ListingCardData }
-  | { kind: "unavailable"; listing_id: string; reason: "deleted" | "archived" };
+  | { kind: "unavailable"; listing_id: string; title: string | null; kaupet_code: string | null };
 
 function FavoritesPage() {
   const native = useIsNative();
@@ -52,23 +53,36 @@ function FavoritesPage() {
       const { data, error } = await supabase
         .from("favorites")
         .select(
-          "listing_id, created_at, listings(id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order), attributes, categories(slug))",
+          "listing_id, created_at, listings(id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, status, sold_at, listing_images(storage_path, sort_order), attributes, categories(slug))",
         )
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((row): FavoriteRow => {
         const l = Array.isArray(row.listings) ? row.listings[0] : row.listings;
+        // Slettet, eller ikke lenger offentlig (f.eks. solgt for over 30
+        // dager siden) — RLS skjuler da annonsen helt.
         if (!l) {
-          return { kind: "unavailable", listing_id: row.listing_id, reason: "deleted" };
+          return {
+            kind: "unavailable",
+            listing_id: row.listing_id,
+            title: null,
+            kaupet_code: null,
+          };
         }
-        if (l.status !== "active") {
-          return { kind: "unavailable", listing_id: row.listing_id, reason: "archived" };
+        // Solgte vises som vanlig kort med Solgt-merke.
+        if (l.status !== "active" && l.status !== "sold") {
+          return {
+            kind: "unavailable",
+            listing_id: row.listing_id,
+            title: l.title,
+            kaupet_code: l.kaupet_code,
+          };
         }
         return {
           kind: "available",
           listing_id: row.listing_id,
-          card: toListingCardData(l),
+          card: { ...toListingCardData(l), sold_at: l.sold_at },
         };
       });
     },
@@ -131,10 +145,17 @@ function FavoritesPage() {
                     key={row.listing_id}
                     className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center"
                   >
-                    <p className="text-sm font-medium">
-                      {row.reason === "deleted"
-                        ? "Annonsen er slettet"
-                        : "Annonsen er ikke lenger tilgjengelig"}
+                    {row.kaupet_code && (
+                      <Link
+                        to="/$kaupetCode"
+                        params={{ kaupetCode: row.kaupet_code }}
+                        className="line-clamp-2 text-sm font-medium hover:underline"
+                      >
+                        {row.title}
+                      </Link>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Annonsen er ikke lenger tilgjengelig
                     </p>
                     <Button
                       size="sm"

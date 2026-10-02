@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { hashRequestIp } from "@/lib/request-ip.server";
 
@@ -8,8 +9,9 @@ export async function assertNotRateLimited(
   bucket: string,
   limit: number,
   windowSeconds: number,
+  message = "For mange forespørsler. Prøv igjen senere.",
 ): Promise<void> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const keyHash = await hashRequestIp();
   const { data: allowed, error } = await supabaseAdmin.rpc("check_endpoint_rate_limit", {
     _bucket: bucket,
@@ -20,7 +22,7 @@ export async function assertNotRateLimited(
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!allowed) throw new ClientError("For mange forespørsler. Prøv igjen senere.", 429);
+  if (!allowed) throw new ClientError(message, 429);
 }
 
 /** Same database-backed limiter, keyed by the authenticated user rather than
@@ -30,8 +32,9 @@ export async function assertUserNotRateLimited(
   bucket: string,
   limit: number,
   windowSeconds: number,
+  message = "For mange forespørsler. Prøv igjen senere.",
 ): Promise<void> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data: allowed, error } = await supabaseAdmin.rpc("check_user_rate_limit", {
     _bucket: bucket,
     _user_id: userId,
@@ -41,5 +44,5 @@ export async function assertUserNotRateLimited(
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!allowed) throw new ClientError("For mange forespørsler. Prøv igjen senere.", 429);
+  if (!allowed) throw new ClientError(message, 429);
 }

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -24,10 +25,6 @@ export const Route = createFileRoute("/_authenticated/admin/bedrifter")({
   head: () => ({ meta: [{ title: "Bedrifter — Administrasjon" }] }),
   component: AdminOrganizationsPage,
 });
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("nb-NO");
-}
 
 function AdminOrganizationsPage() {
   const qc = useQueryClient();

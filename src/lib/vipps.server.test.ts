@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertVippsConfigured, getVippsMode } from "./vipps.server";
+import { assertVippsConfigured, getVippsMode, vippsPaymentStatus } from "./vipps.server";
 
 const VIPPS_KEYS = [
   "VIPPS_ENVIRONMENT",
@@ -68,5 +68,22 @@ describe("assertVippsConfigured", () => {
     process.env.VIPPS_SUBSCRIPTION_KEY = "key";
     process.env.VIPPS_MSN = "123456";
     expect(() => assertVippsConfigured("kaupet.no")).not.toThrow();
+  });
+});
+
+describe("vippsPaymentStatus", () => {
+  const nok = (value: number) => ({ value, currency: "NOK" });
+
+  it.each([
+    ["CREATED", undefined, "CREATED"],
+    ["EXPIRED", undefined, "EXPIRED"],
+    ["AUTHORIZED", undefined, "AUTHORIZED"],
+    ["AUTHORIZED", { authorizedAmount: nok(4900) }, "AUTHORIZED"],
+    ["AUTHORIZED", { capturedAmount: nok(4900) }, "CAPTURED"],
+    ["AUTHORIZED", { capturedAmount: nok(4900), refundedAmount: nok(4900) }, "REFUNDED"],
+    ["AUTHORIZED", { capturedAmount: nok(4900), refundedAmount: nok(900) }, "PARTIALLY_REFUNDED"],
+    ["AUTHORIZED", { cancelledAmount: nok(4900) }, "CANCELLED"],
+  ] as const)("%s med aggregate %o gir %s", (state, aggregate, expected) => {
+    expect(vippsPaymentStatus({ state, aggregate })).toBe(expected);
   });
 });

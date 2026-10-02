@@ -4,8 +4,10 @@
  * everything else uses production API + VIPPS_* secrets.
  * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { isTestHost } from "./env";
+import { describeSafeError } from "@/lib/safe-error";
 
 /** Vipps retries are accepted by event id; only unseen events need freshness. */
 export const VIPPS_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
@@ -236,27 +238,32 @@ export async function createVippsPayment(input: CreatePaymentInput): Promise<Cre
   };
 }
 
+/** Tilstandene ePayment faktisk returnerer i `state`. */
+type VippsPaymentState = "CREATED" | "AUTHORIZED" | "TERMINATED" | "EXPIRED" | "ABORTED";
+
+/** Effektiv status utledet av `vippsPaymentStatus` (state + aggregate). */
 export type VippsPaymentStatus =
-  | "CREATED"
-  | "AUTHORIZED"
-  | "TERMINATED"
-  | "EXPIRED"
-  | "ABORTED"
-  | "CANCELLED"
-  | "FAILED"
-  | "CAPTURED"
-  | "REFUNDED"
-  | "PARTIALLY_REFUNDED";
+  VippsPaymentState | "CAPTURED" | "CANCELLED" | "REFUNDED" | "PARTIALLY_REFUNDED";
+
+type VippsAmount = { value: number; currency: string };
+
+export type VippsPayment = {
+  state: VippsPaymentState;
+  pspReference?: string;
+  amount?: VippsAmount;
+  aggregate?: {
+    authorizedAmount?: VippsAmount;
+    cancelledAmount?: VippsAmount;
+    capturedAmount?: VippsAmount;
+    refundedAmount?: VippsAmount;
+  };
+};
 
 export async function getVippsPayment(
   reference: string,
   host?: string | null,
   explicitMode?: "test" | "production",
-): Promise<{
-  state: VippsPaymentStatus;
-  pspReference?: string;
-  amount?: { value: number; currency: string };
-}> {
+): Promise<VippsPayment> {
   assertVippsConfigured(host);
   const e = hostAwareEnv(host, explicitMode);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}`, {
@@ -266,11 +273,22 @@ export async function getVippsPayment(
     const text = await res.text();
     throw new Error(`Vipps get-payment feilet: ${res.status} ${text}`);
   }
-  return (await res.json()) as {
-    state: VippsPaymentStatus;
-    pspReference?: string;
-    amount?: { value: number; currency: string };
-  };
+  return (await res.json()) as VippsPayment;
+}
+
+/**
+ * ePayment beholder `state: "AUTHORIZED"` etter capture, refusjon og
+ * kansellering; hva som er gjort med betalingen står bare i `aggregate`.
+ * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/api-guide/concepts/
+ */
+export function vippsPaymentStatus(payment: VippsPayment): VippsPaymentStatus {
+  if (payment.state !== "AUTHORIZED") return payment.state;
+  const captured = payment.aggregate?.capturedAmount?.value ?? 0;
+  const refunded = payment.aggregate?.refundedAmount?.value ?? 0;
+  if (refunded > 0) return refunded >= captured ? "REFUNDED" : "PARTIALLY_REFUNDED";
+  if (captured > 0) return "CAPTURED";
+  if ((payment.aggregate?.cancelledAmount?.value ?? 0) > 0) return "CANCELLED";
+  return "AUTHORIZED";
 }
 
 export async function captureVippsPayment(
@@ -317,10 +335,60 @@ export async function refundVippsPayment(
   }
 }
 
+export async function cancelVippsPayment(
+  reference: string,
+  idempotencyKey: string,
+  host?: string | null,
+  explicitMode?: "test" | "production",
+) {
+  assertVippsConfigured(host);
+  const e = hostAwareEnv(host, explicitMode);
+  const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/cancel`, {
+    method: "POST",
+    headers: await vippsHeaders(e, { "Idempotency-Key": idempotencyKey }),
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Vipps cancel feilet: ${res.status} ${text}`);
+  }
+}
+
+/**
+ * Betalt fremheving som ikke kan aktiveres fordi annonsen allerede har en
+ * annen (uniq_active_promotion_per_listing): gi kunden pengene tilbake.
+ * Belastet → refusjon (samme nøkkel som adminRefundPromotion, så admin og
+ * automatikk aldri gir to refusjoner). Bare autorisert → kanseller
+ * reservasjonen; raden blir `failed` siden ingenting er trukket.
+ * Kaster ved feil; nytt forsøk er trygt pga. de stabile nøklene.
+ */
+export async function releaseSupersededPromotionPayment(input: {
+  promotionId: string;
+  reference: string;
+  amountNok: number;
+  captured: boolean;
+  host?: string | null;
+  mode: "test" | "production";
+}): Promise<void> {
+  const { promotionId, reference, amountNok, captured, host, mode } = input;
+  if (!captured) {
+    await cancelVippsPayment(reference, `cancel-${promotionId}`, host, mode);
+    return;
+  }
+  await refundVippsPayment(reference, amountNok, `r-${promotionId.replace(/-/g, "")}`, host, mode);
+  const supabaseAdmin = await getSupabaseAdmin();
+  const { error } = await supabaseAdmin
+    .from("listing_promotions")
+    .update({ status: "refunded", refunded_at: new Date().toISOString() })
+    .eq("id", promotionId)
+    .in("status", ["pending", "failed"]);
+  if (error) throw error;
+}
+
 export async function getVippsWebhookSecret(host?: string | null): Promise<string> {
   const env = hostAwareEnv(host);
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data } = await supabaseAdmin
       .from("vipps_webhook_secrets")
       .select("secret")
@@ -328,7 +396,7 @@ export async function getVippsWebhookSecret(host?: string | null): Promise<strin
       .maybeSingle();
     if (data?.secret) return data.secret;
   } catch (e) {
-    console.error("[vipps] could not read webhook secret from DB", e);
+    console.error("[vipps] could not read webhook secret from DB", describeSafeError(e));
   }
   return env.webhookSecret;
 }

@@ -51,7 +51,7 @@ const result = spawnSync(
     "run",
     "-c",
     "vitest.integration.config.ts",
-    "src/lib/rls.integration.test.ts",
+    "src/lib/rls/",
     "src/lib/category-suggestion.integration.test.ts",
     "src/lib/listing-search-exclusion.integration.test.ts",
     "src/lib/listing-search-semantics.integration.test.ts",

@@ -3,6 +3,7 @@
  * del 1). Kun organisasjonens superbrukere kan liste/opprette/tilbakekalle
  * API-nøkler eller se forbruk — se kravet i planens fase 4.
  */
+import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -19,7 +20,7 @@ const UNAUTHORIZED_MESSAGE = "Du har ikke tilgang til API-nøkler.";
 async function requireSuperuserOrganization(
   userId: string,
 ): Promise<{ supabaseAdmin: AdminClient; organizationId: string }> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data: membership, error } = await supabaseAdmin
     .from("organization_members")
     .select("organization_id, role, status")
@@ -38,7 +39,7 @@ async function requireSuperuserOrganization(
  * interpoleres inn i dem. De videreformidles derfor uendret i stedet for å
  * gå via `toClientError` (som ellers ville sanert dem bort, se
  * `sanitizeClientError`/SAFE_CODE_MESSAGES i to-client-error.ts og
- * business.functions.ts sitt tilsvarende, men ikke fullt konsekvente,
+ * business/*.functions.ts sitt tilsvarende, men ikke fullt konsekvente,
  * mønster). Uventede feil (DB nede o.l.) mangler `message`/har en annen
  * `code` og faller uansett tilbake på den generelle sanerte teksten via
  * `toClientError` i kallerne.
@@ -211,24 +212,17 @@ export const getIntegrationUsage = createServerFn({ method: "GET" })
       }),
     );
 
-    const todayIso = startOfUtcDayIso();
+    const todayIso = startOfUtcDayIso().slice(0, 10);
     const [
-      { count: newListingsToday, error: listingsError },
-      { count: newImagesToday, error: newImagesError },
+      { data: quota, error: quotaError },
       { count: imagesProcessing, error: processingError },
       { count: imagesFailed, error: failedError },
     ] = await Promise.all([
       supabaseAdmin
-        .from("organization_listing_imports")
-        .select("id", { count: "exact", head: true })
+        .from("organization_daily_quotas")
+        .select("usage_date, new_listings, new_images")
         .eq("organization_id", organizationId)
-        .eq("status", "created")
-        .gte("created_at", todayIso),
-      supabaseAdmin
-        .from("listing_image_jobs")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .gte("created_at", todayIso),
+        .maybeSingle(),
       supabaseAdmin
         .from("listing_image_jobs")
         .select("id", { count: "exact", head: true })
@@ -240,16 +234,15 @@ export const getIntegrationUsage = createServerFn({ method: "GET" })
         .eq("organization_id", organizationId)
         .eq("status", "failed"),
     ]);
-    if (listingsError) throw await toClientError("database", listingsError);
-    if (newImagesError) throw await toClientError("database", newImagesError);
+    if (quotaError) throw await toClientError("database", quotaError);
     if (processingError) throw await toClientError("database", processingError);
     if (failedError) throw await toClientError("database", failedError);
 
     return {
       keys,
       organization: {
-        newListingsToday: newListingsToday ?? 0,
-        newImagesToday: newImagesToday ?? 0,
+        newListingsToday: quota?.usage_date === todayIso ? quota.new_listings : 0,
+        newImagesToday: quota?.usage_date === todayIso ? quota.new_images : 0,
         imagesProcessing: imagesProcessing ?? 0,
         imagesFailed: imagesFailed ?? 0,
       },

@@ -139,6 +139,21 @@
         window.Capacitor.Plugins.SplashScreen.hide().catch(function () {});
       }
 
+      // Forhåndsutfyll adressefeltet med sist brukte dev-serveradresse,
+      // lagret nativt av ServerTargetPlugin — brukeren slipper å taste den
+      // inn på nytt ved kaldstart, men kan fortsatt skrive en ny. Metoden
+      // finnes bare på Android-pluginen; på iOS avviser kallet, og det
+      // ignoreres (feltet står bare tomt der).
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ServerTarget) {
+        window.Capacitor.Plugins.ServerTarget.lastDevAddress()
+          .then(function (result) {
+            if (result && result.url) {
+              document.getElementById("ip-input").value = result.url.replace(/^http:\/\//, "");
+            }
+          })
+          .catch(function () {});
+      }
+
       function localDevServerUrl(address) {
         var match = address.trim().match(/^(localhost|\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/);
         if (!match) return null;

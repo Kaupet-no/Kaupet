@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const supabaseAdmin = {
+const supabaseAdmin = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
-};
+}));
 const defaultContext = { userId: "user-1", supabase: supabaseAdmin };
 
 vi.mock("@tanstack/react-start", () => ({
+  createIsomorphicFn: () => ({
+    server: (fn: (...args: unknown[]) => unknown) => Object.assign(fn, { client: () => fn }),
+  }),
   createServerFn: () => {
     let validator: (input: unknown) => unknown = (input) => input;
     let handler:

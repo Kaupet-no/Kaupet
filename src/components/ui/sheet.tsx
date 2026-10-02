@@ -180,8 +180,16 @@ const SheetContent = React.forwardRef<
                 <X className="h-4 w-4" />
                 <span className="sr-only">Lukk</span>
               </SheetPrimitive.Close>
+              {/* `mx-auto w-full`: kallere sender `sm:max-w-*` (samme className
+              brukes i dialog-grenen). Skuffen er fullbredde, så på skjermer over
+              det aktuelle `sm:`-bruddpunktet må innholdsboksen sentrere seg selv
+              — ellers ligger den venstrejustert. `w-full` fordi automargin
+              deaktiverer flex-stretch-størrelsen i tverraksen. */}
               <div
-                className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", className)}
+                className={cn(
+                  "mx-auto w-full min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                  className,
+                )}
                 style={{
                   touchAction: "pan-y",
                   maxHeight: expandable ? "calc(97dvh - var(--snap-point-height, 0px))" : undefined,

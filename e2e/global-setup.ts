@@ -70,7 +70,15 @@ export default async function globalSetup() {
     for (const project of PUBLISH_PROJECTS) {
       users[project] = await createTestUser(project, `E2E Test ${project}`, true);
     }
+    // The generic desktop publish test needs its own quota: Proff bulk import
+    // and vehicle tests also create listings with the desktop-web account.
+    users["desktop-publish"] = await createTestUser(
+      "desktop-publish",
+      "E2E Desktop Publisher",
+      true,
+    );
     const desktopUser = users["desktop-web"];
+    const desktopPublisher = users["desktop-publish"];
     const { data: businessOrganization, error: businessOrganizationError } = await admin
       .from("organizations")
       .insert({
@@ -112,24 +120,28 @@ export default async function globalSetup() {
       .single();
     if (businessLocationError) throw businessLocationError;
     if (!businessLocation) throw new Error("E2E-lokasjon ble ikke opprettet.");
-    const { error: businessMemberError } = await admin.from("organization_members").insert({
-      organization_id: businessOrganization.id,
-      user_id: desktopUser.userId,
-      role: "superuser",
-      status: "active",
-    });
+    const { error: businessMemberError } = await admin.from("organization_members").insert(
+      [desktopUser, desktopPublisher].map((user) => ({
+        organization_id: businessOrganization.id,
+        user_id: user.userId,
+        role: "superuser",
+        status: "active",
+      })),
+    );
     if (businessMemberError) throw businessMemberError;
     const { error: businessLocationMemberError } = await admin
       .from("organization_location_members")
-      .insert({
-        organization_id: businessOrganization.id,
-        location_id: businessLocation.id,
-        user_id: desktopUser.userId,
-        role: "manager",
-        listing_access: "all",
-        listing_edit_scope: "all",
-        chat_access: "all",
-      });
+      .insert(
+        [desktopUser, desktopPublisher].map((user) => ({
+          organization_id: businessOrganization.id,
+          location_id: businessLocation.id,
+          user_id: user.userId,
+          role: "manager",
+          listing_access: "all",
+          listing_edit_scope: "all",
+          chat_access: "all",
+        })),
+      );
     if (businessLocationMemberError) throw businessLocationMemberError;
 
     const { data: category, error: categoryError } = await admin

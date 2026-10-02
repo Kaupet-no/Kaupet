@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import { priceBoundsForMax } from "@/lib/filter-range-bounds";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
 vi.mock("@/components/ui/native-sheet", () => ({
@@ -17,7 +17,7 @@ vi.mock("@/components/ui/native-sheet", () => ({
     children: ReactNode;
   }) => (open ? <div aria-label={title}>{children}</div> : null),
 }));
-vi.mock("@/components/advanced-search-sheet", () => ({
+vi.mock("@/features/listing-search/filters/advanced-search-sheet", () => ({
   CategorySlugPicker: () => <div>kategorivelger</div>,
 }));
 vi.mock("@/lib/native", () => ({

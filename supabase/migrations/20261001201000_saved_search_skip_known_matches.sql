@@ -56,8 +56,6 @@ DECLARE
   l RECORD;
   s RECORD;
   c jsonb;
-  cats jsonb;
-  conds jsonb;
   terms jsonb;
   attrs jsonb;
   attr_key text;
@@ -65,10 +63,6 @@ DECLARE
   attr_kind text;
   attr_item text;
   q_mode text;
-  cat_mode text;
-  min_price int;
-  max_price int;
-  include_free boolean;
   center_lat double precision;
   center_lng double precision;
   radius_km double precision;
@@ -96,31 +90,8 @@ BEGIN
   LOOP
     c := s.criteria;
 
-    cats := COALESCE(c->'categories', '[]'::jsonb);
-    cat_mode := COALESCE(c->>'catMode', 'any');
-    IF jsonb_array_length(cats) > 0 THEN
-      IF l.cat_slug IS NULL THEN CONTINUE search_loop; END IF;
-      IF cat_mode = 'all' AND jsonb_array_length(cats) > 1 THEN CONTINUE search_loop; END IF;
-      IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(cats) x WHERE x.value = l.cat_slug) THEN
-        CONTINUE search_loop;
-      END IF;
-    END IF;
-
-    conds := COALESCE(c->'conditions', '[]'::jsonb);
-    IF jsonb_array_length(conds) > 0 THEN
-      IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(conds) x WHERE x.value = l.condition::text) THEN
-        CONTINUE search_loop;
-      END IF;
-    END IF;
-
-    min_price := NULLIF(c->>'min','')::int;
-    max_price := NULLIF(c->>'max','')::int;
-    include_free := COALESCE((c->>'includeFree')::boolean, true);
-    IF l.is_free THEN
-      IF NOT include_free THEN CONTINUE search_loop; END IF;
-    ELSE
-      IF min_price IS NOT NULL AND (l.price_nok IS NULL OR l.price_nok < min_price) THEN CONTINUE search_loop; END IF;
-      IF max_price IS NOT NULL AND (l.price_nok IS NULL OR l.price_nok > max_price) THEN CONTINUE search_loop; END IF;
+    IF NOT public.saved_search_basic_match(c, l.cat_slug, l.condition::text, l.is_free, l.price_nok) THEN
+      CONTINUE search_loop;
     END IF;
 
     terms := COALESCE(c->'terms', '[]'::jsonb);

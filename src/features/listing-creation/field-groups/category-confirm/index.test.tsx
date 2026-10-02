@@ -54,6 +54,22 @@ describe("CategoryConfirm", () => {
     expect(screen.getByText("Velg kategori")).toBeTruthy();
   });
 
+  it("venter med forslagsknappene til alle forslag har landet", () => {
+    render(
+      <CategoryConfirm
+        {...props({
+          categorySuggestionLoading: true,
+          photoCategorySuggestions: [
+            { category_id: SKO_ID, parent_id: null, name_nb: "Sko", parent_name_nb: null },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /bruk/i })).toBeNull();
+  });
+
   it("slår sammen kjøretøyforslag til ett «Bil og MC»-spørsmål og forhåndsvelger det første", () => {
     const applyCategorySuggestion = vi.fn();
     render(

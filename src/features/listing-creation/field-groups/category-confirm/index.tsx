@@ -97,7 +97,9 @@ export function CategoryConfirm({
     );
   }
 
-  if (!confirmedName && categorySuggestions.length === 0) {
+  // Vent til forslagene har landet: ellers kan knappene bytte plass idet
+  // tittelforslaget kommer etter bildeforslaget.
+  if (!confirmedName && (categorySuggestionLoading || categorySuggestions.length === 0)) {
     return (
       <section
         className="space-y-4 py-6 text-center"

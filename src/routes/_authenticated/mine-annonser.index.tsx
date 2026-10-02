@@ -1,4 +1,4 @@
-import { formatWtbMaxPrice } from "@/lib/format";
+import { formatNok } from "@/lib/format";
 import { useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -377,7 +377,7 @@ function MyListingsPage() {
                             ·{" "}
                             {w.max_price_nok === 0
                               ? "Kun gratis"
-                              : `Maks ${formatWtbMaxPrice(w.max_price_nok)}`}
+                              : `Maks ${formatNok(w.max_price_nok)}`}
                           </span>
                         )}
                         <span>

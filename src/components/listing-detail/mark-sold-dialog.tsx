@@ -42,7 +42,11 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
   const confirmBuyerFn = useServerFn(confirmBuyer);
   const updateStatusFn = useServerFn(updateListingStatus);
 
-  const { data: contacts, isLoading } = useQuery({
+  const {
+    data: contacts,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["listing-contacts", listingId],
     enabled: open,
     queryFn: async (): Promise<Contact[]> => {
@@ -128,9 +132,11 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>Er du sikker på at du vil sette annonsen som solgt?</AlertDialogTitle>
           <AlertDialogDescription>
-            {contacts && contacts.length > 0
-              ? "Velg hvem du valgte å selge til."
-              : "Ingen har tatt kontakt om denne annonsen ennå."}
+            {isError
+              ? "Kunne ikke hente hvem som har tatt kontakt. Prøv igjen."
+              : contacts && contacts.length > 0
+                ? "Velg hvem du valgte å selge til."
+                : "Ingen har tatt kontakt om denne annonsen ennå."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -175,7 +181,8 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
                 Bekreft kjøper
               </Button>
             ) : (
-              !isLoading && (
+              !isLoading &&
+              !isError && (
                 <Button disabled={isPending} onClick={() => markSoldWithoutBuyerMut.mutate()}>
                   {markSoldWithoutBuyerMut.isPending && <Loader2 className="size-4 animate-spin" />}
                   Merk som solgt
@@ -193,13 +200,17 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
  * bare har åpnet, er ingen kontakt. */
 async function onlyStartedConversations(contacts: Contact[]): Promise<Contact[]> {
   if (contacts.length === 0) return contacts;
-  const { data } = await supabase
+  // ponytail: henter alle meldings-id-ene for annonsens samtaler (få per
+  // annonse); bytt til et EXISTS-RPC hvis annonser får mange samtaler.
+  const { data, error } = await supabase
     .from("messages")
     .select("conversation_id")
     .in(
       "conversation_id",
       contacts.map((c) => c.conversationId),
     );
+  // Ellers ville en feil stille gitt en tom kontaktliste.
+  if (error) throw error;
   const started = new Set((data ?? []).map((m) => m.conversation_id));
   return contacts.filter((c) => started.has(c.conversationId));
 }

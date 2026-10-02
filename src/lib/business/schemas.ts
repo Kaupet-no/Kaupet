@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Delt med klienten, som skiller «ingen bedriftstilgang» fra andre feil. */
+export const UNAUTHORIZED_MESSAGE = "Du har ikke tilgang til bedriftskontoen.";
+
 export const uuid = z.string().uuid();
 export const memberRoleSchema = z.enum(["superuser", "member"]);
 export const listingAccessSchema = z.enum(["own", "all"]);

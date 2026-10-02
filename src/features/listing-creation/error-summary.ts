@@ -11,6 +11,6 @@ export function visibleErrorSummary(
 ) {
   if (!message) return null;
   if (stillInvalid !== undefined) return stillInvalid ? message : null;
-  if (message.startsWith("Rett feltene som er markert")) return hasFieldErrors ? message : null;
+  if (message === FIELD_ERRORS_MESSAGE) return hasFieldErrors ? message : null;
   return message;
 }

@@ -629,11 +629,8 @@ function NewListingPage() {
     clientCategoryHint,
     aiFallback: {
       enabled: step > 1 && photoSuggestion.enabled && !categoryId,
-      getToken: async () => {
-        const token = await photoSuggestion.getVerifiedToken();
-        photoSuggestion.turnstileRef.current?.reset();
-        return token;
-      },
+      // Uten token innen rimelig tid viser steget heller velgeren enn å vente.
+      getToken: () => photoSuggestion.takeVerifiedToken(8_000),
     },
   });
 

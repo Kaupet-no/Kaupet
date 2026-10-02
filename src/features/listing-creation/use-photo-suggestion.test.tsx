@@ -76,6 +76,40 @@ describe("usePhotoSuggestion", () => {
     expect(result.current.verificationNeeded).toBe(false);
   });
 
+  it("deler ut ett token om gangen, så samtidige kall aldri får samme token", async () => {
+    let issued = 0;
+    const reset = vi.fn();
+    const { result } = renderHook(() => usePhotoSuggestion({ images: [image], title: "Stol" }));
+    // Widgeten gir samme token til den nullstilles, som ekte Turnstile.
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => Promise.resolve(`token-${issued}`),
+      reset: () => {
+        reset();
+        issued += 1;
+      },
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+
+    const tokens = await act(() =>
+      Promise.all([result.current.takeVerifiedToken(), result.current.takeVerifiedToken()]),
+    );
+    expect(tokens).toEqual(["token-0", "token-1"]);
+    expect(reset).toHaveBeenCalledTimes(2);
+  });
+
+  it("nullstiller ikke widgeten når avkrysning gjenstår", async () => {
+    const reset = vi.fn();
+    const { result } = renderHook(() => usePhotoSuggestion({ images: [image], title: "Stol" }));
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => Promise.reject(new Error("Timeout")),
+      reset,
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+
+    await act(async () => {
+      expect(await result.current.takeVerifiedToken()).toBeNull();
+    });
+    expect(reset).not.toHaveBeenCalled();
+  });
+
   it("beholder kategoriforslaget når tittelforslaget fylles inn i feltet", async () => {
     suggestListingFromPhotos.mockResolvedValue({
       status: "pending",

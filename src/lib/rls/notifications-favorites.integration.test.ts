@@ -86,6 +86,17 @@ describe.skipIf(!canRun)("RLS: favorites are private to their owner", () => {
       .insert({ user_id: ownerId, listing_id: listingId });
     expect(error).not.toBeNull();
   });
+
+  it("blocks the seller from favoriting their own listing", async () => {
+    const seller = await signIn(emails.seller);
+    const {
+      data: { user },
+    } = await seller.auth.getUser();
+    const { error } = await seller
+      .from("favorites")
+      .insert({ user_id: user!.id, listing_id: listingId });
+    expect(error?.code).toBe("42501");
+  });
 });
 
 describe.skipIf(!canRun)("RLS: saved_searches are private to their owner", () => {

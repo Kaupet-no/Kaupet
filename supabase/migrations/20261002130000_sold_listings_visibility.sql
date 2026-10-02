@@ -47,11 +47,13 @@ WHERE l.status = 'sold';
 ALTER TABLE public.listings ENABLE TRIGGER listings_set_updated_at;
 
 -- Én definisjon av «offentlig synlig» for annonsen og radene som henger på
--- den (bilder, 360-bilder). SQL-funksjon, så den inlines i policyene.
+-- den (bilder, 360-bilder). SQL-funksjon, så den inlines i policyene — det
+-- krever at den IKKE har `SET search_path` (et SET-ledd stopper inlining, og
+-- funksjonen ville blitt kalt per rad). Alt i kroppen er skjemakvalifisert
+-- eller fra pg_catalog, og funksjonen er ikke SECURITY DEFINER.
 CREATE FUNCTION public.listing_is_public(_status public.listing_status, _sold_at timestamptz)
 RETURNS boolean
 LANGUAGE sql STABLE
-SET search_path TO 'public'
 AS $$
   SELECT _status = 'active'::public.listing_status
     OR (_status = 'sold'::public.listing_status AND _sold_at > now() - interval '30 days');

@@ -207,6 +207,12 @@ const PREVIEW_SECTION_BY_GROUP_KEY: Record<string, string> = {
   delivery: "location",
 };
 
+/** Stegvalidatoren blokkerer fortsatt — CONFIRM_NO_IMAGE er et spørsmål
+ * (fortsette uten bilde?), ikke en feil banneret skal vise. */
+function stillBlocks(result: ReturnType<NonNullable<FieldGroup["validateExtra"]>>) {
+  return result !== null && result !== "CONFIRM_NO_IMAGE";
+}
+
 function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -1763,9 +1769,7 @@ function NewListingPage() {
             hasFieldErrors: Object.keys(errors).length > 0,
             stillInvalid:
               blockingValidator?.message === validationError
-                ? ![null, "CONFIRM_NO_IMAGE"].includes(
-                    blockingValidator.validate(validateCtx) as string | null,
-                  )
+                ? stillBlocks(blockingValidator.validate(validateCtx))
                 : undefined,
           })}
           validationAttempt={validationAttempt}

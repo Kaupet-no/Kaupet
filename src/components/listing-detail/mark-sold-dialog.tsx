@@ -133,7 +133,7 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
           <AlertDialogTitle>Er du sikker på at du vil sette annonsen som solgt?</AlertDialogTitle>
           <AlertDialogDescription>
             {isError
-              ? "Kunne ikke hente hvem som har tatt kontakt. Prøv igjen."
+              ? "Kunne ikke hente hvem som har tatt kontakt. Du kan likevel merke annonsen som solgt."
               : contacts && contacts.length > 0
                 ? "Velg hvem du valgte å selge til."
                 : "Ingen har tatt kontakt om denne annonsen ennå."}
@@ -181,8 +181,7 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
                 Bekreft kjøper
               </Button>
             ) : (
-              !isLoading &&
-              !isError && (
+              !isLoading && (
                 <Button disabled={isPending} onClick={() => markSoldWithoutBuyerMut.mutate()}>
                   {markSoldWithoutBuyerMut.isPending && <Loader2 className="size-4 animate-spin" />}
                   Merk som solgt

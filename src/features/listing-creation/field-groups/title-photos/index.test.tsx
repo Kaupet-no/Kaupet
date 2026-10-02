@@ -139,7 +139,7 @@ describe("PhotosGroup", () => {
     expect(applyPhotoTitleSuggestion).toHaveBeenCalledWith("Grå sofa i stoff");
   });
 
-  it("viser kategoriforslaget fra bildene", () => {
+  it("viser ikke kategoriforslag på bildesteget", () => {
     render(
       <PhotosGroup
         images={[image]}
@@ -153,9 +153,8 @@ describe("PhotosGroup", () => {
         ]}
       />,
     );
-    expect(screen.getByTestId("photo-category-suggestion").textContent).toContain(
-      "Møbler › Sofaer",
-    );
+    expect(screen.queryByText(/Kaupet foreslår kategori/)).toBeNull();
+    expect(screen.queryByText("Møbler › Sofaer")).toBeNull();
   });
 });
 

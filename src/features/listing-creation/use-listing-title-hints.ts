@@ -126,7 +126,7 @@ export function useListingTitleHints(params: {
     aiFallback,
   } = params;
 
-  const { categorySuggestions, categorySuggestionLoading, setSuggestionDismissed } =
+  const { categorySuggestions, categorySuggestionPending, setSuggestionDismissed } =
     useTitleCategorySuggestion({
       title,
       muted: categoryTouchedManually,
@@ -236,7 +236,7 @@ export function useListingTitleHints(params: {
 
   return {
     categorySuggestions,
-    categorySuggestionLoading,
+    categorySuggestionLoading: categorySuggestionPending,
     setSuggestionDismissed,
     applyCategorySuggestion,
     similarListings,

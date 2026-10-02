@@ -17,7 +17,6 @@ import {
   withRuntimeFieldGroups,
   type LandingEntry,
   resolveWizardPages,
-  suggestionNeedsCategoryConfirm,
 } from "@/features/listing-creation/category-flows";
 import {
   useCategorySelectionActions,
@@ -430,9 +429,7 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
-  // Hentet opp hit (foran baseFieldGroupKeys) fordi showCategoryConfirm
-  // under trenger å vite om AI-forslaget er kjøretøy/båt før resten av
-  // flyten regnes ut — se suggestionNeedsCategoryConfirm.
+  // Lokalt tittelforslag som siste utvei på kategoristeget.
   const clientCategoryHint = useVehicleTitleCategoryHint({
     title,
     allFilters,
@@ -503,23 +500,8 @@ function NewListingPage() {
     photoSuggestion.attributeSuggestionLoading,
   ]);
 
-  // category-confirm holdes bare for forslag som gir en annen flyt enn
-  // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
-  // avgjørelsen må stå fast før resten av sidene regnes ut, siden bl.a.
-  // vehicle-registration er en solo-side som forutsetter avklart kategori.
-  // For alle andre forslag vises kategorien i stedet som en endrebar chip
-  // øverst på "Om tingen" (category-attributes) — mens forslaget ennå ikke
-  // er lastet holdes steget midlertidig for å unngå å måtte bytte sidesett
-  // etter at brukeren allerede har bladd forbi det.
-  const suggestionCategoryIds = [
-    ...categorySuggestions.map((s) => s.category_id),
-    ...(clientCategoryHint ? [clientCategoryHint.category_id] : []),
-  ];
-  const showCategoryConfirm =
-    fromLanding &&
-    !categoryConfirmed &&
-    (categorySuggestionLoading ||
-      suggestionNeedsCategoryConfirm(suggestionCategoryIds, allFlows ?? [], categoriesById));
+  // Alle kategorier bekreftes på et eget steg før detaljfeltene vises.
+  const showCategoryConfirm = fromLanding && !categoryConfirmed;
 
   const baseFieldGroupKeys = useMemo(
     () =>
@@ -1065,27 +1047,6 @@ function NewListingPage() {
     setValidationError(null);
     setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
-
-    // Kategorien regnes som valgt idet brukeren går videre fra "Om tingen"
-    // uten å ha trykket forslagschipen eksplisitt — chippen er en tydelig
-    // handling (UI-guiden), ikke en skjult overskriving, men å måtte trykke
-    // "Riktig" før "Neste" i tillegg ville vært dobbeltarbeid når forslaget
-    // uansett er det eneste feltet peker mot. Bildeforslaget vinner, slik
-    // som i chippen (CategoryAttributes' mergedSuggestions).
-    const photoTop = photoSuggestion.categorySuggestions[0];
-    if (
-      groups.some((g) => g.key === "category-attributes") &&
-      !categoryId &&
-      !categoryTouchedManually
-    ) {
-      if (photoTop) {
-        setSelectedParentId(photoTop.parent_id ?? photoTop.category_id);
-        setValue("category_id", photoTop.category_id, { shouldValidate: true });
-        setCategoryTouchedManually(true);
-      } else if (categorySuggestions.length > 0) {
-        applySuggestedCategory(categorySuggestions[0].category_id);
-      }
-    }
 
     // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
     // skrive over stille — hold brukeren på steg 1 til hen har tatt et

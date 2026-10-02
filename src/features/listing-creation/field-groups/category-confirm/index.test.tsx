@@ -51,35 +51,10 @@ describe("CategoryConfirm", () => {
     expect(screen.getByText("Finner passende kategori …")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Velg kategori selv" }));
 
-    expect(screen.getByText("Vi fant ingen sikker kategori")).toBeTruthy();
+    expect(screen.getByText("Velg kategori")).toBeTruthy();
   });
 
-  it("collapses two vehicle-tree suggestions to a single Bil og MC question", () => {
-    render(
-      <CategoryConfirm
-        {...props({
-          categorySuggestions: [
-            { category_id: BIL_ID, parent_id: BIL_OG_MC_ID, name_nb: "Bil", parent_name_nb: null },
-            {
-              category_id: MC_ID,
-              parent_id: BIL_OG_MC_ID,
-              name_nb: "Motorsykkel",
-              parent_name_nb: null,
-            },
-          ],
-        })}
-      />,
-    );
-
-    expect(
-      screen.getByText("Denne annonsen blir opprettet i kategori Bil og MC. Er det riktig?"),
-    ).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Ja, bruk «Bil og MC»" })).toHaveLength(1);
-    expect(screen.queryByText("Bil")).toBeNull();
-    expect(screen.queryByText("Motorsykkel")).toBeNull();
-  });
-
-  it("commits the first suggested leaf when confirming the collapsed question", () => {
+  it("viser alle kandidater også når begge er kjøretøy", () => {
     const applyCategorySuggestion = vi.fn();
     render(
       <CategoryConfirm
@@ -97,9 +72,30 @@ describe("CategoryConfirm", () => {
         })}
       />,
     );
+    expect(screen.getByRole("button", { name: "Bruk «Bil»" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Bruk «Motorsykkel»" }));
+    expect(applyCategorySuggestion).toHaveBeenCalledWith(MC_ID);
+  });
 
-    screen.getByRole("button", { name: "Ja, bruk «Bil og MC»" }).click();
-    expect(applyCategorySuggestion).toHaveBeenCalledWith(BIL_ID);
+  it("viser bilde- og tittelforslag samlet uten duplikater", () => {
+    const onCategorySelect = vi.fn();
+    const shoe = { category_id: SKO_ID, parent_id: null, name_nb: "Sko", parent_name_nb: null };
+    render(
+      <CategoryConfirm
+        {...props({
+          onCategorySelect,
+          photoCategorySuggestions: [shoe],
+          categorySuggestions: [
+            shoe,
+            { category_id: BIL_ID, parent_id: BIL_OG_MC_ID, name_nb: "Bil", parent_name_nb: null },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: "Bruk «Sko»" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Bruk «Bil»" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Bruk «Sko»" }));
+    expect(onCategorySelect).toHaveBeenCalledWith(SKO_ID, SKO_ID);
   });
 
   it("keeps the per-name question for a non-vehicle suggestion", () => {

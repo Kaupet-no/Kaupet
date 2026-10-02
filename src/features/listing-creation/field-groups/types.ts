@@ -247,7 +247,7 @@ export type WizardSharedProps = {
     "idle" | "analyzing" | "verifying" | "verification-required" | "ok" | "unavailable";
   analyzePhotos: () => void;
   /** 0-2 candidates from the photo `identify` call, same shape as
-   * `categorySuggestions` — merged into the category-attributes chip ahead
+   * `categorySuggestions` — merged on the dedicated category-confirm step ahead
    * of the title-based suggestions when present. */
   photoCategorySuggestions: {
     category_id: string;

@@ -1,5 +1,5 @@
 import { formatNokNumber } from "@/lib/format";
-import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, FolderOpen, Save, X } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -56,7 +56,8 @@ import { CategoryBreadcrumb } from "@/components/category-hero";
 import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
 import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
-import { readInterpretedSearchState, submitSearch } from "@/features/listing-search/submit-search";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { useSearchInterpretation } from "@/features/listing-search/use-search-interpretation";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
 import { SearchStart } from "@/features/listing-search/search-start";
 import { criteriaToValue, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
@@ -143,11 +144,7 @@ function BrowsePage() {
   // Søk fra forsiden/landingssiden tar med tolkningen i router-state, så
   // «Tolket som» viser hva Kaupet la til (f.eks. kategori) i stedet for at
   // filteret dukker opp uforklart.
-  const initialInterpretation = useLocation({
-    select: (location) => readInterpretedSearchState(location.state),
-  });
-  const [interpretedCriteria, setInterpretedCriteria] =
-    useState<InterpretedCriterion[]>(initialInterpretation);
+  const [interpretedCriteria, setInterpretedCriteria] = useSearchInterpretation();
   const [ignoredInterpretations, setIgnoredInterpretations] = useState<Set<string>>(new Set());
 
   const { refreshing, pullDistance } = usePullToRefresh({

@@ -151,6 +151,7 @@ function MyListingsPage() {
   const turnstileEnabled = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const [verificationNeeded, setVerificationNeeded] = useState(false);
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
 
   const doRepublish = useServerFn(republishListing);
   const republish = useMutation({
@@ -435,7 +436,7 @@ function MyListingsPage() {
           </TabsContent>
         </Tabs>
         {turnstileEnabled && (
-          <div className="mx-auto mt-4 w-fit max-w-full">
+          <div ref={turnstileContainerRef} className="mx-auto mt-4 w-fit max-w-full">
             {verificationNeeded && (
               <p role="status" className="mb-2 text-sm text-foreground">
                 Bekreft Cloudflare-sjekken for å publisere annonsen på nytt.
@@ -445,7 +446,11 @@ function MyListingsPage() {
               ref={turnstileRef}
               siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
               options={{ appearance: "interaction-only", action: "kaupet", execution: "execute" }}
-              onBeforeInteractive={() => setVerificationNeeded(true)}
+              onBeforeInteractive={() => {
+                setVerificationNeeded(true);
+                // Widgeten står under lista — knappen kan sitte langt over.
+                turnstileContainerRef.current?.scrollIntoView({ block: "center" });
+              }}
               onSuccess={() => setVerificationNeeded(false)}
             />
           </div>

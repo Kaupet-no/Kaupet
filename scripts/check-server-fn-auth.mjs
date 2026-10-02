@@ -45,6 +45,8 @@ const ALLOWLIST = {
     "token-authorized (QR capture token)",
   "src/lib/vehicle/vehicle-360.functions.ts#uploadVehicle360Frame":
     "token-authorized (QR capture token), DB upload quota",
+  "src/lib/vehicle/vehicle-lookup.functions.ts#lookupVehicleByRegNumber":
+    "guests allowed (draft before login), optional session, rate limit per user or IP hash",
   "src/lib/wtb-listings.functions.ts#countWtbListings": "public read",
   "src/lib/wtb-listings.functions.ts#listWtbListings": "public read",
   "src/lib/wtb-listings.functions.ts#matchListingsForWtb": "public read, rate-limited",

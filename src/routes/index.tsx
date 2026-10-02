@@ -78,6 +78,7 @@ export const Route = createFileRoute("/")({
           "Norges åpne markedsplass for brukte ting. Finn møbler, elektronikk, klær og mer fra naboer over hele landet.",
       },
     ],
+    links: [{ rel: "canonical", href: "https://kaupet.no/" }],
   }),
   component: LandingPage,
 });

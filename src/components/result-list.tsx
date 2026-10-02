@@ -12,7 +12,7 @@ import {
   List,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ClientOnly } from "@tanstack/react-router";
+import { CatchBoundary, ClientOnly, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { ListingCard } from "@/components/listing-card";
 import type { ListingCardData } from "@/lib/listing-card-data";
@@ -40,6 +40,35 @@ import { useListingFavorites } from "@/hooks/use-listing-favorites";
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
 );
+
+// Etter en deploy finnes ikke lenger kartchunken fra forrige bygg, så bare en
+// sidelasting hjelper. Chrome/Firefox: «Failed to fetch dynamically imported
+// module», Safari: «Importing a module script failed».
+const isChunkLoadError = (error: unknown) =>
+  error instanceof Error &&
+  /dynamically imported module|Importing a module script failed/i.test(error.message);
+
+function MapErrorFallback({ error, reset }: ErrorComponentProps) {
+  const reload = isChunkLoadError(error);
+  return (
+    <div
+      role="alert"
+      className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-surface p-6 text-center"
+    >
+      <MapIcon className="size-8 text-muted-foreground" aria-hidden />
+      <p className="text-sm font-medium">Kunne ikke laste kartet</p>
+      <p className="text-xs text-muted-foreground">Resten av søket fungerer som vanlig.</p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={reload ? () => window.location.reload() : reset}
+      >
+        {reload ? "Last inn siden på nytt" : "Prøv på nytt"}
+      </Button>
+    </div>
+  );
+}
 
 // Konstant referanse — unngår at kortene under (memoiserte) får et nytt
 // linkState-objekt hver rendring, som ville nullstilt memoiseringen.
@@ -197,27 +226,31 @@ export function ResultList({
     }
   };
 
+  const mapResetKey = `${mapCenter?.lat ?? ""},${mapCenter?.lng ?? ""},${radiusKm},${mapListings.length}`;
+
   const renderMap = () => (
-    <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
-      <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
-        <ListingsMap
-          center={mapCenter}
-          radiusKm={radiusKm}
-          listings={mapListings}
-          hoveredId={hoveredId}
-          activeId={activeId}
-          onMarkerHover={setHoveredId}
-          onMarkerSelect={setActiveId}
-          onApplyViewport={applyMapViewport}
-          onClearLocation={onMapClearLocation}
-          viewportApplying={viewportApplying}
-          deferViewport={isNative}
-          edgeToEdge={nativePhone}
-          compactTouchControls={nativePhone}
-          className="h-full w-full"
-        />
-      </Suspense>
-    </ClientOnly>
+    <CatchBoundary getResetKey={() => mapResetKey} errorComponent={MapErrorFallback}>
+      <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
+        <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
+          <ListingsMap
+            center={mapCenter}
+            radiusKm={radiusKm}
+            listings={mapListings}
+            hoveredId={hoveredId}
+            activeId={activeId}
+            onMarkerHover={setHoveredId}
+            onMarkerSelect={setActiveId}
+            onApplyViewport={applyMapViewport}
+            onClearLocation={onMapClearLocation}
+            viewportApplying={viewportApplying}
+            deferViewport={isNative}
+            edgeToEdge={nativePhone}
+            compactTouchControls={nativePhone}
+            className="h-full w-full"
+          />
+        </Suspense>
+      </ClientOnly>
+    </CatchBoundary>
   );
   const expansionOptions =
     zeroResultExpansions.length > 0
@@ -362,14 +395,14 @@ export function ResultList({
               onOpenChange={setMobileMapOpen}
               title="Kart"
               titleVisible
-              className="h-[88vh] p-4"
+              className="grid h-[88vh] grid-rows-[auto_minmax(0,1fr)] p-4"
               trigger={
                 <Button type="button" variant="outline" size="sm" className="gap-1.5">
                   <MapIcon className="size-4" /> Kart
                 </Button>
               }
             >
-              <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
+              <div className="min-h-0">{mobileMapOpen ? renderMap() : null}</div>
             </NativeSheet>
           )}
           {(isDesktop || nativeTablet) && (
@@ -393,11 +426,11 @@ export function ResultList({
       <div
         // Signal til SearchResultsBody (:has) om at kartet tar plass, slik at
         // filterkolonnen vikes unna på skjermer under 2xl.
-        data-map-visible={isDesktop && desktopMapVisible && cards.length > 0 ? "" : undefined}
+        data-map-visible={isDesktop && desktopMapVisible ? "" : undefined}
         className={`mt-4 grid gap-6 ${
-          isDesktop && desktopMapVisible && cards.length > 0
+          isDesktop && desktopMapVisible
             ? "lg:grid-cols-[1fr_420px]"
-            : nativeTablet && desktopMapVisible && cards.length > 0
+            : nativeTablet && desktopMapVisible
               ? "grid-cols-[minmax(320px,1fr)_minmax(320px,0.8fr)]"
               : ""
         }`}
@@ -531,7 +564,7 @@ export function ResultList({
           )}
         </div>
 
-        {(isDesktop || nativeTablet) && desktopMapVisible && cards.length > 0 && (
+        {(isDesktop || nativeTablet) && desktopMapVisible && (
           <aside>
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">

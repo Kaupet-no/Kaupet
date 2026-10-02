@@ -46,6 +46,20 @@ export function UsageLabel({
   );
 }
 
+/** Solgte annonser vises en kort stund i søket (se migrasjonen
+ * sold_listings_visibility) — merket må synes før man åpner annonsen. */
+export const SOLD_PRICE_LABEL = "SOLGT";
+
+export function SoldBanner({ compact }: { compact: boolean }) {
+  return (
+    <span
+      className={`pointer-events-none absolute inset-x-0 top-0 z-10 bg-foreground/85 text-center font-semibold uppercase tracking-wide text-background ${compact ? "py-0.5 text-[0.625rem]" : "py-1 text-xs"}`}
+    >
+      Solgt
+    </span>
+  );
+}
+
 type Props = {
   listing: ListingCardData;
   highlighted?: boolean;
@@ -114,8 +128,9 @@ export function ListingCardContent({
   imageFailed?: boolean;
 }) {
   const displayPrice = displayPriceNok(listing);
-  const priceLabel =
-    !listing.is_free && displayPrice == null && missingPriceLabel
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : !listing.is_free && displayPrice == null && missingPriceLabel
       ? missingPriceLabel
       : formatPrice({ price_nok: displayPrice, is_free: listing.is_free });
   const fitmentLabel = partFitmentLabel(listing.attributes);
@@ -130,6 +145,7 @@ export function ListingCardContent({
           compact={false}
           onError={onImageError}
         />
+        {listing.sold_at && <SoldBanner compact={false} />}
       </div>
       <div className="density-data px-3">
         <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
@@ -169,7 +185,9 @@ export const ListingCard = memo(function ListingCard({
   knownFavorite,
   favoriteStateReady,
 }: Props) {
-  const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
   const supportsHover = useRef(true);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -239,6 +257,7 @@ export const ListingCard = memo(function ListingCard({
               compact
               onError={handleImageError}
             />
+            {listing.sold_at && <SoldBanner compact />}
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
             <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>

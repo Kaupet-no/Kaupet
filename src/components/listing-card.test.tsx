@@ -76,4 +76,19 @@ describe("offentlige annonsekort", () => {
 
     expect(screen.getByText("Selger oppgir 1 kompatibel bilmodell")).toBeTruthy();
   });
+
+  it("viser Solgt-merke og SOLGT som pris for nylig solgte annonser", () => {
+    const sold = { ...listing, sold_at: "2026-10-01T12:00:00Z" };
+    render(
+      <>
+        <ListingCard listing={sold} />
+        <ListingCard listing={sold} compact />
+        <ListingCardExpanded listing={sold} />
+      </>,
+    );
+
+    expect(screen.getAllByText("Solgt")).toHaveLength(3);
+    expect(screen.getAllByText("SOLGT")).toHaveLength(3);
+    expect(screen.queryByText("250 000 kr")).toBeNull();
+  });
 });

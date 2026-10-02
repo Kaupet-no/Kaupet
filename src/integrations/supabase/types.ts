@@ -1158,6 +1158,7 @@ export type Database = {
           search_vector: unknown
           seller_id: string
           show_visiting_address: boolean
+          sold_at: string | null
           status: Database["public"]["Enums"]["listing_status"]
           subtitle: string | null
           title: string
@@ -1197,6 +1198,7 @@ export type Database = {
           search_vector?: unknown
           seller_id: string
           show_visiting_address?: boolean
+          sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title: string
@@ -1236,6 +1238,7 @@ export type Database = {
           search_vector?: unknown
           seller_id?: string
           show_visiting_address?: boolean
+          sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title?: string
@@ -3810,6 +3813,7 @@ export type Database = {
           _exclude_any_terms?: string[]
           _include_free?: boolean
           _include_groups?: Json
+          _include_recently_sold?: boolean
           _limit?: number
           _max_price?: number
           _min_price?: number
@@ -3830,6 +3834,7 @@ export type Database = {
           kaupet_code: string
           price_nok: number
           relevance: number
+          sold_at: string | null
           subtitle: string
           title: string
           total_count: number

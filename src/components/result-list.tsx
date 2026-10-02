@@ -41,7 +41,15 @@ const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
 );
 
-function MapErrorFallback({ reset }: ErrorComponentProps) {
+// Etter en deploy finnes ikke lenger kartchunken fra forrige bygg, så bare en
+// sidelasting hjelper. Chrome/Firefox: «Failed to fetch dynamically imported
+// module», Safari: «Importing a module script failed».
+const isChunkLoadError = (error: unknown) =>
+  error instanceof Error &&
+  /dynamically imported module|Importing a module script failed/i.test(error.message);
+
+function MapErrorFallback({ error, reset }: ErrorComponentProps) {
+  const reload = isChunkLoadError(error);
   return (
     <div
       role="alert"
@@ -50,8 +58,13 @@ function MapErrorFallback({ reset }: ErrorComponentProps) {
       <MapIcon className="size-8 text-muted-foreground" aria-hidden />
       <p className="text-sm font-medium">Kunne ikke laste kartet</p>
       <p className="text-xs text-muted-foreground">Resten av søket fungerer som vanlig.</p>
-      <Button type="button" variant="outline" size="sm" onClick={reset}>
-        Prøv på nytt
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={reload ? () => window.location.reload() : reset}
+      >
+        {reload ? "Last inn siden på nytt" : "Prøv på nytt"}
       </Button>
     </div>
   );

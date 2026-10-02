@@ -30,9 +30,10 @@ vi.mock("@/hooks/use-listing-favorites", () => ({
 }));
 vi.mock("@/lib/product-analytics", () => ({ trackProductEvent: vi.fn() }));
 
+const mapError = vi.hoisted(() => ({ message: "kartet feilet" }));
 vi.mock("@/components/listings-map", () => ({
   ListingsMap: () => {
-    throw new Error("kartet feilet");
+    throw new Error(mapError.message);
   },
 }));
 
@@ -151,6 +152,7 @@ describe("ResultList – visningsvalg på native", () => {
 // Feilgjetting: en kartfeil skal ikke ta med seg resultatflaten.
 describe("ResultList – kartfeil ved null treff", () => {
   it("viser kart og isolerer kartfeilen selv når søket har null treff", async () => {
+    mapError.message = "kartet feilet";
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { findByRole, getByText, getByRole, container } = render(
       <ResultList {...baseProps} isDesktop q="" effectiveCategories={[]} resetFilters={vi.fn()} />,
@@ -162,5 +164,19 @@ describe("ResultList – kartfeil ved null treff", () => {
     expect(getByText("Ingen annonser funnet")).toBeTruthy();
     expect(getByRole("button", { name: "Prøv på nytt" })).toBeTruthy();
     expect(container.querySelector("[data-map-visible]")).toBeTruthy();
+  });
+
+  it("tilbyr sidelasting når kartchunken ikke kan hentes etter en deploy", async () => {
+    mapError.message = "Failed to fetch dynamically imported module: /assets/listings-map-abc.js";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { findByRole, getByRole, queryByRole } = render(
+      <ResultList {...baseProps} isDesktop q="" effectiveCategories={[]} resetFilters={vi.fn()} />,
+    );
+
+    fireEvent.click(getByRole("button", { name: "Vis kart" }));
+
+    await findByRole("alert");
+    expect(getByRole("button", { name: "Last inn siden på nytt" })).toBeTruthy();
+    expect(queryByRole("button", { name: "Prøv på nytt" })).toBeNull();
   });
 });

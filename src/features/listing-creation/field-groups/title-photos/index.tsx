@@ -135,7 +135,6 @@ export function PhotosGroup({
   analyzePhotos,
   photoTitleSuggestion,
   applyPhotoTitleSuggestion,
-  photoCategorySuggestions,
 }: Pick<
   WizardSharedProps,
   | "images"
@@ -149,9 +148,7 @@ export function PhotosGroup({
   | "analyzePhotos"
   | "photoTitleSuggestion"
   | "applyPhotoTitleSuggestion"
-  | "photoCategorySuggestions"
 >) {
-  const photoCategory = photoCategorySuggestions[0];
   // Brukeren ba om å få tittelen fylt ut: er feltet tomt, brukes forslaget
   // direkte. Har de skrevet noe selv, får de heller velge med "Bruk" under.
   const fillTitleFromSuggestion = useEffectEvent((suggestion: typeof photoTitleSuggestion) => {
@@ -243,23 +240,6 @@ export function PhotosGroup({
                 Bruk
               </Button>
             </div>
-          )}
-          {/* Settes ikke her: kategorien kan bytte sidesettet (kjøretøy/båt),
-              så den bekreftes med chippen på "Om tingen". */}
-          {photoCategory && (
-            <p
-              data-testid="photo-category-suggestion"
-              className="flex flex-wrap items-center gap-1 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm"
-            >
-              <span className="inline-flex items-center gap-1 font-medium text-brand-text">
-                <Sparkles className="size-4 shrink-0" aria-hidden />
-                Kaupet foreslår kategori:
-              </span>
-              {photoCategory.parent_name_nb
-                ? `${photoCategory.parent_name_nb} › ${photoCategory.name_nb}`
-                : photoCategory.name_nb}
-              <span className="text-muted-foreground">(bekreftes på neste steg)</span>
-            </p>
           )}
         </>
       )}

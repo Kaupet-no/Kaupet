@@ -10,8 +10,10 @@ export function isUnread(
   myId: string | null | undefined,
   myLastReadAt: string | null | undefined,
 ): boolean {
-  if (!lastMessageAt) return false;
-  if (lastMessageSenderId && myId && lastMessageSenderId === myId) return false;
+  // Ingen avsender = ingen meldinger ennå (messages.sender_id er NOT NULL):
+  // en samtale som bare er åpnet, er ikke ulest.
+  if (!lastMessageAt || !lastMessageSenderId) return false;
+  if (myId && lastMessageSenderId === myId) return false;
   if (!myLastReadAt) return true;
   return new Date(lastMessageAt).getTime() > new Date(myLastReadAt).getTime();
 }

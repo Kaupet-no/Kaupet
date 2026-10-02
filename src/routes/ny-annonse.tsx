@@ -17,7 +17,6 @@ import {
   withRuntimeFieldGroups,
   type LandingEntry,
   resolveWizardPages,
-  suggestionNeedsCategoryConfirm,
 } from "@/features/listing-creation/category-flows";
 import {
   useCategorySelectionActions,
@@ -40,7 +39,12 @@ import { useLocationPicker } from "@/features/listing-creation/use-location-pick
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { usePhotoSuggestion } from "@/features/listing-creation/use-photo-suggestion";
 import { useVehicleTitleCategoryHint } from "@/features/listing-creation/use-vehicle-title-category-hint";
-import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
+import {
+  fieldGroupsForKeys,
+  pageLabel,
+  type FieldGroup,
+  type ValidateCtx,
+} from "@/features/listing-creation/field-groups/registry";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   categoryBreadcrumb,
@@ -96,6 +100,10 @@ import { blockImplicitSubmit, publishGate } from "@/features/listing-creation/pu
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import {
+  FIELD_ERRORS_MESSAGE,
+  visibleErrorSummary,
+} from "@/features/listing-creation/error-summary";
 import { ListingStrengthIndicator } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
@@ -198,6 +206,12 @@ const PREVIEW_SECTION_BY_GROUP_KEY: Record<string, string> = {
   location: "location",
   delivery: "location",
 };
+
+/** Stegvalidatoren blokkerer fortsatt — CONFIRM_NO_IMAGE er et spørsmål
+ * (fortsette uten bilde?), ikke en feil banneret skal vise. */
+function stillBlocks(result: ReturnType<NonNullable<FieldGroup["validateExtra"]>>) {
+  return result !== null && result !== "CONFIRM_NO_IMAGE";
+}
 
 function NewListingPage() {
   const navigate = useNavigate();
@@ -421,39 +435,13 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
-  // Hentet opp hit (foran baseFieldGroupKeys) fordi showCategoryConfirm
-  // under trenger å vite om AI-forslaget er kjøretøy/båt før resten av
-  // flyten regnes ut — se suggestionNeedsCategoryConfirm.
+  // Lokalt tittelforslag som siste utvei på kategoristeget.
   const clientCategoryHint = useVehicleTitleCategoryHint({
     title,
     allFilters,
     categories,
     categoriesById,
     bilOgMcCategoryId,
-  });
-
-  const {
-    categorySuggestions,
-    categorySuggestionLoading,
-    setSuggestionDismissed,
-    applyCategorySuggestion,
-    similarListings,
-    wtbMatch,
-    keywordSuggestions,
-    keywordsFetching,
-    appendTagToDescription,
-  } = useListingTitleHints({
-    title,
-    description,
-    categoryId,
-    categoryTouchedManually,
-    setSelectedParentId,
-    setCategoryTouchedManually,
-    priceNok: typeof priceNok === "number" ? priceNok : undefined,
-    isFree,
-    attributes,
-    setValue,
-    clientCategoryHint,
   });
 
   // Fotoassistert kategori-/egenskapsforslag (salg), se
@@ -481,23 +469,8 @@ function NewListingPage() {
     photoSuggestion.attributeSuggestionLoading,
   ]);
 
-  // category-confirm holdes bare for forslag som gir en annen flyt enn
-  // standard (kjøretøy/båt — se suggestionNeedsCategoryConfirm): den
-  // avgjørelsen må stå fast før resten av sidene regnes ut, siden bl.a.
-  // vehicle-registration er en solo-side som forutsetter avklart kategori.
-  // For alle andre forslag vises kategorien i stedet som en endrebar chip
-  // øverst på "Om tingen" (category-attributes) — mens forslaget ennå ikke
-  // er lastet holdes steget midlertidig for å unngå å måtte bytte sidesett
-  // etter at brukeren allerede har bladd forbi det.
-  const suggestionCategoryIds = [
-    ...categorySuggestions.map((s) => s.category_id),
-    ...(clientCategoryHint ? [clientCategoryHint.category_id] : []),
-  ];
-  const showCategoryConfirm =
-    fromLanding &&
-    !categoryConfirmed &&
-    (categorySuggestionLoading ||
-      suggestionNeedsCategoryConfirm(suggestionCategoryIds, allFlows ?? [], categoriesById));
+  // Alle kategorier bekreftes på et eget steg før detaljfeltene vises.
+  const showCategoryConfirm = fromLanding && !categoryConfirmed;
 
   const baseFieldGroupKeys = useMemo(
     () =>
@@ -628,6 +601,39 @@ function NewListingPage() {
     setValidationError,
     setCategoryEditConfirmOpen,
   });
+  // Tittelbasert KI-kategoriforslag (samme Turnstile-widget som bildeforslaget)
+  // først når brukeren har gått forbi første steg — ikke per tastetrykk i
+  // tittelen, som i Ønskes kjøpt. Står etter useWizardNavigation fordi den
+  // trenger `step`; forslagene påvirker ikke hvilke sider veiviseren har.
+  const {
+    categorySuggestions,
+    categorySuggestionLoading,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
+    title,
+    description,
+    categoryId,
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    priceNok: typeof priceNok === "number" ? priceNok : undefined,
+    isFree,
+    attributes,
+    setValue,
+    clientCategoryHint,
+    aiFallback: {
+      enabled: step > 1 && photoSuggestion.enabled && !categoryId,
+      // Uten token innen rimelig tid viser steget heller velgeren enn å vente.
+      getToken: () => photoSuggestion.takeVerifiedToken(8_000),
+    },
+  });
+
   // Intentionally kept fresh every render (not in an effect) since
   // useVehicleLookupFlow's goNext callback, constructed above
   // `pages`/`goNext`, must see the latest function the moment it's called,
@@ -1010,30 +1016,38 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Samme kontekst som stegvalidatorene får ved «Neste» — også brukt til å
+  // kjøre den blokkerende validatoren på nytt, så feilbanneret forsvinner når
+  // brukeren har rettet feilen.
+  const validateCtx: ValidateCtx = {
+    images,
+    attributes,
+    boatFactsActive,
+    missingFilters,
+    isFree,
+    priceNok,
+    categoryId,
+    categories: pickableCategories,
+    bilOgMcCategoryId,
+    vehicleLookupResult,
+    vehicleRegistered,
+    behavior,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    showMileage,
+    canShip,
+  };
+  // Knyttet til meldingen den satte: en senere, annen melding (f.eks. ved
+  // publisering) skal ikke vurderes av denne validatoren.
+  const [blockingValidator, setBlockingValidator] = useState<{
+    message: string;
+    validate: NonNullable<FieldGroup["validateExtra"]>;
+  } | null>(null);
+
   async function goToNextPage(): Promise<ComposerNavigationResult> {
     setValidationError(null);
+    setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
-
-    // Kategorien regnes som valgt idet brukeren går videre fra "Om tingen"
-    // uten å ha trykket forslagschipen eksplisitt — chippen er en tydelig
-    // handling (UI-guiden), ikke en skjult overskriving, men å måtte trykke
-    // "Riktig" før "Neste" i tillegg ville vært dobbeltarbeid når forslaget
-    // uansett er det eneste feltet peker mot. Bildeforslaget vinner, slik
-    // som i chippen (CategoryAttributes' mergedSuggestions).
-    const photoTop = photoSuggestion.categorySuggestions[0];
-    if (
-      groups.some((g) => g.key === "category-attributes") &&
-      !categoryId &&
-      !categoryTouchedManually
-    ) {
-      if (photoTop) {
-        setSelectedParentId(photoTop.parent_id ?? photoTop.category_id);
-        setValue("category_id", photoTop.category_id, { shouldValidate: true });
-        setCategoryTouchedManually(true);
-      } else if (categorySuggestions.length > 0) {
-        applySuggestedCategory(categorySuggestions[0].category_id);
-      }
-    }
 
     // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
     // skrive over stille — hold brukeren på steg 1 til hen har tatt et
@@ -1073,27 +1087,9 @@ function NewListingPage() {
         )
       )
         setAttributesTouched(true);
-      setValidationError("Rett feltene som er markert før du fortsetter.");
+      setValidationError(FIELD_ERRORS_MESSAGE);
       return "blocked";
     }
-    const validateCtx = {
-      images,
-      attributes,
-      boatFactsActive,
-      missingFilters,
-      isFree,
-      priceNok,
-      categoryId,
-      categories: pickableCategories,
-      bilOgMcCategoryId,
-      vehicleLookupResult,
-      vehicleRegistered,
-      behavior,
-      knownIssues,
-      noKnownIssues: !!noKnownIssues,
-      showMileage,
-      canShip,
-    };
     setExtraFieldError(null);
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
@@ -1107,6 +1103,7 @@ function NewListingPage() {
         if (group.key === "category-attributes" || group.key === "boat-facts")
           setAttributesTouched(true);
         setValidationError(result);
+        setBlockingValidator({ message: result, validate: group.validateExtra! });
         return "blocked";
       }
       if (result && typeof result === "object") {
@@ -1119,6 +1116,7 @@ function NewListingPage() {
           setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
+        setBlockingValidator({ message: result.message, validate: group.validateExtra! });
         return "blocked";
       }
     }
@@ -1764,7 +1762,13 @@ function NewListingPage() {
               </p>
             ) : undefined
           }
-          errorSummary={validationError}
+          errorSummary={visibleErrorSummary(validationError, {
+            hasFieldErrors: Object.keys(errors).length > 0,
+            stillInvalid:
+              blockingValidator?.message === validationError
+                ? stillBlocks(blockingValidator.validate(validateCtx))
+                : undefined,
+          })}
           validationAttempt={validationAttempt}
           footer={composerFooter}
           challenge={photoChallenge}

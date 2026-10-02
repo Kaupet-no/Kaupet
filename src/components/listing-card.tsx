@@ -46,6 +46,23 @@ export function UsageLabel({
   );
 }
 
+/** Vises med store bokstaver via CSS (`uppercase`), så skjermlesere leser
+ * ordet og ikke bokstav for bokstav. */
+export const SOLD_PRICE_LABEL = "Solgt";
+
+/** Solgte annonser vises en kort stund i søket (se migrasjonen
+ * sold_listings_visibility) — merket må synes før man åpner annonsen.
+ * Diagonalt hjørnebånd; forelderen må være `relative overflow-hidden`. */
+export function SoldBanner({ compact }: { compact: boolean }) {
+  return (
+    <span
+      className={`pointer-events-none absolute z-10 -rotate-45 bg-destructive text-center font-semibold uppercase tracking-wide text-destructive-foreground ${compact ? "-left-[22px] top-2 w-20 py-px text-[0.625rem]" : "-left-[30px] top-[14px] w-[110px] py-0.5 text-xs"}`}
+    >
+      Solgt
+    </span>
+  );
+}
+
 type Props = {
   listing: ListingCardData;
   highlighted?: boolean;
@@ -104,29 +121,37 @@ export function ListingCardContent({
   imgUrl,
   missingPriceLabel,
   onImageError,
+  imageFailed = false,
 }: {
   listing: ListingCardData;
   imgUrl: string | null;
   missingPriceLabel?: string;
   onImageError?: () => void;
+  /** Bildet ga feil (f.eks. 404) — vis «Ingen bilde», ikke evig skjelett. */
+  imageFailed?: boolean;
 }) {
   const displayPrice = displayPriceNok(listing);
-  const priceLabel =
-    !listing.is_free && displayPrice == null && missingPriceLabel
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : !listing.is_free && displayPrice == null && missingPriceLabel
       ? missingPriceLabel
       : formatPrice({ price_nok: displayPrice, is_free: listing.is_free });
   const fitmentLabel = partFitmentLabel(listing.attributes);
 
   return (
     <>
-      <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
+      <div
+        className="relative aspect-[4/3] overflow-hidden bg-muted"
+        style={{ aspectRatio: "4 / 3" }}
+      >
         <ListingImage
           imgUrl={imgUrl}
-          hasCoverPath={!!listing.cover_path}
+          hasCoverPath={!!listing.cover_path && !imageFailed}
           alt={`${listing.title} — ${priceLabel}`}
           compact={false}
           onError={onImageError}
         />
+        {listing.sold_at && <SoldBanner compact={false} />}
       </div>
       <div className="density-data px-3">
         <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
@@ -137,7 +162,11 @@ export function ListingCardContent({
           <p className="line-clamp-1 text-xs text-muted-foreground">{fitmentLabel}</p>
         )}
         <div className="flex items-baseline justify-between gap-2">
-          <p className="font-display text-lg font-semibold text-primary">{priceLabel}</p>
+          <p
+            className={`font-display text-lg font-semibold text-primary ${listing.sold_at ? "uppercase" : ""}`}
+          >
+            {priceLabel}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {listing.city && <span>{listing.city}</span>}
@@ -166,7 +195,9 @@ export const ListingCard = memo(function ListingCard({
   knownFavorite,
   favoriteStateReady,
 }: Props) {
-  const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
   const supportsHover = useRef(true);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -183,7 +214,7 @@ export const ListingCard = memo(function ListingCard({
     : null;
   const originalUrl = coverPath ? signListingImageUrls([coverPath])[coverPath] : null;
   const primaryImageUrl = signedImageUrl !== undefined ? signedImageUrl : thumbUrl;
-  const { effectiveImageUrl, handleImageError } = useListingImageFallback(
+  const { effectiveImageUrl, imageFailed, handleImageError } = useListingImageFallback(
     primaryImageUrl,
     originalUrl,
   );
@@ -203,6 +234,7 @@ export const ListingCard = memo(function ListingCard({
           imgUrl={effectiveImageUrl}
           missingPriceLabel={missingPriceLabel}
           onImageError={handleImageError}
+          imageFailed={imageFailed}
         />
       </article>
     );
@@ -230,11 +262,12 @@ export const ListingCard = memo(function ListingCard({
           >
             <ListingImage
               imgUrl={effectiveImageUrl}
-              hasCoverPath={!!listing.cover_path}
+              hasCoverPath={!!listing.cover_path && !imageFailed}
               alt={`${listing.title} — ${priceLabel}`}
               compact
               onError={handleImageError}
             />
+            {listing.sold_at && <SoldBanner compact />}
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
             <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
@@ -242,7 +275,11 @@ export const ListingCard = memo(function ListingCard({
               <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
             )}
             <div className="flex items-baseline justify-between gap-2">
-              <p className="font-display text-base font-semibold text-primary">{priceLabel}</p>
+              <p
+                className={`font-display text-base font-semibold text-primary ${listing.sold_at ? "uppercase" : ""}`}
+              >
+                {priceLabel}
+              </p>
               {typeof listing.mileage_km === "number" ? (
                 <UsageLabel value={listing.mileage_km} unit="km" />
               ) : typeof listing.engine_hours === "number" ? (
@@ -292,6 +329,7 @@ export const ListingCard = memo(function ListingCard({
           listing={listing}
           imgUrl={effectiveImageUrl}
           onImageError={handleImageError}
+          imageFailed={imageFailed}
         />
       </Link>
       <FavoriteButton

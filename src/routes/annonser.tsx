@@ -57,6 +57,7 @@ import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
 import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
+import { useSearchInterpretation } from "@/features/listing-search/use-search-interpretation";
 import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
 import { SearchStart } from "@/features/listing-search/search-start";
 import { criteriaToValue, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
@@ -131,8 +132,19 @@ function BrowsePage() {
   const isDesktop = useIsDesktop();
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const { open: searchPanelOpen, openPanel } = useSearchPanel();
-  const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
-  const [interpretedCriteria, setInterpretedCriteria] = useState<InterpretedCriterion[]>([]);
+  // I URL-en, så tilbake-knappen og delte lenker beholder fanen. Hvilken fane
+  // som faktisk vises, avgjøres under (activeTab) — uten ØK-treff faller den
+  // tilbake til «Til salgs», ellers ville fanelinja forsvinne med ØK-visningen.
+  const requestedTab = search.results ?? "listings";
+  const setActiveTab = (tab: "listings" | "wtb") =>
+    navigate({
+      search: (prev) => ({ ...prev, results: tab === "wtb" ? "wtb" : undefined }),
+      replace: true,
+    });
+  // Søk fra forsiden/landingssiden tar med tolkningen i router-state, så
+  // «Tolket som» viser hva Kaupet la til (f.eks. kategori) i stedet for at
+  // filteret dukker opp uforklart.
+  const [interpretedCriteria, setInterpretedCriteria] = useSearchInterpretation();
   const [ignoredInterpretations, setIgnoredInterpretations] = useState<Set<string>>(new Set());
 
   const { refreshing, pullDistance } = usePullToRefresh({
@@ -495,19 +507,14 @@ function BrowsePage() {
     q: search.q,
     effectiveCategories,
     categories,
-    activeTab,
+    activeTab: requestedTab,
   });
-
-  // Reset to listings tab when search criteria change
-  const [prevCriteria, setPrevCriteria] = useState([search.q, search.category, search.categories]);
-  if (
-    search.q !== prevCriteria[0] ||
-    search.category !== prevCriteria[1] ||
-    search.categories !== prevCriteria[2]
-  ) {
-    setPrevCriteria([search.q, search.category, search.categories]);
-    setActiveTab("listings");
-  }
+  const activeTab =
+    requestedTab === "wtb" &&
+    hasSearchCriteria &&
+    (wtbLoading || wtbCount > 0 || wtbListings.length > 0)
+      ? "wtb"
+      : "listings";
 
   /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
      trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.
@@ -644,7 +651,13 @@ function BrowsePage() {
               criteria={interpretedCriteria}
               categories={categories ?? []}
               filters={attrFilters.length > 0 ? attrFilters : (allFilters ?? [])}
-              onCategoryChange={() => undefined}
+              onCategoryChange={() => {
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "category"),
+                );
+                setDismissedMatchText(categoryMatch?.matchedText ?? null);
+                updateSearch({ category: "", categories: [] });
+              }}
               onAttributeChange={(key) => {
                 const criterion = interpretedCriteria.find(
                   (item) => item.kind === "attribute" && item.key === key,

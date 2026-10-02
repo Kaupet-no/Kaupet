@@ -64,4 +64,27 @@ describe("CategoryPicker", () => {
     const tile = screen.getByTestId("category-tile");
     expect(tile.textContent).not.toContain("Hovedkategori");
   });
+
+  it("rangerer ord som starter med søket foran treff midt i et ord", () => {
+    render(
+      <CategoryPicker
+        open
+        onOpenChange={vi.fn()}
+        categories={[
+          { id: "fiske", name_nb: "Fisking", parent_id: null },
+          { id: "kaffe", name_nb: "Kaffemaskin", parent_id: null },
+          { id: "ski", name_nb: "Ski og snowboard", parent_id: null },
+        ]}
+        selectedId=""
+        onSelect={vi.fn()}
+        inline
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("category-search-input"), {
+      target: { value: "ski" },
+    });
+
+    expect(screen.getAllByTestId("category-tile")[0].textContent).toContain("Ski og snowboard");
+  });
 });

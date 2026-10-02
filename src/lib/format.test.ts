@@ -11,6 +11,8 @@ import {
   formatDayMonth,
   formatMonthYear,
   formatNokNumber,
+  formatWtbMaxPrice,
+  initials,
   priceRange,
 } from "./format";
 
@@ -59,5 +61,20 @@ describe("datoformattering", () => {
 describe("formatNokNumber", () => {
   it("bruker norske tusenskiller", () => {
     expect(norm(formatNokNumber(1234567))).toBe("1 234 567");
+  });
+});
+
+describe("formatWtbMaxPrice", () => {
+  it("viser 0 som «Kun gratis», siden matchingen da bare tar gratis-annonser", () => {
+    expect(formatWtbMaxPrice(0)).toBe("Kun gratis");
+    expect(formatWtbMaxPrice(1500)).toBe(`${formatNokNumber(1500)} kr`);
+  });
+});
+
+describe("initials", () => {
+  it("tar første bokstav i de to første ordene, som i menyen", () => {
+    expect(initials("Demo user 2")).toBe("DU");
+    expect(initials(null, "demo2@kaupet.no")).toBe("D");
+    expect(initials("  ")).toBe("?");
   });
 });

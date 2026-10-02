@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
 import { toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -473,6 +474,9 @@ export const matchListingsForWtb = createServerFn({ method: "GET" })
     const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
     await assertNotRateLimited("match-listings-for-wtb", 60, 300);
     const supabaseAdmin = await getSupabaseAdmin();
+    // Valgfri innlogging (gjester kan også lage kjøpsønske): egne
+    // salgsannonser er aldri et relevant treff.
+    const { data: claims } = await getSupabaseServerClient().auth.getClaims();
 
     const { data: page, error } = await supabaseAdmin.rpc("listings_matching_wtb", {
       _category_id: data.category_id,
@@ -482,6 +486,7 @@ export const matchListingsForWtb = createServerFn({ method: "GET" })
       _lng: data.lng ?? null,
       _radius_km: data.radius_km ?? null,
       _limit: data.limit ?? 5,
+      _exclude_seller_id: claims?.claims?.sub ?? null,
     } as never);
     if (error) {
       throw await toClientError("database", error);

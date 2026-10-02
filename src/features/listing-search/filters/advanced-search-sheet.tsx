@@ -29,7 +29,12 @@ import {
   mergeAdvancedSearchGroups,
   resetAdvancedSearchValue,
 } from "@/lib/advanced-search-actions";
-import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
+import {
+  createSavedSearch,
+  savedSearchLabel,
+  summarizeCriteria,
+  type SearchCriteria,
+} from "@/lib/saved-searches";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -695,7 +700,7 @@ export function SaveSearchDialog({
   criteria: SearchCriteria;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState(defaultName);
+  const [name, setName] = useState(() => savedSearchLabel(defaultName));
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -705,7 +710,7 @@ export function SaveSearchDialog({
     setPrevOpen(open);
     setPrevDefaultName(defaultName);
     if (open) {
-      setName(defaultName);
+      setName(savedSearchLabel(defaultName));
       setNotify(true);
     }
   }

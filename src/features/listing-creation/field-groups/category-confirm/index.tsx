@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,40 +11,23 @@ function suggestionLabel(s: { name_nb: string; parent_name_nb: string | null }):
   return s.parent_name_nb ? `${s.parent_name_nb} › ${s.name_nb}` : s.name_nb;
 }
 
-/** True if `id`'s ancestor chain (walked via `parent_id`) reaches
- * `bilOgMcCategoryId`. Used to detect when every current AI/vote suggestion
- * is a Bil og MC underkategori — in which case the model's specific guess
- * (Bil vs. MC vs. Tilhenger, ...) isn't reliable enough to ask about
- * directly (see module doc below), so we only confirm the broad category. */
-function isUnderBilOgMc(
+/** Om `id` ligger under `rootId` i kategoritreet (via `parent_id`). */
+function isUnder(
   id: string,
+  rootId: string,
   categoriesById: Map<string, { id: string; parent_id: string | null }>,
-  bilOgMcCategoryId: string | null,
 ): boolean {
-  if (!bilOgMcCategoryId) return false;
-  let cur = categoriesById.get(id);
-  while (cur) {
-    if (cur.id === bilOgMcCategoryId) return true;
+  for (let cur = categoriesById.get(id); cur;) {
+    if (cur.id === rootId) return true;
     cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
   }
   return false;
 }
 
-/**
- * Runtime-only step spliced into `fieldGroupKeys` right after `title-photos`
- * when the wizard was entered via the intent+title landing screen (see
- * ny-annonse.tsx) — replaces the forced category-select-as-step-1, since the
- * title already lets `suggestCategoryForTitle` guess a category. Mirrors the
- * vehicle-confirm precedent: never part of a category's stored field_groups
- * (see category-flows.ts), always solo (see SOLO_FIELD_GROUP_KEYS).
- *
- * `categorySuggestions` can hold up to 2 candidates (see
- * category-suggestion-ai.server.ts) — e.g. "Bil" vs. "MC" for an ambiguous
- * title — in which case both are offered as buttons rather than forcing
- * a single guess through the full manual picker.
- */
+/** Dedicated category choice before category-specific fields. */
 export function CategoryConfirm({
-  categorySuggestions,
+  categorySuggestions: titleSuggestions,
+  photoCategorySuggestions = [],
   categorySuggestionLoading,
   applyCategorySuggestion,
   categories,
@@ -52,14 +35,30 @@ export function CategoryConfirm({
   onCategorySelect,
   bilOgMcCategoryId,
 }: WizardSharedProps) {
-  const motorsportCategory = categories?.find((c) => c.name_nb === "Motorsport");
-  const categoriesById = useMemo(
-    () => new Map((categories ?? []).map((c) => [c.id, c])),
-    [categories],
-  );
+  // KI-en skiller ikke pålitelig mellom underkategoriene i Bil og MC (Bil,
+  // Motorsykkel, ...), så her bekreftes bare «Bil og MC». Underkategorien
+  // avgjøres på vehicle-registration: av SVV-oppslaget, eller av brukeren
+  // når registreringsnummer ikke oppgis. Det første forslaget under Bil og MC
+  // brukes som forhåndsvalg der.
+  const categoriesById = new Map((categories ?? []).map((c) => [c.id, c]));
   const bilOgMcName = bilOgMcCategoryId
     ? categoriesById.get(bilOgMcCategoryId)?.name_nb
     : undefined;
+  const options = new Map<
+    string,
+    { suggestion: (typeof titleSuggestions)[number]; label: string }
+  >();
+  for (const s of [...photoCategorySuggestions, ...titleSuggestions]) {
+    const vehicle =
+      !!bilOgMcCategoryId &&
+      !!bilOgMcName &&
+      isUnder(s.category_id, bilOgMcCategoryId, categoriesById);
+    const key = vehicle ? bilOgMcCategoryId : s.category_id;
+    if (!options.has(key)) {
+      options.set(key, { suggestion: s, label: vehicle ? bilOgMcName : suggestionLabel(s) });
+    }
+  }
+  const categorySuggestions = [...options.values()];
   const [showPicker, setShowPicker] = useState(false);
   // Captured before applyCategorySuggestion clears categorySuggestions (it's
   // shared state also used to dismiss the category-select suggestion chip) —
@@ -70,18 +69,7 @@ export function CategoryConfirm({
   // categoryConfirmed in ny-annonse.tsx), advancing automatically — this is
   // purely a one-render safety net for that transition, not a resting state.
   const [clickedName, setClickedName] = useState<string | null>(null);
-  // Unlike applyCategorySuggestion (never gated — see applySuggestedCategory
-  // in ny-annonse.tsx), onCategorySelect routes through requestCategorySelect,
-  // which defers to a separate pending-change confirmation dialog instead of
-  // applying immediately if `attributes` already has keys. That shouldn't
-  // happen here in practice (category-confirm is the wizard's first step,
-  // right after title-photos, before anything can populate attributes), but
-  // rather than assume the click always applies synchronously, derive the
-  // Motorsport confirmation from categoryId actually reflecting it instead of
-  // setting it optimistically on click.
-  const confirmedName =
-    clickedName ??
-    (motorsportCategory && categoryId === motorsportCategory.id ? "Motorsport" : null);
+  const confirmedName = clickedName;
   const loadingMessage = CATEGORY_SUGGESTION_LOADING_MESSAGE;
 
   if (
@@ -90,7 +78,9 @@ export function CategoryConfirm({
   ) {
     return (
       <section className="space-y-3">
-        <p className="text-lg font-semibold">Vi fant ingen sikker kategori</p>
+        <p className="text-lg font-semibold">
+          {showPicker ? "Velg kategori" : "Vi fant ingen sikker kategori"}
+        </p>
         <p className="text-sm text-muted-foreground">
           Velg kategorien som passer best for annonsen.
         </p>
@@ -107,6 +97,8 @@ export function CategoryConfirm({
     );
   }
 
+  // Vent til forslagene har landet: ellers kan knappene bytte plass idet
+  // tittelforslaget kommer etter bildeforslaget.
   if (!confirmedName && (categorySuggestionLoading || categorySuggestions.length === 0)) {
     return (
       <section
@@ -135,43 +127,32 @@ export function CategoryConfirm({
     );
   }
 
-  const names = categorySuggestions.slice(0, 3).map(suggestionLabel);
-  // Underkategorien modellen/stemme-RPC-en foreslår (Bil vs. MC vs.
-  // Tilhenger, ...) er ikke pålitelig nok til å spørre om direkte — se
-  // isUnderBilOgMc over. Når alle forslagene ligger under Bil og MC,
-  // kollapses spørsmålet til å kun bekrefte den brede kategorien; den
-  // spesifikke underkategorien blir i stedet et endrbart forslag i
-  // ikonrutenettet over Merke/Modell (vehicle-registration).
-  const isVehicleSuggestion =
-    categorySuggestions.length > 0 &&
-    !!bilOgMcName &&
-    categorySuggestions.every((s) =>
-      isUnderBilOgMc(s.category_id, categoriesById, bilOgMcCategoryId),
-    );
-  const question = isVehicleSuggestion
-    ? `Denne annonsen blir opprettet i kategori ${bilOgMcName}. Er det riktig?`
-    : categorySuggestions.length > 1
+  const question =
+    categorySuggestions.length > 1
       ? "Velg kategorien som passer best for annonsen."
-      : `Denne annonsen blir opprettet i kategori ${names[0]}. Er det riktig?`;
-  const primaryButtons = isVehicleSuggestion
-    ? categorySuggestions.slice(0, 1)
-    : categorySuggestions.slice(0, 3);
+      : `Denne annonsen blir opprettet i kategori ${categorySuggestions[0].label}. Er det riktig?`;
 
   return (
     <section className="space-y-4 py-4 text-center">
       <p className="text-lg font-semibold">{question}</p>
       <div className="flex flex-wrap justify-center gap-3">
-        {primaryButtons.map((suggestion, i) => (
+        {categorySuggestions.map(({ suggestion, label }) => (
           <Button
             key={suggestion.category_id}
             type="button"
             onClick={() => {
-              setClickedName(isVehicleSuggestion ? (bilOgMcName ?? names[i]) : names[i]);
-              applyCategorySuggestion(suggestion.category_id);
+              setClickedName(label);
+              if (photoCategorySuggestions.some((s) => s.category_id === suggestion.category_id)) {
+                onCategorySelect(
+                  suggestion.category_id,
+                  suggestion.parent_id ?? suggestion.category_id,
+                );
+              } else {
+                applyCategorySuggestion(suggestion.category_id);
+              }
             }}
           >
-            {primaryButtons.length > 1 ? "Bruk" : "Ja, bruk"} «
-            {isVehicleSuggestion ? bilOgMcName : suggestionLabel(suggestion)}»
+            {categorySuggestions.length > 1 ? "Bruk" : "Ja, bruk"} «{label}»
           </Button>
         ))}
         <Button type="button" variant="outline" onClick={() => setShowPicker(true)}>

@@ -5,10 +5,11 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdminRole } from "@/lib/admin-auth.server";
+import { passwordSchema } from "@/lib/auth-schemas";
 
 const schema = z.object({
   email: z.string().trim().toLowerCase().email("Ugyldig e-postadresse").max(255),
-  password: z.string().min(8, "Minst 10 tegn").max(72, "Maks 72 tegn"),
+  password: passwordSchema.max(72, "Maks 72 tegn"),
   displayName: z.string().trim().min(1, "Visningsnavn er påkrevd").max(80),
 });
 

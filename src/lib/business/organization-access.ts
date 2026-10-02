@@ -2,10 +2,11 @@ import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import type { Database } from "@/integrations/supabase/types";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { UNAUTHORIZED_MESSAGE } from "@/lib/business/schemas";
 
 export type AdminClient = SupabaseClient<Database>;
 
-export const UNAUTHORIZED_MESSAGE = "Du har ikke tilgang til bedriftskontoen.";
+export { UNAUTHORIZED_MESSAGE };
 export const PROFF_REQUIRED_MESSAGE = "Denne funksjonen krever et aktivt Proff-abonnement.";
 
 export async function requireOrganizationMember(userId: string) {

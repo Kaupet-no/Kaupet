@@ -16,9 +16,12 @@ type SearchRequestInput = {
   terms: string[];
   limit: number;
   offset: number;
+  /** Ta med annonser solgt de siste to dagene (vises med Solgt-merke). Bare
+   * for resultatlisten og treffantallet — ikke prisstatistikk. */
+  includeRecentlySold?: boolean;
 };
 
-type SearchScopeInput = Omit<SearchRequestInput, "limit" | "offset">;
+type SearchScopeInput = Omit<SearchRequestInput, "limit" | "offset" | "includeRecentlySold">;
 
 /**
  * Om kategorilista er klar til å slå opp slugs i. Den lastes asynkront, og
@@ -44,6 +47,7 @@ export function buildListingsSearchRpcArgs({
   terms,
   limit,
   offset,
+  includeRecentlySold = false,
 }: SearchRequestInput) {
   const extraGroups = search.extraGroups ?? [];
   const primaryMode = search.qMode ?? "all";
@@ -98,6 +102,7 @@ export function buildListingsSearchRpcArgs({
     _sort: search.sort,
     _limit: limit,
     _offset: offset,
+    _include_recently_sold: includeRecentlySold,
   };
 }
 

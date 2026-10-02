@@ -1,4 +1,4 @@
-import { formatNokNumber } from "@/lib/format";
+import { formatWtbMaxPrice } from "@/lib/format";
 import { useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -150,10 +150,15 @@ function MyListingsPage() {
   });
   const turnstileEnabled = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
+  const [verificationNeeded, setVerificationNeeded] = useState(false);
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
 
   const doRepublish = useServerFn(republishListing);
   const republish = useMutation({
     mutationFn: async (id: string) => {
+      // Utfordringen kjøres først nå (execution: "execute"), ikke ved
+      // sidelasting — ellers kan sjekkboksen dukke opp uten sammenheng.
+      turnstileRef.current?.execute();
       const turnstileToken = turnstileEnabled
         ? await turnstileRef.current?.getResponsePromise()
         : null;
@@ -168,7 +173,10 @@ function MyListingsPage() {
       void hapticNotification("error");
       showErrorToast(formatErrorMessage(e, "Kunne ikke publisere annonsen på nytt"));
     },
-    onSettled: () => turnstileRef.current?.reset(),
+    onSettled: () => {
+      setVerificationNeeded(false);
+      turnstileRef.current?.reset();
+    },
   });
 
   const statusCounts = {
@@ -214,7 +222,7 @@ function MyListingsPage() {
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none">
               {(
                 [
-                  { value: "all", label: `Alle (${rows?.length ?? 0})` },
+                  { value: "all", label: `Alle salgsannonser (${rows?.length ?? 0})` },
                   {
                     value: "active",
                     label: `Aktive (${statusCounts.active})`,
@@ -250,11 +258,11 @@ function MyListingsPage() {
               ))}
             </div>
           ) : (
-            <TabsList>
+            <TabsList className="max-w-full justify-start overflow-x-auto">
               {/* Alle fanene teller, ikke bare "Alle" — den native varianten
                   under gjorde det allerede, og en fane uten tall leste som om
                   den var tom. */}
-              <TabsTrigger value="all">Alle ({rows?.length ?? 0})</TabsTrigger>
+              <TabsTrigger value="all">Alle salgsannonser ({rows?.length ?? 0})</TabsTrigger>
               <TabsTrigger value="active">Aktive ({statusCounts.active})</TabsTrigger>
               <TabsTrigger value="sold">Solgt / utløpt ({statusCounts.sold})</TabsTrigger>
               <TabsTrigger value="draft">Utkast ({statusCounts.draft})</TabsTrigger>
@@ -366,7 +374,7 @@ function MyListingsPage() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {w.categories && <span>{w.categories.name_nb}</span>}
                         {w.max_price_nok != null && (
-                          <span>· Maks {formatNokNumber(w.max_price_nok)} kr</span>
+                          <span>· {formatWtbMaxPrice(w.max_price_nok, "Maks ")}</span>
                         )}
                         <span>
                           ·{" "}
@@ -428,11 +436,24 @@ function MyListingsPage() {
           </TabsContent>
         </Tabs>
         {turnstileEnabled && (
-          <Turnstile
-            ref={turnstileRef}
-            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            options={{ appearance: "interaction-only", action: "kaupet" }}
-          />
+          <div ref={turnstileContainerRef} className="mx-auto mt-4 w-fit max-w-full">
+            {verificationNeeded && (
+              <p role="status" className="mb-2 text-sm text-foreground">
+                Bekreft Cloudflare-sjekken for å publisere annonsen på nytt.
+              </p>
+            )}
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+              options={{ appearance: "interaction-only", action: "kaupet", execution: "execute" }}
+              onBeforeInteractive={() => {
+                setVerificationNeeded(true);
+                // Widgeten står under lista — knappen kan sitte langt over.
+                turnstileContainerRef.current?.scrollIntoView({ block: "center" });
+              }}
+              onSuccess={() => setVerificationNeeded(false)}
+            />
+          </div>
         )}
 
         {promoteId && (

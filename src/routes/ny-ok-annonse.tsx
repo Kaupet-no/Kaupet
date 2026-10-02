@@ -43,6 +43,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatErrorMessage } from "@/lib/errors";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import {
+  FIELD_ERRORS_MESSAGE,
+  visibleErrorSummary,
+} from "@/features/listing-creation/error-summary";
 import { ComposerStepIndicator } from "@/features/listing-creation/step-indicator";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import {
@@ -512,7 +516,7 @@ function NewWtbPage() {
             ? await trigger(detailsFields, { shouldFocus: true })
             : true;
       if (!valid) {
-        setValidationError("Rett feltene som er markert før du fortsetter.");
+        setValidationError(FIELD_ERRORS_MESSAGE);
         setValidationAttempt((attempt) => attempt + 1);
         return "blocked";
       }
@@ -585,7 +589,7 @@ function NewWtbPage() {
         ? steps.indexOf("details")
         : stepIndex;
     setStepIndex(targetStep === -1 ? stepIndex : targetStep);
-    setValidationError("Rett feltene som er markert før du fortsetter.");
+    setValidationError(FIELD_ERRORS_MESSAGE);
   }
 
   function restoreDraft() {
@@ -919,7 +923,9 @@ function NewWtbPage() {
             </p>
           ) : undefined
         }
-        errorSummary={validationError}
+        errorSummary={visibleErrorSummary(validationError, {
+          hasFieldErrors: Object.keys(errors).length > 0,
+        })}
         validationAttempt={validationAttempt}
         footer={footer}
         firstStep={stepIndex === 0}

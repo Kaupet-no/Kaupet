@@ -5,6 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InboxPage } from "./inbox-page";
+import { lastConversationMessages } from "@/lib/conversation-messages";
+
+vi.mock("@/lib/conversation-messages", () => ({
+  lastConversationMessages: vi.fn(async () => new Map()),
+}));
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...props }: React.ComponentProps<"a">) => <a {...props}>{children}</a>,
@@ -95,6 +100,7 @@ afterEach(() => {
   cleanup();
   updateEq.mockClear();
   conversationsData = [];
+  vi.mocked(lastConversationMessages).mockReset().mockResolvedValue(new Map());
 });
 
 describe("InboxPage – systemmeldinger", () => {
@@ -131,4 +137,18 @@ describe("InboxPage – pris for kjøretøyannonse (F4)", () => {
     expect(getByText(/697 505 kr/)).toBeTruthy();
     expect(queryByText(/690 000 kr/)).toBeNull();
   });
+});
+
+it("feilgjetting: viser feil i stedet for tom innboks når meldingene ikke kan hentes", async () => {
+  conversationsData = [{ ...vehicleConversation, seller_id: "user-1", buyer_id: "buyer-1" }];
+  vi.mocked(lastConversationMessages).mockRejectedValue(new Error("Kunne ikke laste meldinger"));
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { findByText, queryByText, getByRole } = render(
+    <QueryClientProvider client={qc}>
+      <InboxPage />
+    </QueryClientProvider>,
+  );
+  await findByText("Kunne ikke hente samtalene");
+  expect(getByRole("button", { name: "Prøv igjen" })).toBeTruthy();
+  expect(queryByText("Ingen samtaler enda")).toBeNull();
 });

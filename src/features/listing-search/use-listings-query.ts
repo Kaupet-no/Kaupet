@@ -51,6 +51,7 @@ export function useListingsQuery({
         terms,
         limit: PAGE_SIZE,
         offset: pageParam,
+        includeRecentlySold: true,
       });
       if (!args) return emptyPage;
       const data = await runListingsSearch(args, signal);
@@ -77,6 +78,7 @@ export function useListingsQuery({
           engine_hours: typeof engineHoursRaw === "number" ? engineHoursRaw : null,
           category_slug: l.category_slug,
           attributes: attrs,
+          sold_at: l.sold_at,
         };
       });
       return {

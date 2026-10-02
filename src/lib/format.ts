@@ -30,6 +30,12 @@ export function formatNokNumber(n: number): string {
   return n.toLocaleString("nb-NO");
 }
 
+/** Makspris på en ønskes kjøpt-annonse. 0 betyr «bare gratis» i matchingen
+ * (`l.is_free OR l.price_nok <= 0`), så «0 kr» ville vært misvisende. */
+export function formatWtbMaxPrice(n: number, prefix = ""): string {
+  return n === 0 ? "Kun gratis" : `${prefix}${formatNok(n)}`;
+}
+
 /** Standard beløpsvisning i appen — `1234` → `"1 234 kr"`. */
 export function formatNok(n: number): string {
   return `${formatNokNumber(n)} kr`;
@@ -88,3 +94,12 @@ export const formatMonthYear = (iso: string) =>
 /** `1. okt.` */
 export const formatDayMonth = (iso: string) =>
   dateOf(iso).toLocaleDateString(NB, { day: "numeric", month: "short" });
+
+/** Initialer til avatar — første bokstav i de to første ordene («Demo user 2»
+ * → «DU»). Samme regel overalt, ellers viser meny og profil ulike bokstaver. */
+export function initials(name: string | null | undefined, fallback = ""): string {
+  const source = (name ?? fallback).trim();
+  if (!source) return "?";
+  const parts = source.split(/\s+/u).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}

@@ -6,7 +6,6 @@ import {
   DEFAULT_FIELD_GROUPS,
   effectiveFlowForCategory,
   resolveWizardPages,
-  suggestionNeedsCategoryConfirm,
   withRuntimeFieldGroups,
   type CategoryFlowRow,
 } from "./category-flows";
@@ -408,27 +407,10 @@ describe("withRuntimeFieldGroups", () => {
   });
 });
 
-describe("suggestionNeedsCategoryConfirm", () => {
-  const suggestCats: CategoryNode[] = [
-    { id: "bil-og-mc", parent_id: null },
-    { id: "bil", parent_id: "bil-og-mc" },
-    { id: "mobler", parent_id: null },
-    { id: "stol", parent_id: "mobler" },
-  ];
-  const suggestById = new Map(suggestCats.map((c) => [c.id, c]));
-  const flows: CategoryFlowRow[] = [
-    row({ category_id: "bil-og-mc", field_groups: ["photos", "vehicle-registration"] }),
-  ];
-
-  it("keeps category-confirm for a suggestion whose flow has a flow-defining solo page", () => {
-    expect(suggestionNeedsCategoryConfirm(["bil"], flows, suggestById)).toBe(true);
-  });
-
-  it("drops category-confirm for a suggestion on the default (no solo page) flow", () => {
-    expect(suggestionNeedsCategoryConfirm(["stol"], flows, suggestById)).toBe(false);
-  });
-
-  it("is false for an empty suggestion set", () => {
-    expect(suggestionNeedsCategoryConfirm([], flows, suggestById)).toBe(false);
-  });
+it.each([false, true])("holder kategoriforslag alene på steg 2 (native=%s)", (native) => {
+  const keys = withRuntimeFieldGroups(
+    ["photos", "title", "category-attributes", "description-keywords", "review-publish"],
+    { showCategoryConfirm: true },
+  );
+  expect(resolveWizardPages(keys, { native })[1]).toEqual(["category-confirm"]);
 });

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { formatMonthYear } from "@/lib/format";
 import {
   Building2,
@@ -82,6 +83,8 @@ export function SellerContactPanel({
   isLoggedIn,
   seller,
   isOwner,
+  isSold = false,
+  sellerId,
   listingId,
   kaupetCode,
   title,
@@ -95,6 +98,10 @@ export function SellerContactPanel({
   isLoggedIn: boolean;
   seller: SellerIdentity | null;
   isOwner: boolean;
+  /** Solgt annonse: ingen ny kontakt — kjøperen har allerede samtalen i innboksen. */
+  isSold?: boolean;
+  /** Selgerens bruker-id — private selgere får lenke til den offentlige profilen. */
+  sellerId?: string;
   listingId: string;
   kaupetCode: string;
   title: string;
@@ -130,7 +137,17 @@ export function SellerContactPanel({
           {seller?.kind === "private" ? (
             <>
               <div className="flex flex-wrap items-center gap-1.5">
-                <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
+                {sellerId ? (
+                  <Link
+                    to="/bruker/$id"
+                    params={{ id: sellerId }}
+                    className="font-medium hover:underline"
+                  >
+                    {seller?.display_name ?? "Selger"}
+                  </Link>
+                ) : (
+                  <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
+                )}
                 <span className="text-xs text-muted-foreground">Privatperson</span>
               </div>
               {!!seller?.review_count && (
@@ -188,7 +205,7 @@ export function SellerContactPanel({
         <SellerContactList contacts={seller.contacts} />
       )}
 
-      {!isOwner && (
+      {!isOwner && !isSold && (
         <div className="mt-4 space-y-3">
           {seller?.kind !== "business" && <TradeSafetyAdvice context="contact" />}
           <Button className="w-full gap-2" onClick={onContact} disabled={contacting}>

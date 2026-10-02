@@ -103,6 +103,35 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     return null;
   }
 
+  // Turnstile-tokens er engangs, og widgeten deles av bildeforslaget og
+  // tittelens KI-kategoriforslag (ny-annonse.tsx). Ett token deles ut om
+  // gangen, og widgeten nullstilles straks, så to samtidige kall aldri får
+  // samme token. Uten token (avkrysning gjenstår) står widgeten urørt. Har
+  // kalleren gitt opp (timeoutMs), brukes ikke tokenet som kommer senere —
+  // widgeten nullstilles ikke, så neste kall får det ubrukte tokenet.
+  const tokenQueue = useRef<Promise<unknown>>(Promise.resolve());
+  function takeVerifiedToken(timeoutMs?: number): Promise<string | null> {
+    let abandoned = false;
+    const turn = tokenQueue.current.then(async () => {
+      const token = await getVerifiedToken();
+      if (!token || abandoned) return null;
+      turnstileRef.current?.reset();
+      return token;
+    });
+    tokenQueue.current = turn;
+    if (timeoutMs === undefined) return turn;
+    let timer: number | undefined;
+    return Promise.race([
+      turn,
+      new Promise<null>((resolve) => {
+        timer = window.setTimeout(() => {
+          abandoned = true;
+          resolve(null);
+        }, timeoutMs);
+      }),
+    ]).finally(() => window.clearTimeout(timer));
+  }
+
   // Trykket på knappen er samtykket: hjelpeteksten under den forklarer KI-
   // bruken og lenker til personvernerklæringen.
   async function analyzePhotos() {
@@ -117,7 +146,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
         setStatus("unavailable");
         return;
       }
-      const token = await getVerifiedToken();
+      const token = await takeVerifiedToken();
       if (!token) {
         setStatus("verification-required");
         return;
@@ -131,7 +160,6 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
           turnstileToken: token,
         },
       });
-      turnstileRef.current?.reset();
       if (
         result.status !== "unavailable" &&
         "categories" in result &&
@@ -174,12 +202,11 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
         "attributes",
       );
       if (prepared.length === 0) return [];
-      const token = await getVerifiedToken();
+      const token = await takeVerifiedToken();
       if (!token) return [];
       const result = await suggestListingFromPhotos({
         data: { operation: "attributes", images: prepared, categorySlug, turnstileToken: token },
       });
-      turnstileRef.current?.reset();
       return result.status !== "unavailable" && Array.isArray(result.attributes)
         ? result.attributes
         : [];
@@ -194,6 +221,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     enabled,
     turnstileEnabled,
     turnstileRef,
+    takeVerifiedToken,
     verificationNeeded,
     onBeforeInteractive: () => {
       setVerificationNeeded(true);

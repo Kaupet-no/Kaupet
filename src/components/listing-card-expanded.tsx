@@ -4,7 +4,7 @@ import { memo, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { BoatInfoGrid, isBoatAttributes } from "@/components/listing-detail/boat/boat-info-grid";
-import { UsageLabel } from "@/components/listing-card";
+import { SOLD_PRICE_LABEL, SoldBanner, UsageLabel } from "@/components/listing-card";
 import type { ListingCardData } from "@/lib/listing-card-data";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
@@ -34,7 +34,9 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
   favoriteStateReady,
 }: Props) {
   const [activeImage, setActiveImage] = useState(0);
-  const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
   const { rootRef, images, imgUrls, isLoading, effectiveImageUrl, handleImageError } =
     useListingCardGallery(listing.id, listing.cover_path, coverImageUrl);
 
@@ -70,7 +72,11 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
           <h3 className="text-lg font-medium leading-snug">{listing.title}</h3>
           {listing.subtitle && <p className="text-sm text-muted-foreground">{listing.subtitle}</p>}
           <div className="mt-1 flex items-baseline justify-between gap-2">
-            <p className="font-display text-xl font-semibold">{priceLabel}</p>
+            <p
+              className={`font-display text-xl font-semibold ${listing.sold_at ? "uppercase" : ""}`}
+            >
+              {priceLabel}
+            </p>
             {typeof listing.mileage_km === "number" ? (
               <UsageLabel value={listing.mileage_km} unit="km" />
             ) : typeof listing.engine_hours === "number" ? (
@@ -86,7 +92,8 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
       </div>
 
       <div className="grid gap-4 p-4 sm:grid-cols-2">
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden rounded-xl" onClick={(e) => e.stopPropagation()}>
+          {listing.sold_at && <SoldBanner compact={false} />}
           {images.length > 0 ? (
             <ImageGallery
               images={images}

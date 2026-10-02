@@ -13,7 +13,7 @@ const DESKTOP_MIN_WIDTH = 1024;
  * skjerm i to størrelser — og det samme gjelder en smal nettleser mot en
  * desktopskjerm. Kall den der oppsettet faktisk forgrener — ikke spre den som
  * en `isTablet`/`isDesktop`-boolsk rundt i koden (samme disiplin som
- * `CategoryBehavior`, se CLAUDE.md).
+ * `CategoryBehavior`, se AGENTS.md).
  *
  * Native gir "phone" | "tablet", nettleser gir "web" (< 1024px) | "desktop".
  * De to aksene blandes bevisst ikke: en native-nettbrettflate er ikke det

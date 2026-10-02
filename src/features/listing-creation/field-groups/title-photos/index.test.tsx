@@ -28,7 +28,6 @@ const noopPhotoSuggestionProps = {
   analyzePhotos: vi.fn(),
   photoTitleSuggestion: null,
   applyPhotoTitleSuggestion: vi.fn(),
-  photoCategorySuggestions: [],
 };
 
 describe("PhotosGroup", () => {
@@ -137,25 +136,6 @@ describe("PhotosGroup", () => {
     );
     expect(setValue).toHaveBeenCalledWith("title", "Grå sofa i stoff", { shouldValidate: true });
     expect(applyPhotoTitleSuggestion).toHaveBeenCalledWith("Grå sofa i stoff");
-  });
-
-  it("viser kategoriforslaget fra bildene", () => {
-    render(
-      <PhotosGroup
-        images={[image]}
-        setImages={vi.fn()}
-        uploadProgress={null}
-        noImageConfirmPending={false}
-        {...noopPhotoSuggestionProps}
-        photoSuggestionEnabled
-        photoCategorySuggestions={[
-          { category_id: "c", parent_id: "p", name_nb: "Sofaer", parent_name_nb: "Møbler" },
-        ]}
-      />,
-    );
-    expect(screen.getByTestId("photo-category-suggestion").textContent).toContain(
-      "Møbler › Sofaer",
-    );
   });
 });
 

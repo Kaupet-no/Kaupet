@@ -55,7 +55,7 @@ export const Route = createFileRoute("/_authenticated/admin/kategorier")({
 });
 
 // Kategorier redigeres kun i staging; produksjon er read-only og synker
-// derfra via StagingSyncCard (se CLAUDE.md om staging/produksjon-oppsettet).
+// derfra via StagingSyncCard (se docs/STAGING.md).
 const isProduction = import.meta.env.VITE_ENVIRONMENT === "production";
 
 function AdminCategories() {

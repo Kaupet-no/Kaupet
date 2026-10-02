@@ -148,7 +148,6 @@ export function PhotosGroup({
   | "analyzePhotos"
   | "photoTitleSuggestion"
   | "applyPhotoTitleSuggestion"
-  | "photoCategorySuggestions"
 >) {
   // Brukeren ba om å få tittelen fylt ut: er feltet tomt, brukes forslaget
   // direkte. Har de skrevet noe selv, får de heller velge med "Bruk" under.

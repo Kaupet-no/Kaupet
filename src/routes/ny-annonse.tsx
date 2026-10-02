@@ -443,43 +443,6 @@ function NewListingPage() {
   // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
   // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
   const photoSuggestion = usePhotoSuggestion({ images, title });
-  // Tittelbasert KI-kategoriforslag (samme Turnstile-widget som bildeforslaget)
-  // først når brukeren har gått forbi første steg — ikke per tastetrykk i
-  // tittelen, som i Ønskes kjøpt. Satt fra `step` lenger ned (avledet state).
-  const [pastFirstStep, setPastFirstStep] = useState(false);
-
-  const {
-    categorySuggestions,
-    categorySuggestionLoading,
-    setSuggestionDismissed,
-    applyCategorySuggestion,
-    similarListings,
-    wtbMatch,
-    keywordSuggestions,
-    keywordsFetching,
-    appendTagToDescription,
-  } = useListingTitleHints({
-    title,
-    description,
-    categoryId,
-    categoryTouchedManually,
-    setSelectedParentId,
-    setCategoryTouchedManually,
-    priceNok: typeof priceNok === "number" ? priceNok : undefined,
-    isFree,
-    attributes,
-    setValue,
-    clientCategoryHint,
-    aiFallback: {
-      enabled: pastFirstStep && photoSuggestion.enabled && !categoryId,
-      getToken: async () => {
-        const token = await photoSuggestion.getVerifiedToken();
-        photoSuggestion.turnstileRef.current?.reset();
-        return token;
-      },
-    },
-  });
-
   const photoChallengeRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (
@@ -632,7 +595,42 @@ function NewListingPage() {
     setValidationError,
     setCategoryEditConfirmOpen,
   });
-  if (pastFirstStep !== step > 1) setPastFirstStep(step > 1);
+  // Tittelbasert KI-kategoriforslag (samme Turnstile-widget som bildeforslaget)
+  // først når brukeren har gått forbi første steg — ikke per tastetrykk i
+  // tittelen, som i Ønskes kjøpt. Står etter useWizardNavigation fordi den
+  // trenger `step`; forslagene påvirker ikke hvilke sider veiviseren har.
+  const {
+    categorySuggestions,
+    categorySuggestionLoading,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
+    title,
+    description,
+    categoryId,
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    priceNok: typeof priceNok === "number" ? priceNok : undefined,
+    isFree,
+    attributes,
+    setValue,
+    clientCategoryHint,
+    aiFallback: {
+      enabled: step > 1 && photoSuggestion.enabled && !categoryId,
+      getToken: async () => {
+        const token = await photoSuggestion.getVerifiedToken();
+        photoSuggestion.turnstileRef.current?.reset();
+        return token;
+      },
+    },
+  });
+
   // Intentionally kept fresh every render (not in an effect) since
   // useVehicleLookupFlow's goNext callback, constructed above
   // `pages`/`goNext`, must see the latest function the moment it's called,

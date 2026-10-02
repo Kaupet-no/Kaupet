@@ -9,6 +9,7 @@ export async function assertNotRateLimited(
   bucket: string,
   limit: number,
   windowSeconds: number,
+  message = "For mange forespørsler. Prøv igjen senere.",
 ): Promise<void> {
   const supabaseAdmin = await getSupabaseAdmin();
   const keyHash = await hashRequestIp();
@@ -21,7 +22,7 @@ export async function assertNotRateLimited(
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!allowed) throw new ClientError("For mange forespørsler. Prøv igjen senere.", 429);
+  if (!allowed) throw new ClientError(message, 429);
 }
 
 /** Same database-backed limiter, keyed by the authenticated user rather than

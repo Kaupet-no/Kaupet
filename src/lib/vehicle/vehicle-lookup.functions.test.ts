@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { assertUserNotRateLimited, lookupVehicle } = vi.hoisted(() => ({
-  assertUserNotRateLimited: vi.fn(),
-  lookupVehicle: vi.fn(),
-}));
+const { assertNotRateLimited, assertUserNotRateLimited, getClaims, lookupVehicle } = vi.hoisted(
+  () => ({
+    assertNotRateLimited: vi.fn(),
+    assertUserNotRateLimited: vi.fn(),
+    getClaims: vi.fn(),
+    lookupVehicle: vi.fn(),
+  }),
+);
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
     let validator: (input: unknown) => unknown = (input) => input;
-    let handler: ((input: { data: unknown; context: { userId: string } }) => unknown) | undefined;
-    const fn = (input: { data: unknown; context?: { userId: string } }) =>
-      handler!({ data: validator(input.data), context: input.context ?? { userId: "user-id" } });
+    let handler: ((input: { data: unknown }) => unknown) | undefined;
+    const fn = (input: { data: unknown }) => handler!({ data: validator(input.data) });
     Object.assign(fn, {
-      middleware: () => fn,
       validator: (next: typeof validator) => {
         validator = next;
         return fn;
@@ -25,9 +27,12 @@ vi.mock("@tanstack/react-start", () => ({
     return fn;
   },
 }));
-vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
+vi.mock("@tanstack/react-start/server", () => ({ getRequest: () => new Request("http://x") }));
+vi.mock("@/integrations/supabase/session.server", () => ({
+  getSupabaseServerClient: () => ({ auth: { getClaims } }),
+}));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from: vi.fn() } }));
-vi.mock("@/lib/rate-limit.server", () => ({ assertUserNotRateLimited }));
+vi.mock("@/lib/rate-limit.server", () => ({ assertNotRateLimited, assertUserNotRateLimited }));
 vi.mock("@/lib/vehicle/vehicle-lookup.server", () => ({ lookupVehicle }));
 
 import { lookupVehicleByRegNumber } from "./vehicle-lookup.functions";
@@ -36,6 +41,25 @@ describe("lookupVehicleByRegNumber", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     assertUserNotRateLimited.mockResolvedValue(undefined);
+    getClaims.mockResolvedValue({ data: { claims: { sub: "user-id" } } });
+  });
+
+  it("lets guests look up, limited per IP instead of per user", async () => {
+    getClaims.mockResolvedValue({ data: null });
+    assertNotRateLimited.mockRejectedValue(new Error("ip limit"));
+
+    await expect(
+      lookupVehicleByRegNumber({ data: { registrationNumber: "AB12345" } }),
+    ).rejects.toThrow("ip limit");
+
+    expect(assertNotRateLimited).toHaveBeenCalledWith(
+      "vehicle_lookup_guest",
+      20,
+      3600,
+      expect.any(String),
+    );
+    expect(assertUserNotRateLimited).not.toHaveBeenCalled();
+    expect(lookupVehicle).not.toHaveBeenCalled();
   });
 
   it("reserves the per-user hourly quota before looking up a registration", async () => {

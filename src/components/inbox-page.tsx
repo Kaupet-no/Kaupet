@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { isUnread, messagePreview } from "@/lib/unread";
+import { lastConversationMessages } from "@/lib/conversation-messages";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
 type ConversationRow = {
@@ -112,7 +113,13 @@ export function InboxPage() {
     },
   });
 
-  const { data: conversations, isLoading } = useQuery({
+  const {
+    data: conversations,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["my-conversations", user?.id, view],
     enabled: !!user,
     queryFn: async (): Promise<ConversationRow[]> => {
@@ -281,6 +288,13 @@ export function InboxPage() {
                   <Skeleton key={i} className="h-20" />
                 ))}
               </div>
+            ) : isError ? (
+              <EmptyState
+                icon={MessageCircle}
+                title="Kunne ikke hente samtalene"
+                description={formatErrorMessage(error, "Prøv igjen om litt.")}
+                action={<Button onClick={() => void refetch()}>Prøv igjen</Button>}
+              />
             ) : groups.length === 0 ? (
               <EmptyState
                 icon={view === "trash" ? Trash2 : MessageCircle}
@@ -577,22 +591,17 @@ async function attachLastMessage(
   convs: Omit<ConversationRow, "last_message">[],
 ): Promise<ConversationRow[]> {
   if (convs.length === 0) return [];
-  const ids = convs.map((c) => c.id);
-  const { data } = await supabase
-    .from("messages")
-    .select("conversation_id, body, created_at, sender_id, deleted_at, attachment_path")
-    .in("conversation_id", ids)
-    .order("created_at", { ascending: false });
-  const lastByConv = new Map<string, { body: string; created_at: string; sender_id: string }>();
-  for (const m of data ?? []) {
-    if (!lastByConv.has(m.conversation_id)) {
-      lastByConv.set(m.conversation_id, {
-        body: messagePreview(m),
-        created_at: m.created_at,
-        sender_id: m.sender_id,
-      });
-    }
-  }
+  const messages = await lastConversationMessages(convs.map((c) => c.id));
+  const lastByConv = new Map(
+    [...messages].map(([id, message]) => [
+      id,
+      {
+        body: messagePreview(message),
+        created_at: message.created_at,
+        sender_id: message.sender_id,
+      },
+    ]),
+  );
   return convs.map((c) => ({ ...c, last_message: lastByConv.get(c.id) ?? null }));
 }
 

@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { lastConversationMessages } from "@/lib/conversation-messages";
 import { confirmBuyer } from "@/lib/sales.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { updateListingStatus } from "@/lib/listings.functions";
@@ -211,17 +212,6 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
  * bare har åpnet, er ingen kontakt. */
 async function onlyStartedConversations(contacts: Contact[]): Promise<Contact[]> {
   if (contacts.length === 0) return contacts;
-  // ponytail: henter alle meldings-id-ene for annonsens samtaler (få per
-  // annonse); bytt til et EXISTS-RPC hvis annonser får mange samtaler.
-  const { data, error } = await supabase
-    .from("messages")
-    .select("conversation_id")
-    .in(
-      "conversation_id",
-      contacts.map((c) => c.conversationId),
-    );
-  // Ellers ville en feil stille gitt en tom kontaktliste.
-  if (error) throw error;
-  const started = new Set((data ?? []).map((m) => m.conversation_id));
+  const started = await lastConversationMessages(contacts.map((c) => c.conversationId));
   return contacts.filter((c) => started.has(c.conversationId));
 }

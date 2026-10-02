@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useUnreadConversationsCount } from "@/hooks/use-unread";
 import { isUnread, messagePreview } from "@/lib/unread";
+import { lastConversationMessages } from "@/lib/conversation-messages";
 import { hapticImpact } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -97,22 +98,7 @@ async function fetchConversationPreviews(userId: string): Promise<ConvPreview[]>
 
   if (rows.length === 0) return [];
 
-  const ids = rows.map((c) => c.id);
-  const { data: msgs } = await supabase
-    .from("messages")
-    .select("conversation_id, body, sender_id, created_at, deleted_at, attachment_path")
-    .in("conversation_id", ids)
-    .order("created_at", { ascending: false });
-
-  const lastMsg = new Map<string, { body: string; sender_id: string }>();
-  for (const m of msgs ?? []) {
-    if (!lastMsg.has(m.conversation_id)) {
-      lastMsg.set(m.conversation_id, {
-        body: messagePreview(m),
-        sender_id: m.sender_id,
-      });
-    }
-  }
+  const lastMsg = await lastConversationMessages(rows.map((c) => c.id));
 
   // Samtaler kjøperen bare har åpnet, vises ikke for selgeren (som i innboksen).
   rows = rows.filter((c) => lastMsg.has(c.id) || c.buyer_id === userId);
@@ -133,7 +119,7 @@ async function fetchConversationPreviews(userId: string): Promise<ConvPreview[]>
       buyer_last_read_at: c.buyer_last_read_at,
       seller_last_read_at: c.seller_last_read_at,
       other_name: (other as RawProfile | null)?.display_name ?? null,
-      last_message_body: lm?.body ?? null,
+      last_message_body: lm ? messagePreview(lm) : null,
       last_message_sender_id: lm?.sender_id ?? null,
     };
   });

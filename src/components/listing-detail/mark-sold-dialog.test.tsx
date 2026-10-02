@@ -5,6 +5,10 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { MarkSoldDialog } from "./mark-sold-dialog";
 
+vi.mock("@/lib/conversation-messages", () => ({
+  lastConversationMessages: vi.fn(async () => new Map([["c1", { body: "Hei" }]])),
+}));
+
 const updateStatus = vi.fn(async (_args: unknown) => ({}));
 const confirmBuyer = vi.fn(async (_args: unknown) => ({}));
 

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useForegroundRefresh } from "@/hooks/use-foreground-refresh";
 import { isUnread } from "@/lib/unread";
+import { lastConversationMessages } from "@/lib/conversation-messages";
 
 export type ConvSummary = {
   id: string;
@@ -36,21 +37,11 @@ export function useUnreadConversationsCount(): number {
       if (error) throw error;
       const ids = (convs ?? []).map((c) => c.id);
       if (ids.length === 0) return [];
-      const { data: msgs } = await supabase
-        .from("messages")
-        .select("conversation_id, sender_id, created_at")
-        .in("conversation_id", ids)
-        .order("created_at", { ascending: false });
-      const lastSender = new Map<string, string>();
-      for (const m of msgs ?? []) {
-        if (!lastSender.has(m.conversation_id)) {
-          lastSender.set(m.conversation_id, m.sender_id);
-        }
-      }
+      const messages = await lastConversationMessages(ids);
       return (convs ?? []).map((c) => ({
         id: c.id,
         last_message_at: c.last_message_at,
-        last_sender_id: lastSender.get(c.id) ?? null,
+        last_sender_id: messages.get(c.id)?.sender_id ?? null,
         my_last_read_at: c.buyer_id === user!.id ? c.buyer_last_read_at : c.seller_last_read_at,
       }));
     },

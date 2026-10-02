@@ -47,13 +47,14 @@ export function UsageLabel({
 }
 
 /** Solgte annonser vises en kort stund i søket (se migrasjonen
- * sold_listings_visibility) — merket må synes før man åpner annonsen. */
+ * sold_listings_visibility) — merket må synes før man åpner annonsen.
+ * Diagonalt hjørnebånd; forelderen må være `relative overflow-hidden`. */
 export const SOLD_PRICE_LABEL = "SOLGT";
 
 export function SoldBanner({ compact }: { compact: boolean }) {
   return (
     <span
-      className={`pointer-events-none absolute inset-x-0 top-0 z-10 bg-foreground/85 text-center font-semibold uppercase tracking-wide text-background ${compact ? "py-0.5 text-[0.625rem]" : "py-1 text-xs"}`}
+      className={`pointer-events-none absolute z-10 -rotate-45 bg-destructive text-center font-semibold uppercase tracking-wide text-destructive-foreground ${compact ? "-left-[22px] top-2 w-20 py-px text-[0.625rem]" : "-left-[30px] top-[14px] w-[110px] py-0.5 text-xs"}`}
     >
       Solgt
     </span>
@@ -137,7 +138,10 @@ export function ListingCardContent({
 
   return (
     <>
-      <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
+      <div
+        className="relative aspect-[4/3] overflow-hidden bg-muted"
+        style={{ aspectRatio: "4 / 3" }}
+      >
         <ListingImage
           imgUrl={imgUrl}
           hasCoverPath={!!listing.cover_path && !imageFailed}

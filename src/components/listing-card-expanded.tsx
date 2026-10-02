@@ -88,7 +88,7 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
       </div>
 
       <div className="grid gap-4 p-4 sm:grid-cols-2">
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden rounded-xl" onClick={(e) => e.stopPropagation()}>
           {listing.sold_at && <SoldBanner compact={false} />}
           {images.length > 0 ? (
             <ImageGallery

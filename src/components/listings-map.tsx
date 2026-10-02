@@ -1,3 +1,4 @@
+import { SOLD_PRICE_LABEL, SoldBanner } from "@/components/listing-card";
 import { formatNokNumber } from "@/lib/format";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
@@ -75,6 +76,7 @@ export type MapListing = {
   lat: number;
   lng: number;
   cover_path?: string | null;
+  sold_at?: string | null;
 };
 type Props = {
   center: { lat: number; lng: number } | null;
@@ -94,13 +96,15 @@ type Props = {
 };
 
 const priceText = (l: MapListing) =>
-  l.is_free || l.price_nok === 0
-    ? "Gratis"
-    : l.price_nok == null
-      ? "–"
-      : l.price_nok >= 1_000_000
-        ? `${(l.price_nok / 1_000_000).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} mill`
-        : formatNokNumber(l.price_nok);
+  l.sold_at
+    ? SOLD_PRICE_LABEL
+    : l.is_free || l.price_nok === 0
+      ? "Gratis"
+      : l.price_nok == null
+        ? "–"
+        : l.price_nok >= 1_000_000
+          ? `${(l.price_nok / 1_000_000).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} mill`
+          : formatNokNumber(l.price_nok);
 
 /** Prislapp i stedet for prikk på telefon: prisen er det kjøperen sammenligner
  * i kartet, og lappen er et større treffområde enn en 20 px prikk. */
@@ -691,6 +695,7 @@ function PopupCard({ listing }: { listing: MapListing }) {
           </div>
         )}
       </div>
+      {listing.sold_at && <p className="text-sm font-semibold">{SOLD_PRICE_LABEL}</p>}
       <p className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</p>
       <Link
         to="/$kaupetCode"
@@ -717,7 +722,8 @@ function SelectedListingCard({ listing, onClose }: { listing: MapListing; onClos
         state={{ fromSearch: true }}
         className="flex min-w-0 flex-1 items-center gap-3"
       >
-        <span className="size-20 shrink-0 overflow-hidden rounded-xl bg-muted">
+        <span className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-muted">
+          {listing.sold_at && <SoldBanner compact />}
           {imgUrl ? (
             <img src={imgUrl} alt="" className="size-full object-cover" />
           ) : (
@@ -729,7 +735,7 @@ function SelectedListingCard({ listing, onClose }: { listing: MapListing; onClos
         <span className="min-w-0 flex-1">
           <span className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</span>
           <span className="mt-1 block font-display text-lg text-primary">
-            {priceText(listing) === "Gratis" || priceText(listing) === "–"
+            {listing.sold_at || priceText(listing) === "Gratis" || priceText(listing) === "–"
               ? priceText(listing)
               : `${priceText(listing)} kr`}
           </span>

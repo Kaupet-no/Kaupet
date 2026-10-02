@@ -3,6 +3,7 @@ import { MapPin } from "lucide-react";
 import { memo, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import type { ListingCardData } from "@/lib/listing-card-data";
+import { SOLD_PRICE_LABEL, SoldBanner } from "@/components/listing-card";
 import { FavoriteButton } from "@/components/favorite-button";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { useListingCardGallery } from "@/hooks/use-listing-card-gallery";
@@ -29,7 +30,9 @@ export const ListingCardImages = memo(function ListingCardImages({
   favoriteStateReady,
 }: Props) {
   const [activeImage, setActiveImage] = useState(0);
-  const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
+  const priceLabel = listing.sold_at
+    ? SOLD_PRICE_LABEL
+    : formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
   const { rootRef, images, imgUrls, isLoading, effectiveImageUrl, handleImageError } =
     useListingCardGallery(listing.id, listing.cover_path, coverImageUrl);
 
@@ -63,6 +66,7 @@ export const ListingCardImages = memo(function ListingCardImages({
       ref={rootRef}
       className="relative overflow-hidden rounded-xl border border-border bg-card"
     >
+      {listing.sold_at && <SoldBanner compact={false} />}
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}

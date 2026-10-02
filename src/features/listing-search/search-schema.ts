@@ -210,6 +210,7 @@ export type SearchListing = {
   cover_path: string | null;
   category_slug: string | null;
   attributes: Record<string, unknown> | null;
+  sold_at?: string | null;
 };
 
 export type ListingsPage = {

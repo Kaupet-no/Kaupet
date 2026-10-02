@@ -78,7 +78,7 @@ describe("offentlige annonsekort", () => {
     expect(screen.getByText("Selger oppgir 1 kompatibel bilmodell")).toBeTruthy();
   });
 
-  it("viser Solgt-merke og SOLGT som pris for nylig solgte annonser", () => {
+  it("viser Solgt-merke og Solgt som pris for nylig solgte annonser", () => {
     const sold = { ...listing, sold_at: "2026-10-01T12:00:00Z" };
     render(
       <>
@@ -89,8 +89,9 @@ describe("offentlige annonsekort", () => {
       </>,
     );
 
-    expect(screen.getAllByText("Solgt")).toHaveLength(4);
-    expect(screen.getAllByText("SOLGT")).toHaveLength(4);
+    // Båndet og prisen: «Solgt» i DOM-en, store bokstaver bare via CSS.
+    expect(screen.getAllByText("Solgt")).toHaveLength(8);
+    expect(screen.queryByText("SOLGT")).toBeNull();
     expect(screen.queryByText("250 000 kr")).toBeNull();
   });
 });

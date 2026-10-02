@@ -16,7 +16,7 @@ export type ListingCardData = {
   engine_hours?: number | null;
   category_slug?: string | null;
   attributes?: Record<string, unknown> | null;
-  /** Satt for solgte annonser — kortet viser Solgt-merke og «SOLGT» som pris. */
+  /** Satt for solgte annonser — kortet viser Solgt-merke og «Solgt» som pris. */
   sold_at?: string | null;
 };
 

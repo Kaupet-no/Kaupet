@@ -51,7 +51,11 @@ export const ListingCardImages = memo(function ListingCardImages({
         {listing.title}
       </h3>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="font-display text-lg font-semibold drop-shadow-sm">{priceLabel}</p>
+        <p
+          className={`font-display text-lg font-semibold drop-shadow-sm ${listing.sold_at ? "uppercase" : ""}`}
+        >
+          {priceLabel}
+        </p>
         {listing.city && (
           <p className="flex items-center gap-1 text-sm drop-shadow-sm">
             <MapPin className="size-3.5" /> {listing.city}

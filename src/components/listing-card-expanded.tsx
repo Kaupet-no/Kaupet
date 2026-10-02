@@ -72,7 +72,11 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
           <h3 className="text-lg font-medium leading-snug">{listing.title}</h3>
           {listing.subtitle && <p className="text-sm text-muted-foreground">{listing.subtitle}</p>}
           <div className="mt-1 flex items-baseline justify-between gap-2">
-            <p className="font-display text-xl font-semibold">{priceLabel}</p>
+            <p
+              className={`font-display text-xl font-semibold ${listing.sold_at ? "uppercase" : ""}`}
+            >
+              {priceLabel}
+            </p>
             {typeof listing.mileage_km === "number" ? (
               <UsageLabel value={listing.mileage_km} unit="km" />
             ) : typeof listing.engine_hours === "number" ? (

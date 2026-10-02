@@ -46,7 +46,9 @@ export function UsageLabel({
   );
 }
 
-export const SOLD_PRICE_LABEL = "SOLGT";
+/** Vises med store bokstaver via CSS (`uppercase`), så skjermlesere leser
+ * ordet og ikke bokstav for bokstav. */
+export const SOLD_PRICE_LABEL = "Solgt";
 
 /** Solgte annonser vises en kort stund i søket (se migrasjonen
  * sold_listings_visibility) — merket må synes før man åpner annonsen.
@@ -160,7 +162,11 @@ export function ListingCardContent({
           <p className="line-clamp-1 text-xs text-muted-foreground">{fitmentLabel}</p>
         )}
         <div className="flex items-baseline justify-between gap-2">
-          <p className="font-display text-lg font-semibold text-primary">{priceLabel}</p>
+          <p
+            className={`font-display text-lg font-semibold text-primary ${listing.sold_at ? "uppercase" : ""}`}
+          >
+            {priceLabel}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {listing.city && <span>{listing.city}</span>}
@@ -269,7 +275,11 @@ export const ListingCard = memo(function ListingCard({
               <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
             )}
             <div className="flex items-baseline justify-between gap-2">
-              <p className="font-display text-base font-semibold text-primary">{priceLabel}</p>
+              <p
+                className={`font-display text-base font-semibold text-primary ${listing.sold_at ? "uppercase" : ""}`}
+              >
+                {priceLabel}
+              </p>
               {typeof listing.mileage_km === "number" ? (
                 <UsageLabel value={listing.mileage_km} unit="km" />
               ) : typeof listing.engine_hours === "number" ? (

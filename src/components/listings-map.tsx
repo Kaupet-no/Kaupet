@@ -123,6 +123,7 @@ function makePricePin(l: MapListing, opts: { hovered: boolean; active: boolean }
       background:${on ? "var(--primary)" : "var(--card)"};
       color:${on ? "var(--primary-foreground)" : "var(--foreground)"};
       box-shadow:0 2px 8px hsl(0 0% 0% / 0.28);
+      ${l.sold_at ? "text-transform:uppercase;" : ""}
     ">${priceText(l)}</div>`,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
@@ -695,7 +696,7 @@ function PopupCard({ listing }: { listing: MapListing }) {
           </div>
         )}
       </div>
-      {listing.sold_at && <p className="text-sm font-semibold">{SOLD_PRICE_LABEL}</p>}
+      {listing.sold_at && <p className="text-sm font-semibold uppercase">{SOLD_PRICE_LABEL}</p>}
       <p className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</p>
       <Link
         to="/$kaupetCode"
@@ -734,7 +735,9 @@ function SelectedListingCard({ listing, onClose }: { listing: MapListing; onClos
         </span>
         <span className="min-w-0 flex-1">
           <span className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</span>
-          <span className="mt-1 block font-display text-lg text-primary">
+          <span
+            className={`mt-1 block font-display text-lg text-primary ${listing.sold_at ? "uppercase" : ""}`}
+          >
             {listing.sold_at || priceText(listing) === "Gratis" || priceText(listing) === "–"
               ? priceText(listing)
               : `${priceText(listing)} kr`}

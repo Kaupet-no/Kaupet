@@ -54,26 +54,32 @@ describe("CategoryConfirm", () => {
     expect(screen.getByText("Velg kategori")).toBeTruthy();
   });
 
-  it("viser alle kandidater også når begge er kjøretøy", () => {
+  it("slår sammen kjøretøyforslag til ett «Bil og MC»-spørsmål og forhåndsvelger det første", () => {
     const applyCategorySuggestion = vi.fn();
     render(
       <CategoryConfirm
         {...props({
           applyCategorySuggestion,
           categorySuggestions: [
-            { category_id: BIL_ID, parent_id: BIL_OG_MC_ID, name_nb: "Bil", parent_name_nb: null },
             {
               category_id: MC_ID,
               parent_id: BIL_OG_MC_ID,
               name_nb: "Motorsykkel",
               parent_name_nb: null,
             },
+            { category_id: BIL_ID, parent_id: BIL_OG_MC_ID, name_nb: "Bil", parent_name_nb: null },
           ],
         })}
       />,
     );
-    expect(screen.getByRole("button", { name: "Bruk «Bil»" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Bruk «Motorsykkel»" }));
+
+    expect(
+      screen.getByText("Denne annonsen blir opprettet i kategori Bil og MC. Er det riktig?"),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Motorsykkel|«Bil»/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ja, bruk «Bil og MC»" }));
+    // Underkategorien er bare et forhåndsvalg — SVV-oppslaget eller brukeren
+    // avgjør den på vehicle-registration.
     expect(applyCategorySuggestion).toHaveBeenCalledWith(MC_ID);
   });
 
@@ -93,7 +99,7 @@ describe("CategoryConfirm", () => {
       />,
     );
     expect(screen.getAllByRole("button", { name: "Bruk «Sko»" })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Bruk «Bil»" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Bruk «Bil og MC»" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Bruk «Sko»" }));
     expect(onCategorySelect).toHaveBeenCalledWith(SKO_ID, SKO_ID);
   });

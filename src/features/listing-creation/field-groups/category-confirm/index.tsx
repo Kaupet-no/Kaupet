@@ -11,6 +11,19 @@ function suggestionLabel(s: { name_nb: string; parent_name_nb: string | null }):
   return s.parent_name_nb ? `${s.parent_name_nb} › ${s.name_nb}` : s.name_nb;
 }
 
+/** Om `id` ligger under `rootId` i kategoritreet (via `parent_id`). */
+function isUnder(
+  id: string,
+  rootId: string,
+  categoriesById: Map<string, { id: string; parent_id: string | null }>,
+): boolean {
+  for (let cur = categoriesById.get(id); cur;) {
+    if (cur.id === rootId) return true;
+    cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
+  }
+  return false;
+}
+
 /** Dedicated category choice before category-specific fields. */
 export function CategoryConfirm({
   categorySuggestions: titleSuggestions,
@@ -22,11 +35,30 @@ export function CategoryConfirm({
   onCategorySelect,
   bilOgMcCategoryId,
 }: WizardSharedProps) {
-  const categorySuggestions = [
-    ...new Map(
-      [...photoCategorySuggestions, ...titleSuggestions].map((s) => [s.category_id, s]),
-    ).values(),
-  ];
+  // KI-en skiller ikke pålitelig mellom underkategoriene i Bil og MC (Bil,
+  // Motorsykkel, ...), så her bekreftes bare «Bil og MC». Underkategorien
+  // avgjøres på vehicle-registration: av SVV-oppslaget, eller av brukeren
+  // når registreringsnummer ikke oppgis. Det første forslaget under Bil og MC
+  // brukes som forhåndsvalg der.
+  const categoriesById = new Map((categories ?? []).map((c) => [c.id, c]));
+  const bilOgMcName = bilOgMcCategoryId
+    ? categoriesById.get(bilOgMcCategoryId)?.name_nb
+    : undefined;
+  const options = new Map<
+    string,
+    { suggestion: (typeof titleSuggestions)[number]; label: string }
+  >();
+  for (const s of [...photoCategorySuggestions, ...titleSuggestions]) {
+    const vehicle =
+      !!bilOgMcCategoryId &&
+      !!bilOgMcName &&
+      isUnder(s.category_id, bilOgMcCategoryId, categoriesById);
+    const key = vehicle ? bilOgMcCategoryId : s.category_id;
+    if (!options.has(key)) {
+      options.set(key, { suggestion: s, label: vehicle ? bilOgMcName : suggestionLabel(s) });
+    }
+  }
+  const categorySuggestions = [...options.values()];
   const [showPicker, setShowPicker] = useState(false);
   // Captured before applyCategorySuggestion clears categorySuggestions (it's
   // shared state also used to dismiss the category-select suggestion chip) —
@@ -96,18 +128,18 @@ export function CategoryConfirm({
   const question =
     categorySuggestions.length > 1
       ? "Velg kategorien som passer best for annonsen."
-      : `Denne annonsen blir opprettet i kategori ${suggestionLabel(categorySuggestions[0])}. Er det riktig?`;
+      : `Denne annonsen blir opprettet i kategori ${categorySuggestions[0].label}. Er det riktig?`;
 
   return (
     <section className="space-y-4 py-4 text-center">
       <p className="text-lg font-semibold">{question}</p>
       <div className="flex flex-wrap justify-center gap-3">
-        {categorySuggestions.map((suggestion) => (
+        {categorySuggestions.map(({ suggestion, label }) => (
           <Button
             key={suggestion.category_id}
             type="button"
             onClick={() => {
-              setClickedName(suggestionLabel(suggestion));
+              setClickedName(label);
               if (photoCategorySuggestions.some((s) => s.category_id === suggestion.category_id)) {
                 onCategorySelect(
                   suggestion.category_id,
@@ -118,7 +150,7 @@ export function CategoryConfirm({
               }
             }}
           >
-            {categorySuggestions.length > 1 ? "Bruk" : "Ja, bruk"} «{suggestionLabel(suggestion)}»
+            {categorySuggestions.length > 1 ? "Bruk" : "Ja, bruk"} «{label}»
           </Button>
         ))}
         <Button type="button" variant="outline" onClick={() => setShowPicker(true)}>

@@ -135,7 +135,7 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
             {isError
               ? "Kunne ikke hente hvem som har tatt kontakt. Du kan likevel merke annonsen som solgt."
               : contacts && contacts.length > 0
-                ? "Velg hvem du valgte å selge til."
+                ? "Velg hvem du solgte til, eller merk den som solgt uten å velge kjøper."
                 : "Ingen har tatt kontakt om denne annonsen ennå."}
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -189,6 +189,18 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
               )
             )}
           </div>
+          {/* Solgt utenfor Kaupet, eller til noen som ikke står i lista. */}
+          {contacts && contacts.length > 0 && (
+            <Button
+              variant="link"
+              className="self-end px-0"
+              disabled={isPending}
+              onClick={() => markSoldWithoutBuyerMut.mutate()}
+            >
+              {markSoldWithoutBuyerMut.isPending && <Loader2 className="size-4 animate-spin" />}
+              Merk som solgt uten å velge kjøper
+            </Button>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

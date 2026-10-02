@@ -23,3 +23,14 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Disse radene har til nå bare gått ut som push, aldri vist i appen (read_at
+-- ble aldri satt). Når /varsler og bjella begynner å vise dem, skal ikke
+-- historikken dukke opp som en bunke uleste varsler.
+DELETE FROM public.favorite_sold_notifications n
+USING public.listing_sales s
+WHERE s.listing_id = n.listing_id AND s.buyer_id = n.user_id;
+
+UPDATE public.favorite_sold_notifications
+SET read_at = now()
+WHERE read_at IS NULL;

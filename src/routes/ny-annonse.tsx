@@ -474,7 +474,7 @@ function NewListingPage() {
     setValue,
     clientCategoryHint,
     aiFallback: {
-      enabled: pastFirstStep && photoSuggestion.enabled,
+      enabled: pastFirstStep && photoSuggestion.enabled && !categoryId,
       getToken: async () => {
         const token = await photoSuggestion.getVerifiedToken();
         photoSuggestion.turnstileRef.current?.reset();
@@ -1054,7 +1054,10 @@ function NewListingPage() {
     showMileage,
     canShip,
   };
+  // Knyttet til meldingen den satte: en senere, annen melding (f.eks. ved
+  // publisering) skal ikke vurderes av denne validatoren.
   const [blockingValidator, setBlockingValidator] = useState<{
+    message: string;
     validate: NonNullable<FieldGroup["validateExtra"]>;
   } | null>(null);
 
@@ -1138,7 +1141,7 @@ function NewListingPage() {
         if (group.key === "category-attributes" || group.key === "boat-facts")
           setAttributesTouched(true);
         setValidationError(result);
-        setBlockingValidator({ validate: group.validateExtra! });
+        setBlockingValidator({ message: result, validate: group.validateExtra! });
         return "blocked";
       }
       if (result && typeof result === "object") {
@@ -1151,7 +1154,7 @@ function NewListingPage() {
           setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
-        setBlockingValidator({ validate: group.validateExtra! });
+        setBlockingValidator({ message: result.message, validate: group.validateExtra! });
         return "blocked";
       }
     }
@@ -1799,11 +1802,12 @@ function NewListingPage() {
           }
           errorSummary={visibleErrorSummary(validationError, {
             hasFieldErrors: Object.keys(errors).length > 0,
-            stillInvalid: blockingValidator
-              ? ![null, "CONFIRM_NO_IMAGE"].includes(
-                  blockingValidator.validate(validateCtx) as string | null,
-                )
-              : undefined,
+            stillInvalid:
+              blockingValidator?.message === validationError
+                ? ![null, "CONFIRM_NO_IMAGE"].includes(
+                    blockingValidator.validate(validateCtx) as string | null,
+                  )
+                : undefined,
           })}
           validationAttempt={validationAttempt}
           footer={composerFooter}

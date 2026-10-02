@@ -847,7 +847,7 @@ function ListingDetailPage() {
           seller={seller ?? null}
           isOwner={isOwner}
           isSold={data.status === "sold"}
-          sellerId={data.organization_id ? undefined : data.seller_id}
+          sellerId={data.seller_id}
           listingId={data.id}
           kaupetCode={data.kaupet_code}
           title={data.title}

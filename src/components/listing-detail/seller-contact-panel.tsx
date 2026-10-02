@@ -100,7 +100,7 @@ export function SellerContactPanel({
   isOwner: boolean;
   /** Solgt annonse: ingen ny kontakt — kjøperen har allerede samtalen i innboksen. */
   isSold?: boolean;
-  /** Privat selgers bruker-id — gir lenke til den offentlige profilen med vurderinger. */
+  /** Selgerens bruker-id — private selgere får lenke til den offentlige profilen. */
   sellerId?: string;
   listingId: string;
   kaupetCode: string;

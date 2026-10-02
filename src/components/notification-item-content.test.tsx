@@ -34,4 +34,13 @@ describe("NotificationItemContent", () => {
     );
     expect(screen.getByText(/Treff i «hjelm»/)).toBeTruthy();
   });
+
+  it("beholder anførselstegn brukeren selv skrev i navnet", () => {
+    render(
+      <NotificationItemContent
+        n={{ ...base, kind: "search", saved_search_id: "s1", search_name: 'Sykkel 26"' }}
+      />,
+    );
+    expect(screen.getByText(/Treff i «Sykkel 26"»/)).toBeTruthy();
+  });
 });

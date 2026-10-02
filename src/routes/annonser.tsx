@@ -131,8 +131,10 @@ function BrowsePage() {
   const isDesktop = useIsDesktop();
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const { open: searchPanelOpen, openPanel } = useSearchPanel();
-  // I URL-en, så tilbake-knappen og delte lenker beholder fanen.
-  const activeTab = search.results ?? "listings";
+  // I URL-en, så tilbake-knappen og delte lenker beholder fanen. Hvilken fane
+  // som faktisk vises, avgjøres under (activeTab) — uten ØK-treff faller den
+  // tilbake til «Til salgs», ellers ville fanelinja forsvinne med ØK-visningen.
+  const requestedTab = search.results ?? "listings";
   const setActiveTab = (tab: "listings" | "wtb") =>
     navigate({
       search: (prev) => ({ ...prev, results: tab === "wtb" ? "wtb" : undefined }),
@@ -508,8 +510,14 @@ function BrowsePage() {
     q: search.q,
     effectiveCategories,
     categories,
-    activeTab,
+    activeTab: requestedTab,
   });
+  const activeTab =
+    requestedTab === "wtb" &&
+    hasSearchCriteria &&
+    (wtbLoading || wtbCount > 0 || wtbListings.length > 0)
+      ? "wtb"
+      : "listings";
 
   /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
      trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.

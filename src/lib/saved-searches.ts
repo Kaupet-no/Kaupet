@@ -69,9 +69,11 @@ export function summarizeCriteria(c: SearchCriteria): string {
   return parts.length ? parts.join(" · ") : "Alle annonser";
 }
 
-/** Søkenavn uten oppsummeringens anførselstegn (også for eldre lagrede navn). */
+/** Søkenavn uten anførselstegnene summarizeCriteria setter rundt søkeordene
+ * (`"volvo" · 1 kategori`) — også for eldre lagrede navn. Andre tegn, som
+ * tommer i `Sykkel 26"`, beholdes. */
 export function savedSearchLabel(name: string): string {
-  return name.replace(/"/g, "").trim();
+  return name.replace(/^"([^"]*)"/, "$1").trim();
 }
 
 export async function listSavedSearches() {

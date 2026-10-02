@@ -29,6 +29,8 @@
 
 **Q03-beslutning:** De store filene [ny-annonse.tsx](../../src/routes/ny-annonse.tsx#L1), [listing-detail-view.tsx](../../src/components/listing-detail/listing-detail-view.tsx#L1) og [filter-sections.tsx](../../src/features/listing-search/search-panel/filter-sections.tsx#L1) har ingen påvist blokk som blir enklere ved isolert flytting nå. `SearchFilterSections` brukes allerede i flere flater, og stedvelgeren er allerede delt. Ta opp uttrekk ved en konkret funksjonsendring som gir minst to reelle konsumenter av samme kontrakt, i tråd med arkitekturguiden § 2.
 
+**Etterfølgende opprydding ved push:** `listing_image_jobs` og `organization_api_keys` var lagt til som kjente hull i [RLS-inventarsjekken](../../scripts/check-rls-coverage.mjs#L22), men har allerede testreferanser. Den foreldede listen ble fjernet, og sjekken viser nå 71 aktive tabeller og 0 uten testreferanse (`7a7f1c32`). Landingsoverskriftens størrelsesendring ble formattert og verifisert separat (`e362d2fb`). Etter dette besto full lint, typecheck og de fire relevante UI-testene.
+
 ## Formål og omfang
 
 Beslutningsgrunnlag for små, uavhengige forbedringsoppgaver. Gjennomgangen er statisk: kildekode, tester, avhengigheter, migrasjoner, native-prosjekter, CI og arkitekturdokumentasjon er kartlagt. De sterkeste funnene er kontrollert mot kallesteder og faktisk kode. Det er ikke gjort kjøretidstesting eller databaseinspeksjon.

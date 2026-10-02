@@ -133,11 +133,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
       { title: "Kaupet.no — Gi tingene dine et nytt liv" },
-      {
-        name: "description",
-        content:
-          "Kaupet.no er en åpen kildekode-markedsplass for kjøp og salg av brukte ting i Norge. Bygget av frivillige, for fellesskapet.",
-      },
       { name: "author", content: "Kaupet.no" },
       // Synlig i view-source på hver SSR-side, og AGPL §13-kildehenvisningen.
       {
@@ -149,17 +144,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:locale", content: "nb_NO" },
       { property: "og:type", content: "website" },
       { property: "og:title", content: "Kaupet.no — Gi tingene dine et nytt liv" },
-      {
-        property: "og:description",
-        content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
-      },
       { property: "og:url", content: "https://kaupet.no/" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Kaupet.no — Gi tingene dine et nytt liv" },
-      {
-        name: "twitter:description",
-        content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
-      },
       {
         name: "description",
         content:
@@ -208,6 +195,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         crossOrigin: "anonymous",
       },
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
       { rel: "manifest", href: "/manifest.webmanifest" },
     ],
 

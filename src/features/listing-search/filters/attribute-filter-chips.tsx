@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { SlidersHorizontal, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,12 +72,6 @@ type Props = {
   /** Current result count, shown on the native sheets' dismiss button the same
    * way NativeFilterChips does. */
   resultCount?: number;
-  /** The active free-text search box content — used to bring secondary
-   * filters whose label or options match a typed word to the top of "Se
-   * flere filter", so e.g. typing "sykkel" surfaces "Hjulstørrelse" instead
-   * of leaving it buried in a long, fixed admin-sorted list. Purely a
-   * same-session text match, no historical query data required. */
-  queryText?: string;
   /** Pris/Tilstand — generic (non-category) search criteria that share this
    * row on desktop so all visible criteria live in one component/line. Only
    * wired up by desktop callers; native keeps these in NativeFilterChips. */
@@ -95,7 +89,7 @@ type Props = {
    * row silently empty. */
   hasCategory?: boolean;
   /** Facet result counts per filter key/value (e.g. `{ fuel_type: { diesel: 98 } }`),
-   * shown next to options in chip popovers and the "Flere filter" dialog. */
+   * shown next to options in chip popovers. */
   counts?: Record<string, Record<string, number>>;
   /** "chips" (default): the horizontal-scroll pill row. "card": a bordered
    * card with a labeled field per primary filter, plus an "up to"-only price
@@ -107,16 +101,16 @@ type Props = {
    * here too rather than duplicating it. */
   location?: LocationValue;
   onLocationChange?: (v: LocationValue) => void;
-  /** Clears every active filter — shown as a "Nullstill" link next to "Se
-   * flere filter" in `layout="card"`. */
+  /** Clears every active filter — shown as a "Nullstill" link in the card's
+   * bottom bar in `layout="card"`. */
   onReset?: () => void;
   /** Skips the card's own `rounded-2xl border ... shadow-sm` wrapper — for
    * embedding the field grid inside a caller that already supplies its own
    * card chrome (the homepage's category-drilldown panel), so the fields
    * don't end up double-boxed. `layout="card"` only. */
   embedCard?: boolean;
-  /** Extra content in the card's bottom bar, alongside "Nullstill"/"Flere
-   * filter" — `footerLeft` sits before them (e.g. a live result count),
+  /** Extra content in the card's bottom bar, alongside "Nullstill" —
+   * `footerLeft` sits before them (e.g. a live result count),
    * `footerRight` after (e.g. a "Vis treff" submit button for a caller that
    * navigates elsewhere instead of filtering in place). `layout="card"` only. */
   footerLeft?: ReactNode;
@@ -141,10 +135,8 @@ function relevanceScore(filter: CategoryFilter, words: string[]): number {
 
 /**
  * The searchable grid of a category's secondary (non-primary) attribute
- * filters — the content of "Flere filter" on desktop, and of the native
- * advanced-search panel's "Mer" tab. Extracted so both surfaces share one
- * implementation of the search-to-filter and relevance-sort behavior instead
- * of drifting apart.
+ * filters — used by the search panel and the desktop filter sidebar (see
+ * `filter-sections.tsx`), with search-to-filter and relevance sorting.
  */
 export function SecondaryCategoryFilters({
   filters,
@@ -163,7 +155,8 @@ export function SecondaryCategoryFilters({
   values: Record<string, AttributeFilterValue>;
   onChange: (key: string, value: AttributeFilterValue | undefined) => void;
   counts?: Record<string, Record<string, number>>;
-  /** Same relevance-boost input as `AttributeFilterChips`' `queryText`. */
+  /** Free-text search content — filters whose label or options match a typed
+   * word are sorted to the top. */
   queryText?: string;
   isNative?: boolean;
   /** Ta med primærfiltrene (Merke, Modell …) i stedet for bare de sekundære.
@@ -171,8 +164,8 @@ export function SecondaryCategoryFilters({
    * chip-raden ble erstattet av sammendrag-pillen, så der må hele settet med. */
   includePrimary?: boolean;
   /** Autofokuser søkefeltet på mount. Standard `!isNative`, som passer når
-   * dette rendres inne i en overlay brukeren nettopp åpnet (f.eks. "Flere
-   * filter"-dialogen) — der er fokus forventet. I sidekolonnen (`expanded`
+   * dette rendres inne i en overlay brukeren nettopp åpnet — der er fokus
+   * forventet. I sidekolonnen (`expanded`
    * layout i `filter-sections.tsx`) rendres komponenten derimot alltid synlig
    * med `isNative={!expanded}`, så autofokus der ville rykket siden ned til
    * feltet hver gang en hovedkategori velges. Send `false` eksplisitt der. */
@@ -237,11 +230,10 @@ export function SecondaryCategoryFilters({
 }
 
 /**
- * The category-dependent filter row on the search results page: the category's
- * primary filters (Merke, Modell, Drivstoff, Årsmodell …) each get their own
- * always-visible chip, and everything else sits behind "Se flere filter",
- * which opens them in an overlay. Replaces the single "Egenskaper" chip that
- * hid every category field — including the most-used ones — behind one popover.
+ * The category-dependent filter row: the category's primary filters (Merke,
+ * Modell, Drivstoff, Årsmodell …) each get their own always-visible chip.
+ * Secondary filters are deliberately not offered here — the full filter set
+ * lives in the search results page's panel/sidebar, which "Vis treff" leads to.
  */
 export function AttributeFilterChips({
   filters,
@@ -249,7 +241,6 @@ export function AttributeFilterChips({
   onChange,
   isNative = false,
   resultCount,
-  queryText,
   min,
   max,
   includeFree,
@@ -269,7 +260,6 @@ export function AttributeFilterChips({
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const isCard = layout === "card" && !isNative;
   const fieldProps = isCard ? { variant: "field" as const } : {};
@@ -280,21 +270,7 @@ export function AttributeFilterChips({
 
   if (filters.length === 0 && !showPriceCondition && hasCategory) return null;
 
-  const { primary, secondaryRaw } = (() => {
-    const split = splitPrimaryFilters(filters);
-    return { primary: split.primary, secondaryRaw: split.secondary };
-  })();
-  // Same-session relevance boost: filters matching a typed word float to the
-  // top, so a search-in-progress makes "Se flere filter" feel search-aware
-  // rather than a fixed, admin-only-curated list — see relevanceScore above.
-  const queryWords = (queryText ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const secondary =
-    queryWords.length === 0
-      ? secondaryRaw
-      : [...secondaryRaw].sort(
-          (a, b) => relevanceScore(b, queryWords) - relevanceScore(a, queryWords),
-        );
-  const secondaryCount = secondary.filter((f) => values[f.key] !== undefined).length;
+  const { primary } = splitPrimaryFilters(filters);
 
   const openField = (key: string | null) => {
     if (key && isNative) void hapticImpact("light");
@@ -537,8 +513,8 @@ export function AttributeFilterChips({
   const { label: condLabel, active: condActive } = getConditionChipState(conditions ?? []);
 
   // Card layout: Pris is a bare "opp til"-input right in the row (mobile.de
-  // style) instead of a popover — the full min–max slider still lives in the
-  // "Flere filter" dialog for buyers who want finer control.
+  // style) instead of a popover — the full min–max slider lives in the
+  // search results page's filters for buyers who want finer control.
   const priceChip =
     showPriceCondition &&
     (isCard ? (
@@ -641,41 +617,6 @@ export function AttributeFilterChips({
     </Popover>
   );
 
-  const moreButtonContent = (
-    <>
-      <SlidersHorizontal className="size-3.5" />
-      Flere filter
-      {secondaryCount > 0 && (
-        <span
-          className={
-            isCard
-              ? "flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white"
-              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white"
-          }
-        >
-          {secondaryCount}
-        </span>
-      )}
-    </>
-  );
-  const moreButtonClassName = isCard
-    ? "relative gap-1.5 px-0 text-primary hover:bg-transparent"
-    : "relative h-9 shrink-0 gap-1.5 rounded-full";
-  // Native has no "Flere filter" trigger of its own — its secondary filters
-  // live in the "Mer" tab of NativeAdvancedSearch (see annonser.tsx), reached
-  // through NativeFilterChips' single "Mer" chip instead of a second button.
-  const moreButton = secondary.length > 0 && !isNative && (
-    <Button
-      type="button"
-      variant={isCard ? "ghost" : "outline"}
-      size="sm"
-      className={moreButtonClassName}
-      onClick={() => setMoreOpen(true)}
-    >
-      {moreButtonContent}
-    </Button>
-  );
-
   const resetLink = isCard && onReset && (
     <Button
       type="button"
@@ -688,20 +629,9 @@ export function AttributeFilterChips({
       Nullstill
     </Button>
   );
-  // The overlay's own close control handles dismissal on web and narrow viewports.
-  const overlayBody = (
-    <SecondaryCategoryFilters
-      filters={filters}
-      values={values}
-      onChange={onChange}
-      counts={counts}
-      queryText={queryText}
-    />
-  );
-
   // Card layout: one bordered card, primary fields in a responsive grid with
-  // labels above each (mobile.de-style), "Flere filter"/"Nullstill" as plain
-  // links along the bottom instead of buttons in the field row.
+  // labels above each (mobile.de-style), "Nullstill" as a plain link along the
+  // bottom instead of a button in the field row.
   const cardFields = (
     <div className={embedCard ? undefined : "density-task border-y border-border"}>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -710,12 +640,11 @@ export function AttributeFilterChips({
         {cityField}
         {!hideCondition && conditionChip}
       </div>
-      {(moreButton || resetLink || footerLeft || footerRight) && (
+      {(resetLink || footerLeft || footerRight) && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
           <div>{footerLeft}</div>
           <div className="flex flex-wrap items-center gap-4">
             {resetLink}
-            {moreButton}
             {footerRight}
           </div>
         </div>
@@ -737,7 +666,6 @@ export function AttributeFilterChips({
           {priceChip}
           {conditionChip}
           {chips}
-          {moreButton}
         </>
       )}
 
@@ -759,23 +687,10 @@ export function AttributeFilterChips({
             </div>
           </NativeSheet>
         ))}
-
-      {/* "Se flere filter" overlay — web only; native uses NativeAdvancedSearch. */}
-      {secondary.length > 0 && !isNative && (
-        <ResponsiveOverlay open={moreOpen} onOpenChange={setMoreOpen}>
-          <ResponsiveOverlayContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" expandable>
-            <DialogHeader>
-              <DialogTitle>Flere filter</DialogTitle>
-            </DialogHeader>
-            {overlayBody}
-          </ResponsiveOverlayContent>
-        </ResponsiveOverlay>
-      )}
     </>
   );
 
-  // No wrapping row here on native — the caller (annonser.tsx,
-  // category-landing-page.tsx) renders this together with NativeFilterChips
+  // No wrapping row here on native — the caller renders this together with NativeFilterChips
   // inside one shared scroll row, so Pris/Sted/Mer and Merke/Modell read as
   // one filter bar instead of two stacked ones.
   return body;
@@ -822,8 +737,7 @@ const PRICE_UPTO_MAX = 99_999_999;
 /** The card layout's Pris field: a bare "opp til" number input right in the
  * row (mobile.de style), styled to match `FilterChip`'s "field" variant box.
  * Min stays whatever it already was — the card only ever writes `max`; the
- * full min–max slider (`RangeFilterField`, via `PricePopoverContent`) still
- * lives in the "Flere filter" dialog for buyers who want a lower bound too. */
+ * full min–max range lives in the search results page's filters. */
 function PriceUpToField({
   value,
   onChange,

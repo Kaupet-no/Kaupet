@@ -11,13 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogFooter } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -29,7 +22,6 @@ import {
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
 import { CATEGORY_ICON_OPTIONS, CategoryIcon } from "@/lib/category-icons";
-import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 import { collectDescendantIds, depthOf, MAX_CATEGORY_DEPTH } from "@/lib/category-admin-tree";
 import { MAIN_CATEGORY_COLOR_PRESETS, slugify, type Category } from "./shared";
 
@@ -62,9 +54,6 @@ export function CategoryDetailsPanel({
   }, [iconSearch]);
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");
-  const [headingFont, setHeadingFont] = useState<string>(
-    category?.heading_font ?? DEFAULT_CATEGORY_HEADING_FONT,
-  );
   const [searchExamples, setSearchExamples] = useState<string>(
     (category?.search_examples ?? []).join("\n"),
   );
@@ -82,9 +71,8 @@ export function CategoryDetailsPanel({
         slug: slug.trim() || slugify(name),
         parent_id: newParentId,
         icon,
-        // Color and heading font only apply to main (top-level) categories.
+        // Color only applies to main (top-level) categories.
         color: parent === "__none__" ? color.trim() || null : null,
-        heading_font: parent === "__none__" ? headingFont : null,
         search_examples: searchExamples
           .split("\n")
           .map((w) => w.trim())
@@ -297,26 +285,6 @@ export function CategoryDetailsPanel({
             </p>
           </div>
         )}
-        {parent === "__none__" && (
-          <div className="space-y-2">
-            <Label htmlFor="heading-font">Overskriftsfont (hovedkategori)</Label>
-            <Select value={headingFont} onValueChange={setHeadingFont}>
-              <SelectTrigger id="heading-font">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(CATEGORY_HEADING_FONTS).map(([token, { label, stack }]) => (
-                  <SelectItem key={token} value={token}>
-                    <span style={{ fontFamily: stack }}>{label}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Brukes på kategori-overskriften som vises på landingssiden når kategorien er valgt.
-            </p>
-          </div>
-        )}
         <div className="space-y-2">
           <Label htmlFor="search-examples">Eksempelsøkeord</Label>
           <Textarea
@@ -398,15 +366,12 @@ export function CategoryDetailsPanel({
                 </Button>
               }
             />
-            {parent !== "__none__" &&
-              (color.trim() ||
-                searchExamples.trim() ||
-                headingFont !== DEFAULT_CATEGORY_HEADING_FONT) && (
-                <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-                  Denne kategorien har farge, font eller søkeeksempler satt som hovedkategori. Disse
-                  fjernes når du lagrer med en overordnet kategori valgt.
-                </p>
-              )}
+            {parent !== "__none__" && (color.trim() || searchExamples.trim()) && (
+              <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                Denne kategorien har farge eller søkeeksempler satt som hovedkategori. Disse fjernes
+                når du lagrer med en overordnet kategori valgt.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>

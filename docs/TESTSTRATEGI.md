@@ -456,7 +456,7 @@ tilgang til implementasjonen.
 | CAT-04 | U    | P1  | `slug.ts` normalisering                                                                      | Æ/Ø/Å, mellomrom, doble bindestreker og store bokstaver gir stabil slug; `normalizeSlugForMatch` er idempotent     |
 | CAT-05 | U    | P1  | `use-category-drilldown` navigasjonstilstand                                                 | Tilbake fra dypeste nivå går ett nivå opp, ikke til rot                                                            |
 | CAT-06 | E    | P1  | Kategorilandingsside via `$kaupetCode`                                                       | Ukjent kode gir 404-flate med navigasjon videre, ikke tom side                                                     |
-| CAT-07 | U    | P2  | `category-icons.ts` / `category-fonts.ts` fallback                                           | Manglende ikon/font gir definert fallback, aldri tomt element                                                      |
+| CAT-07 | U    | P2  | `category-icons.ts` fallback                                                                 | Manglende ikon gir definert fallback, aldri tomt element                                                           |
 | CAT-08 | R    | P1  | `categories`/`category_filters`/`category_flows` er lesbare anonymt, skrivbare kun for admin | Anonym SELECT OK; INSERT/UPDATE/DELETE avvist for vanlig bruker                                                    |
 | CAT-09 | U    | P2  | Kategorisynk staging→produksjon (`category-sync.functions.ts`)                               | Synk er idempotent: kjørt to ganger gir samme resultat og ingen duplikater                                         |
 

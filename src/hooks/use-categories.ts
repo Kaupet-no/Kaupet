@@ -8,7 +8,6 @@ export type CategoryRecord = {
   parent_id: string | null;
   icon: string | null;
   color: string | null;
-  heading_font: string | null;
   search_examples: string[];
   search_synonyms: string[];
   is_hidden: boolean;

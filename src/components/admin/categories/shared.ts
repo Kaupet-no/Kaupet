@@ -8,7 +8,6 @@ export type Category = {
   sort_order: number;
   icon: string | null;
   color: string | null;
-  heading_font: string | null;
   search_examples: string[] | null;
   search_synonyms: string[] | null;
   title_example: string | null;

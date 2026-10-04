@@ -43,9 +43,14 @@ export const FilterChip = React.forwardRef<
     if (variant === "field") {
       return (
         <div className="flex min-w-0 flex-col gap-1">
-          {fieldLabel && (
-            <span className="text-xs font-medium text-muted-foreground">{fieldLabel}</span>
-          )}
+          {/* Without a label (e.g. boolean toggles, whose button text is the
+              label) keep an empty line so the box aligns with its neighbours. */}
+          <span
+            className="text-xs font-medium text-muted-foreground"
+            aria-hidden={fieldLabel ? undefined : true}
+          >
+            {fieldLabel ?? " "}
+          </span>
           <button
             ref={ref}
             type="button"

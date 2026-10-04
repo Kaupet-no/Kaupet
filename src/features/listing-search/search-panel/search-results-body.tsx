@@ -4,7 +4,7 @@ import type { SearchPanelResultsContext } from "@/features/listing-search/search
 import type { Category } from "@/lib/categories";
 
 /**
- * Desktop-web layout shared by /annonser and the category landing pages:
+ * Desktop-web layout of SearchResultsPage (/annonser and the category pages):
  * filters permanently to the left of the results instead of in a dialog
  * above them (see SearchFilterSidebar). Native and mobile web render
  * `children` alone, full-width — each page decides its own mobile filter UI.

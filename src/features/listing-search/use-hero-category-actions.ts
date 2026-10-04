@@ -5,9 +5,9 @@ import type { searchSchema } from "@/features/listing-search/search-schema";
 
 type UpdateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => void;
 
-/** Category-selection handlers for the `/annonser` hero — pulled out of
- * BrowsePage since they're pure closures over search state with no hooks
- * of their own. See CategoryHero for where each is wired up. */
+/** Category-selection handlers for `/annonser`'s breadcrumb and subcategory
+ * chips — pulled out of SearchResultsPage since they're pure closures over
+ * search state with no hooks of their own. */
 
 /** Ids a category selection actually covers: every selected slug counts as
  * itself plus all its descendants — the same expansion the listings query

@@ -7,7 +7,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { z } from "zod";
-import { CategoryLandingPage } from "@/components/category-landing-page";
+import { SearchResultsPage } from "@/features/listing-search/search-results-page";
 import { supabase } from "@/integrations/supabase/client";
 import { type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/$kaupetCode_/$sub")({
   // has the exact same catch-all-plus-full-search-schema shape and used to
   // 307-redirect any unknown address to itself with nine empty params
   // appended. SubcategoryPage below fills the defaults back in for
-  // CategoryLandingPage, which needs the full shape.
+  // SearchResultsPage, which needs the full shape.
   validateSearch: searchSchema.partial().extend({
     // Slug of a descendant of `sub` to scope the page to, without leaving
     // this URL.
@@ -122,11 +122,8 @@ function SubcategoryPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/$kaupetCode/$sub" });
   return (
-    <CategoryLandingPage
-      category={sub}
-      breadcrumb={[main, sub]}
-      subSlug={search.sub2}
-      subSlugParam="sub2"
+    <SearchResultsPage
+      scope={{ category: sub, breadcrumb: [main, sub], subSlug: search.sub2, subSlugParam: "sub2" }}
       search={searchSchema.parse(search)}
       navigate={navigate}
     />

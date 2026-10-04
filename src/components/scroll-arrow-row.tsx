@@ -14,8 +14,8 @@ type Props = {
 /**
  * Single-row, horizontally scrollable container with visible left/right
  * arrow buttons — used wherever a category chip/pill row must never wrap to
- * a second line (main categories on /annonser, subcategory chips in
- * CategoryHero). Arrows fade out at either scroll end instead of disappearing
+ * a second line (main categories, subcategory chips in
+ * SearchResultsPage). Arrows fade out at either scroll end instead of disappearing
  * outright, so their position stays predictable. Also click-and-drags with
  * the mouse (touch already scrolls natively via `overflow-x-auto`).
  */

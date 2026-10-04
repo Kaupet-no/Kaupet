@@ -22,7 +22,7 @@ import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-
 import { supabase } from "@/integrations/supabase/client";
 import { describeSafeError } from "@/lib/safe-error";
 import { useAuth } from "@/hooks/use-auth";
-import { CategoryLandingPage } from "@/components/category-landing-page";
+import { SearchResultsPage } from "@/features/listing-search/search-results-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { organizationLogoUrl } from "@/lib/organization-logo-url";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
@@ -294,12 +294,14 @@ function RootSlugPage() {
   const navigate = useNavigate({ from: "/$kaupetCode" });
   if (loaderData.kind === "category")
     return (
-      <CategoryLandingPage
-        category={loaderData.category}
-        breadcrumb={[loaderData.category]}
-        subSlug={search.sub}
-        subSlugParam="sub"
-        // CategoryLandingPage expects the full, defaulted /annonser search
+      <SearchResultsPage
+        scope={{
+          category: loaderData.category,
+          breadcrumb: [loaderData.category],
+          subSlug: search.sub,
+          subSlugParam: "sub",
+        }}
+        // SearchResultsPage expects the full, defaulted /annonser search
         // shape (e.g. search.q.trim()). The route itself only validates the
         // fields present in the URL (see the validateSearch comment above),
         // so fill in the rest here rather than back on every other address.

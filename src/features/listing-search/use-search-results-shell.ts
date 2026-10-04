@@ -22,8 +22,7 @@ type Search = z.infer<typeof searchSchema>;
 
 /**
  * Composition hook over the shared /annonser search hooks, covering the
- * wiring layer both /annonser and the category landing pages otherwise
- * hand-copy: query state, text-to-filter matching, listings/zero-result
+ * wiring layer of SearchResultsPage (/annonser and the category pages): query state, text-to-filter matching, listings/zero-result
  * queries, card/map derivation and the search-panel registration. Page-
  * specific concerns (hero, subcategory drilldown, WTB tabs,
  * SearchInterpretation UI) stay in the calling page and are not touched
@@ -258,7 +257,7 @@ export function useSearchResultsShell({
        kategorilandingsside har kategorien sin fra URL-en, og `effectiveSearch`
        der overstyrer `categories` ubetinget. En kategorivelger i panelet ville
        derfor ikke gjort noe i det hele tatt — den skjules i stedet for å stå
-       og lyve. Underkategorier velges i heroens chips på de sidene. */
+       og lyve. Underkategorier velges i brikkeraden over treffene der. */
     categoryLocked: !canRemoveCategoryInZeroResultExpansion,
   };
   useRegisterSearchPanelResults(searchPanelResults);

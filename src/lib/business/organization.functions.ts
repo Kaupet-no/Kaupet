@@ -13,6 +13,8 @@ import {
 } from "@/lib/business/organization-access";
 import { uuid } from "@/lib/business/schemas";
 import { toClientError } from "@/lib/to-client-error";
+import { welcomeEmail } from "@/lib/business-email-templates";
+import { sendBusinessReceipt } from "@/lib/business/business-emails.server";
 
 export type BusinessListingStat = {
   id: string;
@@ -309,7 +311,7 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
       const { data, error } = await supabaseAdmin
         .from("organization_billing_profiles")
         .select(
-          "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at",
+          "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at, payment_receipts",
         )
         .eq("organization_id", organizationId)
         .maybeSingle();
@@ -399,11 +401,64 @@ export const updateOrganizationBillingEmail = createServerFn({ method: "POST" })
       .update({ billing_email: data.billingEmail })
       .eq("organization_id", organizationId)
       .select(
-        "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at",
+        "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at, payment_receipts",
       )
       .single();
     if (error) {
       throw await toClientError("database", error);
     }
     return { billingProfile };
+  });
+
+/**
+ * Velkomst-e-post til ny bedriftskonto. Organisasjonen opprettes allerede ved
+ * registrering (handle_new_user), før e-posten er bekreftet, så den sendes
+ * først når superbrukeren kommer inn i bedriftsflaten med bekreftet adresse.
+ * welcome_email_sent_at gjør den engangs, også ved samtidige kall.
+ */
+export const sendBusinessWelcomeIfNeeded = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { data: user } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    if (!user.user?.email_confirmed_at) return { sent: false };
+    const { data: claimed, error } = await supabaseAdmin
+      .from("organizations")
+      .update({ welcome_email_sent_at: new Date().toISOString() })
+      .eq("id", organizationId)
+      .is("welcome_email_sent_at", null)
+      .select("display_name, legal_name, organization_number")
+      .maybeSingle();
+    if (error) {
+      throw await toClientError("database", error);
+    }
+    if (!claimed) return { sent: false };
+    await sendBusinessReceipt(
+      supabaseAdmin,
+      organizationId,
+      () =>
+        welcomeEmail({
+          displayName: claimed.display_name,
+          legalName: claimed.legal_name,
+          organizationNumber: claimed.organization_number,
+        }),
+      { userIds: [context.userId], includeBilling: false },
+    );
+    return { sent: true };
+  });
+
+/** Kvittering for hver registrerte Proff-betaling. Av som standard. */
+export const updateProffPaymentReceipts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { error } = await supabaseAdmin
+      .from("organization_billing_profiles")
+      .update({ payment_receipts: data.enabled })
+      .eq("organization_id", organizationId);
+    if (error) {
+      throw await toClientError("database", error);
+    }
+    return { enabled: data.enabled };
   });

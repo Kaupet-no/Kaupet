@@ -51,7 +51,7 @@ export async function getOrganization(supabaseAdmin: AdminClient, organizationId
   const { data, error } = await supabaseAdmin
     .from("organizations")
     .select(
-      "id, organization_number, legal_name, display_name, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette, listing_concept, listing_font, listing_overtitle, created_at, updated_at",
+      "id, organization_number, legal_name, display_name, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_subscription_cancelled_at, proff_ended_by_kaupet_at, proff_access_until, welcome_email_sent_at, website_url, logo_path, brand_palette, listing_concept, listing_font, listing_overtitle, created_at, updated_at",
     )
     .eq("id", organizationId)
     .single();

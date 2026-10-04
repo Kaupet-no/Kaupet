@@ -16,7 +16,11 @@ import {
   createOrganizationLocation,
   updateOrganizationLocation,
 } from "@/lib/business/locations.functions";
-import { updateOrganizationBillingEmail } from "@/lib/business/organization.functions";
+import {
+  updateOrganizationBillingEmail,
+  updateProffPaymentReceipts,
+} from "@/lib/business/organization.functions";
+import { Switch } from "@/components/ui/switch";
 import { formatErrorMessage } from "@/lib/errors";
 import {
   LOCATION_FIELDS,
@@ -94,6 +98,16 @@ export function BusinessAdminPanel({ locations, billingProfile }: Props) {
   const [acceptedLocationTerms, setAcceptedLocationTerms] = useState(false);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const callUpdateBilling = useServerFn(updateOrganizationBillingEmail);
+  const callUpdateReceipts = useServerFn(updateProffPaymentReceipts);
+  const receiptsMutation = useMutation({
+    mutationFn: (enabled: boolean) => callUpdateReceipts({ data: { enabled } }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["business-membership"] });
+    },
+  });
+  const paymentReceipts = receiptsMutation.isPending
+    ? receiptsMutation.variables
+    : (billingProfile?.payment_receipts ?? false);
   const callCreateLocation = useServerFn(createOrganizationLocation);
   const callUpdateLocation = useServerFn(updateOrganizationLocation);
 
@@ -395,6 +409,29 @@ export function BusinessAdminPanel({ locations, billingProfile }: Props) {
                   .join(", ") || "Fakturaadresse ikke registrert"}
               </p>
             </div>
+          </div>
+          <div className="flex items-start justify-between gap-4 border-t border-border pt-5">
+            <div className="space-y-1">
+              <Label htmlFor="business-payment-receipts">Kvittering for hver betaling</Label>
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                Få en e-post hver gang vi registrerer en betaling for Proff. Den første betalte
+                perioden bekreftes alltid.
+              </p>
+              {receiptsMutation.error && (
+                <p className="text-sm text-destructive" role="alert">
+                  {formatErrorMessage(
+                    receiptsMutation.error,
+                    "Kunne ikke lagre valget. Prøv igjen.",
+                  )}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="business-payment-receipts"
+              checked={paymentReceipts}
+              disabled={receiptsMutation.isPending}
+              onCheckedChange={(enabled) => receiptsMutation.mutate(enabled)}
+            />
           </div>
         </PanelSection>
       )}

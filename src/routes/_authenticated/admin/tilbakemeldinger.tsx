@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
+import { invalidateAdminEvents } from "@/hooks/use-admin-events";
 
 export const Route = createFileRoute("/_authenticated/admin/tilbakemeldinger")({
   head: () => ({ meta: [{ title: "Tilbakemeldinger — Admin — Kaupet.no" }] }),
@@ -99,6 +100,7 @@ function FeedbackAdminPage() {
       setSelected(new Set());
       setConfirmDelete(false);
       qc.invalidateQueries({ queryKey: ["admin", "feedback"] });
+      invalidateAdminEvents(qc);
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette")),
   });

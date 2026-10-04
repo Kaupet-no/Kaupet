@@ -24,6 +24,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationsCount, useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
+import { useAdminOpenEventsCount } from "@/hooks/use-admin-events";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
@@ -65,6 +66,7 @@ function MegPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
+  const adminEvents = useAdminOpenEventsCount();
   const { data: isDemo } = useIsDemo();
   const canToggleTest = !!(isAdmin || isDemo);
   const isTest = useIsTestEnv();
@@ -189,6 +191,7 @@ function MegPage() {
                 icon={<Shield className="size-5 text-primary" />}
                 label="Administrasjon"
                 onClick={() => void navigate({ to: "/admin" })}
+                count={adminEvents}
               />
             )}
             <NavRow

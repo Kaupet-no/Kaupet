@@ -1,7 +1,10 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 import { supabase } from "@/integrations/supabase/client";
-import { getBusinessOrganization } from "@/lib/business/organization.functions";
+import {
+  getBusinessOrganization,
+  sendBusinessWelcomeIfNeeded,
+} from "@/lib/business/organization.functions";
 import { UNAUTHORIZED_MESSAGE } from "@/lib/business/schemas";
 import { formatErrorMessage } from "@/lib/errors";
 import { showToast } from "@/lib/toast";
@@ -38,6 +41,10 @@ export const Route = createFileRoute("/_authenticated/bedrift")({
       throw redirect({ to: "/" });
     });
     const { organization, membership } = businessOrganization;
+    // Engangs og serverstyrt; en feil her skal aldri stoppe navigasjonen.
+    if (!preload && membership.role === "superuser" && !organization.welcome_email_sent_at) {
+      void sendBusinessWelcomeIfNeeded().catch(() => undefined);
+    }
 
     if (organization.selected_plan === null && location.pathname !== "/bedrift/velg-plan") {
       throw redirect({ to: "/bedrift/velg-plan" });

@@ -55,6 +55,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_events: {
+        Row: {
+          created_at: string
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          kind: string
+          target_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          kind: string
+          target_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          kind?: string
+          target_id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       admin_moderation_log: {
         Row: {
           action: string
@@ -1462,6 +1492,7 @@ export type Database = {
           city: string | null
           created_at: string
           organization_id: string
+          payment_receipts: boolean
           postal_code: string | null
           registry_refreshed_at: string | null
           updated_at: string
@@ -1472,6 +1503,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           organization_id: string
+          payment_receipts?: boolean
           postal_code?: string | null
           registry_refreshed_at?: string | null
           updated_at?: string
@@ -1482,6 +1514,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           organization_id?: string
+          payment_receipts?: boolean
           postal_code?: string | null
           registry_refreshed_at?: string | null
           updated_at?: string
@@ -1898,12 +1931,15 @@ export type Database = {
           proff_access_until: string | null
           proff_trial_cancelled_at: string | null
           proff_trial_ends_at: string | null
+          proff_ended_by_kaupet_at: string | null
+          proff_subscription_cancelled_at: string | null
           proff_trial_started_at: string | null
           selected_plan: string | null
           updated_at: string
           verification_status: string
           verified_at: string | null
           verified_by: string | null
+          welcome_email_sent_at: string | null
           website_url: string | null
         }
         Insert: {
@@ -1920,12 +1956,15 @@ export type Database = {
           proff_access_until?: string | null
           proff_trial_cancelled_at?: string | null
           proff_trial_ends_at?: string | null
+          proff_ended_by_kaupet_at?: string | null
+          proff_subscription_cancelled_at?: string | null
           proff_trial_started_at?: string | null
           selected_plan?: string | null
           updated_at?: string
           verification_status?: string
           verified_at?: string | null
           verified_by?: string | null
+          welcome_email_sent_at?: string | null
           website_url?: string | null
         }
         Update: {
@@ -1942,12 +1981,15 @@ export type Database = {
           proff_access_until?: string | null
           proff_trial_cancelled_at?: string | null
           proff_trial_ends_at?: string | null
+          proff_ended_by_kaupet_at?: string | null
+          proff_subscription_cancelled_at?: string | null
           proff_trial_started_at?: string | null
           selected_plan?: string | null
           updated_at?: string
           verification_status?: string
           verified_at?: string | null
           verified_by?: string | null
+          welcome_email_sent_at?: string | null
           website_url?: string | null
         }
         Relationships: []
@@ -2004,10 +2046,14 @@ export type Database = {
           billing_reference: string | null
           created_at: string
           fiken_invoice_number: string | null
+          invoice_due_on: string | null
+          invoice_sent_on: string | null
           id: string
           organization_id: string
           period_end: string | null
           period_start: string | null
+          paid_on: string | null
+          reminder_sent_on: string | null
           price_ex_vat_nok: number
           requested_by: string | null
           status: string
@@ -2020,10 +2066,14 @@ export type Database = {
           billing_reference?: string | null
           created_at?: string
           fiken_invoice_number?: string | null
+          invoice_due_on?: string | null
+          invoice_sent_on?: string | null
           id?: string
           organization_id: string
           period_end?: string | null
           period_start?: string | null
+          paid_on?: string | null
+          reminder_sent_on?: string | null
           price_ex_vat_nok: number
           requested_by?: string | null
           status?: string
@@ -2036,10 +2086,14 @@ export type Database = {
           billing_reference?: string | null
           created_at?: string
           fiken_invoice_number?: string | null
+          invoice_due_on?: string | null
+          invoice_sent_on?: string | null
           id?: string
           organization_id?: string
           period_end?: string | null
           period_start?: string | null
+          paid_on?: string | null
+          reminder_sent_on?: string | null
           price_ex_vat_nok?: number
           requested_by?: string | null
           status?: string
@@ -3502,6 +3556,29 @@ export type Database = {
         }[]
       }
       generate_kaupet_code: { Args: never; Returns: string }
+      admin_proff_upcoming_invoices: {
+        Args: never
+        Returns: {
+          due_on: string
+          order_id: string | null
+          organization_id: string
+          period_start: string | null
+          send_by: string
+          term: string
+        }[]
+      }
+      create_proff_billing_events: { Args: never; Returns: undefined }
+      start_proff_trial_order: {
+        Args: {
+          _billing_email: string
+          _billing_reference?: string
+          _organization_id: string
+          _price_ex_vat_nok: number
+          _requested_by: string
+          _term: string
+        }
+        Returns: string
+      }
       get_featured_listing_ids: {
         Args: { _category_slug?: string; _limit?: number }
         Returns: {

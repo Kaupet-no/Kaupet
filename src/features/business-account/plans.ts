@@ -115,3 +115,17 @@ export function hasEffectiveProffAccess(
   const accessUntil = Date.parse(organization.proff_access_until);
   return Number.isFinite(accessUntil) && now < accessUntil;
 }
+
+/**
+ * Aktiv betalt Proff-periode (ikke bare prøveperiode). Oppsigelse av en betalt
+ * periode lar Proff løpe ut perioden; å avslutte prøven stopper Proff med en gang.
+ */
+export function hasPaidProffPeriod(
+  organization:
+    (BusinessOrganizationEntitlement & { proff_trial_ends_at?: string | null }) | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (!organization || !hasEffectiveProffAccess(organization, now)) return false;
+  const trialEnds = organization.proff_trial_ends_at;
+  return !trialEnds || Date.parse(organization.proff_access_until!) > Date.parse(trialEnds);
+}

@@ -5,10 +5,12 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdminRole as requireAdmin } from "@/lib/admin-auth.server";
-import { PROFF_TERMS, type ProffTerm } from "@/features/business-account/plans";
+import { PROFF_TERMS, hasPaidProffPeriod, type ProffTerm } from "@/features/business-account/plans";
+import { proffEndedByKaupetEmail, proffPaidEmail } from "@/lib/business-email-templates";
+import { sendBusinessReceipt } from "@/lib/business/business-emails.server";
 
 const ORDER_SELECT =
-  "id, organization_id, term, status, price_ex_vat_nok, billing_email, billing_reference, fiken_invoice_number, period_start, period_end, admin_note, created_at, updated_at";
+  "id, organization_id, term, status, price_ex_vat_nok, billing_email, billing_reference, fiken_invoice_number, invoice_sent_on, invoice_due_on, reminder_sent_on, paid_on, period_start, period_end, admin_note, created_at, updated_at";
 
 export type AdminProffOrder = {
   id: string;
@@ -19,6 +21,10 @@ export type AdminProffOrder = {
   billing_email: string;
   billing_reference: string | null;
   fiken_invoice_number: string | null;
+  invoice_sent_on: string | null;
+  invoice_due_on: string | null;
+  reminder_sent_on: string | null;
+  paid_on: string | null;
   period_start: string | null;
   period_end: string | null;
   admin_note: string | null;
@@ -29,10 +35,14 @@ export type AdminProffOrder = {
     legal_name: string;
     organization_number: string;
     proff_access_until: string | null;
+    proff_trial_ends_at: string | null;
+    proff_trial_cancelled_at: string | null;
   } | null;
 };
 
 const uuid = z.string().uuid();
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ugyldig dato");
+const invoiceNumber = z.string().trim().min(1).max(40);
 
 export const adminListProffOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -49,7 +59,7 @@ export const adminListProffOrders = createServerFn({ method: "GET" })
     let query = supabaseAdmin
       .from("proff_orders")
       .select(
-        `${ORDER_SELECT}, organization:organizations(display_name, legal_name, organization_number, proff_access_until)`,
+        `${ORDER_SELECT}, organization:organizations(display_name, legal_name, organization_number, proff_access_until, proff_trial_ends_at, proff_trial_cancelled_at)`,
       )
       .order("created_at", { ascending: false })
       .limit(200);
@@ -61,30 +71,169 @@ export const adminListProffOrders = createServerFn({ method: "GET" })
     return (orders ?? []) as unknown as AdminProffOrder[];
   });
 
-export const adminMarkProffOrderInvoiced = createServerFn({ method: "POST" })
+export type AdminProffUpcomingInvoice = {
+  organization_id: string;
+  order_id: string | null;
+  term: ProffTerm;
+  period_start: string | null;
+  due_on: string;
+  send_by: string;
+  legal_name: string;
+  organization_number: string;
+  billing_email: string;
+  trial_ends_at: string | null;
+};
+
+/** Fakturaer som skal sendes: prøvebestillinger og neste periode i løpende abonnement. */
+export const adminListProffUpcomingInvoices = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: rows, error } = await supabaseAdmin.rpc("admin_proff_upcoming_invoices");
+    if (error) {
+      throw await toClientError("database", error);
+    }
+    const ids = [...new Set((rows ?? []).map((row) => row.organization_id))];
+    if (ids.length === 0) return [] as AdminProffUpcomingInvoice[];
+    const [orgs, profiles] = await Promise.all([
+      supabaseAdmin
+        .from("organizations")
+        .select("id, legal_name, organization_number, proff_trial_ends_at")
+        .in("id", ids),
+      supabaseAdmin
+        .from("organization_billing_profiles")
+        .select("organization_id, billing_email")
+        .in("organization_id", ids),
+    ]);
+    if (orgs.error) throw await toClientError("database", orgs.error);
+    if (profiles.error) throw await toClientError("database", profiles.error);
+    const orgById = new Map((orgs.data ?? []).map((org) => [org.id, org]));
+    const emailById = new Map(
+      (profiles.data ?? []).map((profile) => [profile.organization_id, profile.billing_email]),
+    );
+    return (rows ?? [])
+      .map((row) => {
+        const org = orgById.get(row.organization_id);
+        return {
+          ...row,
+          term: row.term as ProffTerm,
+          legal_name: org?.legal_name ?? "",
+          organization_number: org?.organization_number ?? "",
+          billing_email: emailById.get(row.organization_id) ?? "",
+          trial_ends_at: org?.proff_trial_ends_at ?? null,
+        };
+      })
+      .sort((a, b) => a.send_by.localeCompare(b.send_by)) satisfies AdminProffUpcomingInvoice[];
+  });
+
+/**
+ * Admin har sendt fakturaen fra Fiken. Enten for en åpen bestilling (orderId),
+ * eller for neste periode i et løpende abonnement (organizationId + term), som
+ * da opprettes her med perioden fra der betalt tilgang slutter.
+ */
+export const adminRegisterProffInvoiceSent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
     z
       .object({
-        orderId: uuid,
-        fikenInvoiceNumber: z.string().trim().min(1).max(40),
+        orderId: uuid.optional(),
+        organizationId: uuid.optional(),
+        term: z.enum(["monthly", "yearly"]).optional(),
+        fikenInvoiceNumber: invoiceNumber,
+        sentOn: isoDate,
+        dueOn: isoDate,
       })
+      .refine((v) => v.dueOn >= v.sentOn, "Forfall kan ikke være før sendt dato.")
+      .refine(
+        (v) => Boolean(v.orderId) !== Boolean(v.organizationId && v.term),
+        "Oppgi enten bestilling eller bedrift og periode.",
+      )
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
+    const invoice = {
+      status: "invoiced",
+      fiken_invoice_number: data.fikenInvoiceNumber,
+      invoice_sent_on: data.sentOn,
+      invoice_due_on: data.dueOn,
+    };
+
+    if (data.orderId) {
+      const { data: updated, error } = await supabaseAdmin
+        .from("proff_orders")
+        .update(invoice)
+        .eq("id", data.orderId)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        throw await toClientError("database", error);
+      }
+      if (!updated) throw new ClientError("Bestillingen er ikke lenger til fakturering.", 409);
+      return { ok: true };
+    }
+
+    const term = PROFF_TERMS[data.term!];
+    const [org, profile] = await Promise.all([
+      supabaseAdmin
+        .from("organizations")
+        .select("proff_access_until")
+        .eq("id", data.organizationId!)
+        .single(),
+      supabaseAdmin
+        .from("organization_billing_profiles")
+        .select("billing_email")
+        .eq("organization_id", data.organizationId!)
+        .single(),
+    ]);
+    if (org.error) throw await toClientError("database", org.error);
+    if (profile.error) throw await toClientError("database", profile.error);
+    if (!org.data.proff_access_until) {
+      throw new ClientError("Bedriften har ingen betalt periode å fornye.", 409);
+    }
+    const periodStart = new Date(org.data.proff_access_until);
+    const periodEnd = new Date(periodStart);
+    periodEnd.setUTCMonth(periodEnd.getUTCMonth() + term.months);
+    const { error } = await supabaseAdmin.from("proff_orders").insert({
+      ...invoice,
+      organization_id: data.organizationId!,
+      requested_by: context.userId,
+      term: term.id,
+      price_ex_vat_nok: term.priceExVatNok,
+      billing_email: profile.data.billing_email,
+      period_start: periodStart.toISOString(),
+      period_end: periodEnd.toISOString(),
+    });
+    if (error) {
+      // proff_orders_one_open_per_org: en annen admin rakk å registrere den først.
+      if (error.code === "23505") {
+        throw new ClientError("Bedriften har allerede en åpen faktura.", 409);
+      }
+      throw await toClientError("database", error);
+    }
+    return { ok: true };
+  });
+
+export const adminRegisterProffReminder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ orderId: uuid, sentOn: isoDate }).parse(input))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: updated, error } = await supabaseAdmin
       .from("proff_orders")
-      .update({ status: "invoiced", fiken_invoice_number: data.fikenInvoiceNumber })
+      .update({ reminder_sent_on: data.sentOn })
       .eq("id", data.orderId)
-      .eq("status", "pending")
+      .eq("status", "invoiced")
       .select("id")
       .maybeSingle();
     if (error) {
       throw await toClientError("database", error);
     }
-    if (!updated) throw new ClientError("Bestillingen er ikke lenger til fakturering.", 409);
+    if (!updated) throw new ClientError("Fakturaen er ikke lenger ubetalt.", 409);
     return { ok: true };
   });
 
@@ -92,7 +241,11 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
     z
-      .object({ orderId: uuid, fikenInvoiceNumber: z.string().trim().max(40).optional() })
+      .object({
+        orderId: uuid,
+        paidOn: isoDate,
+        fikenInvoiceNumber: z.string().trim().max(40).optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -105,11 +258,12 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
       .from("proff_orders")
       .update({
         status: "paid",
+        paid_on: data.paidOn,
         ...(data.fikenInvoiceNumber && { fiken_invoice_number: data.fikenInvoiceNumber }),
       })
       .eq("id", data.orderId)
       .in("status", ["pending", "invoiced"])
-      .select("id, organization_id, term")
+      .select("id, organization_id, term, fiken_invoice_number")
       .maybeSingle();
     if (claimError) {
       throw await toClientError("database", claimError);
@@ -117,6 +271,20 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
     if (!claimed)
       throw new ClientError("Bestillingen er allerede registrert betalt eller kansellert.", 409);
 
+    // Var det betalt Proff fra før? Avgjør om dette er aktiveringen (alltid
+    // bekreftet) eller en fornyelse (kvittering bare når bedriften har valgt det).
+    const { data: before, error: beforeError } = await supabaseAdmin
+      .from("organizations")
+      .select("selected_plan, proff_access_until, proff_trial_ends_at")
+      .eq("id", claimed.organization_id)
+      .single();
+    if (beforeError) {
+      throw await toClientError("database", beforeError);
+    }
+    const firstPeriod = !hasPaidProffPeriod(before);
+
+    // Tilgang gis først ved betaling. Betalt i prøveperioden eller før forrige
+    // periode er over: perioden stables på resten. Betalt for sent: fra nå.
     const { data: period, error: extendError } = await supabaseAdmin
       .rpc("extend_proff_access", {
         _organization_id: claimed.organization_id,
@@ -135,7 +303,152 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
       throw await toClientError("database", periodError);
     }
 
+    await sendPaymentReceipt(supabaseAdmin, {
+      organizationId: claimed.organization_id,
+      firstPeriod,
+      term: claimed.term as ProffTerm,
+      invoiceNumber: claimed.fiken_invoice_number,
+      periodStart: period.period_start,
+      periodEnd: period.period_end,
+    });
+
     return { ok: true, periodStart: period.period_start, periodEnd: period.period_end };
+  });
+
+async function sendPaymentReceipt(
+  supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>,
+  params: {
+    organizationId: string;
+    firstPeriod: boolean;
+    term: ProffTerm;
+    invoiceNumber: string | null;
+    periodStart: string;
+    periodEnd: string;
+  },
+) {
+  if (!params.firstPeriod) {
+    const { data: profile } = await supabaseAdmin
+      .from("organization_billing_profiles")
+      .select("payment_receipts")
+      .eq("organization_id", params.organizationId)
+      .maybeSingle();
+    if (!profile?.payment_receipts) return;
+  }
+  const { data: org } = await supabaseAdmin
+    .from("organizations")
+    .select("display_name, legal_name")
+    .eq("id", params.organizationId)
+    .maybeSingle();
+  if (!org) return;
+  await sendBusinessReceipt(
+    supabaseAdmin,
+    params.organizationId,
+    () =>
+      proffPaidEmail({
+        displayName: org.display_name,
+        legalName: org.legal_name,
+        firstPeriod: params.firstPeriod,
+        term: params.term,
+        invoiceNumber: params.invoiceNumber,
+        periodStart: params.periodStart,
+        periodEnd: params.periodEnd,
+      }),
+    { includeBilling: true },
+  );
+}
+
+/**
+ * Kaupet avslutter Proff-avtalen. Åpne fakturaer kanselleres, det lages ingen
+ * nye (proff_subscription_cancelled_at), og Proff varer ut perioden som er
+ * betalt — tilgangen røres ikke. Bedriften får e-post med fast tekst; notatet
+ * er internt. Skiller seg fra adminCancelProffOrder, som bare retter én faktura.
+ */
+export const adminEndProffAgreement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z.object({ organizationId: uuid, note: z.string().trim().max(500).optional() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
+
+    const { data: org, error: orgError } = await supabaseAdmin
+      .from("organizations")
+      .select("display_name, legal_name, proff_access_until, proff_subscription_cancelled_at")
+      .eq("id", data.organizationId)
+      .single();
+    if (orgError) {
+      throw await toClientError("database", orgError);
+    }
+
+    const { data: cancelled, error: cancelError } = await supabaseAdmin
+      .from("proff_orders")
+      .update({ status: "cancelled", admin_note: data.note || "Avtalen avsluttet av Kaupet" })
+      .eq("organization_id", data.organizationId)
+      .in("status", ["pending", "invoiced"])
+      .select("status, fiken_invoice_number, invoice_due_on, invoice_sent_on");
+    if (cancelError) {
+      throw await toClientError("database", cancelError);
+    }
+
+    const endedAt = new Date().toISOString();
+    const { error: endError } = await supabaseAdmin
+      .from("organizations")
+      .update({
+        proff_ended_by_kaupet_at: endedAt,
+        proff_subscription_cancelled_at: org.proff_subscription_cancelled_at ?? endedAt,
+      })
+      .eq("id", data.organizationId);
+    if (endError) {
+      throw await toClientError("database", endError);
+    }
+    if (!org.proff_subscription_cancelled_at) {
+      // Triggeren lager «sa opp Proff»-hendelsen; her er det admin selv som avsluttet.
+      await supabaseAdmin
+        .from("admin_events")
+        .update({ handled_at: new Date().toISOString(), handled_by: context.userId })
+        .eq("target_id", data.organizationId)
+        .eq("kind", "proff_cancelled")
+        .is("handled_at", null);
+    }
+
+    const { error: logError } = await supabaseAdmin.from("admin_moderation_log").insert({
+      admin_id: context.userId,
+      action: "end_proff_agreement",
+      target_type: "organization",
+      target_id: data.organizationId,
+      reason: data.note || null,
+    });
+    if (logError) {
+      console.error("adminEndProffAgreement: moderation log failed", logError.message);
+    }
+
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" });
+    const sent = (cancelled ?? []).filter(
+      (order) => order.invoice_sent_on && order.fiken_invoice_number,
+    );
+    const overdue = sent.find((order) => order.invoice_due_on && order.invoice_due_on < today);
+    const accessUntil =
+      org.proff_access_until && Date.parse(org.proff_access_until) > Date.now()
+        ? org.proff_access_until
+        : null;
+    await sendBusinessReceipt(
+      supabaseAdmin,
+      data.organizationId,
+      () =>
+        proffEndedByKaupetEmail({
+          displayName: org.display_name,
+          legalName: org.legal_name,
+          accessUntil,
+          overdueInvoice: overdue
+            ? { number: overdue.fiken_invoice_number!, dueOn: overdue.invoice_due_on! }
+            : null,
+          creditedInvoiceNumber: sent[0]?.fiken_invoice_number ?? null,
+        }),
+      { includeBilling: true },
+    );
+
+    return { ok: true, accessUntil };
   });
 
 export const adminCancelProffOrder = createServerFn({ method: "POST" })

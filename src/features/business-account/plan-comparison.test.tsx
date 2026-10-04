@@ -201,6 +201,61 @@ describe("business plan comparison", () => {
     expect(setBusinessPlanMock).not.toHaveBeenCalled();
   });
 
+  it("starter prøveperioden gjennom en bestilling som forklarer første faktura", async () => {
+    renderPlans();
+    fireEvent.click(screen.getAllByRole("button", { name: "Start 30 dagers prøveperiode" })[0]!);
+
+    expect(await screen.findByText(/Første faktura sendes før prøveperioden utløper/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Start prøveperioden" }));
+
+    await waitFor(() =>
+      expect(requestProffSubscriptionMock).toHaveBeenCalledWith({
+        data: { term: "monthly", billingReference: undefined },
+      }),
+    );
+    expect(setBusinessPlanMock).not.toHaveBeenCalled();
+  });
+
+  it("viser utløpsdato, første faktura og opphør ved manglende betaling mens prøven er aktiv", async () => {
+    const ends = new Date(Date.now() + 10 * 864e5).toISOString();
+    getOpenProffOrderMock.mockResolvedValue({
+      order: { id: "o1", term: "yearly", status: "pending", billing_email: "faktura@example.com" },
+    });
+    renderPlans({
+      selected_plan: "proff",
+      proff_access_until: ends,
+      proff_trial_started_at: new Date().toISOString(),
+      proff_trial_ends_at: ends,
+      proff_trial_cancelled_at: null,
+    });
+
+    expect(await screen.findByText(/Prøveperioden er aktiv til/)).toBeTruthy();
+    expect(
+      screen.getByText(/Betales den ikke, opphører Proff når prøveperioden er over/),
+    ).toBeTruthy();
+  });
+
+  it("tilbyr oppsigelse ved periodeslutt og angring for betalt Proff", () => {
+    const paid = {
+      selected_plan: "proff",
+      proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+      proff_trial_started_at: "2026-08-01T00:00:00.000Z",
+      proff_trial_ends_at: "2026-08-31T00:00:00.000Z",
+      proff_trial_cancelled_at: null,
+    } as const;
+    renderPlans(paid);
+    expect(screen.getAllByRole("button", { name: "Si opp Proff" }).length).toBeGreaterThan(0);
+    cleanup();
+
+    renderPlans({ ...paid, proff_subscription_cancelled_at: new Date().toISOString() });
+    expect(screen.getAllByRole("button", { name: "Fortsett abonnementet" }).length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      (screen.getAllByRole("button", { name: "Sagt opp" })[0] as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("shows loading and success states for a plan submission", async () => {
     let resolve!: (value: { organization: object }) => void;
     const promise = new Promise<{ organization: object }>((resolver) => {
@@ -208,11 +263,11 @@ describe("business plan comparison", () => {
     });
     setBusinessPlanMock.mockReturnValueOnce(promise);
     renderPlans();
-    fireEvent.click(screen.getAllByRole("button", { name: "Start 30 dagers prøveperiode" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Velg Proff basis" })[0]!);
 
     await screen.findByRole("status");
     expect(screen.getByRole("status").textContent).toContain("Lagrer valgt plan");
-    expect(setBusinessPlanMock).toHaveBeenCalledWith({ data: { plan: "proff" } });
+    expect(setBusinessPlanMock).toHaveBeenCalledWith({ data: { plan: "proff_basis" } });
     resolve({ organization: {} });
     await waitFor(() =>
       expect(screen.getByRole("status").textContent).toContain("Planen er lagret."),

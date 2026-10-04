@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { formatErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { invalidateAdminEvents } from "@/hooks/use-admin-events";
 
 export const Route = createFileRoute("/_authenticated/admin/bedrifter")({
   head: () => ({ meta: [{ title: "Bedrifter — Administrasjon" }] }),
@@ -41,6 +42,7 @@ function AdminOrganizationsPage() {
     onSuccess: () => {
       showSuccessToast("Bedriften er godkjent.");
       qc.invalidateQueries({ queryKey: ["admin-unverified-organizations"] });
+      invalidateAdminEvents(qc);
     },
     onError: (error) =>
       showErrorToast(formatErrorMessage(error, "Kunne ikke godkjenne bedriften.")),

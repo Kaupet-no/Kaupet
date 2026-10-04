@@ -41,6 +41,7 @@ import { Route as VilkarBedriftRouteImport } from './routes/vilkar_.bedrift'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminBedrifterRouteImport } from './routes/_authenticated/admin/bedrifter'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
+import { Route as AuthenticatedAdminHendelserRouteImport } from './routes/_authenticated/admin/hendelser'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
@@ -232,6 +233,12 @@ const AuthenticatedAdminBrukereRoute =
   AuthenticatedAdminBrukereRouteImport.update({
     id: '/brukere',
     path: '/brukere',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminHendelserRoute =
+  AuthenticatedAdminHendelserRouteImport.update({
+    id: '/hendelser',
+    path: '/hendelser',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminKategorierRoute =
@@ -434,6 +441,7 @@ export interface FileRoutesByFullPath {
   '/vilkar/bedrift': typeof VilkarBedriftRoute
   '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
+  '/admin/hendelser': typeof AuthenticatedAdminHendelserRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -495,6 +503,7 @@ export interface FileRoutesByTo {
   '/vilkar/bedrift': typeof VilkarBedriftRoute
   '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
+  '/admin/hendelser': typeof AuthenticatedAdminHendelserRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -560,6 +569,7 @@ export interface FileRoutesById {
   '/vilkar_/bedrift': typeof VilkarBedriftRoute
   '/_authenticated/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
+  '/_authenticated/admin/hendelser': typeof AuthenticatedAdminHendelserRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -625,6 +635,7 @@ export interface FileRouteTypes {
     | '/vilkar/bedrift'
     | '/admin/bedrifter'
     | '/admin/brukere'
+    | '/admin/hendelser'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
@@ -686,6 +697,7 @@ export interface FileRouteTypes {
     | '/vilkar/bedrift'
     | '/admin/bedrifter'
     | '/admin/brukere'
+    | '/admin/hendelser'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
@@ -750,6 +762,7 @@ export interface FileRouteTypes {
     | '/vilkar_/bedrift'
     | '/_authenticated/admin/bedrifter'
     | '/_authenticated/admin/brukere'
+    | '/_authenticated/admin/hendelser'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/kjoretoy'
     | '/_authenticated/admin/moderasjon'
@@ -1050,6 +1063,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminBrukereRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/hendelser': {
+      id: '/_authenticated/admin/hendelser'
+      path: '/hendelser'
+      fullPath: '/admin/hendelser'
+      preLoaderRoute: typeof AuthenticatedAdminHendelserRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/kategorier': {
       id: '/_authenticated/admin/kategorier'
       path: '/kategorier'
@@ -1266,6 +1286,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminBedrifterRoute: typeof AuthenticatedAdminBedrifterRoute
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
+  AuthenticatedAdminHendelserRoute: typeof AuthenticatedAdminHendelserRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
   AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
@@ -1280,6 +1301,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
   {
     AuthenticatedAdminBedrifterRoute: AuthenticatedAdminBedrifterRoute,
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
+    AuthenticatedAdminHendelserRoute: AuthenticatedAdminHendelserRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
     AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
+import { useAdminOpenEventsCount } from "@/hooks/use-admin-events";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
@@ -28,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { clearMessageAttachmentUrlCache } from "@/lib/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { CountBadge } from "@/components/ui/count-badge";
 import { Switch } from "@/components/ui/switch";
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import {
@@ -49,6 +51,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
   const navigate = useNavigate();
   const { data: isAdmin } = useIsAdmin();
   const { data: isDemo } = useIsDemo();
+  const adminEvents = useAdminOpenEventsCount();
   const canToggleTest = !!(isAdmin || isDemo);
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
@@ -93,8 +96,12 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="h-10 gap-2 rounded-full px-1.5 pr-3"
-          aria-label="Brukermeny"
+          className="relative h-10 gap-2 rounded-full px-1.5 pr-3"
+          aria-label={
+            adminEvents > 0
+              ? `Brukermeny, ${adminEvents} nye administrasjonshendelser`
+              : "Brukermeny"
+          }
         >
           <Avatar className="size-8">
             {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
@@ -102,6 +109,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
               {initials(profile?.display_name, email ?? "")}
             </AvatarFallback>
           </Avatar>
+          {adminEvents > 0 && <CountBadge count={adminEvents} className="absolute right-1 top-0" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
@@ -177,6 +185,12 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
           <DropdownMenuItem asChild>
             <Link to="/admin" className="cursor-pointer">
               <Shield className="size-4" /> Administrasjon
+              {adminEvents > 0 && (
+                <>
+                  <CountBadge count={adminEvents} className="ml-auto" />
+                  <span className="sr-only">, {adminEvents} nye hendelser</span>
+                </>
+              )}
             </Link>
           </DropdownMenuItem>
         )}

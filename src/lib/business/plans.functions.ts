@@ -16,7 +16,7 @@ import {
   trialStartedEmail,
 } from "@/lib/business-email-templates";
 import { sendBusinessReceipt } from "@/lib/business/business-emails.server";
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import type { Database } from "@/integrations/supabase/types";
 
 const planSchema = z.enum(["proff_basis", "proff"]);
@@ -32,7 +32,6 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
     const current = await getOrganization(supabaseAdmin, organizationId);
-    const now = new Date();
 
     if (data.plan === "proff") {
       // Prøveperioden starter med første bestilling (requestProffSubscription),
@@ -61,45 +60,40 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
           organization: await cancelPaidSubscription(supabaseAdmin, organizationId, context.userId),
         };
       }
-      const updates = hasAccess
-        ? {
-            selected_plan: "proff_basis",
-            proff_trial_cancelled_at: now.toISOString(),
-            proff_access_until: now.toISOString(),
+      if (hasAccess) {
+        const { data: cancelled, error } = await supabaseAdmin
+          .rpc("cancel_proff_trial", { _organization_id: organizationId })
+          .single();
+        if (error) {
+          if (error.message?.includes("trial_not_cancellable")) {
+            throw new ClientError(
+              "Prøveperioden er ikke lenger aktiv. Oppdater siden og prøv igjen.",
+              409,
+            );
           }
-        : { selected_plan: "proff_basis" };
+          throw await toClientError("database", error);
+        }
+        if (cancelled.claimed) {
+          await sendBusinessReceipt(
+            supabaseAdmin,
+            organizationId,
+            () =>
+              trialEndedEmail({
+                displayName: current.display_name,
+                legalName: current.legal_name,
+                endedAt: cancelled.cancelled_at,
+                sentInvoiceNumber: cancelled.sent_invoice_number,
+              }),
+            { userIds: [context.userId], includeBilling: true },
+          );
+        }
+        return { organization: await getOrganization(supabaseAdmin, organizationId) };
+      }
       const { error } = await supabaseAdmin
         .from("organizations")
-        .update(updates)
+        .update({ selected_plan: "proff_basis" })
         .eq("id", organizationId);
-      if (error) {
-        throw await toClientError("database", error);
-      }
-      if (hasAccess) {
-        // Avsluttet: åpen faktura skal ikke betales. Var den allerede sendt,
-        // ser admin det på «Prøveperiode avsluttet»-hendelsen og krediterer i Fiken.
-        const { data: cancelledOrders, error: orderError } = await supabaseAdmin
-          .from("proff_orders")
-          .update({ status: "cancelled", admin_note: "Avsluttet av kunden" })
-          .eq("organization_id", organizationId)
-          .in("status", ["pending", "invoiced"])
-          .select("status, fiken_invoice_number");
-        if (orderError) {
-          throw await toClientError("database", orderError);
-        }
-        await sendBusinessReceipt(
-          supabaseAdmin,
-          organizationId,
-          () =>
-            trialEndedEmail({
-              displayName: current.display_name,
-              legalName: current.legal_name,
-              endedAt: now.toISOString(),
-              sentInvoiceNumber: sentInvoiceNumber(cancelledOrders),
-            }),
-          { userIds: [context.userId], includeBilling: true },
-        );
-      }
+      if (error) throw await toClientError("database", error);
     }
 
     const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
@@ -113,16 +107,6 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
 
 const ORDER_SELECT =
   "id, term, status, price_ex_vat_nok, billing_email, billing_reference, fiken_invoice_number, invoice_sent_on, invoice_due_on, period_start, period_end, created_at";
-
-/** Fakturanummeret til en kansellert faktura som allerede var sendt (den krediteres). */
-function sentInvoiceNumber(
-  orders: { status: string; fiken_invoice_number: string | null }[] | null,
-) {
-  return (
-    orders?.find((order) => order.status === "cancelled" && order.fiken_invoice_number)
-      ?.fiken_invoice_number ?? null
-  );
-}
 
 export type ProffOrder = {
   id: string;

@@ -154,61 +154,27 @@ export const adminRegisterProffInvoiceSent = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
-    const invoice = {
-      status: "invoiced",
-      fiken_invoice_number: data.fikenInvoiceNumber,
-      invoice_sent_on: data.sentOn,
-      invoice_due_on: data.dueOn,
-    };
-
-    if (data.orderId) {
-      const { data: updated, error } = await supabaseAdmin
-        .from("proff_orders")
-        .update(invoice)
-        .eq("id", data.orderId)
-        .eq("status", "pending")
-        .select("id")
-        .maybeSingle();
-      if (error) {
-        throw await toClientError("database", error);
-      }
-      if (!updated) throw new ClientError("Bestillingen er ikke lenger til fakturering.", 409);
-      return { ok: true };
-    }
-
-    const term = PROFF_TERMS[data.term!];
-    const [org, profile] = await Promise.all([
-      supabaseAdmin
-        .from("organizations")
-        .select("proff_access_until")
-        .eq("id", data.organizationId!)
-        .single(),
-      supabaseAdmin
-        .from("organization_billing_profiles")
-        .select("billing_email")
-        .eq("organization_id", data.organizationId!)
-        .single(),
-    ]);
-    if (org.error) throw await toClientError("database", org.error);
-    if (profile.error) throw await toClientError("database", profile.error);
-    if (!org.data.proff_access_until) {
-      throw new ClientError("Bedriften har ingen betalt periode å fornye.", 409);
-    }
-    const periodStart = new Date(org.data.proff_access_until);
-    const periodEnd = new Date(periodStart);
-    periodEnd.setUTCMonth(periodEnd.getUTCMonth() + term.months);
-    const { error } = await supabaseAdmin.from("proff_orders").insert({
-      ...invoice,
-      organization_id: data.organizationId!,
-      requested_by: context.userId,
-      term: term.id,
-      price_ex_vat_nok: term.priceExVatNok,
-      billing_email: profile.data.billing_email,
-      period_start: periodStart.toISOString(),
-      period_end: periodEnd.toISOString(),
+    const term = data.term ? PROFF_TERMS[data.term] : undefined;
+    const { error } = await supabaseAdmin.rpc("register_proff_invoice_sent", {
+      _invoice_number: data.fikenInvoiceNumber,
+      _sent_on: data.sentOn,
+      _due_on: data.dueOn,
+      _order_id: data.orderId,
+      _organization_id: data.organizationId,
+      _term: term?.id,
+      _price_ex_vat_nok: term?.priceExVatNok,
+      _requested_by: context.userId,
     });
     if (error) {
-      // proff_orders_one_open_per_org: en annen admin rakk å registrere den først.
+      if (error.message?.includes("order_not_invoiceable")) {
+        throw new ClientError("Bestillingen er ikke lenger til fakturering.", 409);
+      }
+      if (error.message?.includes("agreement_not_renewable")) {
+        throw new ClientError(
+          "Avtalen er sagt opp, avsluttet eller ikke aktiv. Oppdater oversikten.",
+          409,
+        );
+      }
       if (error.code === "23505") {
         throw new ClientError("Bedriften har allerede en åpen faktura.", 409);
       }

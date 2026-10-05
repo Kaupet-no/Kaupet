@@ -176,7 +176,7 @@ function buildAdmin(
     return chain;
   };
   supabaseAdmin.from.mockImplementation((table: string) => makeChain(table));
-  supabaseAdmin.rpc.mockImplementation(async (name: string) => {
+  supabaseAdmin.rpc.mockImplementation((name: string) => {
     if (name === "request_proff_subscription_order") {
       if (
         organization.proff_ended_by_kaupet_at &&
@@ -194,6 +194,24 @@ function buildAdmin(
         proff_access_until: ends,
       });
       return { data: "33333333-3333-4333-8333-333333333333", error: null };
+    }
+    if (name === "cancel_proff_trial") {
+      const claimed = !organization.proff_trial_cancelled_at;
+      if (claimed)
+        Object.assign(organization, {
+          selected_plan: "proff_basis",
+          proff_trial_cancelled_at: new Date().toISOString(),
+          proff_access_until: new Date().toISOString(),
+        });
+      const result = {
+        data: {
+          claimed,
+          cancelled_at: organization.proff_trial_cancelled_at,
+          sent_invoice_number: null,
+        },
+        error: null,
+      };
+      return { single: async () => result };
     }
     if (name === "cancel_proff_subscription") {
       const claimed = !organization.proff_subscription_cancelled_at;
@@ -439,18 +457,53 @@ describe("business server functions", () => {
     expect(result.organization.selected_plan).toBe("proff_basis");
     expect(result.organization.proff_access_until).toEqual(expect.any(String));
     expect(result.organization.proff_trial_cancelled_at).toEqual(expect.any(String));
-    expect(admin.calls.updates[0]).toMatchObject({ selected_plan: "proff_basis" });
-    // Bestillingen fra prøvestarten skal ikke rulle over til fakturering.
-    expect(admin.calls.updates).toContainEqual({
-      status: "cancelled",
-      admin_note: "Avsluttet av kunden",
-    });
+    expect(admin.calls.updates).toEqual([]);
     expect(receipts()).toEqual([
       {
         subject: "Prøveperioden for Kaupet Proff er avsluttet",
         options: { userIds: ["superuser-1"], includeBilling: true },
       },
     ]);
+  });
+
+  it("sender ingen bekreftelse når atomisk prøveavslutning feiler", async () => {
+    buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-09-01",
+        proff_trial_ends_at: "2099-09-30",
+        proff_access_until: "2099-09-30",
+      },
+      proff: true,
+    });
+    const rpc = supabaseAdmin.rpc.getMockImplementation()!;
+    supabaseAdmin.rpc.mockImplementation((name: string, ...args: unknown[]) =>
+      name === "cancel_proff_trial"
+        ? { single: async () => ({ data: null, error: { code: "XX000", message: "failed" } }) }
+        : rpc(name, ...args),
+    );
+    await expect(setBusinessPlan({ data: { plan: "proff_basis" } })).rejects.toThrow();
+    expect(sendBusinessReceipt).not.toHaveBeenCalled();
+  });
+
+  it("sender ikke prøvebekreftelse på nytt når avslutningen allerede er lagret", async () => {
+    buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-09-01",
+        proff_trial_ends_at: "2099-09-30",
+        proff_access_until: "2099-09-30",
+      },
+      proff: true,
+    });
+    const rpc = supabaseAdmin.rpc.getMockImplementation()!;
+    supabaseAdmin.rpc.mockImplementation((name: string, ...args: unknown[]) =>
+      name === "cancel_proff_trial"
+        ? { single: async () => ({ data: { claimed: false }, error: null }) }
+        : rpc(name, ...args),
+    );
+    await setBusinessPlan({ data: { plan: "proff_basis" } });
+    expect(sendBusinessReceipt).not.toHaveBeenCalled();
   });
 
   it("sier opp betalt Proff uten å kutte tilgangen før perioden er over", async () => {

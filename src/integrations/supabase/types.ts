@@ -3594,6 +3594,27 @@ export type Database = {
           term: string
         }[]
       }
+      cancel_proff_trial: {
+        Args: { _organization_id: string }
+        Returns: {
+          cancelled_at: string
+          claimed: boolean
+          sent_invoice_number: string
+        }[]
+      }
+      register_proff_invoice_sent: {
+        Args: {
+          _due_on: string
+          _invoice_number: string
+          _order_id?: string
+          _organization_id?: string
+          _price_ex_vat_nok?: number
+          _requested_by?: string
+          _sent_on: string
+          _term?: string
+        }
+        Returns: string
+      }
       cancel_proff_subscription: {
         Args: { _organization_id: string }
         Returns: {

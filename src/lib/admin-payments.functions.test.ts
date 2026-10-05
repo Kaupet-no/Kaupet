@@ -70,7 +70,10 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       chain.then = (resolve: (v: unknown) => void) => resolve(next(table));
       return chain;
     },
-    rpc: (name: string) => ({ single: async () => next(`rpc:${name}`) }),
+    rpc: (name: string) => ({
+      single: async () => next(`rpc:${name}`),
+      then: (resolve: (value: Result) => void) => resolve(next(`rpc:${name}`)),
+    }),
   },
 }));
 
@@ -142,17 +145,10 @@ describe("admin-proff: fakturering, betaling og kansellering", () => {
         },
       });
 
-    it("registrerer fakturanummer, sendt dato og forfall på bestillinger som ikke er sendt", async () => {
-      s.queues.proff_orders = [{ data: { id } }];
+    it("registrerer sendt faktura atomisk", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [{ data: id }];
       await expect(run()).resolves.toEqual({ ok: true });
-      const [op] = ops("proff_orders", "update");
-      expect(op.values).toEqual({
-        status: "invoiced",
-        fiken_invoice_number: "42",
-        invoice_sent_on: "2026-10-01",
-        invoice_due_on: "2026-10-20",
-      });
-      expect(op.filters).toContainEqual(["eq", "status", "pending"]);
+      expect(s.ops.filter((op) => op.op !== "select")).toEqual([]);
     });
 
     it("avviser forfall før sendt dato uten databasekall", async () => {
@@ -164,40 +160,52 @@ describe("admin-proff: fakturering, betaling og kansellering", () => {
       expect(s.ops).toEqual([]);
     });
 
-    it("oppretter neste periode fra der betalt tilgang slutter", async () => {
-      s.queues.organizations = [{ data: { proff_access_until: "2026-11-03T10:00:00.000Z" } }];
-      s.queues.organization_billing_profiles = [{ data: { billing_email: "f@example.com" } }];
-      s.queues.proff_orders = [{ data: null }];
-      await adminRegisterProffInvoiceSent({
-        data: {
-          organizationId: id,
-          term: "yearly",
-          fikenInvoiceNumber: "43",
-          sentOn: "2026-10-01",
-          dueOn: "2026-11-03",
-        },
-      });
-      const [op] = ops("proff_orders", "insert");
-      expect(op.values).toMatchObject({
-        status: "invoiced",
-        term: "yearly",
-        price_ex_vat_nok: 16092,
-        billing_email: "f@example.com",
-        period_start: "2026-11-03T10:00:00.000Z",
-        period_end: "2027-11-03T10:00:00.000Z",
-      });
+    it("registrerer fornyelse atomisk", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [{ data: id }];
+      await expect(
+        adminRegisterProffInvoiceSent({
+          data: {
+            organizationId: id,
+            term: "yearly",
+            fikenInvoiceNumber: "43",
+            sentOn: "2026-10-01",
+            dueOn: "2026-11-03",
+          },
+        }),
+      ).resolves.toEqual({ ok: true });
+      expect(s.ops.filter((op) => op.op !== "select")).toEqual([]);
     });
 
     it("409 når bestillingen ikke lenger er til fakturering", async () => {
-      s.queues.proff_orders = [{ data: null }];
+      s.queues["rpc:register_proff_invoice_sent"] = [
+        { error: { message: "order_not_invoiceable" } },
+      ];
       expect(await rejection(run())).toMatchObject({
         message: "Bestillingen er ikke lenger til fakturering.",
         status: 409,
       });
     });
 
+    it("409 når avtalen er avsluttet etter at admin åpnet oversikten", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [
+        { error: { message: "agreement_not_renewable" } },
+      ];
+      expect(await rejection(run())).toMatchObject({
+        message: "Avtalen er sagt opp, avsluttet eller ikke aktiv. Oppdater oversikten.",
+        status: 409,
+      });
+    });
+
+    it("409 når en annen administrator allerede har registrert faktura", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [{ error: { code: "23505" } }];
+      expect(await rejection(run())).toMatchObject({
+        message: "Bedriften har allerede en åpen faktura.",
+        status: 409,
+      });
+    });
+
     it("maskerer databasefeil", async () => {
-      s.queues.proff_orders = [{ error: dbError }];
+      s.queues["rpc:register_proff_invoice_sent"] = [{ error: dbError }];
       expect((await rejection(run())).message).toBe(GENERIC);
     });
   });

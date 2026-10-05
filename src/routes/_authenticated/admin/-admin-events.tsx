@@ -41,7 +41,7 @@ export const EVENT_KINDS: Record<AdminEventKind, { label: string; icon: LucideIc
       icon: Sparkles,
       to: "/admin/proff-abonnement",
     },
-    proff_cancelled: { label: "Prøveperiode avsluttet", icon: Ban, to: "/admin/proff-abonnement" },
+    proff_cancelled: { label: "Proff avsluttet", icon: Ban, to: "/admin/proff-abonnement" },
     proff_ordered: { label: "Proff bestilt", icon: Receipt, to: "/admin/proff-abonnement" },
     proff_invoice_due: {
       label: "Faktura skal sendes",

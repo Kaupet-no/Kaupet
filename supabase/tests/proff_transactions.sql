@@ -1,7 +1,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(33);
+SELECT plan(52);
 
 INSERT INTO public.organizations (id, organization_number, legal_name, display_name,
   selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_access_until,
@@ -155,5 +155,92 @@ SELECT ok(NOT has_function_privilege('authenticated', 'public.end_proff_agreemen
   AND has_function_privilege('service_role', 'public.end_proff_agreement(uuid,uuid,text)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.cancel_proff_subscription(uuid)', 'EXECUTE'),
   'Oppsigelsesoperasjonene er kun for serveren');
+-- Tilstandsovergang og feilgjetting: avbrutt prøveavslutning og gammel adminflate.
+INSERT INTO organizations (id, organization_number, legal_name, display_name, selected_plan,
+  proff_trial_started_at, proff_trial_ends_at, proff_access_until)
+VALUES ('00000000-0000-4000-8000-000000000105', '999000105', 'Prøve AS', 'Prøve', 'proff',
+  now(), now() + interval '30 days', now() + interval '30 days');
+INSERT INTO proff_orders (organization_id, term, price_ex_vat_nok, billing_email, status,
+  fiken_invoice_number, invoice_sent_on, invoice_due_on)
+VALUES ('00000000-0000-4000-8000-000000000105', 'monthly', 1490, 'faktura@example.com', 'invoiced',
+  'F-105', current_date, current_date + 30);
+CREATE FUNCTION pg_temp.reject_trial_cancel() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.organization_id = '00000000-0000-4000-8000-000000000105'
+    AND current_setting('kaupet_test.fail_trial_cancel', true) = 'on' THEN
+    RAISE EXCEPTION 'forced_trial_cancel_failure';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER test_reject_trial_cancel BEFORE UPDATE OF status ON proff_orders
+  FOR EACH ROW EXECUTE FUNCTION pg_temp.reject_trial_cancel();
+SET LOCAL kaupet_test.fail_trial_cancel = 'on';
+SELECT throws_ok($$SELECT * FROM public.cancel_proff_trial('00000000-0000-4000-8000-000000000105')$$,
+  'P0001', 'forced_trial_cancel_failure', 'Fakturafeil ruller tilbake prøveavslutningen');
+SELECT ok((SELECT selected_plan = 'proff' AND proff_trial_cancelled_at IS NULL
+  AND proff_access_until = proff_trial_ends_at FROM organizations
+  WHERE id = '00000000-0000-4000-8000-000000000105'), 'Prøvetilgangen bevares ved feil');
+SELECT is((SELECT status FROM proff_orders WHERE organization_id = '00000000-0000-4000-8000-000000000105'),
+  'invoiced', 'Fakturaen bevares ved feil');
+SET LOCAL kaupet_test.fail_trial_cancel = 'off';
+SELECT is((SELECT claimed::text || '|' || sent_invoice_number FROM public.cancel_proff_trial(
+  '00000000-0000-4000-8000-000000000105')), 'true|F-105', 'Retry avslutter prøven og rapporterer faktura');
+SELECT ok((SELECT selected_plan = 'proff_basis' AND proff_trial_cancelled_at IS NOT NULL
+  AND proff_access_until <= now() FROM organizations
+  WHERE id = '00000000-0000-4000-8000-000000000105'), 'Vellykket avslutning stopper prøvetilgangen');
+SELECT is((SELECT status FROM proff_orders WHERE organization_id = '00000000-0000-4000-8000-000000000105'),
+  'cancelled', 'Vellykket avslutning kansellerer fakturaen');
+SELECT ok(NOT (SELECT claimed FROM public.cancel_proff_trial('00000000-0000-4000-8000-000000000105')),
+  'Dobbeltklikk sender ingen ny prøvebekreftelse');
+SELECT throws_ok($$SELECT public.cancel_proff_trial('00000000-0000-4000-8000-000000000103')$$,
+  'P0001', 'trial_not_cancellable', 'Prøveavslutning kan ikke kutte en betalt periode');
+
+INSERT INTO organizations (id, organization_number, legal_name, display_name, selected_plan, proff_access_until)
+VALUES ('00000000-0000-4000-8000-000000000106', '999000106', 'Fornyelse AS', 'Fornyelse', 'proff', now() + interval '10 days');
+INSERT INTO organization_billing_profiles (organization_id, billing_email)
+VALUES ('00000000-0000-4000-8000-000000000106', 'faktura@example.com');
+INSERT INTO proff_orders (organization_id, term, price_ex_vat_nok, billing_email, status)
+VALUES ('00000000-0000-4000-8000-000000000106', 'monthly', 1490, 'faktura@example.com', 'paid');
+SELECT lives_ok($$SELECT public.register_proff_invoice_sent('F-106', current_date, current_date + 14,
+  NULL, '00000000-0000-4000-8000-000000000106', 'monthly', 1490)$$,
+  'Aktiv betalt avtale kan faktureres');
+SELECT lives_ok($$SELECT public.cancel_proff_subscription('00000000-0000-4000-8000-000000000106')$$,
+  'Oppsigelse kansellerer registrert fornyelsesfaktura');
+SELECT throws_ok($$SELECT public.register_proff_invoice_sent('F-107', current_date, current_date + 14,
+  NULL, '00000000-0000-4000-8000-000000000106', 'monthly', 1490)$$,
+  'P0001', 'agreement_not_renewable', 'Gammel adminflate kan ikke fakturere oppsagt avtale');
+SELECT is((SELECT count(*)::int FROM proff_orders WHERE organization_id = '00000000-0000-4000-8000-000000000106'
+  AND status IN ('pending', 'invoiced')), 0, 'Avvist fakturering etterlater ingen åpen faktura');
+UPDATE organizations SET proff_subscription_cancelled_at = NULL, proff_ended_by_kaupet_at = now()
+WHERE id = '00000000-0000-4000-8000-000000000106';
+SELECT throws_ok($$SELECT public.register_proff_invoice_sent('F-107', current_date, current_date + 14,
+  NULL, '00000000-0000-4000-8000-000000000106', 'monthly', 1490)$$,
+  'P0001', 'agreement_not_renewable', 'Kaupet-avsluttet avtale kan ikke faktureres');
+UPDATE organizations SET proff_ended_by_kaupet_at = NULL, proff_access_until = now() - interval '1 day'
+WHERE id = '00000000-0000-4000-8000-000000000106';
+SELECT throws_ok($$SELECT public.register_proff_invoice_sent('F-107', current_date, current_date + 14,
+  NULL, '00000000-0000-4000-8000-000000000106', 'monthly', 1490)$$,
+  'P0001', 'agreement_not_renewable', 'Utløpt avtale kan ikke automatisk fornyes');
+UPDATE organizations SET proff_access_until = now() + interval '10 days', selected_plan = 'proff_basis'
+WHERE id = '00000000-0000-4000-8000-000000000106';
+SELECT throws_ok($$SELECT public.register_proff_invoice_sent('F-107', current_date, current_date + 14,
+  NULL, '00000000-0000-4000-8000-000000000106', 'monthly', 1490)$$,
+  'P0001', 'agreement_not_renewable', 'Basisplan kan ikke faktureres som fornyelse');
+INSERT INTO proff_orders (id, organization_id, term, price_ex_vat_nok, billing_email)
+VALUES ('00000000-0000-4000-8000-000000000107', '00000000-0000-4000-8000-000000000106', 'monthly', 1490, 'faktura@example.com');
+SELECT lives_ok($$SELECT public.register_proff_invoice_sent('F-107', current_date, current_date + 14,
+  '00000000-0000-4000-8000-000000000107')$$, 'Eksplisitt ny bestilling kan faktureres før tilgang starter');
+SELECT throws_ok($$SELECT public.register_proff_invoice_sent('F-107', current_date, current_date + 14,
+  '00000000-0000-4000-8000-000000000107')$$,
+  'P0001', 'order_not_invoiceable', 'Samme bestilling registreres ikke sendt to ganger');
+SELECT ok(NOT has_function_privilege('anon', 'public.cancel_proff_trial(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.cancel_proff_trial(uuid)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.cancel_proff_trial(uuid)', 'EXECUTE'),
+  'Prøveavslutning er kun tilgjengelig for serveren');
+SELECT ok(NOT has_function_privilege('anon', 'public.register_proff_invoice_sent(text,date,date,uuid,uuid,text,integer,uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.register_proff_invoice_sent(text,date,date,uuid,uuid,text,integer,uuid)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.register_proff_invoice_sent(text,date,date,uuid,uuid,text,integer,uuid)', 'EXECUTE'),
+  'Fakturaregistrering er kun tilgjengelig for serveren');
+
 SELECT * FROM finish();
 ROLLBACK;

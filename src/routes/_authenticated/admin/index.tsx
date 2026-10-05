@@ -27,6 +27,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { EventLinkRow, type AdminEventKind } from "./-admin-events";
 
 // recharts er ~95 KiB brotli og trengs ikke i første maling — kun
@@ -84,7 +86,7 @@ function AdminDashboard() {
   // ponytail: henter inntil 500 åpne hendelser og teller per område i klienten;
   // bytt til en gruppert RPC hvis køen noen gang blir så lang.
   const openEvents = useQuery({
-    queryKey: ["admin-events", false, null],
+    queryKey: ["admin-events", "overview"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("admin_events")
@@ -97,7 +99,7 @@ function AdminDashboard() {
     },
   });
   const countKinds = (...kinds: AdminEventKind[]) =>
-    openEvents.data?.filter((e) => kinds.includes(e.kind as AdminEventKind)).length ?? 0;
+    openEvents.data?.filter((e) => kinds.includes(e.kind as AdminEventKind)).length;
 
   return (
     <div className="space-y-10">
@@ -110,6 +112,23 @@ function AdminDashboard() {
             Åpne hendelser fordelt på hvor de håndteres.
           </p>
         </div>
+        {openEvents.isError && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              Kunne ikke hente åpne hendelser.
+              {openEvents.data && " Viste tall kan være utdaterte."}
+              <Button
+                type="button"
+                variant="outline"
+                className="ml-3"
+                disabled={openEvents.isFetching}
+                onClick={() => void openEvents.refetch()}
+              >
+                Prøv igjen
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
           <AttentionCard
             to="/admin/moderasjon"
@@ -331,7 +350,7 @@ function AttentionCard({
   to: string;
   icon: React.ReactNode;
   label: string;
-  count: number;
+  count: number | undefined;
   loading: boolean;
 }) {
   return (
@@ -344,8 +363,14 @@ function AttentionCard({
         {label}
         <ChevronRight className="ml-auto size-4" aria-hidden="true" />
       </p>
-      <p className={`mt-3 text-lg font-semibold tabular-nums ${count > 0 ? "text-primary" : ""}`}>
-        {loading ? "—" : count === 0 ? "Ingen åpne" : `${count} ${count === 1 ? "åpen" : "åpne"}`}
+      <p
+        className={`mt-3 text-lg font-semibold tabular-nums ${(count ?? 0) > 0 ? "text-primary" : ""}`}
+      >
+        {loading || count === undefined
+          ? "—"
+          : count === 0
+            ? "Ingen åpne"
+            : `${count} ${count === 1 ? "åpen" : "åpne"}`}
       </p>
     </Link>
   );

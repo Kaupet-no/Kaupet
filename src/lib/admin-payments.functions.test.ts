@@ -259,46 +259,28 @@ describe("admin-proff: fakturering, betaling og kansellering", () => {
   });
 
   describe("adminEndProffAgreement", () => {
-    const org = {
-      display_name: "Eksempel",
-      legal_name: "Eksempel AS",
-      proff_access_until: "2099-01-01T00:00:00.000Z",
-      proff_subscription_cancelled_at: null,
+    const ended = {
+      claimed: true,
+      access_until: "2099-01-01T00:00:00.000Z",
+      overdue_invoice_number: "10009",
+      overdue_due_on: "2020-01-15",
+      credited_invoice_number: "10009",
     };
     const run = (note?: string) => adminEndProffAgreement({ data: { organizationId: id, note } });
+    beforeEach(() => {
+      s.queues.organizations = [{ data: { display_name: "Eksempel", legal_name: "Eksempel AS" } }];
+    });
 
-    it("kansellerer åpne fakturaer, stopper fornyelse og lar tilgangen stå", async () => {
-      s.queues.organizations = [{ data: org }, { data: null }];
-      s.queues.proff_orders = [
-        {
-          data: [
-            {
-              status: "cancelled",
-              fiken_invoice_number: "10009",
-              invoice_sent_on: "2020-01-01",
-              invoice_due_on: "2020-01-15",
-            },
-          ],
-        },
-      ];
-      s.queues.admin_events = [{ data: null }];
-      s.queues.admin_moderation_log = [{ data: null }];
+    it("avslutter atomisk og sender e-post med forfalt og kreditert faktura", async () => {
+      s.queues["rpc:end_proff_agreement"] = [{ data: ended }];
 
       await expect(run("Ubetalt etter purring")).resolves.toEqual({
         ok: true,
-        accessUntil: org.proff_access_until,
+        accessUntil: ended.access_until,
       });
 
-      const [orders] = ops("proff_orders", "update");
-      expect(orders.values).toEqual({ status: "cancelled", admin_note: "Ubetalt etter purring" });
-      expect(orders.filters).toContainEqual(["in", "status", ["pending", "invoiced"]]);
-      const [orgUpdate] = ops("organizations", "update");
-      expect(orgUpdate.values).toMatchObject({
-        proff_ended_by_kaupet_at: expect.any(String),
-        proff_subscription_cancelled_at: expect.any(String),
-      });
-      expect(orgUpdate.values).not.toHaveProperty("proff_access_until");
-
+      // Ingen løse skriveoperasjoner utenom transaksjonen.
+      expect(s.ops.filter((o) => o.op !== "select")).toEqual([]);
       const [, , buildEmail, options] = s.sendReceipt.mock.calls[0]!;
       const email = buildEmail();
       expect(options).toEqual({ includeBilling: true });
@@ -310,14 +292,32 @@ describe("admin-proff: fakturering, betaling og kansellering", () => {
     });
 
     it("bruker nøytral tekst når ingen faktura har forfalt", async () => {
-      s.queues.organizations = [{ data: org }, { data: null }];
-      s.queues.proff_orders = [{ data: [] }];
-      s.queues.admin_events = [{ data: null }];
-      s.queues.admin_moderation_log = [{ data: null }];
+      s.queues["rpc:end_proff_agreement"] = [
+        {
+          data: {
+            ...ended,
+            overdue_invoice_number: null,
+            overdue_due_on: null,
+            credited_invoice_number: null,
+          },
+        },
+      ];
       await run();
       const email = s.sendReceipt.mock.calls[0]![2]();
       expect(email.text).toContain("Kaupet har avsluttet Proff-avtalen for Eksempel.");
       expect(email.text).not.toContain("kreditnota");
+    });
+
+    it("sender ikke ny e-post ved dobbeltklikk", async () => {
+      s.queues["rpc:end_proff_agreement"] = [{ data: { ...ended, claimed: false } }];
+      await expect(run()).resolves.toEqual({ ok: true, accessUntil: ended.access_until });
+      expect(s.sendReceipt).not.toHaveBeenCalled();
+    });
+
+    it("maskerer transaksjonsfeil og sender ingen e-post", async () => {
+      s.queues["rpc:end_proff_agreement"] = [{ error: dbError }];
+      expect((await rejection(run())).message).toBe(GENERIC);
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
   });
 

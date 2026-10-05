@@ -3594,6 +3594,24 @@ export type Database = {
           term: string
         }[]
       }
+      cancel_proff_subscription: {
+        Args: { _organization_id: string }
+        Returns: {
+          access_until: string | null
+          claimed: boolean
+          sent_invoice_number: string | null
+        }[]
+      }
+      end_proff_agreement: {
+        Args: { _admin_id: string; _note?: string; _organization_id: string }
+        Returns: {
+          access_until: string | null
+          claimed: boolean
+          credited_invoice_number: string | null
+          overdue_due_on: string | null
+          overdue_invoice_number: string | null
+        }[]
+      }
       start_proff_trial_order: {
         Args: {
           _billing_email: string

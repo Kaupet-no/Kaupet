@@ -195,6 +195,17 @@ function buildAdmin(
       });
       return { data: "33333333-3333-4333-8333-333333333333", error: null };
     }
+    if (name === "cancel_proff_subscription") {
+      const claimed = !organization.proff_subscription_cancelled_at;
+      if (claimed)
+        Object.assign(organization, { proff_subscription_cancelled_at: new Date().toISOString() });
+      return {
+        data: [
+          { claimed, access_until: organization.proff_access_until, sent_invoice_number: null },
+        ],
+        error: null,
+      };
+    }
     if (name === "organization_has_proff_access") {
       return {
         data:
@@ -461,13 +472,11 @@ describe("business server functions", () => {
       proff_access_until: paidUntil,
       proff_subscription_cancelled_at: expect.any(String),
     });
-    expect(admin.calls.updates).toContainEqual({
-      status: "cancelled",
-      admin_note: "Sagt opp av kunden",
+    // Oppsigelse og kansellering av åpen faktura skjer atomisk i databasen.
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith("cancel_proff_subscription", {
+      _organization_id: organizationId,
     });
-    expect(admin.calls.updates).not.toContainEqual(
-      expect.objectContaining({ proff_access_until: expect.anything() }),
-    );
+    expect(admin.calls.updates).toEqual([]);
     expect(receipts()).toEqual([
       {
         subject: "Oppsigelsen av Kaupet Proff er bekreftet",

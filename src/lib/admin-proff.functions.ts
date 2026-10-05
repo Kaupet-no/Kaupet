@@ -335,83 +335,45 @@ export const adminEndProffAgreement = createServerFn({ method: "POST" })
     await requireAdmin(context.supabase, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
 
-    const { data: org, error: orgError } = await supabaseAdmin
-      .from("organizations")
-      .select("display_name, legal_name, proff_access_until, proff_subscription_cancelled_at")
-      .eq("id", data.organizationId)
-      .single();
-    if (orgError) {
-      throw await toClientError("database", orgError);
-    }
-
-    const { data: cancelled, error: cancelError } = await supabaseAdmin
-      .from("proff_orders")
-      .update({ status: "cancelled", admin_note: data.note || "Avtalen avsluttet av Kaupet" })
-      .eq("organization_id", data.organizationId)
-      .in("status", ["pending", "invoiced"])
-      .select("status, fiken_invoice_number, invoice_due_on, invoice_sent_on");
-    if (cancelError) {
-      throw await toClientError("database", cancelError);
-    }
-
-    const endedAt = new Date().toISOString();
-    const { error: endError } = await supabaseAdmin
-      .from("organizations")
-      .update({
-        proff_ended_by_kaupet_at: endedAt,
-        proff_subscription_cancelled_at: org.proff_subscription_cancelled_at ?? endedAt,
+    // Fakturaer, avtalestatus, hendelse og logg lagres atomisk. claimed er
+    // false når avtalen allerede var avsluttet (dobbeltklikk): da sendes ingen ny e-post.
+    const { data: ended, error } = await supabaseAdmin
+      .rpc("end_proff_agreement", {
+        _organization_id: data.organizationId,
+        _admin_id: context.userId,
+        _note: data.note,
       })
-      .eq("id", data.organizationId);
-    if (endError) {
-      throw await toClientError("database", endError);
+      .single();
+    if (error) {
+      throw await toClientError("database", error);
     }
-    if (!org.proff_subscription_cancelled_at) {
-      // Triggeren lager «sa opp Proff»-hendelsen; her er det admin selv som avsluttet.
-      await supabaseAdmin
-        .from("admin_events")
-        .update({ handled_at: new Date().toISOString(), handled_by: context.userId })
-        .eq("target_id", data.organizationId)
-        .eq("kind", "proff_cancelled")
-        .is("handled_at", null);
+    if (!ended.claimed) return { ok: true, accessUntil: ended.access_until };
+
+    const { data: org } = await supabaseAdmin
+      .from("organizations")
+      .select("display_name, legal_name")
+      .eq("id", data.organizationId)
+      .maybeSingle();
+    if (org) {
+      await sendBusinessReceipt(
+        supabaseAdmin,
+        data.organizationId,
+        () =>
+          proffEndedByKaupetEmail({
+            displayName: org.display_name,
+            legalName: org.legal_name,
+            accessUntil: ended.access_until,
+            overdueInvoice:
+              ended.overdue_invoice_number && ended.overdue_due_on
+                ? { number: ended.overdue_invoice_number, dueOn: ended.overdue_due_on }
+                : null,
+            creditedInvoiceNumber: ended.credited_invoice_number,
+          }),
+        { includeBilling: true },
+      );
     }
 
-    const { error: logError } = await supabaseAdmin.from("admin_moderation_log").insert({
-      admin_id: context.userId,
-      action: "end_proff_agreement",
-      target_type: "organization",
-      target_id: data.organizationId,
-      reason: data.note || null,
-    });
-    if (logError) {
-      console.error("adminEndProffAgreement: moderation log failed", logError.message);
-    }
-
-    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" });
-    const sent = (cancelled ?? []).filter(
-      (order) => order.invoice_sent_on && order.fiken_invoice_number,
-    );
-    const overdue = sent.find((order) => order.invoice_due_on && order.invoice_due_on < today);
-    const accessUntil =
-      org.proff_access_until && Date.parse(org.proff_access_until) > Date.now()
-        ? org.proff_access_until
-        : null;
-    await sendBusinessReceipt(
-      supabaseAdmin,
-      data.organizationId,
-      () =>
-        proffEndedByKaupetEmail({
-          displayName: org.display_name,
-          legalName: org.legal_name,
-          accessUntil,
-          overdueInvoice: overdue
-            ? { number: overdue.fiken_invoice_number!, dueOn: overdue.invoice_due_on! }
-            : null,
-          creditedInvoiceNumber: sent[0]?.fiken_invoice_number ?? null,
-        }),
-      { includeBilling: true },
-    );
-
-    return { ok: true, accessUntil };
+    return { ok: true, accessUntil: ended.access_until };
   });
 
 export const adminCancelProffOrder = createServerFn({ method: "POST" })

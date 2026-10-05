@@ -245,29 +245,19 @@ async function cancelPaidSubscription(
   organizationId: string,
   userId: string,
 ) {
-  const cancelledAt = new Date().toISOString();
-  const { data: claimed, error } = await supabaseAdmin
-    .from("organizations")
-    .update({ proff_subscription_cancelled_at: cancelledAt })
-    .eq("id", organizationId)
-    .is("proff_subscription_cancelled_at", null)
-    .select("id");
+  // Oppsigelse og kansellering av åpen faktura lagres atomisk.
+  const { data, error } = await supabaseAdmin.rpc("cancel_proff_subscription", {
+    _organization_id: organizationId,
+  });
   if (error) {
     throw await toClientError("database", error);
   }
-  const { data: cancelledOrders, error: orderError } = await supabaseAdmin
-    .from("proff_orders")
-    .update({ status: "cancelled", admin_note: "Sagt opp av kunden" })
-    .eq("organization_id", organizationId)
-    .in("status", ["pending", "invoiced"])
-    .select("status, fiken_invoice_number");
-  if (orderError) {
-    throw await toClientError("database", orderError);
-  }
+  const cancelled = data?.[0];
   const organization = await getOrganization(supabaseAdmin, organizationId);
-  // Bare én bekreftelse, også ved dobbeltklikk: claimed er tom når den allerede var sagt opp.
+  // Bare én bekreftelse, også ved dobbeltklikk: claimed er false når den allerede var sagt opp.
   const accessUntil = organization.proff_access_until;
-  if (claimed?.length && accessUntil) {
+  const cancelledAt = organization.proff_subscription_cancelled_at;
+  if (cancelled?.claimed && accessUntil && cancelledAt) {
     await sendBusinessReceipt(
       supabaseAdmin,
       organizationId,
@@ -277,7 +267,7 @@ async function cancelPaidSubscription(
           legalName: organization.legal_name,
           cancelledAt,
           accessUntil,
-          sentInvoiceNumber: sentInvoiceNumber(cancelledOrders),
+          sentInvoiceNumber: cancelled.sent_invoice_number,
         }),
       { userIds: [userId], includeBilling: true },
     );

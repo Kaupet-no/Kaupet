@@ -159,9 +159,12 @@ export function BedriftsvilkarContent({
       <section id="proff" className="scroll-mt-24">
         <h2 className="font-display text-2xl">9. Planer, priser og betaling</h2>
         <p className="mt-3">
-          Bedriftskontoer kan velge «Proff basis» eller «Proff». Proff basis er gratis. Proff er et
-          løpende abonnement som bestilles med månedlig eller årlig fakturering. Første bestilling
-          gir én ikke-fornybar prøveperiode på 30 dager med umiddelbar tilgang.
+          Kaupet tilbyr to ulike avtaleplaner for bedriftskontoer: «Proff basis» og «Proff». «Proff
+          basis» er tilgjengelig for alle bedriftskontoer uten kostnad, og inkluderer all
+          grunnleggende funksjonalitet. «Proff» er et betalt abonnement for bedrifter som ønsker
+          utvidet funksjonalitet. Det er et løpende abonnement som bestilles med månedlig eller
+          årlig fakturering. Første bestilling gir én ikke-fornybar prøveperiode på 30 dager med
+          umiddelbar tilgang.
         </p>
         <p className="mt-3">
           Første faktura sendes i god tid før prøveperioden utløper, med forfall den dagen
@@ -200,9 +203,9 @@ export function BedriftsvilkarContent({
         <p className="mt-3">
           Bedriften kan kjøpe «fremhevet annonse». Én navngitt annonse vises da i en egen
           «Fremhevet»-seksjon øverst i relevante søk og kategorisider i valgt antall dager (3 eller
-          5). Inntil to fremhevede annonser vises om gangen — om flere annonser har aktiv
-          fremheving, velges to tilfeldig per visning. Pris vises i kjøpsdialogen, og betalingen
-          belastes umiddelbart. Fremhevingen aktiveres når betalingen er bekreftet.
+          5). Inntil to fremhevede annonser vises om gangen. Om flere annonser har aktiv fremheving,
+          velges to tilfeldig per visning. Pris vises i kjøpsdialogen, og betalingen belastes
+          umiddelbart. Fremhevingen aktiveres når betalingen er bekreftet.
         </p>
         <p className="mt-3">
           Kjøpet er et kjøp mellom næringsdrivende, og angrerettloven gjelder ikke. Kan fremhevingen

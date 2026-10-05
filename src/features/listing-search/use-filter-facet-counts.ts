@@ -16,7 +16,7 @@ type Args = {
 
 /**
  * Per-value result counts (e.g. "Diesel 98") shown next to filter options in
- * chip popovers and the "Flere filter" dialog, via the
+ * chip popovers and the search filter panel, via the
  * `listing_filter_facet_counts` RPC. Mirrors the category/condition/price
  * resolution `use-listings-query.ts` does for the main listings fetch, minus
  * the free-text/radius id constraint — a facet count that ignores an active

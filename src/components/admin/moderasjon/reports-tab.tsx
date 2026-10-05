@@ -18,6 +18,7 @@ import {
 import { adminListReports, adminResolveReport } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
+import { invalidateAdminEvents } from "@/hooks/use-admin-events";
 
 type ReportRow = {
   id: string;
@@ -57,6 +58,7 @@ export function ReportsTab() {
     onSuccess: () => {
       showSuccessToast("Rapporten er markert som løst");
       qc.invalidateQueries({ queryKey: ["admin-reports"] });
+      invalidateAdminEvents(qc);
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke løse rapporten")),
   });

@@ -5,6 +5,5 @@ export type CategoryRow = {
   parent_id: string | null;
   icon: string | null;
   color: string | null;
-  heading_font: string | null;
   search_examples: string[] | null;
 };

@@ -1,0 +1,1006 @@
+import { formatNokNumber } from "@/lib/format";
+import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { Bell, FolderOpen, Save, X } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { Button } from "@/components/ui/button";
+import { SearchBar } from "@/features/listing-search/filters/search-bar";
+import { SaveSearchDialog } from "@/features/listing-search/filters/advanced-search-sheet";
+import { ActiveFilters } from "@/features/listing-search/filters/active-filters";
+import { ResultList } from "@/components/result-list";
+import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
+import { MobileFilterButton } from "@/features/listing-search/search-panel/mobile-filter-button";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
+import { SearchFilterChipRow } from "@/features/listing-search/search-panel/search-filter-chip-row";
+import { saveLastSearchContext } from "@/lib/last-search-context";
+import { summarizeCriteria, type SavedSearch } from "@/lib/saved-searches";
+import { WtbListingCard } from "@/components/wtb-listing-card";
+import type { SearchParams } from "@/features/listing-search/search-schema";
+import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
+import { SearchInterpretation } from "@/features/listing-search/search-interpretation";
+import type { InterpretedCriterion } from "@/features/listing-search/resolve-text-to-filters";
+import {
+  buildStructuredSearchSuggestions,
+  type StructuredSearchSuggestion,
+} from "@/features/listing-search/structured-search-suggestions";
+import {
+  matchCategoryPhrase,
+  matchVehicleBrandPhrase,
+  matchVehicleAttributeOptionPhrase,
+  removeCategoryMatch,
+} from "@/lib/search-category-match";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { useBrandCategoryCandidate } from "@/features/listing-search/use-brand-category-candidate";
+import { stripFillerWords } from "@/lib/search-stopwords";
+import { parseNumericFilters } from "@/lib/search-number-parser";
+import {
+  vehicleCategoryGroupFor,
+  vehicleCategoriesForBrandGroup,
+  genericBrandFilterFor,
+} from "@/lib/category-filters";
+import { getCategoryBehavior } from "@/lib/category-behavior";
+import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
+import { useAuth } from "@/hooks/use-auth";
+import { useIsNative } from "@/hooks/use-is-native";
+import { useIsDesktop } from "@/hooks/use-form-factor";
+import { NativePageHeader } from "@/components/native-page-header";
+import { hapticImpact } from "@/lib/haptics";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
+import { CategoryBreadcrumb } from "@/components/category-breadcrumb";
+import { ScrollArrowRow } from "@/components/scroll-arrow-row";
+import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
+import {
+  breadcrumbPath,
+  buildTree,
+  descendants,
+  pathFromAncestor,
+  resolveHeroCategory,
+  type Category,
+} from "@/lib/categories";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { useSearchInterpretation } from "@/features/listing-search/use-search-interpretation";
+import { SearchSuggestionsLayer } from "@/features/listing-search/search-suggestions-layer";
+import { SearchStart } from "@/features/listing-search/search-start";
+import { criteriaToValue, DEFAULT_SEARCH_RADIUS_KM } from "@/lib/advanced-search-value";
+
+const noopSubscribe = () => () => {};
+
+/** Lukker tastaturet og forslagene etter et valg i forslagslaget. */
+function blurActiveElement() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
+
+export type SearchResultsScope = {
+  /** The route's own URL-level category — a main category for /{slug}, or a
+   * subcategory for /{main}/{sub}. Drilling deeper (via `subSlug`) never
+   * leaves the page — it only changes which descendant is scoped/shown. */
+  category: Category;
+  /** Breadcrumb chain of *real, distinct URLs* leading to (and including)
+   * `category` — [main] or [main, sub]. */
+  breadcrumb: Category[];
+  /** Slug of a descendant of `category` to scope the page to instead — e.g.
+   * from the homepage's category picker drilling past this page's own level
+   * (Interiør > Møbler > Sofa still lands on /interiør, with `sub` carrying
+   * "sofa"). Ignored if it isn't actually a descendant of `category`. */
+  subSlug?: string;
+  /** Search param key `subSlug` is read from/written to — "sub" on /{main},
+   * but that name is already a path param on /{main}/{sub}, so that route
+   * uses "sub2" instead. */
+  subSlugParam: "sub" | "sub2";
+};
+
+/**
+ * The search results page — /annonser, and the category pages (/{main},
+ * /{main}/{sub}), which are the same page with `scope` locking the category
+ * to the URL's. One component so the two can't drift apart.
+ */
+export function SearchResultsPage({
+  search,
+  navigate,
+  scope,
+}: {
+  search: SearchParams;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  navigate: (opts: any) => unknown;
+  scope?: SearchResultsScope;
+}) {
+  const isNative = useIsNative();
+  const queryClient = useQueryClient();
+  const navigateTo = useNavigate();
+  const { user } = useAuth();
+  const [qDraft, setQDraft] = useState(search.q);
+  // false i SSR og under hydrering, true ellers — også ved første render
+  // på klientnavigasjon, så skjelettet ikke blinker da.
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+  const isDesktop = useIsDesktop();
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const { open: searchPanelOpen, openPanel } = useSearchPanel();
+  // I URL-en, så tilbake-knappen og delte lenker beholder fanen. Hvilken fane
+  // som faktisk vises, avgjøres under (activeTab) — uten ØK-treff faller den
+  // tilbake til «Til salgs», ellers ville fanelinja forsvinne med ØK-visningen.
+  const requestedTab = search.results ?? "listings";
+  const setActiveTab = (tab: "listings" | "wtb") =>
+    navigate({
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        results: tab === "wtb" ? "wtb" : undefined,
+      }),
+      replace: true,
+    });
+  // Søk fra forsiden/landingssiden tar med tolkningen i router-state, så
+  // «Tolket som» viser hva Kaupet la til (f.eks. kategori) i stedet for at
+  // filteret dukker opp uforklart.
+  const [interpretedCriteria, setInterpretedCriteria] = useSearchInterpretation();
+  const [ignoredInterpretations, setIgnoredInterpretations] = useState<Set<string>>(new Set());
+
+  const { refreshing, pullDistance } = usePullToRefresh({
+    enabled: isNative && mounted && !searchPanelOpen && !saveSearchOpen,
+    onRefresh: async () => {
+      await queryClient.resetQueries({ queryKey: ["listings"] });
+    },
+  });
+
+  const [prevQ, setPrevQ] = useState(search.q);
+  if (search.q !== prevQ) {
+    setPrevQ(search.q);
+    setQDraft(search.q);
+  }
+
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
+
+  const { data: allFilters } = useAllCategoryFilters();
+
+  // Kategorisidene: kategorien er låst til URL-ens (eller en dypere `sub`),
+  // og hele undertreet søkes — en hub som «Møbler» dekker også «Sofa» osv.
+  const scopeTree = useMemo(() => buildTree(categories), [categories]);
+  const scopeSelected = useMemo(() => {
+    if (!scope) return null;
+    if (!scope.subSlug) return scope.category;
+    const found = scopeTree.bySlug.get(scope.subSlug);
+    if (!found || found.id === scope.category.id) return scope.category;
+    const isDescendant = descendants(scope.category, scopeTree).some((d) => d.id === found.id);
+    return isDescendant ? found : scope.category;
+  }, [scope, scopeTree]);
+  const shellSearch: SearchParams = useMemo(
+    () =>
+      scopeSelected
+        ? {
+            ...search,
+            category: "",
+            categories: [
+              scopeSelected.slug,
+              ...descendants(scopeSelected, scopeTree).map((d) => d.slug),
+            ],
+            catMode: "any",
+          }
+        : search,
+    [search, scopeSelected, scopeTree],
+  );
+  // Et annet kategorinivå på en kategoriside endrer bare søkeparameteren —
+  // siden blir på sin egen URL.
+  const selectScopeCategory = (target: Category) =>
+    navigate({
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        [scope!.subSlugParam]: target.id === scope!.category.id ? undefined : target.slug,
+      }),
+    });
+
+  const {
+    location,
+    effectiveCategories,
+    categoryTree,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    terms,
+    appliedSearch,
+    currentCriteria,
+    updateSearch,
+    applyPanelDraft,
+    resetFilters: resetSearchFilters,
+    justCreatedKeys,
+    removeAttrWithRestore,
+    activeFilterCount,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    totalCount,
+    zeroResultExpansion,
+    zeroResultExpansions,
+    zeroResultExpansionPending,
+    cards,
+    mapListings,
+    mapCenter,
+    searchPanelResults,
+  } = useSearchResultsShell({
+    search: shellSearch,
+    navigate,
+    categories,
+    allFilters,
+    qDraft,
+    setQDraft,
+    // See resolveHeroCategory below — the hero is recomputed from this same
+    // effectiveCategories/categoryTree pair right after this call, since the
+    // shell needs a resolved category id before it can even know `hero`.
+    resolveCategoryId: scopeSelected
+      ? () => scopeSelected.id
+      : (ec, tree) => resolveHeroCategory(ec, tree)?.selected.id ?? null,
+    // Kategorisidens kategori kommer fra URL-en og kan ikke fjernes her.
+    canRemoveCategoryInZeroResultExpansion: !scope,
+    onInterpreted: setInterpretedCriteria,
+    ignoredInterpretations,
+    markIgnored: (restoredText) =>
+      setIgnoredInterpretations(
+        (previous) => new Set([...previous, restoredText.toLocaleLowerCase()]),
+      ),
+  });
+
+  // When the category filter narrows the results down to a single main-category
+  // branch, the page presents itself like that category's own landing page —
+  // "/Kategori" over the category's color, with its subcategories to drill
+  // into — so a search that started out category-less still shows which
+  // category the user ended up in.
+  const hero = useMemo(
+    () =>
+      scope && scopeSelected
+        ? { selected: scopeSelected, main: scope.breadcrumb[0] }
+        : resolveHeroCategory(effectiveCategories, categoryTree),
+    [scope, scopeSelected, effectiveCategories, categoryTree],
+  );
+  // Always just the main category — not `hero.selected`, which can drill
+  // deeper as subcategories narrow the selection. With multi-select
+  // subcategories, `selected` is whichever one happened to be picked most
+  // recently, so a title that followed it would flip around confusingly;
+  // the main category's own name stays stable no matter how many (or which)
+  // subcategories are toggled.
+  // Kategorisider: URL-kjeden pluss eventuell dypere `sub`-sti.
+  const heroBreadcrumb = useMemo(() => {
+    if (scope && scopeSelected)
+      return [...scope.breadcrumb, ...pathFromAncestor(scope.category, scopeSelected, scopeTree)];
+    return hero ? breadcrumbPath(hero.main, categoryTree) : [];
+  }, [scope, scopeSelected, scopeTree, hero, categoryTree]);
+  const categoryTokenLabel = useMemo(() => {
+    const names = effectiveCategories
+      .map((slug: string) => categoryTree.bySlug.get(slug)?.name_nb)
+      .filter((name: string | undefined): name is string => !!name);
+    if (names.length === 0) return null;
+    return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+  }, [effectiveCategories, categoryTree]);
+  const interpretedKeys = useMemo(
+    () =>
+      new Set(
+        interpretedCriteria
+          .filter(
+            (criterion): criterion is Extract<InterpretedCriterion, { kind: "attribute" }> =>
+              criterion.kind === "attribute",
+          )
+          .map((criterion) => criterion.key),
+      ),
+    [interpretedCriteria],
+  );
+  const activeAttrValues = useMemo(
+    () =>
+      Object.fromEntries(Object.entries(attrValues).filter(([key]) => !interpretedKeys.has(key))),
+    [attrValues, interpretedKeys],
+  );
+  const resetFilters = () => {
+    setInterpretedCriteria([]);
+    setIgnoredInterpretations(new Set());
+    resetSearchFilters();
+  };
+
+  // Recognizes a category name typed as a whole phrase (e.g. "mobiltelefon")
+  // and applies it as the category filter — the same action as clicking the
+  // "Gå til kategori" suggestion in SearchBar, just without requiring the
+  // click. See search-category-match.ts. Only on /annonser: category
+  // landing pages are already scoped to one category, so auto-navigating
+  // away based on typed text there would be surprising rather than helpful.
+  // A category match is confirmed (click or Enter) rather than applied the
+  // instant it's recognized — unlike the attribute/number matches above, it
+  // triggers a full page navigation (new hero, new breadcrumb), which is too
+  // disruptive to fire mid-sentence while the user is still typing. Tracking
+  // `dismissedMatchText` keeps a closed suggestion closed for that exact
+  // phrase instead of it reappearing on every keystroke.
+  const [dismissedMatchText, setDismissedMatchText] = useState<string | null>(null);
+  // Vehicle brand names ("Volvo") don't match any category name, so without
+  // this a query like "Volvo med cruisecontrol" never gets a category
+  // assigned — and the equipment-synonym matcher above requires one to scope
+  // its vocabulary lookup, so "cruisecontrol" would just fall through to a
+  // plain text search that finds nothing. See matchVehicleBrandPhrase.
+  const advancedSearchCount = (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0);
+  const hasExtraSearchRules =
+    search.qMode === "any" || search.extraGroups.some((group) => group.terms.length > 0);
+  const ordinaryFilterCount = Math.max(0, activeFilterCount - advancedSearchCount);
+  const { data: vehicleBrands } = useAllVehicleBrands();
+  const submitQuery = (text = qDraft) => {
+    void hapticImpact("medium");
+    void submitSearch({
+      applied: appliedSearch,
+      query: text,
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (next) => {
+        setQDraft(next.q);
+        navigate({ search: next, resetScroll: false });
+      },
+    });
+  };
+  // Valg fra forslagslaget og Søk-fanens startflate.
+  const pickQuery = (text: string) => {
+    blurActiveElement();
+    setQDraft(text);
+    submitQuery(text);
+  };
+  const pickCategory = (category: Category) => {
+    blurActiveElement();
+    // Kategorisidens kategori er låst — et annet kategorivalg er et nytt søk.
+    if (scope) {
+      void navigateTo({
+        to: "/annonser",
+        search: { q: "", category: "", categories: [category.slug], sort: "new" },
+      });
+      return;
+    }
+    const needle = category.name_nb.toLocaleLowerCase();
+    const nextQ = qDraft.toLocaleLowerCase().trim() === needle ? "" : qDraft;
+    setQDraft(nextQ);
+    updateSearch({ category: "", categories: [category.slug], q: nextQ });
+  };
+  const pickSavedSearch = (saved: SavedSearch) => {
+    blurActiveElement();
+    void submitSearch({
+      applied: {
+        value: criteriaToValue(saved.criteria),
+        attributes: saved.criteria.attributes ?? {},
+      },
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (next) => {
+        setQDraft(next.q);
+        navigate({ search: next });
+      },
+    });
+  };
+  // Uten kriterier er dette Søk-fanens startflate på native.
+  const showSearchStart =
+    isNative && !search.q && effectiveCategories.length === 0 && activeFilterCount === 0;
+  const rawCategoryMatch = useMemo(() => {
+    const m =
+      matchCategoryPhrase(qDraft, categories ?? []) ??
+      matchVehicleBrandPhrase(qDraft, vehicleBrands ?? []) ??
+      matchVehicleAttributeOptionPhrase(qDraft, allFilters ?? [], categories ?? []);
+    return m && m.matchedText !== dismissedMatchText ? m : null;
+  }, [qDraft, categories, vehicleBrands, allFilters, dismissedMatchText]);
+
+  // For a brand match, resolve the "Bil og MC" root fallback from
+  // matchVehicleBrandPhrase down to the actual subcategory (e.g. "Bil") the
+  // brand's category_group implies — computed live from the category tree
+  // (vehicleCategoriesForBrandGroup) rather than a hardcoded slug table, so
+  // it survives category-tree restructuring. Some groups (moped_atv,
+  // bobil_campingvogn) now span two categories after being split, so those
+  // need useBrandCategoryCandidate to pick the one with more matching
+  // listings for the current query.
+  const brandCategoryCandidates = useMemo(() => {
+    if (rawCategoryMatch?.source !== "brand" || !rawCategoryMatch.brandCategoryGroup) return [];
+    return vehicleCategoriesForBrandGroup(
+      rawCategoryMatch.brandCategoryGroup,
+      categories ?? [],
+      allFilters ?? [],
+      categoryTree.byId,
+    );
+  }, [rawCategoryMatch, categories, allFilters, categoryTree]);
+  const { candidate: brandCategoryCandidate, isLoading: brandCategoryCandidateLoading } =
+    useBrandCategoryCandidate(brandCategoryCandidates, qDraft);
+
+  const categoryMatch = useMemo(() => {
+    // Kategorisider er allerede avgrenset; å flytte brukeren ut av siden
+    // basert på skrevet tekst ville vært overraskende.
+    if (!rawCategoryMatch || scope) return null;
+    if (rawCategoryMatch.source !== "brand" || brandCategoryCandidates.length === 0) {
+      return rawCategoryMatch;
+    }
+    // Ambiguous group (2+ candidates): wait for the count comparison before
+    // showing the banner, so it doesn't first suggest "Bil og MC" and then
+    // jump to the resolved subcategory under the user.
+    if (brandCategoryCandidateLoading) return null;
+    if (!brandCategoryCandidate) return rawCategoryMatch;
+    return {
+      ...rawCategoryMatch,
+      categorySlug: brandCategoryCandidate.slug,
+      categoryName: brandCategoryCandidate.name_nb,
+    };
+  }, [
+    rawCategoryMatch,
+    brandCategoryCandidates,
+    brandCategoryCandidateLoading,
+    brandCategoryCandidate,
+    scope,
+  ]);
+
+  const applyCategoryMatch = () => {
+    if (!categoryMatch) return;
+    // Brand matches ("Volvo") stay in the query — they're still a useful
+    // title-search term — unlike category-name matches, which are redundant
+    // once the category filter itself exists.
+    const nextQ =
+      categoryMatch.source === "category"
+        ? stripFillerWords(removeCategoryMatch(qDraft, categoryMatch))
+        : qDraft;
+    setQDraft(nextQ);
+    updateSearch({
+      category: "",
+      categories: [categoryMatch.categorySlug],
+      catMode: "any",
+      q: nextQ,
+    });
+    // Brand matches keep the brand name in the query, so without this the
+    // banner would immediately reappear for the same text after the
+    // category filter is applied — dismiss it explicitly instead.
+    setDismissedMatchText(categoryMatch.matchedText);
+  };
+  const applyStructuredFilterSuggestion = (suggestion: StructuredSearchSuggestion) => {
+    const current = attrValues[suggestion.filterKey];
+    const value =
+      suggestion.value.kind === "multiselect" && current?.kind === "multiselect"
+        ? {
+            kind: "multiselect" as const,
+            values: [...new Set([...current.values, ...suggestion.value.values])],
+          }
+        : suggestion.value;
+    handleAttrValueChange(suggestion.filterKey, value);
+    const escaped = suggestion.matchedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nextQ = stripFillerWords(qDraft.replace(new RegExp(`\\b${escaped}\\b`, "i"), " "));
+    setQDraft(nextQ);
+    updateSearch({ q: nextQ });
+  };
+  const structuredFilterSuggestions = buildStructuredSearchSuggestions(
+    qDraft,
+    attrFilters,
+    attrValues,
+  ).map((suggestion) => ({
+    id: suggestion.id,
+    label: suggestion.label,
+    onSelect: () => applyStructuredFilterSuggestion(suggestion),
+  }));
+  const filterSuggestions = [
+    ...structuredFilterSuggestions,
+    ...parseNumericFilters(qDraft, attrFilters).map((match) => {
+      const filter = attrFilters.find((candidate) => candidate.key === match.filterKey);
+      const value =
+        match.min != null && match.max != null
+          ? `${formatNokNumber(match.min)}–${formatNokNumber(match.max)}`
+          : match.min != null
+            ? `fra ${formatNokNumber(match.min)}`
+            : `opptil ${match.max?.toLocaleString("nb-NO") ?? ""}`;
+      return {
+        id: `${match.filterKey}:${match.matchedText}`,
+        label: `${filter?.label_nb ?? match.filterKey}: ${value}`,
+        onSelect: submitQuery,
+      };
+    }),
+  ];
+
+  // Merke/Modell selected in the attribute filters get appended as extra
+  // brødsmuler after the category chain, matching the ad-detail page's
+  // breadcrumb so the two page types read as one continuous path.
+  const heroExtraSegments = useMemo(() => {
+    if (!hero) return [];
+    const attributes: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(attrValues)) {
+      if (v.kind === "text" || v.kind === "select") attributes[key] = v.value;
+    }
+    const vehicleGroup = vehicleCategoryGroupFor(
+      hero.selected.id,
+      allFilters ?? [],
+      categoryTree.byId,
+    );
+    const genericBrandFilter = genericBrandFilterFor(
+      hero.selected.id,
+      allFilters ?? [],
+      categoryTree.byId,
+    );
+    const rootCategorySlug = hero.main?.slug ?? hero.selected.slug;
+    return getCategoryBehavior(vehicleGroup).extraBreadcrumbSegments(attributes, {
+      rootCategorySlug,
+      genericBrandFilter,
+    });
+  }, [hero, attrValues, allFilters, categoryTree]);
+
+  const { selectHeroCategory, toggleChildCategory, isChildActive } = useHeroCategoryActions({
+    categoryTree,
+    effectiveCategories,
+    updateSearch,
+  });
+
+  // Underkategoriene til det valgte hero-nivået — brikkene native brukeren
+  // får tilbudt etter å ha valgt en hovedkategori, slik at valget kan
+  // snevres inn videre uten å åpne filterpanelet.
+  const heroSubcategories = useMemo(
+    () => (hero ? (categoryTree.childrenByParent.get(hero.selected.id) ?? []) : []),
+    [hero, categoryTree],
+  );
+
+  useEffect(() => {
+    // Bunnmenyens «Søk» skal gjenoppta /annonser-søk, ikke kategorisider.
+    if (!mounted || scope) return;
+    const categoryNames = effectiveCategories
+      .map((slug: string) => categories?.find((c) => c.slug === slug)?.name_nb)
+      .filter((n: string | undefined): n is string => !!n);
+    let label = "annonser";
+    if (search.q) {
+      label = `søket «${search.q}»`;
+    } else if (categoryNames.length === 1) {
+      label = categoryNames[0];
+    } else if (categoryNames.length > 1) {
+      label = "valgte kategorier";
+    }
+    saveLastSearchContext({ search, label });
+  }, [mounted, scope, search, effectiveCategories, categories]);
+
+  const { wtbCount, wtbLoading, wtbListings, hasSearchCriteria } = useWtbListings({
+    q: search.q,
+    effectiveCategories,
+    categories,
+    activeTab: requestedTab,
+  });
+  const activeTab =
+    requestedTab === "wtb" &&
+    hasSearchCriteria &&
+    (wtbLoading || wtbCount > 0 || wtbListings.length > 0)
+      ? "wtb"
+      : "listings";
+
+  /* Desktop har filtrene stående i sidekolonnen (SearchFilterSidebar) — der
+     trengs ingen knapp. Native har sin egen inngang i SearchSummaryPill.
+     Mobilweb bruker den delte knappen, som kategorilandingssidene også
+     bruker, slik at de to flatene ikke kan drifte fra hverandre. */
+  const mobileFilterButton =
+    !isNative && !isDesktop ? <MobileFilterButton activeFilterCount={ordinaryFilterCount} /> : null;
+
+  // Kategorisidene SSR-rendres (SEO), så de hopper over skjelettet.
+  if (!mounted && !scope) {
+    return <BrowsePageSkeleton />;
+  }
+
+  return (
+    <div>
+      <NativePageHeader
+        title={hero && scope ? hero.selected.name_nb : "Annonser"}
+        hideBack={!scope}
+      />
+
+      {isNative && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
+
+      <div
+        className={`mx-auto w-full px-4 ${
+          isNative ? "max-w-6xl pb-8 pt-2" : "max-w-[1600px] pb-8 pt-3 md:pb-10 md:pt-4"
+        }`}
+      >
+        {/* Kategorivalg og -filtrering skjer i søkepanelet, så vi trenger ikke
+            en egen hero med chip-rad her — bare en enkel brødsmule viser hvor
+            brukeren er. Rendres i samme slot som "Annonser"-tittelen (i stedet
+            for som en egen rad over) så valg av hovedkategori ikke skyver
+            resten av siden nedover. */}
+        {/* Native viser kategorien som en brikke i søkefeltet i stedet. */}
+        {hero && !isNative ? (
+          <>
+            <CategoryBreadcrumb
+              breadcrumbEntries={heroBreadcrumb}
+              extraSegments={heroExtraSegments}
+              onSelectCategory={scope ? selectScopeCategory : selectHeroCategory}
+              linkUntilIndex={scope ? scope.breadcrumb.length - 1 : 0}
+            />
+            {scope && (
+              <h1 className="mt-2 font-display text-3xl tracking-tight">{hero.selected.name_nb}</h1>
+            )}
+          </>
+        ) : (
+          !isNative && <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
+        )}
+
+        <div className={isNative ? "space-y-2" : "mt-6 space-y-2"}>
+          {/* Ett søkefelt er hovedinngangen. Kategorier og sekundære filter
+              åpnes fra den samme filterhandlingen i stedet for å ta plass
+              permanent over resultatene. */}
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              {isNative ? (
+                <SearchSummaryPill
+                  q={qDraft}
+                  filterCount={ordinaryFilterCount}
+                  onQChange={(q) => {
+                    setInterpretedCriteria([]);
+                    setIgnoredInterpretations(new Set());
+                    setQDraft(q);
+                  }}
+                  onSubmitQ={() => submitQuery()}
+                  suggestions={
+                    <SearchSuggestionsLayer
+                      q={qDraft}
+                      categories={categories ?? []}
+                      currentCategorySlugs={effectiveCategories}
+                      onSubmitQuery={pickQuery}
+                      onPickCategory={pickCategory}
+                      onPickSavedSearch={pickSavedSearch}
+                    />
+                  }
+                  // Kategorisider viser kategorien i headeren; den kan ikke fjernes.
+                  categoryToken={
+                    categoryTokenLabel && !scope
+                      ? {
+                          label: categoryTokenLabel,
+                          onRemove: () => updateSearch({ category: "", categories: [] }),
+                        }
+                      : undefined
+                  }
+                />
+              ) : (
+                <>
+                  <SearchBar
+                    q={qDraft}
+                    onQChange={(q) => {
+                      setInterpretedCriteria([]);
+                      setIgnoredInterpretations(new Set());
+                      setQDraft(q);
+                    }}
+                    onSubmitQ={() => submitQuery()}
+                    qMode={search.qMode}
+                    onQModeChange={(m) => updateSearch({ qMode: m })}
+                    showQMode={isDesktop}
+                    extraGroups={isDesktop ? search.extraGroups : undefined}
+                    onExtraGroupsChange={
+                      isDesktop ? (extraGroups) => updateSearch({ extraGroups }) : undefined
+                    }
+                    onOpenRules={
+                      isDesktop
+                        ? undefined
+                        : () => {
+                            openPanel("search", qDraft);
+                          }
+                    }
+                    rulesActive={hasExtraSearchRules}
+                    categorySuggestion={
+                      categoryMatch
+                        ? {
+                            label: `Begrens søket til ${categoryMatch.categoryName}`,
+                            onSelect: applyCategoryMatch,
+                          }
+                        : undefined
+                    }
+                    filterSuggestions={filterSuggestions}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {isNative && (
+          <SearchFilterChipRow
+            min={search.min}
+            max={search.max}
+            includeFree={search.includeFree}
+            conditions={search.conditions ?? []}
+            categorySlugs={effectiveCategories}
+            location={location}
+            sort={search.sort}
+            onSortChange={(sort) => updateSearch({ sort })}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            queryText={qDraft}
+            filterCount={ordinaryFilterCount}
+          />
+        )}
+        {interpretedCriteria.length > 0 && (
+          <div className="rounded-lg border border-border/70 bg-card/50 px-3 py-2">
+            <SearchInterpretation
+              criteria={interpretedCriteria}
+              categories={categories ?? []}
+              filters={attrFilters.length > 0 ? attrFilters : (allFilters ?? [])}
+              onCategoryChange={() => {
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "category"),
+                );
+                setDismissedMatchText(categoryMatch?.matchedText ?? null);
+                updateSearch({ category: "", categories: [] });
+              }}
+              onAttributeChange={(key) => {
+                const criterion = interpretedCriteria.find(
+                  (item) => item.kind === "attribute" && item.key === key,
+                );
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "attribute" || item.key !== key),
+                );
+                removeAttrWithRestore(key, undefined, criterion?.matchedText);
+              }}
+              onAttributeRemove={(key, value, matchedText) => {
+                const criterion = interpretedCriteria.find(
+                  (item) =>
+                    item.kind === "attribute" &&
+                    item.key === key &&
+                    (value == null ||
+                      (item.value.kind === "multiselect" || item.value.kind === "exclude"
+                        ? item.value.values.includes(value)
+                        : true)),
+                );
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "attribute" || item.key !== key),
+                );
+                removeAttrWithRestore(key, value, matchedText ?? criterion?.matchedText);
+              }}
+              onPriceRemove={(matchedText) => {
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "price"),
+                );
+                if (!matchedText) {
+                  updateSearch({ min: undefined, max: undefined });
+                  return;
+                }
+                setIgnoredInterpretations(
+                  (previous) => new Set([...previous, matchedText.toLocaleLowerCase()]),
+                );
+                const nextQ = qDraft ? `${qDraft} ${matchedText}` : matchedText;
+                setQDraft(nextQ);
+                updateSearch({ q: nextQ, min: undefined, max: undefined });
+              }}
+            />
+          </div>
+        )}
+        {categoryMatch && isNative && (
+          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <FolderOpen className="size-4 shrink-0 text-primary" />
+            <button
+              type="button"
+              onClick={applyCategoryMatch}
+              className="flex-1 text-left underline-offset-2 hover:underline"
+            >
+              Begrens søket til{" "}
+              <span className="font-medium text-primary">{categoryMatch.categoryName}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDismissedMatchText(categoryMatch.matchedText)}
+              className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Ikke nå"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+        {!isNative && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ActiveFilters
+              search={search}
+              terms={terms}
+              onUpdate={(patch) => updateSearch(patch)}
+              attrValues={activeAttrValues}
+              attrFilters={attrFilters}
+              location={location}
+              onRemoveLocation={() =>
+                updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+              }
+              onRemoveAttr={removeAttrWithRestore}
+              justCreatedKeys={justCreatedKeys}
+            />
+          </div>
+        )}
+
+        {user && (
+          <SaveSearchDialog
+            open={saveSearchOpen}
+            onOpenChange={setSaveSearchOpen}
+            defaultName={summarizeCriteria(currentCriteria)}
+            criteria={currentCriteria}
+            onSaved={() => setSaveSearchOpen(false)}
+          />
+        )}
+
+        {showSearchStart && (
+          <SearchStart
+            categories={categories ?? []}
+            onSubmitQuery={pickQuery}
+            onPickCategory={pickCategory}
+            onPickSavedSearch={pickSavedSearch}
+          />
+        )}
+
+        {/* Native: når en hovedkategori er valgt (fra startflaten eller
+            kategoriforslag), treffer SearchStart-betingelsen over ikke lenger
+            — i stedet får brukeren brikker for hero-nivåets underkategorier,
+            slik at valget kan snevres inn videre uten filterpanelet.
+            Kategorisidene viser raden også på web, siden kategoriseksjonen i
+            filterpanelet er låst der; et valg bytter `sub`-parameteren. */}
+        {(isNative || scope) && hero && heroSubcategories.length > 0 && (
+          <section className="mt-4" aria-labelledby="annonser-subcategories-heading">
+            <h2
+              id="annonser-subcategories-heading"
+              className="mb-2 font-display text-base tracking-tight"
+            >
+              Underkategorier
+            </h2>
+            <ScrollArrowRow>
+              {heroSubcategories.map((category) => {
+                const active = !scope && isChildActive(hero.selected, category);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() =>
+                      scope
+                        ? selectScopeCategory(category)
+                        : toggleChildCategory(hero.selected, category)
+                    }
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {category.name_nb}
+                  </button>
+                );
+              })}
+            </ScrollArrowRow>
+          </section>
+        )}
+
+        {/* Desktop: filtrene står permanent til venstre for treffene i stedet
+          for i en dialog over dem (se SearchFilterSidebar). */}
+        <SearchResultsBody
+          isNative={isNative}
+          isDesktop={isDesktop}
+          searchPanelResults={searchPanelResults}
+          categories={categories ?? []}
+          onSaveSearch={user ? () => setSaveSearchOpen(true) : undefined}
+        >
+          <>
+            {/* ØK-tab — vises kun når søkkriterier gir treff */}
+            {hasSearchCriteria && wtbCount > 0 && (
+              <div className="mt-4 flex gap-2" role="tablist" aria-label="Annonsetype">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "listings"}
+                  onClick={() => setActiveTab("listings")}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === "listings"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  Til salgs
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "wtb"}
+                  onClick={() => setActiveTab("wtb")}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === "wtb"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  Ønskes kjøpt ({wtbCount})
+                </button>
+              </div>
+            )}
+
+            {activeTab === "wtb" ? (
+              <div className="mt-4">
+                {mobileFilterButton && (
+                  <div className="mb-3 flex justify-end">{mobileFilterButton}</div>
+                )}
+                {wtbLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : wtbListings.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+                    <p className="text-lg font-medium">Ingen ønskes kjøpt-annonser funnet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Ingen etterspør dette akkurat nå. Prøv et bredere søk.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {wtbListings.map((w) => (
+                      <WtbListingCard key={w.id} listing={w} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <ResultList
+                isNative={isNative}
+                isDesktop={isDesktop}
+                q={search.q}
+                // Kategorisider søker hele undertreet, men fremhevede annonser
+                // o.l. gjelder sidens egen kategori.
+                effectiveCategories={scope && hero ? [hero.selected.slug] : effectiveCategories}
+                cards={cards}
+                totalCount={totalCount}
+                isLoading={isLoading}
+                hasNextPage={!!hasNextPage}
+                isFetchingNextPage={isFetchingNextPage}
+                fetchNextPage={() => void fetchNextPage()}
+                resetFilters={resetFilters}
+                // Free text alone isn't a filter "Nullstill alle filtre" can
+                // undo — only show it when a real filter/category is set (F8).
+                hasActiveCriteria={activeFilterCount > 0 || effectiveCategories.length > 0}
+                onBrowseCategories={scope ? undefined : () => openPanel("categories")}
+                categorySuggestion={
+                  cards.length === 0 &&
+                  !isLoading &&
+                  categoryMatch &&
+                  effectiveCategories.length === 0
+                    ? { categoryName: categoryMatch.categoryName, onApply: applyCategoryMatch }
+                    : undefined
+                }
+                zeroResultExpansion={zeroResultExpansion}
+                zeroResultExpansionPending={zeroResultExpansionPending}
+                zeroResultExpansions={zeroResultExpansions}
+                onApplyZeroResultExpansion={(expansion) => {
+                  applyPanelDraft(expansion.applied);
+                }}
+                mapListings={mapListings}
+                mapCenter={mapCenter}
+                radiusKm={search.radius ?? DEFAULT_SEARCH_RADIUS_KM}
+                onMapClearLocation={() =>
+                  updateSearch({
+                    lat: undefined,
+                    lng: undefined,
+                    radius: undefined,
+                    loc: undefined,
+                  })
+                }
+                onMapApplyViewport={(c, radius, label) =>
+                  updateSearch({ lat: c.lat, lng: c.lng, radius, loc: label ?? "" })
+                }
+                sort={search.sort}
+                onSortChange={(s) => updateSearch({ sort: s })}
+                // Native har sorteringen i brikkeraden.
+                hideSort={isNative}
+                toolbarLead={mobileFilterButton}
+                toolbarExtra={
+                  // Desktop har «Lagre søk» nederst i filterkolonnen. Ellers
+                  // står det ved antall treff, der interessen for søket oppstår.
+                  user && !isDesktop && hasSearchCriteria ? (
+                    <Button
+                      type="button"
+                      variant={isNative ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => setSaveSearchOpen(true)}
+                      className={isNative ? "gap-1.5 rounded-full text-primary" : "gap-1.5"}
+                    >
+                      {isNative ? <Bell className="size-4" /> : <Save className="size-4" />} Lagre
+                      søk
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )}
+          </>
+        </SearchResultsBody>
+      </div>
+    </div>
+  );
+}

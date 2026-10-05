@@ -47,6 +47,9 @@ export type BusinessOrganization = {
   proff_trial_started_at: string | null;
   proff_trial_ends_at: string | null;
   proff_trial_cancelled_at: string | null;
+  proff_subscription_cancelled_at: string | null;
+  proff_ended_by_kaupet_at: string | null;
+  welcome_email_sent_at: string | null;
   proff_access_until: string | null;
   website_url: string | null;
   logo_path: string | null;
@@ -79,6 +82,7 @@ export type BusinessMembership = {
     postal_code: string | null;
     city: string | null;
     registry_refreshed_at: string | null;
+    payment_receipts: boolean;
   } | null;
 };
 

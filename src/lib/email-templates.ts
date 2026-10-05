@@ -1,6 +1,6 @@
 // Email-trygge fargeverdier hentet fra src/styles.css (oklch der erstattet
 // med nærmeste hex, siden de fleste e-postklienter ikke støtter oklch()).
-const COLOR = {
+export const COLOR = {
   background: "#fbf9f3",
   card: "#ffffff",
   border: "#e7e1d3",
@@ -59,7 +59,7 @@ const COPY: Record<NotificationEmailType, { eyebrow: string; intro: string; cta:
   },
 };
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

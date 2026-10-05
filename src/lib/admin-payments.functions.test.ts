@@ -8,6 +8,7 @@ const s = vi.hoisted(() => ({
   refundVippsPayment: vi.fn(),
   getVippsPayment: vi.fn(),
   logServerError: vi.fn(),
+  sendReceipt: vi.fn(),
   queues: {} as Record<string, Result[]>,
   ops: [] as { table: string; op: string; values?: unknown; filters: unknown[][] }[],
   context: { supabase: {}, userId: "admin-1" } as unknown,
@@ -37,6 +38,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 vi.mock("@/lib/admin-auth.server", () => ({ requireAdminRole: s.requireAdmin }));
 vi.mock("@/lib/server-error-log", () => ({ logServerError: s.logServerError }));
+vi.mock("@/lib/business/business-emails.server", () => ({ sendBusinessReceipt: s.sendReceipt }));
 vi.mock("@/lib/vipps.server", async (importActual) => ({
   vippsPaymentStatus: (await importActual<typeof import("@/lib/vipps.server")>())
     .vippsPaymentStatus,
@@ -57,7 +59,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       s.ops.push(op);
       const chain: Record<string, unknown> = {};
       for (const m of ["select", "order", "limit"]) chain[m] = () => chain;
-      for (const m of ["eq", "in"]) {
+      for (const m of ["eq", "in", "is"]) {
         chain[m] = (...args: unknown[]) => (op.filters.push([m, ...args]), chain);
       }
       for (const m of ["insert", "update"]) {
@@ -68,15 +70,20 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       chain.then = (resolve: (v: unknown) => void) => resolve(next(table));
       return chain;
     },
-    rpc: (name: string) => ({ single: async () => next(`rpc:${name}`) }),
+    rpc: (name: string) => ({
+      single: async () => next(`rpc:${name}`),
+      then: (resolve: (value: Result) => void) => resolve(next(`rpc:${name}`)),
+    }),
   },
 }));
 
 import { isAlreadyLogged } from "@/lib/to-client-error";
 import {
   adminCancelProffOrder,
-  adminMarkProffOrderInvoiced,
+  adminEndProffAgreement,
   adminMarkProffOrderPaid,
+  adminRegisterProffInvoiceSent,
+  adminRegisterProffReminder,
 } from "./admin-proff.functions";
 import {
   adminGetVippsPaymentStatus,
@@ -107,14 +114,19 @@ beforeEach(() => {
   s.refundVippsPayment.mockReset().mockResolvedValue(undefined);
   s.getVippsPayment.mockReset();
   s.logServerError.mockReset().mockResolvedValue(undefined);
+  s.sendReceipt.mockReset().mockResolvedValue(undefined);
 });
 
 describe("admin-proff: fakturering, betaling og kansellering", () => {
   it("avviser ikke-admin før noen databaseoperasjon", async () => {
     s.requireAdmin.mockRejectedValue(new Error("Ikke autorisert"));
     for (const call of [
-      () => adminMarkProffOrderInvoiced({ data: { orderId: id, fikenInvoiceNumber: "1" } }),
-      () => adminMarkProffOrderPaid({ data: { orderId: id } }),
+      () =>
+        adminRegisterProffInvoiceSent({
+          data: { orderId: id, fikenInvoiceNumber: "1", sentOn: "2026-10-01", dueOn: "2026-10-20" },
+        }),
+      () => adminRegisterProffReminder({ data: { orderId: id, sentOn: "2026-10-21" } }),
+      () => adminMarkProffOrderPaid({ data: { orderId: id, paidOn: "2026-10-04" } }),
       () => adminCancelProffOrder({ data: { orderId: id } }),
     ]) {
       expect((await rejection(call())).message).toBe("Ikke autorisert");
@@ -122,84 +134,198 @@ describe("admin-proff: fakturering, betaling og kansellering", () => {
     expect(s.ops).toEqual([]);
   });
 
-  describe("adminMarkProffOrderInvoiced", () => {
+  describe("adminRegisterProffInvoiceSent", () => {
     const run = () =>
-      adminMarkProffOrderInvoiced({ data: { orderId: id, fikenInvoiceNumber: " 42 " } });
+      adminRegisterProffInvoiceSent({
+        data: {
+          orderId: id,
+          fikenInvoiceNumber: " 42 ",
+          sentOn: "2026-10-01",
+          dueOn: "2026-10-20",
+        },
+      });
 
-    it("fakturerer bare bestillinger med status pending", async () => {
-      s.queues.proff_orders = [{ data: { id } }];
+    it("registrerer sendt faktura atomisk", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [{ data: id }];
       await expect(run()).resolves.toEqual({ ok: true });
-      const [op] = ops("proff_orders", "update");
-      expect(op.values).toEqual({ status: "invoiced", fiken_invoice_number: "42" });
-      expect(op.filters).toContainEqual(["eq", "status", "pending"]);
+      expect(s.ops.filter((op) => op.op !== "select")).toEqual([]);
+    });
+
+    it("avviser forfall før sendt dato uten databasekall", async () => {
+      await expect(async () =>
+        adminRegisterProffInvoiceSent({
+          data: { orderId: id, fikenInvoiceNumber: "1", sentOn: "2026-10-20", dueOn: "2026-10-01" },
+        }),
+      ).rejects.toThrow();
+      expect(s.ops).toEqual([]);
+    });
+
+    it("registrerer fornyelse atomisk", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [{ data: id }];
+      await expect(
+        adminRegisterProffInvoiceSent({
+          data: {
+            organizationId: id,
+            term: "yearly",
+            fikenInvoiceNumber: "43",
+            sentOn: "2026-10-01",
+            dueOn: "2026-11-03",
+          },
+        }),
+      ).resolves.toEqual({ ok: true });
+      expect(s.ops.filter((op) => op.op !== "select")).toEqual([]);
     });
 
     it("409 når bestillingen ikke lenger er til fakturering", async () => {
-      s.queues.proff_orders = [{ data: null }];
+      s.queues["rpc:register_proff_invoice_sent"] = [
+        { error: { message: "order_not_invoiceable" } },
+      ];
       expect(await rejection(run())).toMatchObject({
         message: "Bestillingen er ikke lenger til fakturering.",
         status: 409,
       });
     });
 
+    it("409 når avtalen er avsluttet etter at admin åpnet oversikten", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [
+        { error: { message: "agreement_not_renewable" } },
+      ];
+      expect(await rejection(run())).toMatchObject({
+        message: "Avtalen er sagt opp, avsluttet eller ikke aktiv. Oppdater oversikten.",
+        status: 409,
+      });
+    });
+
+    it("409 når en annen administrator allerede har registrert faktura", async () => {
+      s.queues["rpc:register_proff_invoice_sent"] = [{ error: { code: "23505" } }];
+      expect(await rejection(run())).toMatchObject({
+        message: "Bedriften har allerede en åpen faktura.",
+        status: 409,
+      });
+    });
+
     it("maskerer databasefeil", async () => {
-      s.queues.proff_orders = [{ error: dbError }];
+      s.queues["rpc:register_proff_invoice_sent"] = [{ error: dbError }];
       expect((await rejection(run())).message).toBe(GENERIC);
     });
   });
 
   describe("adminMarkProffOrderPaid", () => {
-    const claimed = { id, organization_id: "org-1", term: "yearly" };
-    const run = (fikenInvoiceNumber?: string) =>
-      adminMarkProffOrderPaid({ data: { orderId: id, fikenInvoiceNumber } });
+    const payment = {
+      organization_id: "org-1",
+      term: "yearly",
+      fiken_invoice_number: "77",
+      first_period: true,
+      period_start: "2099-01-01",
+      period_end: "2100-01-01",
+    };
+    const run = () => adminMarkProffOrderPaid({ data: { orderId: id, paidOn: "2026-10-04" } });
+    beforeEach(() => {
+      s.queues.organizations = [{ data: { display_name: "Eksempel", legal_name: "Eksempel AS" } }];
+    });
 
-    it("409 når bestillingen allerede er betalt eller kansellert, uten å utvide tilgang", async () => {
-      s.queues.proff_orders = [{ data: null }];
+    it("avviser en betaling som allerede er registrert", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ error: { message: "order_not_payable" } }];
       expect(await rejection(run())).toMatchObject({
         message: "Bestillingen er allerede registrert betalt eller kansellert.",
         status: 409,
       });
-      expect(s.queues["rpc:extend_proff_access"]).toBeUndefined();
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
 
-    it("maskerer databasefeil ved claim", async () => {
-      s.queues.proff_orders = [{ error: dbError }];
+    it("maskerer transaksjonsfeil og sender ingen kvittering", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ error: dbError }];
       expect((await rejection(run())).message).toBe(GENERIC);
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
 
-    it("claimer bare pending/invoiced, utvider tilgang og lagrer perioden", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { data: null }];
-      s.queues["rpc:extend_proff_access"] = [
-        { data: { period_start: "2026-01-01", period_end: "2027-01-01" } },
-      ];
-      await expect(run("77")).resolves.toEqual({
+    it("returnerer den lagrede perioden og bekrefter første betaling", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ data: payment }];
+      await expect(run()).resolves.toEqual({
         ok: true,
-        periodStart: "2026-01-01",
-        periodEnd: "2027-01-01",
+        periodStart: "2099-01-01",
+        periodEnd: "2100-01-01",
       });
-      const [claim, periodUpdate] = ops("proff_orders", "update");
-      expect(claim.values).toEqual({ status: "paid", fiken_invoice_number: "77" });
-      expect(claim.filters).toContainEqual(["in", "status", ["pending", "invoiced"]]);
-      expect(periodUpdate.values).toEqual({ period_start: "2026-01-01", period_end: "2027-01-01" });
+      const [, , buildEmail] = s.sendReceipt.mock.calls[0]!;
+      expect(buildEmail().subject).toBe("Betalingen er mottatt – Kaupet Proff er aktivt");
     });
 
-    it("overskriver ikke fakturanummer når det ikke er oppgitt", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { data: null }];
-      s.queues["rpc:extend_proff_access"] = [{ data: { period_start: "a", period_end: "b" } }];
+    it("sender ikke kvittering for fornyelse når bedriften ikke har valgt det", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ data: { ...payment, first_period: false } }];
+      s.queues.organization_billing_profiles = [{ data: { payment_receipts: false } }];
       await run();
-      expect(ops("proff_orders", "update")[0].values).toEqual({ status: "paid" });
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
 
-    it("maskerer feil når tilgangen ikke kan utvides", async () => {
-      s.queues.proff_orders = [{ data: claimed }];
-      s.queues["rpc:extend_proff_access"] = [{ error: dbError }];
-      expect((await rejection(run())).message).toBe(GENERIC);
+    it("sender valgt kvittering for fornyelse", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ data: { ...payment, first_period: false } }];
+      s.queues.organization_billing_profiles = [{ data: { payment_receipts: true } }];
+      await run();
+      const [, , buildEmail] = s.sendReceipt.mock.calls[0]!;
+      expect(buildEmail().subject).toBe("Betaling mottatt for Kaupet Proff");
+    });
+  });
+
+  describe("adminEndProffAgreement", () => {
+    const ended = {
+      claimed: true,
+      access_until: "2099-01-01T00:00:00.000Z",
+      overdue_invoice_number: "10009",
+      overdue_due_on: "2020-01-15",
+      credited_invoice_number: "10009",
+    };
+    const run = (note?: string) => adminEndProffAgreement({ data: { organizationId: id, note } });
+    beforeEach(() => {
+      s.queues.organizations = [{ data: { display_name: "Eksempel", legal_name: "Eksempel AS" } }];
     });
 
-    it("maskerer feil når perioden ikke kan lagres på bestillingen", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { error: dbError }];
-      s.queues["rpc:extend_proff_access"] = [{ data: { period_start: "a", period_end: "b" } }];
+    it("avslutter atomisk og sender e-post med forfalt og kreditert faktura", async () => {
+      s.queues["rpc:end_proff_agreement"] = [{ data: ended }];
+
+      await expect(run("Ubetalt etter purring")).resolves.toEqual({
+        ok: true,
+        accessUntil: ended.access_until,
+      });
+
+      // Ingen løse skriveoperasjoner utenom transaksjonen.
+      expect(s.ops.filter((o) => o.op !== "select")).toEqual([]);
+      const [, , buildEmail, options] = s.sendReceipt.mock.calls[0]!;
+      const email = buildEmail();
+      expect(options).toEqual({ includeBilling: true });
+      expect(email.subject).toBe("Kaupet Proff er avsluttet");
+      expect(email.text).toContain("ikke mottatt betaling for faktura 10009");
+      expect(email.text).toContain("kreditnota for faktura 10009");
+      // Notatet er internt.
+      expect(email.text).not.toContain("purring");
+    });
+
+    it("bruker nøytral tekst når ingen faktura har forfalt", async () => {
+      s.queues["rpc:end_proff_agreement"] = [
+        {
+          data: {
+            ...ended,
+            overdue_invoice_number: null,
+            overdue_due_on: null,
+            credited_invoice_number: null,
+          },
+        },
+      ];
+      await run();
+      const email = s.sendReceipt.mock.calls[0]![2]();
+      expect(email.text).toContain("Kaupet har avsluttet Proff-avtalen for Eksempel.");
+      expect(email.text).not.toContain("kreditnota");
+    });
+
+    it("sender ikke ny e-post ved dobbeltklikk", async () => {
+      s.queues["rpc:end_proff_agreement"] = [{ data: { ...ended, claimed: false } }];
+      await expect(run()).resolves.toEqual({ ok: true, accessUntil: ended.access_until });
+      expect(s.sendReceipt).not.toHaveBeenCalled();
+    });
+
+    it("maskerer transaksjonsfeil og sender ingen e-post", async () => {
+      s.queues["rpc:end_proff_agreement"] = [{ error: dbError }];
       expect((await rejection(run())).message).toBe(GENERIC);
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
   });
 

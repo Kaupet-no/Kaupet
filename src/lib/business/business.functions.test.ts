@@ -48,6 +48,17 @@ vi.mock("@/lib/email.server", () => ({
   sendInternalEmail: (...args: unknown[]) => sendInternalEmail(...args),
 }));
 
+const sendBusinessReceipt = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/business/business-emails.server", () => ({
+  sendBusinessReceipt: (...args: unknown[]) => sendBusinessReceipt(...args),
+}));
+/** Emne og mottakervalg for kvitteringene som ble sendt. */
+const receipts = () =>
+  sendBusinessReceipt.mock.calls.map(([, , build, options]) => ({
+    subject: (build as () => { subject: string })().subject,
+    options,
+  }));
+
 const defaultContext = { userId: "superuser-1", supabase: supabaseAdmin };
 
 import { getBusinessListingStats, updateBusinessProfile } from "./organization.functions";
@@ -87,6 +98,8 @@ function buildAdmin(
     proff_trial_started_at: null,
     proff_trial_ends_at: null,
     proff_trial_cancelled_at: null,
+    proff_subscription_cancelled_at: null,
+    proff_ended_by_kaupet_at: null,
     proff_access_until: null,
     website_url: null,
     logo_path: null,
@@ -147,21 +160,70 @@ function buildAdmin(
         data:
           table === "user_roles"
             ? [{ user_id: "admin-user-1" }]
-            : table === "listings"
-              ? (overrides.listingStats ?? null)
-              : table === "listing_status_history"
-                ? (overrides.listingStatusHistory ?? null)
-                : table === "listing_sales"
-                  ? (overrides.sales ?? null)
-                  : table === "listing_view_events"
-                    ? (overrides.viewEvents ?? null)
-                    : null,
+            : table === "organizations"
+              ? [organization]
+              : table === "listings"
+                ? (overrides.listingStats ?? null)
+                : table === "listing_status_history"
+                  ? (overrides.listingStatusHistory ?? null)
+                  : table === "listing_sales"
+                    ? (overrides.sales ?? null)
+                    : table === "listing_view_events"
+                      ? (overrides.viewEvents ?? null)
+                      : null,
         error: null,
       }).then(resolve, reject);
     return chain;
   };
   supabaseAdmin.from.mockImplementation((table: string) => makeChain(table));
-  supabaseAdmin.rpc.mockImplementation(async (name: string) => {
+  supabaseAdmin.rpc.mockImplementation((name: string) => {
+    if (name === "request_proff_subscription_order") {
+      if (
+        organization.proff_ended_by_kaupet_at &&
+        Date.parse(organization.proff_access_until ?? "") > Date.now()
+      ) {
+        return { data: null, error: { message: "agreement_ended_by_kaupet" } };
+      }
+      if (organization.proff_trial_started_at)
+        return { data: "33333333-3333-4333-8333-333333333333", error: null };
+      const ends = new Date(Date.now() + 30 * 864e5).toISOString();
+      Object.assign(organization, {
+        selected_plan: "proff",
+        proff_trial_started_at: new Date().toISOString(),
+        proff_trial_ends_at: ends,
+        proff_access_until: ends,
+      });
+      return { data: "33333333-3333-4333-8333-333333333333", error: null };
+    }
+    if (name === "cancel_proff_trial") {
+      const claimed = !organization.proff_trial_cancelled_at;
+      if (claimed)
+        Object.assign(organization, {
+          selected_plan: "proff_basis",
+          proff_trial_cancelled_at: new Date().toISOString(),
+          proff_access_until: new Date().toISOString(),
+        });
+      const result = {
+        data: {
+          claimed,
+          cancelled_at: organization.proff_trial_cancelled_at,
+          sent_invoice_number: null,
+        },
+        error: null,
+      };
+      return { single: async () => result };
+    }
+    if (name === "cancel_proff_subscription") {
+      const claimed = !organization.proff_subscription_cancelled_at;
+      if (claimed)
+        Object.assign(organization, { proff_subscription_cancelled_at: new Date().toISOString() });
+      return {
+        data: [
+          { claimed, access_until: organization.proff_access_until, sent_invoice_number: null },
+        ],
+        error: null,
+      };
+    }
     if (name === "organization_has_proff_access") {
       return {
         data:
@@ -329,23 +391,56 @@ describe("business server functions", () => {
     }
   });
 
-  it("starts Proff once with a thirty-day database trial and does not restart it", async () => {
+  it("starter ikke prøveperioden ved planvalg — den krever en bestilling", async () => {
     buildAdmin();
-    const first = await setBusinessPlan({ data: { plan: "proff" } });
-    expect(first.organization.selected_plan).toBe("proff");
-    expect(first.organization.proff_trial_started_at).toEqual(expect.any(String));
-    expect(first.organization.proff_trial_ends_at).toEqual(expect.any(String));
-    expect(first.organization.proff_access_until).toBe(first.organization.proff_trial_ends_at);
-    expect(supabaseAdmin.rpc).toHaveBeenCalledWith("sync_organization_entitlements", {
-      _organization_id: organizationId,
+    await expect(setBusinessPlan({ data: { plan: "proff" } })).rejects.toThrow(
+      "Bestill Proff for å starte prøveperioden.",
+    );
+  });
+
+  it("starter prøveperioden atomisk med første bestilling", async () => {
+    buildAdmin({ contactEmail: "admin@kaupet.no" });
+    delete process.env.PROFF_ORDER_INBOX;
+
+    await requestProffSubscription({ data: { term: "monthly", billingReference: "Kari" } });
+
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
+      "request_proff_subscription_order",
+      expect.objectContaining({
+        _organization_id: organizationId,
+        _term: "monthly",
+        _price_ex_vat_nok: 1490,
+        _billing_reference: "Kari",
+      }),
+    );
+    const email = sendInternalEmail.mock.calls[0]![0] as { subject: string };
+    expect(email.subject).toContain("Proff-prøveperiode startet");
+    expect(receipts()).toEqual([
+      {
+        subject: "Takk! Prøveperioden for Kaupet Proff har startet",
+        options: { userIds: ["superuser-1"], includeBilling: false },
+      },
+    ]);
+  });
+
+  it("legger en ny bestilling rett til fakturering når prøven er brukt", async () => {
+    buildAdmin({
+      organization: {
+        selected_plan: "proff_basis",
+        proff_trial_started_at: "2026-08-01T00:00:00.000Z",
+        proff_trial_ends_at: "2026-08-31T00:00:00.000Z",
+        proff_access_until: "2026-08-31T00:00:00.000Z",
+      },
+      proff: false,
     });
 
-    const second = await setBusinessPlan({ data: { plan: "proff" } });
-    expect(second.organization.proff_trial_started_at).toBe(
-      first.organization.proff_trial_started_at,
+    const result = await requestProffSubscription({ data: { term: "yearly" } });
+
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
+      "request_proff_subscription_order",
+      expect.anything(),
     );
-    expect(second.organization.proff_trial_ends_at).toBe(first.organization.proff_trial_ends_at);
-    expect(second.organization.proff_access_until).toBe(first.organization.proff_access_until);
+    expect(result).toMatchObject({ trialEndsAt: null });
   });
 
   it("cancels an active trial immediately when basis is selected", async () => {
@@ -362,7 +457,175 @@ describe("business server functions", () => {
     expect(result.organization.selected_plan).toBe("proff_basis");
     expect(result.organization.proff_access_until).toEqual(expect.any(String));
     expect(result.organization.proff_trial_cancelled_at).toEqual(expect.any(String));
-    expect(admin.calls.updates[0]).toMatchObject({ selected_plan: "proff_basis" });
+    expect(admin.calls.updates).toEqual([]);
+    expect(receipts()).toEqual([
+      {
+        subject: "Prøveperioden for Kaupet Proff er avsluttet",
+        options: { userIds: ["superuser-1"], includeBilling: true },
+      },
+    ]);
+  });
+
+  it("sender ingen bekreftelse når atomisk prøveavslutning feiler", async () => {
+    buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-09-01",
+        proff_trial_ends_at: "2099-09-30",
+        proff_access_until: "2099-09-30",
+      },
+      proff: true,
+    });
+    const rpc = supabaseAdmin.rpc.getMockImplementation()!;
+    supabaseAdmin.rpc.mockImplementation((name: string, ...args: unknown[]) =>
+      name === "cancel_proff_trial"
+        ? { single: async () => ({ data: null, error: { code: "XX000", message: "failed" } }) }
+        : rpc(name, ...args),
+    );
+    await expect(setBusinessPlan({ data: { plan: "proff_basis" } })).rejects.toThrow();
+    expect(sendBusinessReceipt).not.toHaveBeenCalled();
+  });
+
+  it("sender ikke prøvebekreftelse på nytt når avslutningen allerede er lagret", async () => {
+    buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-09-01",
+        proff_trial_ends_at: "2099-09-30",
+        proff_access_until: "2099-09-30",
+      },
+      proff: true,
+    });
+    const rpc = supabaseAdmin.rpc.getMockImplementation()!;
+    supabaseAdmin.rpc.mockImplementation((name: string, ...args: unknown[]) =>
+      name === "cancel_proff_trial"
+        ? { single: async () => ({ data: { claimed: false }, error: null }) }
+        : rpc(name, ...args),
+    );
+    await setBusinessPlan({ data: { plan: "proff_basis" } });
+    expect(sendBusinessReceipt).not.toHaveBeenCalled();
+  });
+
+  it("sier opp betalt Proff uten å kutte tilgangen før perioden er over", async () => {
+    const paidUntil = new Date(Date.now() + 200 * 864e5).toISOString();
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-08-01T00:00:00.000Z",
+        proff_trial_ends_at: "2026-08-31T00:00:00.000Z",
+        proff_access_until: paidUntil,
+      },
+      proff: true,
+    });
+
+    const result = await setBusinessPlan({ data: { plan: "proff_basis" } });
+
+    expect(result.organization).toMatchObject({
+      selected_plan: "proff",
+      proff_access_until: paidUntil,
+      proff_subscription_cancelled_at: expect.any(String),
+    });
+    // Oppsigelse og kansellering av åpen faktura skjer atomisk i databasen.
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith("cancel_proff_subscription", {
+      _organization_id: organizationId,
+    });
+    expect(admin.calls.updates).toEqual([]);
+    expect(receipts()).toEqual([
+      {
+        subject: "Oppsigelsen av Kaupet Proff er bekreftet",
+        options: { userIds: ["superuser-1"], includeBilling: true },
+      },
+    ]);
+  });
+
+  it("lar bedriften angre oppsigelsen mens betalt periode løper", async () => {
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+        proff_subscription_cancelled_at: "2026-10-01T00:00:00.000Z",
+      },
+      proff: true,
+    });
+
+    const result = await setBusinessPlan({ data: { plan: "proff" } });
+
+    expect(result.organization.proff_subscription_cancelled_at).toBeNull();
+    expect(admin.calls.updates).toEqual([{ proff_subscription_cancelled_at: null }]);
+  });
+
+  it("lar ikke bedriften angre når Kaupet har avsluttet avtalen", async () => {
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+        proff_subscription_cancelled_at: "2026-10-01T00:00:00.000Z",
+        proff_ended_by_kaupet_at: "2026-10-01T00:00:00.000Z",
+      },
+      proff: true,
+    });
+    await expect(setBusinessPlan({ data: { plan: "proff" } })).rejects.toThrow(
+      "Proff-avtalen er avsluttet av Kaupet",
+    );
+    expect(admin.calls.updates).toEqual([]);
+  });
+
+  it("angrer ikke oppsigelsen når Kaupet avslutter avtalen samtidig", async () => {
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+        proff_subscription_cancelled_at: "2026-10-01T00:00:00.000Z",
+      },
+      proff: true,
+    });
+    const build = supabaseAdmin.from.getMockImplementation()!;
+    supabaseAdmin.from.mockImplementation((table: string) => {
+      const chain = build(table);
+      if (table !== "organizations") return chain;
+      const isNull: string[] = [];
+      let pending: Record<string, unknown> | null = null;
+      chain.is = vi.fn((column: string, value: unknown) => {
+        if (value === null) isNull.push(column);
+        return chain;
+      });
+      chain.update = vi.fn((updates: Record<string, unknown>) => {
+        // Admin avslutter avtalen mellom lesingen og skrivingen.
+        (admin.organization as Record<string, unknown>).proff_ended_by_kaupet_at =
+          "2026-10-05T00:00:00.000Z";
+        pending = updates;
+        return chain;
+      });
+      chain.then = (resolve: (value: unknown) => unknown) => {
+        const org = admin.organization as Record<string, unknown>;
+        const matches = isNull.every((column) => org[column] == null);
+        if (pending && matches) Object.assign(org, pending);
+        return Promise.resolve({ data: matches ? [org] : [], error: null }).then(resolve);
+      };
+      return chain;
+    });
+
+    await expect(setBusinessPlan({ data: { plan: "proff" } })).rejects.toThrow(
+      "Proff-avtalen er avsluttet av Kaupet",
+    );
+    expect(admin.organization.proff_subscription_cancelled_at).toBe("2026-10-01T00:00:00.000Z");
+  });
+
+  it("avviser ny bestilling mens en adminavsluttet periode fortsatt løper", async () => {
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-08-01T00:00:00.000Z",
+        proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+        proff_subscription_cancelled_at: "2026-10-01T00:00:00.000Z",
+        proff_ended_by_kaupet_at: "2026-10-01T00:00:00.000Z",
+      },
+    });
+    await expect(requestProffSubscription({ data: { term: "monthly" } })).rejects.toThrow(
+      "Proff-avtalen er avsluttet av Kaupet",
+    );
+    expect(admin.organization.proff_ended_by_kaupet_at).not.toBeNull();
+    expect(admin.calls.updates).toEqual([]);
   });
 
   it("rejects Proff reactivation after a used trial", async () => {

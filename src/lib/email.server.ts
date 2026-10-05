@@ -27,6 +27,29 @@ export async function sendInternalEmail(params: {
   if (error) throw new Error(`Resend email failed: ${error.message}`);
 }
 
+/** Kvittering til en bedriftskonto (business-email-templates.ts). Svar går til Proff-teamet. */
+export async function sendBusinessEmail(params: {
+  to: string[];
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY");
+  }
+
+  const { error } = await new Resend(apiKey).emails.send({
+    from: FROM,
+    replyTo: "Kaupet Proff <proff@kaupet.no>",
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    text: params.text,
+  });
+  if (error) throw new Error(`Resend email failed: ${error.message}`);
+}
+
 export async function sendNotificationEmail(params: {
   to: string;
   type: NotificationEmailType;

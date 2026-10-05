@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { CountBadge } from "@/components/ui/count-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -129,14 +130,7 @@ function MessagesIconLink() {
         className="relative"
       >
         <MessageCircle className="size-5" />
-        {unread > 0 && (
-          <span
-            className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
-            aria-hidden="true"
-          >
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
+        {unread > 0 && <CountBadge count={unread} className="absolute right-0 top-0" />}
       </Link>
     </Button>
   );

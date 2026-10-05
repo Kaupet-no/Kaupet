@@ -11,9 +11,9 @@ export async function requireAdminOrModeratorRole(
     .select("role")
     .eq("user_id", userId)
     .in("role", ["admin", "moderator"])
-    .maybeSingle();
+    .limit(1);
   if (error) {
     throw await toClientError("database", error);
   }
-  if (!data) throw new Error("Ikke autorisert");
+  if (!data?.length) throw new Error("Ikke autorisert");
 }

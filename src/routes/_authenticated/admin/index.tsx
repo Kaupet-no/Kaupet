@@ -1,8 +1,19 @@
 import { formatNokNumber } from "@/lib/format";
 import { lazy, Suspense } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, UserPlus, ListChecks, MessagesSquare, Loader2 } from "lucide-react";
+import {
+  Eye,
+  UserPlus,
+  ListChecks,
+  MessagesSquare,
+  Loader2,
+  ChevronRight,
+  Flag,
+  BadgeCheck,
+  Receipt,
+  FolderPlus,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +27,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { EventLinkRow, type AdminEventKind } from "./-admin-events";
 
 // recharts er ~95 KiB brotli og trengs ikke i første maling — kun
 // visningsgrafen under bruker den.
@@ -69,9 +83,112 @@ function AdminDashboard() {
     },
   });
 
+  // ponytail: henter inntil 500 åpne hendelser og teller per område i klienten;
+  // bytt til en gruppert RPC hvis køen noen gang blir så lang.
+  const openEvents = useQuery({
+    queryKey: ["admin-events", "overview"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_events")
+        .select("*")
+        .is("handled_at", null)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data;
+    },
+  });
+  const countKinds = (...kinds: AdminEventKind[]) =>
+    openEvents.data?.filter((e) => kinds.includes(e.kind as AdminEventKind)).length;
+
   return (
-    <div className="space-y-8">
-      <h2 className="font-display text-xl tracking-tight">Oversikt</h2>
+    <div className="space-y-10">
+      <section aria-labelledby="admin-attention-title" className="space-y-6">
+        <div className="max-w-2xl">
+          <h2 id="admin-attention-title" className="font-display text-3xl tracking-tight">
+            Trenger oppmerksomhet
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Åpne hendelser fordelt på hvor de håndteres.
+          </p>
+        </div>
+        {openEvents.isError && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              Kunne ikke hente åpne hendelser.
+              {openEvents.data && " Viste tall kan være utdaterte."}
+              <Button
+                type="button"
+                variant="outline"
+                className="ml-3"
+                disabled={openEvents.isFetching}
+                onClick={() => void openEvents.refetch()}
+              >
+                Prøv igjen
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <AttentionCard
+            to="/admin/moderasjon"
+            icon={<Flag className="size-4" aria-hidden="true" />}
+            label="Rapporter"
+            count={countKinds("listing_reported", "user_reported")}
+            loading={openEvents.isLoading}
+          />
+          <AttentionCard
+            to="/admin/bedrifter"
+            icon={<BadgeCheck className="size-4" aria-hidden="true" />}
+            label="Nye bedrifter"
+            count={countKinds("organization_registered")}
+            loading={openEvents.isLoading}
+          />
+          <AttentionCard
+            to="/admin/proff-abonnement"
+            icon={<Receipt className="size-4" aria-hidden="true" />}
+            label="Proff og fakturering"
+            count={countKinds(
+              "proff_ordered",
+              "proff_trial_started",
+              "proff_cancelled",
+              "proff_invoice_due",
+              "proff_payment_overdue",
+            )}
+            loading={openEvents.isLoading}
+          />
+          <AttentionCard
+            to="/admin/tilbakemeldinger"
+            icon={<FolderPlus className="size-4" aria-hidden="true" />}
+            label="Kategoriforslag"
+            count={countKinds("category_suggestion")}
+            loading={openEvents.isLoading}
+          />
+        </div>
+        {!!openEvents.data?.length && (
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-5">
+              <h3 className="text-sm font-semibold">Siste hendelser</h3>
+              <Link
+                to="/admin/hendelser"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Se alle
+              </Link>
+            </div>
+            {openEvents.data.slice(0, 5).map((event) => (
+              <EventLinkRow key={event.id} event={event} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="max-w-2xl">
+        <h2 className="font-display text-3xl tracking-tight">Statistikk</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Trafikk, brukere og annonser på tvers av Kaupet.
+        </p>
+      </div>
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Visninger (7 dager)"
@@ -220,6 +337,42 @@ function AdminDashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function AttentionCard({
+  to,
+  icon,
+  label,
+  count,
+  loading,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  count: number | undefined;
+  loading: boolean;
+}) {
+  return (
+    <Link
+      to={to}
+      className="block bg-card p-4 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:p-5"
+    >
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span className="text-primary">{icon}</span>
+        {label}
+        <ChevronRight className="ml-auto size-4" aria-hidden="true" />
+      </p>
+      <p
+        className={`mt-3 text-lg font-semibold tabular-nums ${(count ?? 0) > 0 ? "text-primary" : ""}`}
+      >
+        {loading || count === undefined
+          ? "—"
+          : count === 0
+            ? "Ingen åpne"
+            : `${count} ${count === 1 ? "åpen" : "åpne"}`}
+      </p>
+    </Link>
   );
 }
 

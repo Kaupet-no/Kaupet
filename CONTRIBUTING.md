@@ -13,7 +13,7 @@ Thank you for considering contributing! Kaupet.no is a community-driven project,
    bunx tsc --noEmit
    bun run build
    ```
-5. **Open a pull request** against `main`. Describe what you changed and why. Screenshots are gold for UI changes.
+5. **Open a pull request** against `staging`. Describe what you changed and why. Screenshots are gold for UI changes. All changes must be deployed and verified on staging before a separate pull request promotes them from `staging` to `main`.
 
 A moderator will look at the PR as soon as possible. CI must be green and at least one moderator must approve before merging.
 

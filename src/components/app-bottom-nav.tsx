@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationsCount, useUnreadSystemMessagesCount } from "@/hooks/use-unread";
+import { useAdminOpenEventsCount } from "@/hooks/use-admin-events";
+import { CountBadge } from "@/components/ui/count-badge";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
@@ -318,6 +320,9 @@ export function UserAvatarButton({
   // her i stedet for å få en egen badge ved siden av — se
   // useUnreadSystemMessagesCount i use-unread.ts.
   const unreadCount = useUnreadNotificationsCount() + useUnreadSystemMessagesCount();
+  // Meg-fanen er profilikonet i native — admin-hendelser vises her som i
+  // webens brukermeny, men med eget tall i aria-label.
+  const adminEvents = useAdminOpenEventsCount();
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
     queryFn: async () => {
@@ -336,7 +341,13 @@ export function UserAvatarButton({
   return (
     <button
       type="button"
-      aria-label={unreadCount > 0 ? `Meg, ${unreadCount} nye varsler` : "Meg"}
+      aria-label={[
+        "Meg",
+        unreadCount > 0 && `${unreadCount} nye varsler`,
+        adminEvents > 0 && `${adminEvents} nye administrasjonshendelser`,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       aria-current={isActive ? "page" : undefined}
       onClick={() => {
         void hapticImpact("light");
@@ -351,13 +362,8 @@ export function UserAvatarButton({
             {initials(profile?.display_name, email ?? "")}
           </AvatarFallback>
         </Avatar>
-        {unreadCount > 0 && (
-          <span
-            className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
-            aria-hidden="true"
-          >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
+        {unreadCount + adminEvents > 0 && (
+          <CountBadge count={unreadCount + adminEvents} className="absolute right-0 top-0" />
         )}
       </span>
       <span

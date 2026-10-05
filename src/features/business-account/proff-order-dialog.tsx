@@ -12,6 +12,7 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { getBusinessOrganization } from "@/lib/business/organization.functions";
 import { requestProffSubscription } from "@/lib/business/plans.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { formatDate } from "@/lib/format";
 import { PROFF_TERMS, type ProffTerm } from "./plans";
 import { formatProffTermPrice } from "./proff-pricing";
 
@@ -19,10 +20,18 @@ export type ProffOrderDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   term: ProffTerm;
+  /** Første bestilling starter en 30 dagers prøveperiode før første faktura. */
+  startsTrial?: boolean;
   onOrdered?: () => void;
 };
 
-export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffOrderDialogProps) {
+export function ProffOrderDialog({
+  open,
+  onOpenChange,
+  term,
+  startsTrial = false,
+  onOrdered,
+}: ProffOrderDialogProps) {
   const [billingReference, setBillingReference] = useState("");
   const request = useServerFn(requestProffSubscription);
   const loadBusinessOrganization = useServerFn(getBusinessOrganization);
@@ -60,17 +69,22 @@ export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffO
     >
       <ResponsiveOverlayContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Bestill Kaupet Proff</DialogTitle>
+          <DialogTitle>
+            {startsTrial ? "Start 30 dagers prøveperiode" : "Bestill Kaupet Proff"}
+          </DialogTitle>
           <DialogDescription>
-            {formatProffTermPrice(term)}. Fakturaen sendes på e-post eller EHF, og Proff aktiveres
-            når betalingen er registrert.
+            {startsTrial
+              ? `Proff er gratis de første 30 dagene. Deretter fortsetter det som ${PROFF_TERMS[term].months === 12 ? "årlig" : "månedlig"} abonnement (${formatProffTermPrice(term)}). Første faktura sendes før prøveperioden utløper, med forfall når den utløper. Betales den ikke, opphører Proff når prøveperioden er over.`
+              : `${formatProffTermPrice(term)}. Fakturaen sendes på e-post eller EHF, og Proff aktiveres når betalingen er registrert.`}
           </DialogDescription>
         </DialogHeader>
 
         {mutation.isSuccess ? (
           <Alert role="status">
             <AlertDescription>
-              Bestillingen er mottatt. Fakturaen sendes til fakturaprofilen.
+              {startsTrial && mutation.data?.trialEndsAt
+                ? `Prøveperioden er startet og varer til ${formatDate(mutation.data.trialEndsAt)}. Første faktura sendes til fakturaprofilen før den utløper.`
+                : "Bestillingen er mottatt. Fakturaen sendes til fakturaprofilen."}
             </AlertDescription>
           </Alert>
         ) : (
@@ -108,9 +122,10 @@ export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffO
             </div>
             <p className="text-sm text-muted-foreground">
               {PROFF_TERMS[term].months === 12
-                ? "Årsabonnementet faktureres forskuddsvis for 12 måneder."
-                : "Månedsabonnementet faktureres forskuddsvis hver måned."}{" "}
-              Ingen bindingstid — abonnementet løper ut betalt periode ved oppsigelse.
+                ? "Årsabonnementet faktureres forskuddsvis for 12 måneder"
+                : "Månedsabonnementet faktureres forskuddsvis hver måned"}
+              , med minst 14 dagers betalingsfrist. Ingen bindingstid — abonnementet løper ut betalt
+              periode ved oppsigelse.
             </p>
             {errorMessage && (
               <Alert variant="destructive" role="alert">
@@ -128,7 +143,7 @@ export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffO
               </Button>
               <Button type="submit" disabled={pending} aria-busy={pending}>
                 {pending && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-                {pending ? "Sender…" : "Send bestilling"}
+                {pending ? "Sender…" : startsTrial ? "Start prøveperioden" : "Send bestilling"}
               </Button>
             </DialogFooter>
           </form>

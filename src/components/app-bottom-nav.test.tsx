@@ -7,6 +7,7 @@ import { hapticImpact } from "@/lib/haptics";
 
 let unreadCount = 0;
 let unreadSystemCount = 0;
+let adminEventsCount = 0;
 const navigateMock = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigateMock }));
@@ -17,6 +18,9 @@ vi.mock("@/hooks/use-unread", () => ({
   useUnreadNotificationsCount: () => unreadCount,
   useUnreadSystemMessagesCount: () => unreadSystemCount,
 }));
+vi.mock("@/hooks/use-admin-events", () => ({
+  useAdminOpenEventsCount: () => adminEventsCount,
+}));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/lib/haptics", () => ({ hapticImpact: vi.fn() }));
 
@@ -24,6 +28,7 @@ afterEach(() => {
   cleanup();
   unreadCount = 0;
   unreadSystemCount = 0;
+  adminEventsCount = 0;
   navigateMock.mockReset();
   vi.mocked(hapticImpact).mockClear();
 });
@@ -49,6 +54,17 @@ describe("UserAvatarButton", () => {
     render(<UserAvatarButton userId="user-1" email="kari@eksempel.no" />);
 
     expect(screen.getByText("9+")).toBeTruthy();
+  });
+
+  it("legger åpne admin-hendelser til badgen og nevner dem i tilgjengelig navn", () => {
+    unreadCount = 1;
+    adminEventsCount = 2;
+    render(<UserAvatarButton userId="user-1" email="kari@eksempel.no" />);
+
+    expect(
+      screen.getByRole("button", { name: "Meg, 1 nye varsler, 2 nye administrasjonshendelser" }),
+    ).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
   });
 
   it("gir nøyaktig ett haptikk-signal per trykk på Meg-fanen", () => {

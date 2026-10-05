@@ -46,7 +46,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { BusinessMembership } from "@/features/business-account/use-business-membership";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BUSINESS_PLANS, hasEffectiveProffAccess } from "@/features/business-account/plans";
+import {
+  BUSINESS_PLANS,
+  hasEffectiveProffAccess,
+  hasPaidProffPeriod,
+  type BusinessPlan,
+} from "@/features/business-account/plans";
 import type {
   BusinessLocation,
   BusinessOrganization,
@@ -64,7 +69,11 @@ import {
   type BusinessListingStat,
   type BusinessListingStats,
 } from "@/lib/business/organization.functions";
-import { setBusinessPlan } from "@/lib/business/plans.functions";
+import {
+  getOpenProffOrder,
+  setBusinessPlan,
+  type ProffOrder,
+} from "@/lib/business/plans.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
 import { formatErrorMessage } from "@/lib/errors";
 import { formatNokNumber } from "@/lib/format";
@@ -177,11 +186,18 @@ export function BusinessConsole({
       }),
   });
   const [now] = useState(() => Date.now());
+  const fetchOpenProffOrder = useServerFn(getOpenProffOrder);
+  const openProffOrderQuery = useQuery({
+    queryKey: ["proff-open-order"],
+    queryFn: () => fetchOpenProffOrder(),
+    enabled: role === "superuser" && organization.selected_plan === "proff",
+    staleTime: 30_000,
+  });
   const [planError, setPlanError] = useState<string | null>(null);
   const planMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (nextPlan: BusinessPlan) => {
       setPlanError(null);
-      return callSetPlan({ data: { plan: "proff_basis" } });
+      return callSetPlan({ data: { plan: nextPlan } });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["business-membership"] });
@@ -200,7 +216,16 @@ export function BusinessConsole({
     organization.selected_plan === "proff" &&
     !!organization.proff_trial_ends_at &&
     !organization.proff_trial_cancelled_at &&
-    new Date(organization.proff_trial_ends_at).getTime() > now;
+    new Date(organization.proff_trial_ends_at).getTime() > now &&
+    !hasPaidProffPeriod(organization, now);
+  const paidPeriod = hasPaidProffPeriod(organization, now);
+  const planMessage = !planMutation.isSuccess
+    ? null
+    : planMutation.variables === "proff"
+      ? "Abonnementet fortsetter."
+      : organization.proff_subscription_cancelled_at
+        ? "Abonnementet er sagt opp. Proff løper ut den betalte perioden."
+        : "Proff-prøveperioden er avsluttet.";
   const selectedLocation = locations.find((location) => location.id === selectedLocationId);
   const effectiveListingAccess =
     selectedLocation?.permissions.listingAccess ?? (role === "superuser" ? "all" : "own");
@@ -329,8 +354,11 @@ export function BusinessConsole({
                 planError={planError}
                 canCancelTrial={canCancelTrial}
                 planMutationPending={planMutation.isPending}
-                planMutationSuccess={planMutation.isSuccess}
-                onCancelTrial={() => planMutation.mutate()}
+                planMessage={planMessage}
+                onCancelProff={() => planMutation.mutate("proff_basis")}
+                paidPeriod={paidPeriod}
+                onResumeSubscription={() => planMutation.mutate("proff")}
+                openProffOrder={openProffOrderQuery.data?.order}
                 onNavigate={handleTabChange}
                 canManageMembers={role === "superuser"}
                 listingStats={businessListingStatsQuery.data?.current}
@@ -404,8 +432,11 @@ function Overview({
   canCancelTrial,
   planError,
   planMutationPending,
-  planMutationSuccess,
-  onCancelTrial,
+  planMessage,
+  onCancelProff,
+  paidPeriod,
+  onResumeSubscription,
+  openProffOrder,
   onNavigate,
   canManageMembers,
   listingStats,
@@ -427,8 +458,12 @@ function Overview({
   canCancelTrial: boolean;
   planError: string | null;
   planMutationPending: boolean;
-  planMutationSuccess: boolean;
-  onCancelTrial: () => void;
+  planMessage: string | null;
+  onCancelProff: () => void;
+  paidPeriod: boolean;
+  onResumeSubscription: () => void;
+  /** undefined når brukeren ikke er superbruker eller data ikke er lastet. */
+  openProffOrder: ProffOrder | null | undefined;
   onNavigate: (tab: BusinessTab) => void;
   canManageMembers: boolean;
   listingStats: BusinessListingStat[] | undefined;
@@ -443,11 +478,30 @@ function Overview({
   threshold: number;
   onThresholdChange: (value: string) => void;
 }) {
+  const accessUntil = organization.proff_access_until
+    ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "long" }).format(
+        new Date(organization.proff_access_until),
+      )
+    : null;
   const trialEnd = organization.proff_trial_ends_at
     ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "long" }).format(
         new Date(organization.proff_trial_ends_at),
       )
     : null;
+  const trialActive = effectiveProff && !paidPeriod && !!trialEnd && !trialEnded;
+  const longDate = (iso: string) =>
+    new Intl.DateTimeFormat("nb-NO", { dateStyle: "long" }).format(new Date(iso));
+  // Kun for superbrukere (openProffOrder er undefined for andre).
+  const invoiceStatus =
+    openProffOrder === undefined || !(paidPeriod || trialActive)
+      ? null
+      : openProffOrder?.status === "invoiced"
+        ? `Faktura ${openProffOrder.fiken_invoice_number ?? ""} sendt, forfall ${
+            openProffOrder.invoice_due_on ? longDate(openProffOrder.invoice_due_on) : "–"
+          }`
+        : paidPeriod
+          ? "Ingen utestående betaling"
+          : null;
   return (
     <section aria-labelledby="business-overview-title" className="space-y-8">
       <div className="max-w-2xl">
@@ -464,9 +518,9 @@ function Overview({
           <AlertDescription>{planError}</AlertDescription>
         </Alert>
       )}
-      {planMutationSuccess && (
-        <Alert>
-          <AlertDescription>Proff-prøveperioden er avsluttet.</AlertDescription>
+      {planMessage && (
+        <Alert role="status">
+          <AlertDescription>{planMessage}</AlertDescription>
         </Alert>
       )}
 
@@ -488,18 +542,33 @@ function Overview({
         <StatusCard
           icon={<CalendarClock className="size-4" />}
           label="Proff-tilgang"
-          value={effectiveProff ? "Aktiv" : "Ikke aktiv"}
+          value={
+            paidPeriod
+              ? "Proff aktiv"
+              : trialActive
+                ? "Prøveperiode aktiv"
+                : effectiveProff
+                  ? "Aktiv"
+                  : "Ikke aktiv"
+          }
           detail={
             organization.selected_plan === "proff_basis"
               ? "Gratis plan"
-              : trialEnd
-                ? trialEnded
-                  ? `Prøveperioden utløp ${trialEnd}`
-                  : `Prøveperiode til ${trialEnd}`
-                : effectiveProff
-                  ? "Aktiv tilgang"
-                  : "Ingen aktiv tilgang"
+              : paidPeriod
+                ? organization.proff_ended_by_kaupet_at
+                  ? `Avsluttet av Kaupet, aktiv til ${accessUntil}`
+                  : organization.proff_subscription_cancelled_at
+                    ? `Sagt opp, aktiv til ${accessUntil}`
+                    : `Fornyes ${accessUntil}`
+                : trialActive
+                  ? `Til ${trialEnd}`
+                  : trialEnd && !effectiveProff
+                    ? `Prøveperioden utløp ${trialEnd}`
+                    : effectiveProff
+                      ? "Aktiv tilgang"
+                      : "Ingen aktiv tilgang"
           }
+          secondary={invoiceStatus}
           href="/bedrift/velg-plan"
         />
         <StatusCard
@@ -509,6 +578,19 @@ function Overview({
           detail={organization.organization_number}
         />
       </div>
+
+      {canManageMembers && organization.selected_plan === "proff" && (
+        <p className="-mt-4 text-sm text-muted-foreground">
+          Spørsmål om Proff-avtalen? Kontakt oss på{" "}
+          <a
+            href="mailto:proff@kaupet.no"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            proff@kaupet.no
+          </a>
+          .
+        </p>
+      )}
       <ListingInsights
         stats={listingStats}
         soldCount={soldCount}
@@ -564,7 +646,10 @@ function Overview({
         <div className="border-t border-border pt-6">
           <h3 className="text-base font-semibold">Avslutt prøveperioden</h3>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Proff-funksjonene deaktiveres umiddelbart. Medlems- og profildata beholdes.
+            Prøveperioden varer til {trialEnd}. Første faktura sendes før den utløper, med forfall{" "}
+            {trialEnd}, og Proff fortsetter når den er betalt. Avslutter du nå, blir du ikke
+            fakturert, og Proff-funksjonene deaktiveres umiddelbart. Medlems- og profildata
+            beholdes.
           </p>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -576,8 +661,9 @@ function Overview({
               <AlertDialogHeader>
                 <AlertDialogTitle>Avslutte Proff-prøveperioden?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Dette kan ikke angres før betalingsløsningen er på plass. Logo, branding og ekstra
-                  brukere blir utilgjengelige, men ingen data slettes.
+                  Prøveperioden kan ikke startes på nytt. Bestillingen kanselleres, og er fakturaen
+                  allerede sendt, krediteres den. Logo, branding og ekstra brukere blir
+                  utilgjengelige, men ingen data slettes.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -585,7 +671,7 @@ function Overview({
                 <AlertDialogAction
                   onClick={(event) => {
                     event.preventDefault();
-                    if (!planMutationPending) onCancelTrial();
+                    if (!planMutationPending) onCancelProff();
                   }}
                 >
                   {planMutationPending && <Loader2 className="size-4 animate-spin" />}
@@ -594,6 +680,77 @@ function Overview({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+        </div>
+      )}
+
+      {paidPeriod && (
+        <div className="border-t border-border pt-6">
+          {organization.proff_subscription_cancelled_at ? (
+            <>
+              {organization.proff_ended_by_kaupet_at ? (
+                <>
+                  <h3 className="text-base font-semibold">Proff-avtalen er avsluttet av Kaupet</h3>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    Proff løper ut den betalte perioden til {accessUntil}, og du blir ikke fakturert
+                    for flere perioder. Ta kontakt på proff@kaupet.no hvis du vil fortsette.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base font-semibold">Abonnementet er sagt opp</h3>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    Proff løper ut den betalte perioden til {accessUntil}, og du blir ikke fakturert
+                    for neste periode. Du kan angre frem til da.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    disabled={planMutationPending}
+                    onClick={onResumeSubscription}
+                  >
+                    {planMutationPending && <Loader2 className="size-4 animate-spin" />}
+                    Fortsett abonnementet
+                  </Button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <h3 className="text-base font-semibold">Si opp Proff</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Abonnementet fornyes {accessUntil}. Sier du opp, løper Proff ut den betalte
+                perioden, og du blir ikke fakturert for neste.
+              </p>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="mt-4">
+                    Si opp abonnementet
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Si opp Proff?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Proff fortsetter til {accessUntil}. Deretter blir logo, branding og ekstra
+                      brukere utilgjengelige, men ingen data slettes. Du kan angre frem til da.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Behold Proff</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(event) => {
+                        event.preventDefault();
+                        if (!planMutationPending) onCancelProff();
+                      }}
+                    >
+                      {planMutationPending && <Loader2 className="size-4 animate-spin" />}
+                      {planMutationPending ? "Sier opp…" : "Si opp abonnementet"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
         </div>
       )}
 
@@ -978,6 +1135,7 @@ function StatusCard({
   label,
   value,
   detail,
+  secondary,
   href,
   emphasized = false,
 }: {
@@ -985,6 +1143,8 @@ function StatusCard({
   label: string;
   value: string;
   detail: string;
+  /** Ekstra statuslinje, f.eks. utestående Proff-faktura. */
+  secondary?: string | null;
   href?: "/bedrift/velg-plan";
   emphasized?: boolean;
 }) {
@@ -999,6 +1159,7 @@ function StatusCard({
       </p>
       <p className="mt-3 truncate text-lg font-semibold">{value}</p>
       <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+      {secondary && <p className="mt-1 text-sm font-medium">{secondary}</p>}
     </>
   );
   const className = `border-b border-border p-4 last:border-b-0 sm:border-b-0 sm:p-5 ${

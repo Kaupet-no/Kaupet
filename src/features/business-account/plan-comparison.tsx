@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatErrorMessage } from "@/lib/errors";
+import { formatDate } from "@/lib/format";
 import { getOpenProffOrder, setBusinessPlan } from "@/lib/business/plans.functions";
 import { BusinessPlanLogo } from "./business-plan-logo";
 import { ProffOrderDialog } from "./proff-order-dialog";
@@ -18,6 +19,7 @@ import {
   BUSINESS_PLANS,
   PROFF_TERMS,
   hasEffectiveProffAccess,
+  hasPaidProffPeriod,
   type BusinessOrganizationEntitlement,
   type BusinessPlan,
   type BusinessPlanConfig,
@@ -29,6 +31,8 @@ export type PlanComparisonOrganization = BusinessOrganizationEntitlement & {
   proff_trial_started_at?: string | null;
   proff_trial_ends_at?: string | null;
   proff_trial_cancelled_at?: string | null;
+  proff_subscription_cancelled_at?: string | null;
+  proff_ended_by_kaupet_at?: string | null;
 };
 
 export type PlanComparisonProps = {
@@ -46,6 +50,12 @@ function formatPrice(config: BusinessPlanConfig, term: ProffTerm) {
 
 function hasUsedTrial(organization: PlanComparisonOrganization | null | undefined) {
   return Boolean(organization?.proff_trial_started_at);
+}
+
+function activeTrialEndsAt(organization: PlanComparisonOrganization | null | undefined) {
+  const ends = organization?.proff_trial_ends_at;
+  if (!ends || organization?.proff_trial_cancelled_at) return null;
+  return new Date(ends).getTime() > Date.now() ? ends : null;
 }
 
 function FeatureStatus({ feature }: { feature: BusinessPlanFeature }) {
@@ -76,14 +86,30 @@ function planAction(
       : { label: "Bestill Proff", disabled: false, order: true };
   }
 
+  // Betalt Proff: basis betyr oppsigelse ved periodeslutt, og en oppsigelse kan angres.
+  if (hasPaidProffPeriod(organization)) {
+    if (organization?.proff_ended_by_kaupet_at) {
+      return { label: plan === "proff" ? "Avsluttet av Kaupet" : "Sagt opp", disabled: true };
+    }
+    const cancelled = Boolean(organization?.proff_subscription_cancelled_at);
+    if (plan === "proff_basis") {
+      return cancelled
+        ? { label: "Sagt opp", disabled: true }
+        : { label: "Si opp Proff", disabled: false };
+    }
+    return cancelled
+      ? { label: "Fortsett abonnementet", disabled: false }
+      : { label: "Valgt", disabled: true };
+  }
+
   if (organization?.selected_plan === plan) {
     return { label: "Valgt", disabled: true };
   }
 
-  return {
-    label: plan === "proff" ? "Start 30 dagers prøveperiode" : "Velg Proff basis",
-    disabled: false,
-  };
+  // Prøveperioden starter med første bestilling, så Proff går alltid via dialogen.
+  return plan === "proff"
+    ? { label: "Start 30 dagers prøveperiode", disabled: false, order: true }
+    : { label: "Velg Proff basis", disabled: false };
 }
 
 function PlanHeading({ config, term }: { config: BusinessPlanConfig; term: ProffTerm }) {
@@ -132,6 +158,7 @@ export function PlanComparison({
     ? formatErrorMessage(mutation.error, "Kunne ikke lagre bedriftsplanen. Prøv igjen.")
     : null;
   const trialUsed = hasUsedTrial(organization) && !hasEffectiveProffAccess(organization);
+  const trialEndsAt = activeTrialEndsAt(organization);
 
   function choosePlan(plan: BusinessPlan) {
     if (mutation.isPending) return;
@@ -177,13 +204,24 @@ export function PlanComparison({
         </RadioGroup>
       </fieldset>
 
-      {openOrder && (
+      {openOrder && trialEndsAt ? (
         <Alert role="status">
           <AlertDescription>
-            Bestillingen er mottatt. Fakturaen sendes til {openOrder.billing_email}, og Proff
-            aktiveres når betalingen er registrert.
+            Prøveperioden er aktiv til {formatDate(trialEndsAt)}. Første faktura for{" "}
+            {openOrder.term === "yearly" ? "årlig" : "månedlig"} abonnement sendes til{" "}
+            {openOrder.billing_email} før den utløper, med forfall {formatDate(trialEndsAt)}.
+            Betales den ikke, opphører Proff når prøveperioden er over.
           </AlertDescription>
         </Alert>
+      ) : (
+        openOrder && (
+          <Alert role="status">
+            <AlertDescription>
+              Bestillingen er mottatt. Fakturaen sendes til {openOrder.billing_email}, og Proff
+              aktiveres når betalingen er registrert.
+            </AlertDescription>
+          </Alert>
+        )
       )}
       {trialUsed && !openOrder && (
         <Alert role="status">
@@ -222,7 +260,11 @@ export function PlanComparison({
         open={orderOpen}
         onOpenChange={setOrderOpen}
         term={term}
-        onOrdered={() => openOrderQuery.refetch()}
+        startsTrial={!hasUsedTrial(organization)}
+        onOrdered={() => {
+          void openOrderQuery.refetch();
+          if (!hasUsedTrial(organization)) onSuccess?.("proff");
+        }}
       />
     </section>
   );

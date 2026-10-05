@@ -10,7 +10,7 @@ export function BedriftsvilkarContent({
   return (
     <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
       <section>
-        <p className="text-muted-foreground">Sist oppdatert 27. september 2026</p>
+        <p className="text-muted-foreground">Sist oppdatert 4. oktober 2026</p>
         <p className="mt-3">
           Disse vilkårene gjelder for virksomheter som bruker Kaupet.no med bedriftskonto, og for
           personer som bruker tjenesten på vegne av en slik virksomhet. Avtalen inngås mellom Happy
@@ -159,25 +159,38 @@ export function BedriftsvilkarContent({
       <section id="proff" className="scroll-mt-24">
         <h2 className="font-display text-2xl">9. Planer, priser og betaling</h2>
         <p className="mt-3">
-          Bedriftskontoer kan velge «Proff basis» eller «Proff». Proff basis er gratis. Proff gir én
-          ikke-fornybar prøveperiode på 30 dager med umiddelbar tilgang. Når prøveperioden avsluttes
-          eller utløper, blir Proff-funksjoner som branding, nettsidelenke og ekstra brukere
-          deaktivert. Lagrede bedrifts-, medlems- og profileringsopplysninger slettes ikke av den
-          grunn.
+          Kaupet tilbyr to ulike avtaleplaner for bedriftskontoer: «Proff basis» og «Proff». «Proff
+          basis» er tilgjengelig for alle bedriftskontoer uten kostnad, og inkluderer all
+          grunnleggende funksjonalitet. «Proff» er et betalt abonnement for bedrifter som ønsker
+          utvidet funksjonalitet. Det er et løpende abonnement som bestilles med månedlig eller
+          årlig fakturering. Første bestilling gir én ikke-fornybar prøveperiode på 30 dager med
+          umiddelbar tilgang.
+        </p>
+        <p className="mt-3">
+          Første faktura sendes i god tid før prøveperioden utløper, med forfall den dagen
+          prøveperioden utløper. Når fakturaen er betalt, fortsetter Proff uten avbrudd for den
+          valgte perioden. Blir fakturaen ikke betalt ved forfall, opphører Proff-avtalen når
+          prøveperioden er over. Bedriften kan avslutte prøveperioden i bedriftskonsollen når som
+          helst før den utløper. Bestillingen kanselleres da, og en faktura som allerede er sendt,
+          krediteres.
         </p>
         <p className="mt-3">
           Proff koster 1 490 kr per måned eks. mva, eller 16 092 kr per år eks. mva ved
           årsabonnement (12 måneder med 10 % rabatt). Hver lokasjon utover den første koster 249 kr
           per måned eks. mva, og faktureres fra neste faktureringsperiode etter at lokasjonen er
           opprettet. Merverdiavgift kommer i tillegg etter gjeldende sats. Abonnementet faktureres
-          forskuddsvis for hele perioden, med betalingsfrist oppgitt på fakturaen.
+          forskuddsvis for hver periode. Fakturaen sendes minst 14 dager før forfall, og forfall er
+          første dag i perioden fakturaen gjelder.
         </p>
         <p className="mt-3">
-          Bestillingen er bindende for den perioden som er fakturert, men abonnementet har ingen
-          bindingstid utover dette. Ved oppsigelse løper Proff ut den betalte perioden, og påbegynte
-          perioder refunderes ikke. Blir en faktura ikke betalt ved forfall, sendes
-          betalingspåminnelse, og Proff-funksjonene deaktiveres når den betalte perioden er utløpt.
-          Prisendringer varsles minst 30 dager før de får virkning for en ny faktureringsperiode.
+          Abonnementet fornyes med en ny periode av samme lengde til det sies opp. Hver fakturert
+          periode er bindende, men abonnementet har ingen bindingstid utover dette. Ved oppsigelse
+          løper Proff ut den betalte perioden, og påbegynte perioder refunderes ikke. Blir en
+          faktura ikke betalt ved forfall, kan det sendes betalingspåminnelse, og Proff-avtalen
+          opphører når den betalte perioden er utløpt. Når Proff opphører, blir Proff-funksjoner som
+          branding, nettsidelenke og ekstra brukere deaktivert. Lagrede bedrifts-, medlems- og
+          profileringsopplysninger slettes ikke av den grunn. Prisendringer varsles minst 30 dager
+          før de får virkning for en ny faktureringsperiode.
         </p>
         <p className="mt-3">
           Funksjoner som er merket «Kommer senere» i planoversikten, er ikke en del av det som
@@ -190,9 +203,9 @@ export function BedriftsvilkarContent({
         <p className="mt-3">
           Bedriften kan kjøpe «fremhevet annonse». Én navngitt annonse vises da i en egen
           «Fremhevet»-seksjon øverst i relevante søk og kategorisider i valgt antall dager (3 eller
-          5). Inntil to fremhevede annonser vises om gangen — om flere annonser har aktiv
-          fremheving, velges to tilfeldig per visning. Pris vises i kjøpsdialogen, og betalingen
-          belastes umiddelbart. Fremhevingen aktiveres når betalingen er bekreftet.
+          5). Inntil to fremhevede annonser vises om gangen. Om flere annonser har aktiv fremheving,
+          velges to tilfeldig per visning. Pris vises i kjøpsdialogen, og betalingen belastes
+          umiddelbart. Fremhevingen aktiveres når betalingen er bekreftet.
         </p>
         <p className="mt-3">
           Kjøpet er et kjøp mellom næringsdrivende, og angrerettloven gjelder ikke. Kan fremhevingen

@@ -10,7 +10,6 @@ function makeCategory(overrides: Partial<CategoryRow> & { id: string; slug: stri
     parent_id: null,
     icon: null,
     color: null,
-    heading_font: null,
     search_examples: null,
     ...overrides,
   };

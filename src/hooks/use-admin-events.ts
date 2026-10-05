@@ -24,7 +24,8 @@ export function useAdminOpenEventsCount(): number {
         .from("admin_events")
         .select("id", { count: "exact", head: true })
         .is("handled_at", null);
-      if (error) return 0;
+      // Kast, så React Query beholder forrige tall i stedet for å vise 0 ved feil.
+      if (error) throw error;
       return count ?? 0;
     },
     refetchInterval: 60_000,

@@ -240,6 +240,20 @@ function AdminProffOrdersPage() {
         </h3>
         {upcomingQ.isLoading ? (
           <Loading label="Laster fakturaer som skal sendes…" />
+        ) : upcomingQ.isError ? (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              Kunne ikke hente fakturaer som skal sendes.
+              <Button
+                type="button"
+                variant="outline"
+                className="ml-3"
+                onClick={() => void upcomingQ.refetch()}
+              >
+                Prøv igjen
+              </Button>
+            </AlertDescription>
+          </Alert>
         ) : upcoming.length === 0 ? (
           <EmptyState title="Ingen fakturaer å sende" className="p-8" />
         ) : (
@@ -311,6 +325,20 @@ function AdminProffOrdersPage() {
         </div>
         {ordersQ.isLoading ? (
           <Loading label="Laster fakturaer…" />
+        ) : ordersQ.isError ? (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              Kunne ikke hente fakturaer.
+              <Button
+                type="button"
+                variant="outline"
+                className="ml-3"
+                onClick={() => void ordersQ.refetch()}
+              >
+                Prøv igjen
+              </Button>
+            </AlertDescription>
+          </Alert>
         ) : orders.length === 0 ? (
           <EmptyState title="Ingen fakturaer med denne statusen" className="p-8" />
         ) : (
@@ -435,6 +463,20 @@ function AdminProffOrdersPage() {
         </h3>
         {locationChargesQ.isLoading ? (
           <Loading label="Laster lokasjonsperioder…" />
+        ) : locationChargesQ.isError ? (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              Kunne ikke hente lokasjonsperioder.
+              <Button
+                type="button"
+                variant="outline"
+                className="ml-3"
+                onClick={() => void locationChargesQ.refetch()}
+              >
+                Prøv igjen
+              </Button>
+            </AlertDescription>
+          </Alert>
         ) : locationCharges.length === 0 ? (
           <EmptyState title="Ingen lokasjonsperioder til fakturering" className="p-8" />
         ) : (

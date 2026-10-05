@@ -55,7 +55,38 @@ describe.skipIf(!canRun)("Proff: oppsigelse før neste faktura opprettes", () =>
       .update({ proff_subscription_cancelled_at: null })
       .eq("id", organizationId);
     expect(resume.error).toBeNull();
+    // Varselet kommer med en gang, ikke først ved neste daglige kjøring.
+    expect((await openEvents()).data).toHaveLength(1);
     expect((await service.rpc("create_proff_billing_events")).error).toBeNull();
     expect((await openEvents()).data).toHaveLength(1);
+  });
+
+  it("angring lukker bare oppsigelsesvarselet, ikke et eldre prøvevarsel", async () => {
+    const cancelledEvents = () =>
+      service
+        .from("admin_events")
+        .select("title")
+        .eq("target_id", organizationId)
+        .eq("kind", "proff_cancelled")
+        .is("handled_at", null);
+    const trialCancel = await service
+      .from("organizations")
+      .update({ proff_trial_cancelled_at: new Date().toISOString() })
+      .eq("id", organizationId);
+    expect(trialCancel.error).toBeNull();
+    const cancel = await service
+      .from("organizations")
+      .update({ proff_subscription_cancelled_at: new Date().toISOString() })
+      .eq("id", organizationId);
+    expect(cancel.error).toBeNull();
+    expect((await cancelledEvents()).data).toHaveLength(2);
+    const resume = await service
+      .from("organizations")
+      .update({ proff_subscription_cancelled_at: null })
+      .eq("id", organizationId);
+    expect(resume.error).toBeNull();
+    const open = (await cancelledEvents()).data;
+    expect(open).toHaveLength(1);
+    expect(open![0].title).toContain("avsluttet Proff-prøveperioden");
   });
 });

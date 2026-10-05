@@ -41,13 +41,18 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
         if (!current.proff_subscription_cancelled_at) return { organization: current };
         if (current.proff_ended_by_kaupet_at) throw new Error(ENDED_BY_KAUPET_MESSAGE);
         // Angrer oppsigelsen mens betalt periode løper: abonnementet fortsetter.
-        const { error } = await supabaseAdmin
+        // Vakten på proff_ended_by_kaupet_at hindrer at angringen overskriver en
+        // adminavslutning som ble lagret etter at vi leste organisasjonen.
+        const { data: resumed, error } = await supabaseAdmin
           .from("organizations")
           .update({ proff_subscription_cancelled_at: null })
-          .eq("id", organizationId);
+          .eq("id", organizationId)
+          .is("proff_ended_by_kaupet_at", null)
+          .select("id");
         if (error) {
           throw await toClientError("database", error);
         }
+        if (!resumed?.length) throw new Error(ENDED_BY_KAUPET_MESSAGE);
         return { organization: await getOrganization(supabaseAdmin, organizationId) };
       }
       throw new Error(current.proff_trial_started_at ? USED_TRIAL_MESSAGE : ORDER_FIRST_MESSAGE);

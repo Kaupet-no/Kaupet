@@ -570,6 +570,47 @@ describe("business server functions", () => {
     expect(admin.calls.updates).toEqual([]);
   });
 
+  it("angrer ikke oppsigelsen når Kaupet avslutter avtalen samtidig", async () => {
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+        proff_subscription_cancelled_at: "2026-10-01T00:00:00.000Z",
+      },
+      proff: true,
+    });
+    const build = supabaseAdmin.from.getMockImplementation()!;
+    supabaseAdmin.from.mockImplementation((table: string) => {
+      const chain = build(table);
+      if (table !== "organizations") return chain;
+      const isNull: string[] = [];
+      let pending: Record<string, unknown> | null = null;
+      chain.is = vi.fn((column: string, value: unknown) => {
+        if (value === null) isNull.push(column);
+        return chain;
+      });
+      chain.update = vi.fn((updates: Record<string, unknown>) => {
+        // Admin avslutter avtalen mellom lesingen og skrivingen.
+        (admin.organization as Record<string, unknown>).proff_ended_by_kaupet_at =
+          "2026-10-05T00:00:00.000Z";
+        pending = updates;
+        return chain;
+      });
+      chain.then = (resolve: (value: unknown) => unknown) => {
+        const org = admin.organization as Record<string, unknown>;
+        const matches = isNull.every((column) => org[column] == null);
+        if (pending && matches) Object.assign(org, pending);
+        return Promise.resolve({ data: matches ? [org] : [], error: null }).then(resolve);
+      };
+      return chain;
+    });
+
+    await expect(setBusinessPlan({ data: { plan: "proff" } })).rejects.toThrow(
+      "Proff-avtalen er avsluttet av Kaupet",
+    );
+    expect(admin.organization.proff_subscription_cancelled_at).toBe("2026-10-01T00:00:00.000Z");
+  });
+
   it("avviser ny bestilling mens en adminavsluttet periode fortsatt løper", async () => {
     const admin = buildAdmin({
       organization: {

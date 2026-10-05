@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdminRole as requireAdmin } from "@/lib/admin-auth.server";
-import { PROFF_TERMS, hasPaidProffPeriod, type ProffTerm } from "@/features/business-account/plans";
+import { PROFF_TERMS, type ProffTerm } from "@/features/business-account/plans";
 import { proffEndedByKaupetEmail, proffPaidEmail } from "@/lib/business-email-templates";
 import { sendBusinessReceipt } from "@/lib/business/business-emails.server";
 
@@ -252,67 +252,30 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
     await requireAdmin(context.supabase, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
 
-    // Claim the order first: the status filter is what makes a double click idempotent,
-    // so access can never be extended twice for the same payment.
-    const { data: claimed, error: claimError } = await supabaseAdmin
-      .from("proff_orders")
-      .update({
-        status: "paid",
-        paid_on: data.paidOn,
-        ...(data.fikenInvoiceNumber && { fiken_invoice_number: data.fikenInvoiceNumber }),
-      })
-      .eq("id", data.orderId)
-      .in("status", ["pending", "invoiced"])
-      .select("id, organization_id, term, fiken_invoice_number")
-      .maybeSingle();
-    if (claimError) {
-      throw await toClientError("database", claimError);
-    }
-    if (!claimed)
-      throw new ClientError("Bestillingen er allerede registrert betalt eller kansellert.", 409);
-
-    // Var det betalt Proff fra før? Avgjør om dette er aktiveringen (alltid
-    // bekreftet) eller en fornyelse (kvittering bare når bedriften har valgt det).
-    const { data: before, error: beforeError } = await supabaseAdmin
-      .from("organizations")
-      .select("selected_plan, proff_access_until, proff_trial_ends_at")
-      .eq("id", claimed.organization_id)
-      .single();
-    if (beforeError) {
-      throw await toClientError("database", beforeError);
-    }
-    const firstPeriod = !hasPaidProffPeriod(before);
-
-    // Tilgang gis først ved betaling. Betalt i prøveperioden eller før forrige
-    // periode er over: perioden stables på resten. Betalt for sent: fra nå.
-    const { data: period, error: extendError } = await supabaseAdmin
-      .rpc("extend_proff_access", {
-        _organization_id: claimed.organization_id,
-        _months: PROFF_TERMS[claimed.term as ProffTerm].months,
+    const { data: payment, error } = await supabaseAdmin
+      .rpc("mark_proff_order_paid", {
+        _order_id: data.orderId,
+        _paid_on: data.paidOn,
+        _fiken_invoice_number: data.fikenInvoiceNumber,
       })
       .single();
-    if (extendError) {
-      throw await toClientError("database", extendError);
-    }
-
-    const { error: periodError } = await supabaseAdmin
-      .from("proff_orders")
-      .update({ period_start: period.period_start, period_end: period.period_end })
-      .eq("id", claimed.id);
-    if (periodError) {
-      throw await toClientError("database", periodError);
+    if (error) {
+      if (error.message?.includes("order_not_payable")) {
+        throw new ClientError("Bestillingen er allerede registrert betalt eller kansellert.", 409);
+      }
+      throw await toClientError("database", error);
     }
 
     await sendPaymentReceipt(supabaseAdmin, {
-      organizationId: claimed.organization_id,
-      firstPeriod,
-      term: claimed.term as ProffTerm,
-      invoiceNumber: claimed.fiken_invoice_number,
-      periodStart: period.period_start,
-      periodEnd: period.period_end,
+      organizationId: payment.organization_id,
+      firstPeriod: payment.first_period,
+      term: payment.term as ProffTerm,
+      invoiceNumber: payment.fiken_invoice_number,
+      periodStart: payment.period_start,
+      periodEnd: payment.period_end,
     });
 
-    return { ok: true, periodStart: period.period_start, periodEnd: period.period_end };
+    return { ok: true, periodStart: payment.period_start, periodEnd: payment.period_end };
   });
 
 async function sendPaymentReceipt(

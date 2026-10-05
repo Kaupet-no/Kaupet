@@ -177,7 +177,15 @@ function buildAdmin(
   };
   supabaseAdmin.from.mockImplementation((table: string) => makeChain(table));
   supabaseAdmin.rpc.mockImplementation(async (name: string) => {
-    if (name === "start_proff_trial_order") {
+    if (name === "request_proff_subscription_order") {
+      if (
+        organization.proff_ended_by_kaupet_at &&
+        Date.parse(organization.proff_access_until ?? "") > Date.now()
+      ) {
+        return { data: null, error: { message: "agreement_ended_by_kaupet" } };
+      }
+      if (organization.proff_trial_started_at)
+        return { data: "33333333-3333-4333-8333-333333333333", error: null };
       const ends = new Date(Date.now() + 30 * 864e5).toISOString();
       Object.assign(organization, {
         selected_plan: "proff",
@@ -368,7 +376,7 @@ describe("business server functions", () => {
     await requestProffSubscription({ data: { term: "monthly", billingReference: "Kari" } });
 
     expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
-      "start_proff_trial_order",
+      "request_proff_subscription_order",
       expect.objectContaining({
         _organization_id: organizationId,
         _term: "monthly",
@@ -399,8 +407,8 @@ describe("business server functions", () => {
 
     const result = await requestProffSubscription({ data: { term: "yearly" } });
 
-    expect(supabaseAdmin.rpc).not.toHaveBeenCalledWith(
-      "start_proff_trial_order",
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
+      "request_proff_subscription_order",
       expect.anything(),
     );
     expect(result).toMatchObject({ trialEndsAt: null });
@@ -497,6 +505,23 @@ describe("business server functions", () => {
     await expect(setBusinessPlan({ data: { plan: "proff" } })).rejects.toThrow(
       "Proff-avtalen er avsluttet av Kaupet",
     );
+    expect(admin.calls.updates).toEqual([]);
+  });
+
+  it("avviser ny bestilling mens en adminavsluttet periode fortsatt løper", async () => {
+    const admin = buildAdmin({
+      organization: {
+        selected_plan: "proff",
+        proff_trial_started_at: "2026-08-01T00:00:00.000Z",
+        proff_access_until: new Date(Date.now() + 200 * 864e5).toISOString(),
+        proff_subscription_cancelled_at: "2026-10-01T00:00:00.000Z",
+        proff_ended_by_kaupet_at: "2026-10-01T00:00:00.000Z",
+      },
+    });
+    await expect(requestProffSubscription({ data: { term: "monthly" } })).rejects.toThrow(
+      "Proff-avtalen er avsluttet av Kaupet",
+    );
+    expect(admin.organization.proff_ended_by_kaupet_at).not.toBeNull();
     expect(admin.calls.updates).toEqual([]);
   });
 

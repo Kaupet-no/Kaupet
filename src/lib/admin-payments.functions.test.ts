@@ -203,98 +203,58 @@ describe("admin-proff: fakturering, betaling og kansellering", () => {
   });
 
   describe("adminMarkProffOrderPaid", () => {
-    const claimed = { id, organization_id: "org-1", term: "yearly", fiken_invoice_number: "77" };
-    // Før betalingen: i prøveperioden (ingen betalt periode) → aktivering.
-    const inTrial = {
-      selected_plan: "proff",
-      proff_access_until: "2099-01-01T00:00:00.000Z",
-      proff_trial_ends_at: "2099-01-01T00:00:00.000Z",
+    const payment = {
+      organization_id: "org-1",
+      term: "yearly",
+      fiken_invoice_number: "77",
+      first_period: true,
+      period_start: "2099-01-01",
+      period_end: "2100-01-01",
     };
-    const names = { display_name: "Eksempel", legal_name: "Eksempel AS" };
+    const run = () => adminMarkProffOrderPaid({ data: { orderId: id, paidOn: "2026-10-04" } });
     beforeEach(() => {
-      s.queues.organizations = [{ data: inTrial }, { data: names }];
+      s.queues.organizations = [{ data: { display_name: "Eksempel", legal_name: "Eksempel AS" } }];
     });
-    const run = (fikenInvoiceNumber?: string) =>
-      adminMarkProffOrderPaid({ data: { orderId: id, paidOn: "2026-10-04", fikenInvoiceNumber } });
 
-    it("409 når bestillingen allerede er betalt eller kansellert, uten å utvide tilgang", async () => {
-      s.queues.proff_orders = [{ data: null }];
+    it("avviser en betaling som allerede er registrert", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ error: { message: "order_not_payable" } }];
       expect(await rejection(run())).toMatchObject({
         message: "Bestillingen er allerede registrert betalt eller kansellert.",
         status: 409,
       });
-      expect(s.queues["rpc:extend_proff_access"]).toBeUndefined();
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
 
-    it("maskerer databasefeil ved claim", async () => {
-      s.queues.proff_orders = [{ error: dbError }];
+    it("maskerer transaksjonsfeil og sender ingen kvittering", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ error: dbError }];
       expect((await rejection(run())).message).toBe(GENERIC);
+      expect(s.sendReceipt).not.toHaveBeenCalled();
     });
 
-    it("claimer bare pending/invoiced, utvider tilgang og lagrer perioden", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { data: null }];
-      s.queues["rpc:extend_proff_access"] = [
-        { data: { period_start: "2026-01-01", period_end: "2027-01-01" } },
-      ];
-      await expect(run("77")).resolves.toEqual({
+    it("returnerer den lagrede perioden og bekrefter første betaling", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ data: payment }];
+      await expect(run()).resolves.toEqual({
         ok: true,
-        periodStart: "2026-01-01",
-        periodEnd: "2027-01-01",
+        periodStart: "2099-01-01",
+        periodEnd: "2100-01-01",
       });
-      const [claim, periodUpdate] = ops("proff_orders", "update");
-      expect(claim.values).toEqual({
-        status: "paid",
-        paid_on: "2026-10-04",
-        fiken_invoice_number: "77",
-      });
-      expect(claim.filters).toContainEqual(["in", "status", ["pending", "invoiced"]]);
-      expect(periodUpdate.values).toEqual({ period_start: "2026-01-01", period_end: "2027-01-01" });
-    });
-
-    it("bekrefter alltid første betalte periode", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { data: null }];
-      s.queues["rpc:extend_proff_access"] = [
-        { data: { period_start: "2099-01-01", period_end: "2100-01-01" } },
-      ];
-      await run();
-      expect(s.sendReceipt).toHaveBeenCalledTimes(1);
-      const [, orgId, buildEmail, options] = s.sendReceipt.mock.calls[0]!;
-      expect(orgId).toBe("org-1");
+      const [, , buildEmail] = s.sendReceipt.mock.calls[0]!;
       expect(buildEmail().subject).toBe("Betalingen er mottatt – Kaupet Proff er aktivt");
-      expect(options).toEqual({ includeBilling: true });
     });
 
     it("sender ikke kvittering for fornyelse når bedriften ikke har valgt det", async () => {
-      s.queues.organizations = [
-        { data: { ...inTrial, proff_trial_ends_at: "2020-01-01T00:00:00.000Z" } },
-      ];
+      s.queues["rpc:mark_proff_order_paid"] = [{ data: { ...payment, first_period: false } }];
       s.queues.organization_billing_profiles = [{ data: { payment_receipts: false } }];
-      s.queues.proff_orders = [{ data: claimed }, { data: null }];
-      s.queues["rpc:extend_proff_access"] = [{ data: { period_start: "a", period_end: "b" } }];
       await run();
       expect(s.sendReceipt).not.toHaveBeenCalled();
     });
 
-    it("overskriver ikke fakturanummer når det ikke er oppgitt", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { data: null }];
-      s.queues["rpc:extend_proff_access"] = [{ data: { period_start: "a", period_end: "b" } }];
+    it("sender valgt kvittering for fornyelse", async () => {
+      s.queues["rpc:mark_proff_order_paid"] = [{ data: { ...payment, first_period: false } }];
+      s.queues.organization_billing_profiles = [{ data: { payment_receipts: true } }];
       await run();
-      expect(ops("proff_orders", "update")[0].values).toEqual({
-        status: "paid",
-        paid_on: "2026-10-04",
-      });
-    });
-
-    it("maskerer feil når tilgangen ikke kan utvides", async () => {
-      s.queues.proff_orders = [{ data: claimed }];
-      s.queues["rpc:extend_proff_access"] = [{ error: dbError }];
-      expect((await rejection(run())).message).toBe(GENERIC);
-    });
-
-    it("maskerer feil når perioden ikke kan lagres på bestillingen", async () => {
-      s.queues.proff_orders = [{ data: claimed }, { error: dbError }];
-      s.queues["rpc:extend_proff_access"] = [{ data: { period_start: "a", period_end: "b" } }];
-      expect((await rejection(run())).message).toBe(GENERIC);
+      const [, , buildEmail] = s.sendReceipt.mock.calls[0]!;
+      expect(buildEmail().subject).toBe("Betaling mottatt for Kaupet Proff");
     });
   });
 

@@ -3568,6 +3568,32 @@ export type Database = {
         }[]
       }
       create_proff_billing_events: { Args: never; Returns: undefined }
+      request_proff_subscription_order: {
+        Args: {
+          _billing_email: string
+          _billing_reference?: string
+          _organization_id: string
+          _price_ex_vat_nok: number
+          _requested_by: string
+          _term: string
+        }
+        Returns: string
+      }
+      mark_proff_order_paid: {
+        Args: {
+          _fiken_invoice_number?: string
+          _order_id: string
+          _paid_on: string
+        }
+        Returns: {
+          fiken_invoice_number: string
+          first_period: boolean
+          organization_id: string
+          period_end: string
+          period_start: string
+          term: string
+        }[]
+      }
       start_proff_trial_order: {
         Args: {
           _billing_email: string

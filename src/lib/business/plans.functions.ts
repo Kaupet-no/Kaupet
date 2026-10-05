@@ -185,38 +185,18 @@ export const requestProffSubscription = createServerFn({ method: "POST" })
     }
     const current = await getOrganization(supabaseAdmin, organizationId);
     const startsTrial = !current.proff_trial_started_at;
-    if (current.proff_subscription_cancelled_at || current.proff_ended_by_kaupet_at) {
-      // Ny bestilling etter oppsigelse: abonnementet er løpende igjen.
-      const { error: resumeError } = await supabaseAdmin
-        .from("organizations")
-        .update({ proff_subscription_cancelled_at: null, proff_ended_by_kaupet_at: null })
-        .eq("id", organizationId);
-      if (resumeError) {
-        throw await toClientError("database", resumeError);
-      }
-    }
-    const { data: inserted, error } = startsTrial
-      ? await insertTrialOrder(supabaseAdmin, {
-          _organization_id: organizationId,
-          _requested_by: context.userId,
-          _term: term.id,
-          _price_ex_vat_nok: term.priceExVatNok,
-          _billing_email: profile.billing_email,
-          _billing_reference: data.billingReference || undefined,
-        })
-      : await supabaseAdmin
-          .from("proff_orders")
-          .insert({
-            organization_id: organizationId,
-            requested_by: context.userId,
-            term: term.id,
-            price_ex_vat_nok: term.priceExVatNok,
-            billing_email: profile.billing_email,
-            billing_reference: data.billingReference || null,
-          })
-          .select(ORDER_SELECT)
-          .single();
+    const { data: inserted, error } = await insertSubscriptionOrder(supabaseAdmin, {
+      _organization_id: organizationId,
+      _requested_by: context.userId,
+      _term: term.id,
+      _price_ex_vat_nok: term.priceExVatNok,
+      _billing_email: profile.billing_email,
+      _billing_reference: data.billingReference || undefined,
+    });
     if (error) {
+      if (error.message?.includes("agreement_ended_by_kaupet")) {
+        throw new Error(ENDED_BY_KAUPET_MESSAGE);
+      }
       if (error.message?.includes("trial_used")) throw new Error(USED_TRIAL_MESSAGE);
       if (error.code === "23505") {
         const existing = await findOpenProffOrder(supabaseAdmin, organizationId);
@@ -305,12 +285,15 @@ async function cancelPaidSubscription(
   return organization;
 }
 
-/** Starter prøven og legger inn bestillingen atomisk (start_proff_trial_order). */
-async function insertTrialOrder(
+/** Bestilling og eventuell prøvestart/gjenopptakelse lagres atomisk. */
+async function insertSubscriptionOrder(
   supabaseAdmin: AdminClient,
-  args: Database["public"]["Functions"]["start_proff_trial_order"]["Args"],
+  args: Database["public"]["Functions"]["request_proff_subscription_order"]["Args"],
 ) {
-  const { data: orderId, error } = await supabaseAdmin.rpc("start_proff_trial_order", args);
+  const { data: orderId, error } = await supabaseAdmin.rpc(
+    "request_proff_subscription_order",
+    args,
+  );
   if (error) return { data: null, error };
   return supabaseAdmin.from("proff_orders").select(ORDER_SELECT).eq("id", orderId).single();
 }

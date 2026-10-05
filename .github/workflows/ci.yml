@@ -160,6 +160,9 @@ jobs:
           done
           exit 1
 
+      - name: Test database transactions
+        run: bunx supabase test db
+
       - name: Run RLS integration tests
         run: bun run test:rls
 

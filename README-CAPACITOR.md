@@ -215,8 +215,10 @@ pushe et tag som matcher `v*` — aldri på vanlige push/PR-er.
 
 ### Påkrevde secrets
 
-Alle hemmelighetene under må ligge i GitHub-miljøet **`production`**
-(Settings → Environments → production → Environment secrets). Mangler noen
+Alle hemmelighetene under må ligge i Doppler **`kaupet/prd`**.
+GitHub-miljøet **`production`** har et read-only `DOPPLER_TOKEN` for å hente
+dem. Doppler-flyten ligger i PR #317 og gjelder etter promotering til `main`;
+før det bruker eksisterende native-workflow GitHub-secrets. Mangler noen
 av dem feiler jobben umiddelbart med en tydelig norsk feilmelding som lister
 de manglende navnene, i stedet for å bygge et usignert eller halvferdig
 resultat.

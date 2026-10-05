@@ -5,8 +5,10 @@
 Produksjonskonfigurasjonen `kaupet/prd` er fylt og kontrollert ved
 tilbakelesing. GitHub production har et read-only `DOPPLER_TOKEN` avgrenset
 til denne konfigurasjonen og dagens offentlige `VITE_VAPID_PUBLIC_KEY`.
-Kodeflyten er klargjort, men **ikke aktivert pa main**. Synk til Worker og
-Supabase Auth avventer ny produksjonsnokkel fra Resend.
+Worker, Supabase Auth og de tre aktive jobbhemmelighetene er synket fra
+Doppler. Separat lesekontroll passerer, og forsiden/sitemap svarer 200.
+Den automatiske kodeflyten er **ikke aktivert pa main**; den ligger i
+PR #317 mot staging. Gamle GitHub-kopier beholdes frem til promotering.
 
 ## Kilder og kontroller
 
@@ -33,9 +35,10 @@ Supabase Auth avventer ny produksjonsnokkel fra Resend.
 - Resends 401 pa domenelesing skyldes en sending-only nokkel og er ikke
   bevis pa ugyldig autentisering. Sende-endepunktet aksepterte nokkelen og
   avviste tom mottakerliste med 422; ingen e-post ble sendt. Begge
-  Supabase-miljoer bruker `ikkesvar@varsel.kaupet.no`. En midlertidig delt
-  Resend-nokkel er lagt i prd; brukeren oppretter en egen produksjonsnokkel
-  som erstatter den for aktivering.
+  Supabase-miljoer bruker `ikkesvar@varsel.kaupet.no`. Brukerens nye, separate
+  produksjonsnokkel erstatter den midlertidige delte nokkelen i prd og er
+  synket til Worker og Supabase SMTP. Den nye nokkelen er kontrollert med
+  samme tomme mottakerliste; ingen e-post ble sendt.
 
 ## Losning
 
@@ -65,10 +68,8 @@ Staging-skriptet beholdes fordi staging-kontrollene utforer bildejobber.
 
 ## Gjenstar for aktivering
 
-- Erstatt `RESEND_API_KEY` i prd med den nye produksjonsnokkelen.
-- Kjor forhandskontroll og synk, deretter separat lesekontroll.
 - Verifiser kodeendringen gjennom staging/PR-flyten for promotering til main.
-- Kjor vanlig produksjonsroyktest etter deploy. Fjern eldre kopier forst
+- Kjor full produksjonsroyktest etter deploy. Fjern eldre kopier forst
   etter bekreftet overforing og aktivert Doppler-flyt pa main.
 
 ## Tilbakeforing
@@ -84,3 +85,11 @@ atomisk: feil krever at samme verdier synkes pa nytt til alle mottakere.
 `python3 scripts/check-doppler-native.py` kjorer offline med falske HTTP-
 og Wrangler-kall. De inngar i CI. `actionlint` validerer workflowene.
 Ingen av disse kontrollene berorer produksjonen.
+
+Produksjonens bootstrap, sync og separate verify passerer. Alle 24
+administrerte runtime-bindinger finnes pa Workeren; Cloudflare skjuler
+verdiene, sa direkte tilbakelesing er ikke mulig. Supabase-jobbenes verdier
+matcher Doppler. API-et aksepterte Auth-oppdateringen, og captcha-aktivering
+og avsender er bevart. Auth-hemmeligheter kan skjules som hash, sa direkte
+samsvar kan ikke alltid bekreftes. Bare forsiden/sitemap er royktestet;
+innlogging, faktisk e-postutsending, push, SVV og HF er ikke funksjonstestet.

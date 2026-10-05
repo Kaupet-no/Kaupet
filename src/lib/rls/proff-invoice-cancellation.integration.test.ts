@@ -89,4 +89,32 @@ describe.skipIf(!canRun)("Proff: oppsigelse før neste faktura opprettes", () =>
     expect(open).toHaveLength(1);
     expect(open![0].title).toContain("avsluttet Proff-prøveperioden");
   });
+  it("angring bevarer prøvevarselet når oppsigelsen allerede er håndtert", async () => {
+    const cancel = await service
+      .from("organizations")
+      .update({ proff_subscription_cancelled_at: new Date().toISOString() })
+      .eq("id", organizationId);
+    expect(cancel.error).toBeNull();
+    const handled = await service
+      .from("admin_events")
+      .update({ handled_at: new Date().toISOString() })
+      .eq("target_id", organizationId)
+      .eq("kind", "proff_cancelled")
+      .like("title", "% sa opp Proff%");
+    expect(handled.error).toBeNull();
+    const resume = await service
+      .from("organizations")
+      .update({ proff_subscription_cancelled_at: null })
+      .eq("id", organizationId);
+    expect(resume.error).toBeNull();
+    const open = await service
+      .from("admin_events")
+      .select("title")
+      .eq("target_id", organizationId)
+      .eq("kind", "proff_cancelled")
+      .is("handled_at", null);
+    expect(open.error).toBeNull();
+    expect(open.data).toHaveLength(1);
+    expect(open.data![0].title).toContain("avsluttet Proff-prøveperioden");
+  });
 });

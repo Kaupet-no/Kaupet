@@ -12,37 +12,7 @@ bestod i [CI-kjøring 37524283187](https://github.com/Kaupet-no/Kaupet/actions/r
 Dette bekrefter deployflyten, ikke leverandørenes brukerreiser. Eldre kilder
 beholdes til verifisering av overføring og tilbakeføring er fullført.
 
-## Kilder og kontroller
-
-- Gjeldende Supabase service-role ble hentet fra produksjonsprosjektet
-  `efuexbrxdvjznrvoqbsd`, ikke fra den eldre verdien i `secrets/dev.env`.
-- Supabase management-token ble hentet fra CLI-innloggingen og validert
-  mot produksjonen etter uttrykkelig godkjenning.
-- De tre aktive jobbhemmelighetene ble lest fra produksjonens `app_settings`
-  og sammenlignet med `secrets/cloudflare.env`; alle tre matchet.
-- Vipps, R2, Mistral, SVV og den eldre HF-nokkelen kommer fra
-  `secrets/dev.env`. Brukeren bekreftet filen som produksjonskilde.
-  Begge produksjonsbucketene svarte 200 pa HEAD, Mistral-modellisten
-  svarte 200, og Vipps production/test autentiserte med 200 uten betalinger.
-  SVV og HF er importert, men ikke funksjonstestet.
-- VAPID-paret fra SOPS matcher klientnokkelen pa main. FCM-kilden i
-  `secrets/staging.env` tilhorer Firebase-prosjektet `kaupet-no`, som
-  produksjonsappens lokale Firebase-konfigurasjon bruker.
-- Android- og iOS-Firebase-filene er importert fra lokale, gitignorede
-  filer etter kontroll av prosjekt og pakke/bundle-ID `no.kaupet.app`.
-- Turnstile ble hentet fra eksisterende produksjonswidget i Cloudflare.
-  HMAC finnes ikke i de tilgjengelige SOPS-revisjonene; ny 256-bit nokkel
-  er klargjort etter uttrykkelig godkjenning. Aktivering gir nye IP-hasher
-  og nullstiller dermed de lopende IP-baserte rate-limit-vinduene.
-- Resends 401 pa domenelesing skyldes en sending-only nokkel og er ikke
-  bevis pa ugyldig autentisering. Sende-endepunktet aksepterte nokkelen og
-  avviste tom mottakerliste med 422; ingen e-post ble sendt. Begge
-  Supabase-miljoer bruker `ikkesvar@varsel.kaupet.no`. Brukerens nye, separate
-  produksjonsnokkel erstatter den midlertidige delte nokkelen i prd og er
-  synket til Worker og Supabase SMTP. Den nye nokkelen er kontrollert med
-  samme tomme mottakerliste; ingen e-post ble sendt.
-
-## Losning
+## Løsning
 
 Produksjonsdeployen bruker `scripts/doppler-production.sh`. Den henter bare
 en eksplisitt liste fra `kaupet/prd`, validerer verdiene og kontrollerer
@@ -75,7 +45,7 @@ Staging-skriptet beholdes fordi staging-kontrollene utforer bildejobber.
 - Verifiser tilbakeføring og dokumenter overføringen før eldre kopier fjernes.
 - Produksjonsrøyktest er avgrenset til repoets tillatte lesekontroller.
 
-## Tilbakeforing
+## Tilbakeføring
 
 Gamle GitHub- og SOPS-kilder er beholdt. Reverter workflow-endringen for
 a bruke tidligere deployflyt. HMAC-originalen kan ikke hentes tilbake;

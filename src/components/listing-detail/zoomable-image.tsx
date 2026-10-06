@@ -1,5 +1,5 @@
 // Pinch-/dobbelttrykk-zoom med panorering, og sveip-ned-for-å-lukke når
-// bildet ikke er zoomet (fase 6, se docs/NATIVE-UI-UX-PLAN.md).
+// bildet ikke er zoomet.
 //
 // Egen transform, ikke nettleserens egen pinch: Capacitor slår av sidenivå-
 // zoom i WebView-en (`zoomEnabled` er `false` som standard på begge

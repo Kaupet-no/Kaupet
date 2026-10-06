@@ -56,17 +56,17 @@ symptomet i den ene ruten der det ble observert (se `AGENTS.md`, ARCHITECTURE
 
 ISTQB-nivåene mappet konkret til dette repoet:
 
-| Nivå                     | Verktøy                                                     | Filmønster                                           | Kommando                                                             | Kjøres                   |
-| ------------------------ | ----------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------- | ------------------------ |
-| Komponenttest (unit)     | Vitest                                                      | `src/**/*.test.ts`                                   | `bun run test`                                                       | Hver CI-kjøring          |
-| Komponentintegrasjon     | Vitest + Testing Library                                    | `src/**/*.test.tsx`                                  | `bun run test`                                                       | Hver CI-kjøring          |
-| Systemintegrasjon (data) | Vitest mot lokal Supabase                                   | `src/**/*.integration.test.ts`                       | `bun run test:rls`                                                   | CI-jobb `rls`            |
-| Systemtest (E2E)         | Playwright                                                  | `e2e/*.spec.ts`                                      | `bun run test:e2e`                                                   | PR mot `main` + dispatch |
-| Visuell regresjon        | Playwright screenshots                                      | `e2e/*.visual.spec.ts`                               | samme                                                                | samme                    |
-| Statisk test             | ESLint, tsc, prettier, boundary-script, `bun audit`, CodeQL | —                                                    | `bun run lint`, `bunx tsc --noEmit`, `bun run check:server-boundary` | Hver CI-kjøring + hooks  |
-| Byggverifikasjon         | Vite + bundle-budsjett                                      | —                                                    | `bun run build && bun run check:bundle`                              | Hver CI-kjøring          |
-| Native enhetstest        | Gradle                                                      | `android/**`                                         | `./gradlew test<Flavor>DebugUnitTest`                                | CI-jobb `native-android` |
-| Akseptansetest (manuell) | Sjekklister                                                 | `docs/plans/ANNONSEOPPRETTELSE-MANUELL-QA.md` + § 12 | —                                                                    | Før release              |
+| Nivå                     | Verktøy                                                     | Filmønster                           | Kommando                                                             | Kjøres                   |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- | ------------------------ |
+| Komponenttest (unit)     | Vitest                                                      | `src/**/*.test.ts`                   | `bun run test`                                                       | Hver CI-kjøring          |
+| Komponentintegrasjon     | Vitest + Testing Library                                    | `src/**/*.test.tsx`                  | `bun run test`                                                       | Hver CI-kjøring          |
+| Systemintegrasjon (data) | Vitest mot lokal Supabase                                   | `src/**/*.integration.test.ts`       | `bun run test:rls`                                                   | CI-jobb `rls`            |
+| Systemtest (E2E)         | Playwright                                                  | `e2e/*.spec.ts`                      | `bun run test:e2e`                                                   | PR mot `main` + dispatch |
+| Visuell regresjon        | Playwright screenshots                                      | `e2e/*.visual.spec.ts`               | samme                                                                | samme                    |
+| Statisk test             | ESLint, tsc, prettier, boundary-script, `bun audit`, CodeQL | —                                    | `bun run lint`, `bunx tsc --noEmit`, `bun run check:server-boundary` | Hver CI-kjøring + hooks  |
+| Byggverifikasjon         | Vite + bundle-budsjett                                      | —                                    | `bun run build && bun run check:bundle`                              | Hver CI-kjøring          |
+| Native enhetstest        | Gradle                                                      | `android/**`                         | `./gradlew test<Flavor>DebugUnitTest`                                | CI-jobb `native-android` |
+| Akseptansetest (manuell) | Sjekklister                                                 | Intern QA-sjekkliste (Notion) + § 12 | —                                                                    | Før release              |
 
 **Nivåvalgstabell.** Slå opp raden som passer og bruk nivået den gir. Ikke
 vurder — slå opp. Passer flere rader, velg den øverste.
@@ -816,7 +816,7 @@ oppretter høyst én annonse.
 ### 12.2 Manuell QA-sesjon
 
 Roller, enheter og detaljerte a11y-steg for annonseopprettelse er allerede
-beskrevet i `docs/plans/ANNONSEOPPRETTELSE-MANUELL-QA.md` — det dokumentet er den
+beskrevet i den interne QA-sjekklisten i Notion — den er den
 operasjonelle sjekklisten for J2–J5 og skal ikke dupliseres her. Utvid samme
 mal når nye flyter når release-modenhet.
 

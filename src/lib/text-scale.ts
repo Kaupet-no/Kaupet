@@ -1,4 +1,4 @@
-// Dynamic Type / OS-tekststørrelse (fase 8, se docs/NATIVE-UI-UX-PLAN.md).
+// Dynamic Type / OS-tekststørrelse.
 //
 // Skalerer KUN typografitokens (`--text-*` i src/styles.css), aldri rot-
 // font-size. `rem` er alltid relativt til <html>-elementets font-size —

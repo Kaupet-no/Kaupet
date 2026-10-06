@@ -927,7 +927,7 @@ function ListingDetailViewBody({
             {statusBadge && <StatusBadge label={statusBadge} />}
             {avgiftBreakdown && (
               /* Samme etikettstil som tiles i faktarutenettet, ikke en
-                 versal "eyebrow" — se F1 i docs/plans/ui-gjennomgang.md. */
+                 versal "eyebrow". */
               <p className="text-xs text-muted-foreground">Totalpris</p>
             )}
             {priceBlock}

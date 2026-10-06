@@ -28,17 +28,23 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Hent Android-hemmeligheter fra Doppler
+        run: bash scripts/doppler-native.sh
+        env:
+          PLATFORM: android
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
       # Signeringskontoene finnes ikke ennå. Feil raskt og tydelig her i
       # stedet for at gradlew/opplastingssteget lenger nede feiler kryptisk
       # eller — verre — hopper stille over signering/opplasting.
       - name: Sjekk at nødvendige hemmeligheter er satt
         env:
-          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
-          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          ANDROID_GOOGLE_SERVICES_JSON: ${{ env.ANDROID_GOOGLE_SERVICES_JSON }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ env.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ env.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ env.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ env.ANDROID_UPLOAD_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
           missing=()
           [ -z "$ANDROID_GOOGLE_SERVICES_JSON" ] && missing+=("ANDROID_GOOGLE_SERVICES_JSON")
@@ -49,7 +55,7 @@ jobs:
           [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ] && missing+=("PLAY_SERVICE_ACCOUNT_JSON")
 
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "Følgende hemmeligheter mangler i GitHub-miljøet «production» og må opprettes før Android kan publiseres til Google Play:" >&2
+            echo "Følgende hemmeligheter mangler i Doppler «kaupet/prd» og må opprettes før Android kan publiseres til Google Play:" >&2
             printf '  - %s\n' "${missing[@]}" >&2
             echo "Se README-CAPACITOR.md § Publisering til butikkene for hva hver av dem skal inneholde." >&2
             exit 1
@@ -66,7 +72,7 @@ jobs:
         working-directory: android/app
         run: printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
         env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+          GOOGLE_SERVICES_JSON: ${{ env.ANDROID_GOOGLE_SERVICES_JSON }}
 
       - name: Sync Android project (production)
         run: bunx cap sync android
@@ -90,10 +96,10 @@ jobs:
           keyPassword=$ANDROID_UPLOAD_KEY_PASSWORD
           EOF
         env:
-          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ env.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ env.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ env.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ env.ANDROID_UPLOAD_KEY_PASSWORD }}
 
       - name: Build production AAB
         working-directory: android
@@ -128,7 +134,7 @@ jobs:
       - name: Last opp til Google Play (internal, draft)
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: no.kaupet.app
           releaseFiles: android/app/build/outputs/bundle/productionRelease/app-production-release.aab
           track: internal
@@ -146,13 +152,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Hent iOS-hemmeligheter fra Doppler
+        run: bash scripts/doppler-native.sh
+        env:
+          PLATFORM: ios
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
       - name: Sjekk at nødvendige hemmeligheter er satt
         env:
-          IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}
+          APP_STORE_CONNECT_KEY_ID: ${{ env.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ env.APP_STORE_CONNECT_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
         run: |
           missing=()
           [ -z "$IOS_GOOGLE_SERVICE_INFO_PLIST" ] && missing+=("IOS_GOOGLE_SERVICE_INFO_PLIST")
@@ -162,7 +174,7 @@ jobs:
           [ -z "$APPLE_TEAM_ID" ] && missing+=("APPLE_TEAM_ID")
 
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "Følgende hemmeligheter mangler i GitHub-miljøet «production» og må opprettes før iOS kan publiseres til TestFlight:" >&2
+            echo "Følgende hemmeligheter mangler i Doppler «kaupet/prd» og må opprettes før iOS kan publiseres til TestFlight:" >&2
             printf '  - %s\n' "${missing[@]}" >&2
             echo "Se README-CAPACITOR.md § Publisering til butikkene for hva hver av dem skal inneholde." >&2
             exit 1
@@ -182,7 +194,7 @@ jobs:
         working-directory: ios/App/App
         run: printf '%s' "$IOS_GOOGLE_SERVICE_INFO_PLIST" > GoogleService-Info.plist
         env:
-          IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST }}
+          IOS_GOOGLE_SERVICE_INFO_PLIST: ${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST }}
 
       - name: Sync iOS project (production)
         run: bunx cap sync ios
@@ -208,7 +220,7 @@ jobs:
         working-directory: ios
         run: printf '%s' "$APP_STORE_CONNECT_KEY_P8" > AuthKey.p8
         env:
-          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          APP_STORE_CONNECT_KEY_P8: ${{ env.APP_STORE_CONNECT_KEY_P8 }}
 
       - name: Skriv ExportOptions.plist
         working-directory: ios
@@ -230,7 +242,7 @@ jobs:
           </plist>
           EOF
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
 
       - name: Arkiver (xcodebuild archive)
         working-directory: ios/App
@@ -251,9 +263,9 @@ jobs:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER"
         env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ env.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
 
       # Med automatisk signering setter Xcode aps-environment i det arkiverte
       # binæret ut fra distribusjonsprofilen den velger (produksjon), ikke ut
@@ -287,8 +299,8 @@ jobs:
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
         env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ env.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
 
       - name: Rydd opp API-nøkkelfil
         if: always()

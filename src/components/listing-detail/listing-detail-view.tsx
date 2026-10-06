@@ -1,7 +1,15 @@
 import { formatNokNumber } from "@/lib/format";
 import { Fragment, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ClientOnly, Link, useLocation } from "@tanstack/react-router";
-import { ChevronLeft, Expand, Loader2, MapPin, Maximize2, Shrink } from "lucide-react";
+import {
+  ChevronLeft,
+  Expand,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Maximize2,
+  Shrink,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -1122,6 +1130,22 @@ function ListingDetailViewBody({
                 <VehicleEquipmentPanel attributes={attributes} onClose={close} />
               )}
             />
+          )}
+
+          {/* ponytail: lenke til Brregs gratis offentlige oppslag. Bytt til
+              oppslags-API-et (Maskinporten + avtale) når det er på plass —
+              vis da aldri roller/skyldner, de er personopplysninger. */}
+          {isVehicleListing && vehicleLookup?.registrationNumber && (
+            <a
+              href={`https://rettsstiftelser.brreg.no/nb/oppslag/motorvogn/${encodeURIComponent(vehicleLookup.registrationNumber.toUpperCase())}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex min-h-12 items-center gap-1.5 text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Sjekk heftelser i Løsøreregisteret
+              <span className="sr-only">(åpnes i ny fane)</span>
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+            </a>
           )}
 
           {sellerInColumn && sellerContactSlot && <div className="mt-8">{sellerContactSlot}</div>}

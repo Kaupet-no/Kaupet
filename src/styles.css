@@ -498,7 +498,7 @@ html.native body::before {
   display: none;
 }
 
-/* Native polish (fase 7, se docs/NATIVE-UI-UX-PLAN.md). `.native` settes på
+/* Native polish. `.native` settes på
    <html> fra setupNative(), altså kun i Capacitor-WebView-en — web er
    uberørt. */
 

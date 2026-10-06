@@ -53,6 +53,11 @@ jobs:
       - name: Local staging configuration
         run: node --test scripts/staging-env.test.mjs
 
+      - name: Doppler distribution (offline)
+        run: |
+          python3 scripts/check-doppler-production.py
+          python3 scripts/check-doppler-native.py
+
       - name: Build
         run: bun run build
 
@@ -174,6 +179,7 @@ jobs:
     name: Android unit tests
     needs: verify
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     outputs:
       android: ${{ steps.filter.outputs.android }}
       flavor: ${{ steps.env.outputs.flavor }}
@@ -222,6 +228,13 @@ jobs:
 
       # Each application id needs its own Firebase registration. Never put
       # production credentials in the isolated staging package.
+      - name: Hent produksjonens Firebase-konfigurasjon fra Doppler
+        if: steps.filter.outputs.android == 'true' && github.ref_name == 'main'
+        run: bash scripts/doppler-native.sh
+        env:
+          PLATFORM: android-preview
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
       - name: Skriv google-services.json fra miljøspesifikk secret
         if: steps.filter.outputs.android == 'true'
         working-directory: android/app
@@ -232,7 +245,7 @@ jobs:
             printf '%s' "$GOOGLE_SERVICES_STAGING_JSON" > google-services.json
           fi
         env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+          GOOGLE_SERVICES_JSON: ${{ env.ANDROID_GOOGLE_SERVICES_JSON }}
           GOOGLE_SERVICES_STAGING_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_STAGING_JSON }}
 
       - name: Sync Android project
@@ -272,6 +285,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
+    concurrency:
+      group: doppler-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -286,7 +302,6 @@ jobs:
         env:
           VITE_R2_PUBLIC_BASE_URL: ${{ vars.VITE_R2_PUBLIC_BASE_URL }}
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
         run: |
           if [ -z "$VITE_R2_PUBLIC_BASE_URL" ]; then
             echo "VITE_R2_PUBLIC_BASE_URL mangler i production-miljøet — hele siden krasjer uten den." >&2
@@ -296,15 +311,12 @@ jobs:
             echo "R2_ACCOUNT_ID mangler i production-miljøet — CSP-en ville blokkert meldingsvedlegg." >&2
             exit 1
           fi
-          if [ -z "$R2_CLEANUP_SECRET" ]; then
-            echo "R2_CLEANUP_SECRET mangler i production-miljøet — opprydningsjobben ville svart 401 i det stille." >&2
-            exit 1
-          fi
 
       - name: Build
         run: bun run build
         env:
           VITE_ENVIRONMENT: production
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -329,10 +341,16 @@ jobs:
             esac
           done
 
+      - name: Kontroller produksjonshemmeligheter og hent tilgang fra Doppler
+        run: bash scripts/doppler-production.sh
+        env:
+          OPERATION: bootstrap
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+
       - name: Deploy
         run: bun run deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # Category sync reads public staging tables with a publishable key. A
@@ -344,42 +362,27 @@ jobs:
         env:
           STAGING_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
           STAGING_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set R2 secrets on the production Worker
         run: |
           printf '%s' "$R2_ACCOUNT_ID" | bunx wrangler secret put R2_ACCOUNT_ID --name kaupet-no
-          printf '%s' "$R2_ACCESS_KEY_ID" | bunx wrangler secret put R2_ACCESS_KEY_ID --name kaupet-no
-          printf '%s' "$R2_SECRET_ACCESS_KEY" | bunx wrangler secret put R2_SECRET_ACCESS_KEY --name kaupet-no
           printf '%s' "$R2_BILDER_BUCKET" | bunx wrangler secret put R2_BILDER_BUCKET --name kaupet-no
           printf '%s' "$R2_VEDLEGG_BUCKET" | bunx wrangler secret put R2_VEDLEGG_BUCKET --name kaupet-no
           printf '%s' "$R2_PUBLIC_BASE_URL" | bunx wrangler secret put R2_PUBLIC_BASE_URL --name kaupet-no
-          printf '%s' "$R2_CLEANUP_SECRET" | bunx wrangler secret put R2_CLEANUP_SECRET --name kaupet-no
-          # Bildekøen (/api/public/images/process) er valgfri inntil hemmeligheten er satt:
-          # uten den blir jobbene bare liggende som «Behandles», deployen stopper ikke.
-          if [ -n "$IMAGE_JOBS_SECRET" ]; then
-            printf '%s' "$IMAGE_JOBS_SECRET" | bunx wrangler secret put IMAGE_JOBS_SECRET --name kaupet-no
-          else
-            echo "::warning::IMAGE_JOBS_SECRET mangler — bilder fra Proff-import/API blir ikke behandlet."
-          fi
-          # Varsel om API-nøkler som snart utløper (/api/public/api-keys/expiry-notify).
-          if [ -n "$API_KEY_EXPIRY_SECRET" ]; then
-            printf '%s' "$API_KEY_EXPIRY_SECRET" | bunx wrangler secret put API_KEY_EXPIRY_SECRET --name kaupet-no
-          else
-            echo "::warning::API_KEY_EXPIRY_SECRET mangler — superbrukere varsles ikke før API-nøkler utløper."
-          fi
         env:
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BILDER_BUCKET: ${{ vars.R2_BILDER_BUCKET }}
           R2_VEDLEGG_BUCKET: ${{ vars.R2_VEDLEGG_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
-          R2_CLEANUP_SECRET: ${{ secrets.R2_CLEANUP_SECRET }}
-          IMAGE_JOBS_SECRET: ${{ secrets.IMAGE_JOBS_SECRET }}
-          API_KEY_EXPIRY_SECRET: ${{ secrets.API_KEY_EXPIRY_SECRET }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Synk produksjonshemmeligheter fra Doppler
+        run: bash scripts/doppler-production.sh
+        env:
+          OPERATION: sync
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   android-release:

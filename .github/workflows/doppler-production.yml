@@ -1,0 +1,38 @@
+name: Doppler (produksjon)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Lesekontroll eller synk av produksjonshemmeligheter
+        type: choice
+        options: [verify, sync]
+        default: verify
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doppler-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Kontroller eller synk produksjonshemmeligheter
+        run: bash scripts/doppler-production.sh
+        env:
+          OPERATION: ${{ inputs.operation }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

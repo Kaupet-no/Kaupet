@@ -582,7 +582,7 @@ function PushHintForMessages() {
 }
 
 /** En samtale kjøperen bare har åpnet (ingen meldinger ennå) vises ikke for
- * selgeren — se #3 i docs/test/staging-gjennomgang-2026-10-01.md. */
+ * selgeren. */
 function hideUnstartedForCounterpart(rows: ConversationRow[], myId: string): ConversationRow[] {
   return rows.filter((c) => c.last_message || c.buyer_id === myId);
 }

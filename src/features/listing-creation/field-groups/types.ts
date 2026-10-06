@@ -238,8 +238,7 @@ export type WizardSharedProps = {
    * saved yet (e.g. title too short). */
   ensureDraftId: () => Promise<string | null>;
 
-  // photo-assisted suggestions (see
-  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md), one
+  // photo-assisted suggestions, one
   // usePhotoSuggestion() instance shared by the photos and category-
   // attributes steps — see use-photo-suggestion.ts.
   photoSuggestionEnabled: boolean;

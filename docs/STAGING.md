@@ -8,9 +8,8 @@ Staging kjører mot et eget Supabase-prosjekt. Konfigurasjonen styres av et GitH
 
 Migrerte server-hemmeligheter administreres i Doppler `kaupet/stg` og synkes
 av `scripts/doppler-staging.sh` ved deploy. Cloudflare-tilgang hentes også fra
-Doppler; management-tokens distribueres aldri til Workeren. Se
-[migreringsstatus](decisions/2026-10-01-doppler-staging-status.md) for mottakere,
-unntak og verifiseringsbegrensninger. FCM er foreløpig inaktivt i staging.
+Doppler; management-tokens distribueres aldri til Workeren. FCM er foreløpig
+inaktivt i staging.
 Vipps-betalinger bruker alltid `VIPPS_ENVIRONMENT=test`. Produksjonens
 kategori-synk bruker staging publishable key, aldri staging service-role.
 
@@ -52,7 +51,7 @@ uten å måtte spørre noen.
 `supabase/config.toml` er kun lokal dev-config — de faktiske innstillingene
 for staging/produksjon bor i Supabase-dashbordet (**Authentication →
 Sign In / Providers → Email**) og kan ikke verifiseres fra repoet. Forvent
-og hold disse verdiene i produksjon (se den interne sikkerhetsvurderingen, L-15):
+og hold disse verdiene i produksjon:
 
 - **`secure_password_change`: på.** Uten reauth ved passordbytte kan en
   kapret sesjon (stjålet token) endre passordet og låse ut den rettmessige
@@ -63,13 +62,6 @@ og hold disse verdiene i produksjon (se den interne sikkerhetsvurderingen, L-15)
   `src/lib/auth-schemas.ts`. Merk at `passwordSchema` kun er klientvalidering:
   håndheves ikke lengden også i dashbordet, kan et direkte API-kall utenom
   appen sette et kortere passord.
-
-**Kontoer under kravet:** Supabase håndhever ikke minstelengden retroaktivt.
-Kontoer opprettet før kravet ble slått på — deriblant testkontoene fra
-sluttbrukertesten 2026-09-16, som har åtte tegn — fortsetter å fungere med
-korte passord. Dette er en bevisst, akseptert begrensning: kohorten er
-testkontoer, og en tvungen nullstilling ville krevd egen flyt. Vurder på nytt
-hvis brukerbasen vokser før policyen får virke.
 
 ## Testing
 

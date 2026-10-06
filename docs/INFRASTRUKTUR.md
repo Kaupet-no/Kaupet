@@ -224,29 +224,6 @@ Et `text/html`-svar med «Cloudflare Access» i innholdet betyr at Access
 stopper kallet. Et 401 betyr at hemmeligheten i `app_settings` ikke matcher
 Worker-secreten.
 
-**Status 2026-09-28** (verdiene kan ha endret seg siden):
-
-| Rad / secret                                         | Staging                                     | Produksjon                     |
-| ---------------------------------------------------- | ------------------------------------------- | ------------------------------ |
-| `push_dispatch_url` / `_secret`                      | Satt (URL rettet fra `test.kaupet.no`)      | Satt                           |
-| `r2_cleanup_url` / `_secret`                         | Satt                                        | Satt (URL lagt inn 2026-09-28) |
-| `image_jobs_url` / `_secret`                         | Mangler                                     | Kun URL                        |
-| `api_key_expiry_url` / `_secret`                     | Mangler                                     | Kun URL                        |
-| Worker: `IMAGE_JOBS_SECRET`, `API_KEY_EXPIRY_SECRET` | Mangler (GitHub Environment-secret mangler) | Mangler                        |
-
-**Bildejobber, kontroll 2026-09-29:** `IMAGE_JOBS_SECRET` er satt på begge
-Workerne med samme verdi, lagret kryptert i `secrets/cloudflare.env`.
-Staging-prosjektet `zpazmwzhvylptptygzlw` har både `image_jobs_url`
-(`https://staging.kaupet.no/api/public/images/process`) og matchende
-`image_jobs_secret`. Et autentisert kall mot staging-endepunktet svarte 200
-med `claimed: 0` da køen var tom. Produksjonsprosjektet
-`efuexbrxdvjznrvoqbsd` har korrekt `image_jobs_url`
-(`https://kaupet.no/api/public/images/process`) og en `image_jobs_secret`
-som matcher den krypterte kilden. Dette ble kontrollert lesende etter at
-raden ble satt; produksjonsendepunktet ble ikke testet. GitHub
-Environment-secret `IMAGE_JOBS_SECRET` er satt fra samme krypterte verdi i
-både `staging` og `production`, og begge navnene er bekreftet i GitHub.
-
 Bildejobbens kildehenting krever `EXTERNAL_IMAGE_ALLOWED_HOSTS` på Workeren
 før funksjonen rulles ut i et miljø. Verdien er en kommaseparert liste med
 eksakte ASCII/Punycode-vertsnavn for kilder Kaupet-operatøren har gjennomgått
@@ -319,22 +296,17 @@ Tre steder, avhengig av hvem som trenger verdien:
    Mistral, SVV, `RATE_LIMIT_HMAC_SECRET`, `PUSH_DISPATCH_SECRET`,
    `PUBLIC_SITE_URL` m.fl.) er satt manuelt med
    `wrangler secret put <NAVN> --name <worker>`.
-3. **`secrets/*.env`** — SOPS/age-kryptert i repoet, for lokal utvikling og
-   som kilde til sannhet for staging og Cloudflare-tokenet. Se
-   `secrets/README.md`.
+3. **`secrets/*.env`** — SOPS/age-kryptert i repoet, for lokal utvikling.
+   Se `secrets/README.md`.
+
+**Doppler** (prosjekt `kaupet`) er kilden for staging-hemmeligheter
+(konfigurasjon `stg`). `scripts/doppler-staging.sh` synker dem ved deploy til
+Workeren, Supabase Auth og `app_settings`, og `bun run env:staging` genererer
+lokal `.env` fra samme kilde. Management- og Cloudflare-tokens sendes aldri
+til Workeren.
 
 Fullstendig liste over variabler med forklaring: `.env.example` og
 `.env.staging.example`.
-
-**Doppler-pilot (klargjort, ikke verifisert i staging):**
-`.github/workflows/doppler-staging.yml` distribuerer manuelt kun
-`MISTRAL_API_KEY` og `IMAGE_JOBS_SECRET` fra prosjekt `kaupet`, konfigurasjon `stg`, til
-`kaupet-no-staging`. `DOPPLER_TOKEN` ligger i GitHub Environment `staging`.
-Bildejobbhemmeligheten settes også i staging-Supabase
-som `app_settings.image_jobs_secret`, med etterfølgende verifisering.
-Vanlig staging-deploy skriver ikke lenger `IMAGE_JOBS_SECRET`.
-Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md) for
-kjøring, verifisering og tilbakeføring.
 
 ## 8. CI/CD
 
@@ -387,41 +359,3 @@ Dette må slås opp i de respektive dashbordene:
   Firebase, Apple Developer, Google Play Console, Vipps, Resend og Mistral.
 - Supabase-planer, backup og point-in-time recovery.
 - Verdiene i `app_settings` i hvert miljø.
-
-## Doppler staging: neste migreringssteg
-
-Doppler er målbildets eneste autoritative kilde for staging-hemmeligheter;
-GitHub, Worker og Supabase har nødvendige distribuerte kopier.
-Pilotens `verify` bruker tilfeldig ugyldig autentisering når gammel
-`IMAGE_JOBS_SECRET` er fjernet fra GitHub staging. Synken til
-`app_settings` må beholdes: Dopplers Supabase-integrasjon dekker
-Edge Function-secrets, ikke disse databaseradene eller Auth-oppsettet.
-Se [pilotbeslutningen](decisions/2026-10-01-doppler-staging-pilot.md)
-for bootstrap, miljøseparasjon og kontrollert videre migrering.
-
-Synkjobben henter nå også staging `SUPABASE_SERVICE_ROLE_KEY` fra Doppler.
-Den distribueres også til Workerens eksisterende serverklient. Management-
-og Cloudflare-token inngår ikke i Workerens bulk-payload. Gamle GitHub
-staging-kopier er fjernet etter bekreftet deploy og separat verify.
-
-`PUSH_DISPATCH_SECRET` inngår også i Doppler-synken til staging-Worker og
-`app_settings.push_dispatch_secret`. En midlertidig
-`PUSH_DISPATCH_SECRET_PREVIOUS` i Doppler sikrer tilbakeføring: gammel
-staging-verdi avvek fra SOPS ved kontroll 2026-10-01. Push-verifisering
-sender ugyldig payload og kontrollerer 401/400 uten varselutsending.
-
-Manuell staging-synk og vanlig staging-deploy deler nå
-`scripts/doppler-staging.sh`. Separate staging-nøkler for VAPID, HMAC og
-R2-jobben er klargjort. Staging-bygg får `VITE_VAPID_PUBLIC_KEY`;
-produksjon beholder eksisterende offentlige VAPID-nøkkel.
-Synken inkluderer også Workerens nødvendige Supabase service-role,
-men aldri Cloudflare- eller Supabase management-token i Worker-payloaden.
-R2-kontrollen kjører ikke opprydning. Se
-[statuslisten](decisions/2026-10-01-doppler-staging-status.md).
-
-Lokal staging-bruk er flyttet til samme Doppler-kilde: `bun run env:staging`
-genererer `.env` med appens hemmeligheter og offentlige GitHub staging-vars.
-`bun run db:refresh-local -- --replace` henter staging service-role direkte,
-og skriver bare til lokal Supabase. Gamle `.env.staging.local` brukes ikke.
-Kommandoene krever innlogget Doppler CLI og GitHub CLI. Migrerte SOPS-felt
-fjernes fra staging-filen; produksjon og lokal utviklings kilder beholdes.

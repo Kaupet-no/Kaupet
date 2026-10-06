@@ -1,4 +1,4 @@
-// Orienteringsstyring (fase 5, se docs/NATIVE-UI-UX-PLAN.md).
+// Orienteringsstyring.
 //
 // Telefon er låst til portrett, med ett unntak: fullskjermvisning av bilde.
 // Nettbrett låses aldri. Låsen styres i kjøretid — `Info.plist` beholder

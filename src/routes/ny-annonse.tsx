@@ -444,8 +444,7 @@ function NewListingPage() {
     bilOgMcCategoryId,
   });
 
-  // Fotoassistert kategori-/egenskapsforslag (salg), se
-  // docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2. Én
+  // Fotoassistert kategori-/egenskapsforslag (salg). Én
   // instans for hele veiviseren — samtykket/tokenet dekker både bildesteget
   // (identify) og "Om tingen" (attributes), se use-photo-suggestion.ts.
   const photoSuggestion = usePhotoSuggestion({ images, title });

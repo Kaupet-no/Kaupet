@@ -21,8 +21,7 @@ type PhotoSuggestionStatus =
 
 /**
  * Client-side state machine for the photo-assisted category/attribute
- * suggestion action (see
- * docs/decisions/2026-09-04-photo-assisted-listing-suggestions.md § 2). One
+ * suggestion action. One
  * instance lives in ny-annonse.tsx for the whole wizard, since the same
  * Turnstile token/consent needs to reach both the "photos" step (identify)
  * and the "Om tingen" step (attributes) — passing the resulting functions

@@ -300,6 +300,14 @@ RPC-en `log_product_event_rate_limited` (`src/lib/product-analytics.functions.ts
 
 ## 7. Hemmeligheter og konfigurasjon
 
+**Produksjonens Doppler-migrering er under arbeid:** produksjonshemmeligheter
+og native Firebase-filer er importert til `kaupet/prd`. Worker, Supabase
+Auth og aktive jobbhemmeligheter er synket og lesekontrollert. GitHub production
+har et avgrenset read-only `DOPPLER_TOKEN`. Ny deploy/synk er klargjort,
+men ikke aktivert pa `main`; eksisterende CI-flyt gjelder fortsatt frem
+til promotering av PR #317. Resend bruker en egen produksjonsnokkel. Se
+[status og aktivering](decisions/2026-10-05-doppler-production.md).
+
 Tre steder, avhengig av hvem som trenger verdien:
 
 1. **`VITE_*`** — bygges inn i klientbundlen og er offentlige. Kommer fra

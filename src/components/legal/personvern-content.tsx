@@ -93,7 +93,8 @@ export function PersonvernContent() {
             <li>
               <strong>Betaling og annonsepromotering</strong>: Hvis du betaler for å fremheve en
               annonse, lagres transaksjonsdata fra betalingsleverandøren Vipps, samt hvilken annonse
-              betalingen gjelder.
+              betalingen gjelder. Vi lagrer også hvilken versjon av kjøpsvilkårene du aksepterte,
+              aksepttidspunktet og teksten i kjøpsaksepten.
             </li>
             <li>
               <strong>Varsler om prisendringer</strong>: Hvis du har lagt til en annonse som

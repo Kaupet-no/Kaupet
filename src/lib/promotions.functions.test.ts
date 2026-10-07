@@ -235,7 +235,12 @@ describe("createPromotionCheckout", () => {
 
     await expect(
       createPromotionCheckout({
-        data: { listing_id: listingId, duration_days: 7 },
+        data: {
+          listing_id: listingId,
+          duration_days: 7,
+          purchase_terms_accepted: true,
+          purchase_terms_version: "2.0",
+        },
       }),
     ).rejects.toThrow("Ikke autorisert");
     expect(state.supabaseAdmin.from).not.toHaveBeenCalled();
@@ -247,7 +252,12 @@ describe("createPromotionCheckout", () => {
 
     await expect(
       createPromotionCheckout({
-        data: { listing_id: listingId, duration_days: 7 },
+        data: {
+          listing_id: listingId,
+          duration_days: 7,
+          purchase_terms_accepted: true,
+          purchase_terms_version: "2.0",
+        },
       }),
     ).resolves.toEqual({
       promotion_id: promotionId,
@@ -263,7 +273,12 @@ describe("createPromotionCheckout", () => {
 
     await expect(
       createPromotionCheckout({
-        data: { listing_id: listingId, duration_days: 7 },
+        data: {
+          listing_id: listingId,
+          duration_days: 7,
+          purchase_terms_accepted: true,
+          purchase_terms_version: "2.0",
+        },
       }),
     ).resolves.toMatchObject({ promotion_id: promotionId });
   });
@@ -278,10 +293,24 @@ describe("createPromotionCheckout", () => {
       .mockReturnValueOnce(query(conflict));
 
     await expect(
-      createPromotionCheckout({ data: { listing_id: listingId, duration_days: 7 } }),
+      createPromotionCheckout({
+        data: {
+          listing_id: listingId,
+          duration_days: 7,
+          purchase_terms_accepted: true,
+          purchase_terms_version: "2.0",
+        },
+      }),
     ).resolves.toMatchObject({ promotion_id: promotionId });
     await expect(
-      createPromotionCheckout({ data: { listing_id: listingId, duration_days: 7 } }),
+      createPromotionCheckout({
+        data: {
+          listing_id: listingId,
+          duration_days: 7,
+          purchase_terms_accepted: true,
+          purchase_terms_version: "2.0",
+        },
+      }),
     ).rejects.toThrow("Finnes allerede.");
     expect(promotionsQuery.insert).toHaveBeenCalledTimes(2);
     expect(state.createVippsPayment).toHaveBeenCalledOnce();

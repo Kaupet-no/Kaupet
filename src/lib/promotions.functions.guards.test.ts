@@ -420,7 +420,14 @@ describe("reconcilePromotionPayment: tilstandsvakter", () => {
 describe("createPromotionCheckout: tilstandsvakter", () => {
   const listing = { id: listingId, seller_id: "user-1", status: "active", title: "Sykkel" };
   const run = (days = 7) =>
-    createPromotionCheckout({ data: { listing_id: listingId, duration_days: days } });
+    createPromotionCheckout({
+      data: {
+        listing_id: listingId,
+        duration_days: days,
+        purchase_terms_accepted: true,
+        purchase_terms_version: "2.0",
+      },
+    });
   let listingResult: Result;
 
   beforeEach(() => {
@@ -439,6 +446,66 @@ describe("createPromotionCheckout: tilstandsvakter", () => {
     c.maybeSingle = async () => ({ data: null, error: null, ...get() });
     return c;
   }
+
+  // PAY-16: validation precedes database writes and payment-provider calls.
+  it.each([false, undefined, null, "true", 1])(
+    "avviser kjøp uten uttrykkelig aksept (%s)",
+    (accepted) => {
+      expect(() =>
+        createPromotionCheckout({
+          data: {
+            listing_id: listingId,
+            duration_days: 7,
+            purchase_terms_accepted: accepted,
+            purchase_terms_version: "2.0",
+          } as never,
+        }),
+      ).toThrow();
+      expect(ops("listing_promotions", "insert")).toEqual([]);
+      expect(s.createVippsPayment).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([undefined, null, "", "1.0", "2.0 "])(
+    "avviser manglende eller foreldet vilkårsversjon (%s)",
+    (version) => {
+      expect(() =>
+        createPromotionCheckout({
+          data: {
+            listing_id: listingId,
+            duration_days: 7,
+            purchase_terms_accepted: true,
+            purchase_terms_version: version,
+          } as never,
+        }),
+      ).toThrow();
+      expect(s.createVippsPayment).not.toHaveBeenCalled();
+    },
+  );
+
+  it("lagrer akseptens tekst, versjon og serverens tidspunkt før betaling", async () => {
+    const before = Date.now();
+    s.createVippsPayment.mockImplementationOnce(async () => {
+      const [acceptance] = ops("listing_promotions", "insert") as Record<string, string>[];
+      expect(acceptance.purchase_terms_version).toBe("2.0");
+      return { redirectUrl: "https://vipps.test/redirect" };
+    });
+    await run();
+    const [acceptance] = ops("listing_promotions", "insert") as Record<string, string>[];
+    expect(acceptance.purchase_terms_version).toBe("2.0");
+    expect(acceptance.purchase_acceptance_text).toBe(
+      "Jeg har lest vilkår for kjøp og samtykker til at fremhevingen leveres umiddelbart, slik at angreretten bortfaller (angrerettloven § 22 bokstav n).",
+    );
+    expect(Date.parse(acceptance.purchase_terms_accepted_at)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(acceptance.purchase_terms_accepted_at)).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("avbryter ved feil i sjekken for eksisterende fremheving", async () => {
+    s.queues.listing_promotions = [{ error: dbError }];
+    expect((await rejection(run())).message).toBe(GENERIC);
+    expect(ops("listing_promotions", "insert")).toEqual([]);
+    expect(s.createVippsPayment).not.toHaveBeenCalled();
+  });
 
   it("404 når annonsen ikke finnes", async () => {
     listingResult = { data: null };

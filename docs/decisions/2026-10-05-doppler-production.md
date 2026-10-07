@@ -7,8 +7,10 @@ tilbakelesing. GitHub production har et read-only `DOPPLER_TOKEN` avgrenset
 til denne konfigurasjonen og dagens offentlige `VITE_VAPID_PUBLIC_KEY`.
 Worker, Supabase Auth og de tre aktive jobbhemmelighetene er synket fra
 Doppler. Separat lesekontroll passerer, og forsiden/sitemap svarer 200.
-Den automatiske kodeflyten er **ikke aktivert pa main**; den ligger i
-PR #317 mot staging. Gamle GitHub-kopier beholdes frem til promotering.
+Den automatiske kodeflyten er aktivert på main: bootstrap, deploy og synk
+bestod i [CI-kjøring 37524283187](https://github.com/Kaupet-no/Kaupet/actions/runs/37524283187).
+Dette bekrefter deployflyten, ikke leverandørenes brukerreiser. Eldre kilder
+beholdes til verifisering av overføring og tilbakeføring er fullført.
 
 ## Kilder og kontroller
 
@@ -66,11 +68,12 @@ bare Firebase-filen. Butikkjobbens signeringsnokler ma opprettes i prd
 nar butikkkontoene er klare; disse fantes ikke i GitHub ved migreringen.
 Staging-skriptet beholdes fordi staging-kontrollene utforer bildejobber.
 
-## Gjenstar for aktivering
+## Gjenstår for verifisering
 
-- Verifiser kodeendringen gjennom staging/PR-flyten for promotering til main.
-- Kjor full produksjonsroyktest etter deploy. Fjern eldre kopier forst
-  etter bekreftet overforing og aktivert Doppler-flyt pa main.
+- Funksjonstest innlogging, e-post, push og relevante leverandører i lokalt
+  testmiljø; lokale tester beviser ikke hosted konfigurasjon.
+- Verifiser tilbakeføring og dokumenter overføringen før eldre kopier fjernes.
+- Produksjonsrøyktest er avgrenset til repoets tillatte lesekontroller.
 
 ## Tilbakeforing
 

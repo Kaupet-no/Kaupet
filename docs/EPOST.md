@@ -32,13 +32,12 @@ lagringstid) er dokumentert i
 | `RESEND_API_KEY`    | Både applikasjonen og lokal Supabase Auth SMTP | Server-only. Legg den aldri i en `VITE_*`-variabel         |
 | `RESEND_FROM_EMAIL` | `src/lib/email.server.ts`                      | Faller tilbake til `Kaupet.no <ikkesvar@varsel.kaupet.no>` |
 
-Nøkkelen settes på workeren med
-`wrangler secret put RESEND_API_KEY --name <worker>`, eller i Supabases
-SMTP-innstilling for auth-kanalen. Aldri i git.
+Nøkkelen administreres i Doppler (`kaupet/stg` og `kaupet/prd`) og synkes
+til Worker og Supabase Auth SMTP av miljøets deployskript. Aldri i git.
 
-Uten `RESEND_API_KEY` logger `email.server.ts` en feil og hopper over
-utsendingen — den kaster ikke. Lokal utvikling sender altså ingenting med
-mindre nøkkelen er satt.
+Uten `RESEND_API_KEY` kaster `email.server.ts` `Missing RESEND_API_KEY`.
+Varselutsendingen fanger og registrerer feilen per mottaker; øvrige kallere
+må håndtere den. Lokal utvikling sender ingenting uten nøkkelen.
 
 ## Kanal 1 — Supabase Auth
 

@@ -286,33 +286,23 @@ RPC-en `log_product_event_rate_limited` (`src/lib/product-analytics.functions.ts
 
 ## 7. Hemmeligheter og konfigurasjon
 
-**Produksjonens Doppler-migrering er under arbeid:** produksjonshemmeligheter
-og native Firebase-filer er importert til `kaupet/prd`. Worker, Supabase
-Auth og aktive jobbhemmeligheter er synket og lesekontrollert. GitHub production
-har et avgrenset read-only `DOPPLER_TOKEN`. Ny deploy/synk er klargjort,
-men ikke aktivert pa `main`; eksisterende CI-flyt gjelder fortsatt frem
-til promotering av PR #317. Resend bruker en egen produksjonsnokkel. Se
-[status og aktivering](decisions/2026-10-05-doppler-production.md).
+**Doppler** (prosjekt `kaupet`) er kilde for serverhemmeligheter i staging
+(`stg`) og produksjon (`prd`). CI på main har gjennomført bootstrap, deploy
+og synk i [kjøring 37524283187](https://github.com/Kaupet-no/Kaupet/actions/runs/37524283187).
+Dette er deploybevis, ikke funksjonstest av alle leverandører. Se
+[status og verifisering](decisions/2026-10-05-doppler-production.md).
 
 Tre steder, avhengig av hvem som trenger verdien:
 
-1. **`VITE_*`** — bygges inn i klientbundlen og er offentlige. Kommer fra
-   GitHub Environment `vars` ved bygg i CI.
-2. **Worker-secrets** — server-only. CI setter R2-verdiene,
-   `R2_CLEANUP_SECRET`, `IMAGE_JOBS_SECRET`, `API_KEY_EXPIRY_SECRET` og (i
-   produksjon) `STAGING_SUPABASE_*` ved hver deploy. Alle andre
-   (`SUPABASE_SERVICE_ROLE_KEY`, Vipps, Resend, Turnstile, FCM, VAPID,
-   Mistral, SVV, `RATE_LIMIT_HMAC_SECRET`, `PUSH_DISPATCH_SECRET`,
-   `PUBLIC_SITE_URL` m.fl.) er satt manuelt med
-   `wrangler secret put <NAVN> --name <worker>`.
-3. **`secrets/*.env`** — SOPS/age-kryptert i repoet, for lokal utvikling.
-   Se `secrets/README.md`.
-
-**Doppler** (prosjekt `kaupet`) er kilden for staging-hemmeligheter
-(konfigurasjon `stg`). `scripts/doppler-staging.sh` synker dem ved deploy til
-Workeren, Supabase Auth og `app_settings`, og `bun run env:staging` genererer
-lokal `.env` fra samme kilde. Management- og Cloudflare-tokens sendes aldri
-til Workeren.
+1. **`VITE_*`** — offentlige byggevariabler fra GitHub Environment `vars`.
+2. **Doppler / Worker-secrets** — miljøets deployskript
+   (`scripts/doppler-staging.sh` / `scripts/doppler-production.sh`) validerer
+   og synker en eksplisitt liste til Worker, Supabase Auth og `app_settings`.
+   Management- og Cloudflare-tokens sendes aldri til Workeren.
+   Produksjonens Resend-nøkkel er separat fra staging.
+3. **`secrets/*.env`** — eldre SOPS/age-krypterte kilder for lokal utvikling
+   og tilbakeføring. Beholdes til overføring og tilbakeføring er bekreftet;
+   se `secrets/README.md`. `bun run env:staging` henter fra Doppler.
 
 Fullstendig liste over variabler med forklaring: `.env.example` og
 `.env.staging.example`.
@@ -327,7 +317,7 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 | `verify`          | Formatering, grensesjekker, RLS-tabellinventar, lint, typecheck, enhetstester med dekningskrav, bygg og røyktest i `workerd` |
 | `rls`             | RLS-tester mot en midlertidig lokal Supabase-stack                                                                           |
 | `native-android`  | Android-enhetstester og debug-APK                                                                                            |
-| `e2e`             | Playwright mot egen lokal stack. Gater **ikke** deploy                                                                       |
+| `e2e`             | Playwright mot egen lokal stack. Kreves før både staging- og produksjonsdeploy                                               |
 | `staging-gate`    | På PR mot `main`: krever vellykket staging-deploy av samme innhold                                                           |
 | `deploy-staging`  | Push til `staging`: bygger og deployer `kaupet-no-staging`                                                                   |
 | `deploy`          | Push til `main`: bygger og deployer `kaupet-no`                                                                              |
@@ -347,13 +337,12 @@ CI-kjøringen. GitHubs opprinnelige publiseringsdato for releasen blir stående.
   `https://kaupet.no` (`capacitor.config.ts`, `androidScheme: "https"`), så
   sesjonskapselen er same-origin. Staging-appen setter ikke `server.url`.
 - Push: Firebase (`google-services.json` / `GoogleService-Info.plist`).
-  Android-filene kommer fra GitHub-secretene `ANDROID_GOOGLE_SERVICES_JSON` og
-  `ANDROID_GOOGLE_SERVICES_STAGING_JSON` i CI.
+  Produksjonens Firebase-filer hentes fra Doppler via `scripts/doppler-native.sh`;
+  staging bruker `ANDROID_GOOGLE_SERVICES_STAGING_JSON` i GitHub-miljøet.
 - Distribusjon: App Store og Google Play. `.github/workflows/release-native.yml`
   bygger produksjonsbygg og laster dem opp til Google Play (internal track)
   og TestFlight — trigges kun via `workflow_dispatch` eller et `v*`-tag, aldri
-  på vanlige push/PR-er. Krever signeringssecrets i GitHub-miljøet
-  `production` (se README-CAPACITOR.md § Publisering til butikkene); uten dem
+  på vanlige push/PR-er. Krever signeringssecrets i Doppler `kaupet/prd` (se README-CAPACITOR.md § Publisering til butikkene); uten dem
   feiler jobben raskt med en tydelig feilmelding i stedet for å bygge
   usignerte/uferdige artefakter. Appens første release i hver butikk må
   fortsatt opprettes manuelt (dokumentert samme sted).

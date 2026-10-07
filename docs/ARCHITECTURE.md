@@ -81,7 +81,8 @@ minst to reelle konsumenter trenger samme kontrakt.
 - Kall mot eksterne tredjeparts-API-er (f.eks. Mistral API for AI-basert
   kategoriforslag i `category-suggestion-ai.server.ts`) skjer kun fra
   `*.server.ts`-moduler, aldri fra klientkode. Nøkler/endepunkt-URL-er lagres
-  i sops-secrets (`secrets/`) og som Cloudflare Worker-secrets, aldri i
+  i miljøets hemmelighetskilde (Doppler for staging/produksjon) og som
+  Cloudflare Worker-secrets, aldri i
   `VITE_*`-variabler eller committet i klartekst.
 - `/api/v1/…`-rutene (`src/routes/api/v1/…`) er en egen, uautentisert-mot-
   brukersesjon inngangsport: de autentiserer med en hashet API-nøkkel

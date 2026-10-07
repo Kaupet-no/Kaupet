@@ -249,20 +249,29 @@ signert med `VIPPS_WEBHOOK_SECRET`), `/api/public/csp-report`, `/api/v1/*`
 
 ## 6. Eksterne tjenester
 
-Alle kalles kun fra serveren, med nøkler som Worker-secrets.
+API-oppslag kalles kun fra serveren, med eventuelle nøkler som Worker-secrets.
+Kartfliser lastes direkte i klienten.
 
-| Tjeneste                         | Brukes til                                                                                 | Nøkkel / konfigurasjon                                                                                 | Kode                                       |
-| -------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| Vipps MobilePay (ePayment)       | Betaling for promoteringer                                                                 | `VIPPS_*`, `VIPPS_TEST_*`, `VIPPS_ENVIRONMENT`                                                         | `src/lib/vipps.server.ts`                  |
-| Resend                           | Transaksjonell e-post og Supabase Auth-SMTP                                                | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`                                                                  | `src/lib/email.server.ts`, EPOST.md        |
-| Firebase Cloud Messaging         | Push til Android og iOS                                                                    | `FCM_SERVICE_ACCOUNT_JSON`                                                                             | `src/routes/api/public/push/dispatch.ts`   |
-| Web Push (VAPID)                 | Push i nettleseren                                                                         | `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`                                                                   | samme                                      |
-| Mistral AI (EU-endepunkt)        | Kategoriforslag fra bilder (Ministral 3 14B) og fra tittel i ønskes kjøpt (Ministral 3 3B) | `MISTRAL_API_KEY`, `MISTRAL_PHOTO_SUGGESTIONS_ENABLED`, `site_settings.category_suggestion_ai_enabled` | `src/lib/category-suggestion-ai.server.ts` |
-| Statens vegvesen, Datautlevering | Kjøretøyoppslag på kjennemerke                                                             | `STATENS_VEGVESEN_API_KEY`                                                                             | `src/lib/vehicle/vehicle-lookup.server.ts` |
-| Brønnøysundregistrene            | Oppslag av organisasjonsnummer                                                             | Ingen nøkkel                                                                                           | `src/lib/brreg.server.ts`                  |
-| Nominatim (OpenStreetMap)        | Geokoding og omvendt geokoding                                                             | Ingen nøkkel                                                                                           | `src/lib/geocode.ts`                       |
-| Kartverket                       | Kartfliser (`cache.kartverket.no`)                                                         | Ingen nøkkel                                                                                           | CSP i `src/lib/security-headers.ts`        |
-| Cloudflare Turnstile             | Bot-beskyttelse                                                                            | `VITE_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                      | `src/lib/turnstile.server.ts`              |
+Stedsoppslag bruker Kartverkets åpne stedsnavn- og adresse-API. Den offentlige
+serverfunksjonsgrensen deler én databasebasert IP-grense (60 kall per minutt).
+Workerens utgående GET-kall ber Cloudflare om edge-cache av HTTP 200 i ett
+døgn; dette er en regional cache, ikke en global trafikkgrense. HTTP-feil
+caches ikke. Kartpunkter slås opp mot nærmeste adresse innen 1 km, og
+postnummerpunkter er omtrentlige adressepunkter, ikke områdesentre.
+Postboksnumre uten adressetreff gir ingen koordinater.
+Se [beslutningen](decisions/2026-10-07-kartverket-stedsoppslag.md).
+
+| Tjeneste                         | Brukes til                                                                                 | Nøkkel / konfigurasjon                                                                                 | Kode                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Vipps MobilePay (ePayment)       | Betaling for promoteringer                                                                 | `VIPPS_*`, `VIPPS_TEST_*`, `VIPPS_ENVIRONMENT`                                                         | `src/lib/vipps.server.ts`                                        |
+| Resend                           | Transaksjonell e-post og Supabase Auth-SMTP                                                | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`                                                                  | `src/lib/email.server.ts`, EPOST.md                              |
+| Firebase Cloud Messaging         | Push til Android og iOS                                                                    | `FCM_SERVICE_ACCOUNT_JSON`                                                                             | `src/routes/api/public/push/dispatch.ts`                         |
+| Web Push (VAPID)                 | Push i nettleseren                                                                         | `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`                                                                   | samme                                                            |
+| Mistral AI (EU-endepunkt)        | Kategoriforslag fra bilder (Ministral 3 14B) og fra tittel i ønskes kjøpt (Ministral 3 3B) | `MISTRAL_API_KEY`, `MISTRAL_PHOTO_SUGGESTIONS_ENABLED`, `site_settings.category_suggestion_ai_enabled` | `src/lib/category-suggestion-ai.server.ts`                       |
+| Statens vegvesen, Datautlevering | Kjøretøyoppslag på kjennemerke                                                             | `STATENS_VEGVESEN_API_KEY`                                                                             | `src/lib/vehicle/vehicle-lookup.server.ts`                       |
+| Brønnøysundregistrene            | Oppslag av organisasjonsnummer                                                             | Ingen nøkkel                                                                                           | `src/lib/brreg.server.ts`                                        |
+| Kartverket                       | Stedsnavn-/adresseoppslag (`api.kartverket.no`) og kartfliser (`cache.kartverket.no`)      | Ingen nøkkel                                                                                           | `src/lib/geocode.server.ts`, CSP i `src/lib/security-headers.ts` |
+| Cloudflare Turnstile             | Bot-beskyttelse                                                                            | `VITE_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                      | `src/lib/turnstile.server.ts`                                    |
 
 Web Push-endepunkter godtas bare fra Google FCM, Mozilla Autopush, Apple Push
 og Windows Push (`fcm.googleapis.com`, `updates.push.services.mozilla.com`,

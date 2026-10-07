@@ -20,7 +20,7 @@ import { Slider } from "@/components/ui/slider";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { signListingImageUrls } from "@/lib/storage";
-import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
+import { usePlaceSearch, type PlaceSearchResult } from "@/hooks/use-place-search";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { isValidMapCoordinate, KARTVERKET_TILE_LAYER } from "@/lib/kartverket-map";
 
@@ -330,10 +330,11 @@ export function ListingsMap({
   const {
     results: locResults,
     loading: locLoading,
+    error: locError,
     searchedQuery: locSearchedQuery,
     search: searchLocation,
     clear: clearLocationSearch,
-  } = useNominatimSearch();
+  } = usePlaceSearch();
   // Ruten er fasit etter et eksplisitt søk eller et filterapply.
   useResetOnChange([center?.lat, center?.lng, radiusKm], () => setPendingCenter(null));
   useResetOnChange([mapCenter?.lat, mapCenter?.lng, radiusKm], () =>
@@ -381,8 +382,8 @@ export function ListingsMap({
     await onApplyViewport(pendingCenter, previewRadiusKm);
   };
 
-  const pickLocResult = (r: NominatimResult) => {
-    const next = { lat: Number.parseFloat(r.lat), lng: Number.parseFloat(r.lon) };
+  const pickLocResult = (r: PlaceSearchResult) => {
+    const next = { lat: r.lat, lng: r.lng };
     if (!isValidMapCoordinate(next)) return;
     commitCenter(next);
     setLocQuery("");
@@ -554,19 +555,27 @@ export function ListingsMap({
                 isTouchDevice || isSliderInteracting ? "" : "hidden group-hover:block"
               }`}
             >
-              {locLoading && <div className="px-2 py-2 text-xs text-muted-foreground">Søker…</div>}
-              {!locLoading && locSearchedQuery === locQuery.trim() && locResults.length === 0 && (
-                <div className="px-2 py-2 text-xs text-muted-foreground">Ingen treff</div>
+              {locError && (
+                <p role="alert" className="px-2 py-2 text-xs text-destructive">
+                  {locError}
+                </p>
               )}
+              {locLoading && <div className="px-2 py-2 text-xs text-muted-foreground">Søker…</div>}
+              {!locLoading &&
+                !locError &&
+                locSearchedQuery === locQuery.trim() &&
+                locResults.length === 0 && (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">Ingen treff</div>
+                )}
               {locResults.map((r) => (
                 <button
-                  key={r.place_id}
+                  key={r.id}
                   type="button"
                   onClick={() => pickLocResult(r)}
                   className="flex w-full items-start gap-2 px-2 py-2 text-left text-xs hover:bg-muted"
                 >
                   <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="line-clamp-2">{r.display_name}</span>
+                  <span className="line-clamp-2">{r.label}</span>
                 </button>
               ))}
             </div>

@@ -8,6 +8,15 @@ const AUTH_MIDDLEWARE = ["requireSupabaseAuth"];
 
 // key: "file#exportName" -> reason
 const ALLOWLIST = {
+  "src/lib/geocode.functions.ts#searchPlacesFn": "public location lookup, shared IP rate limit",
+  "src/lib/geocode.functions.ts#lookupPostalCodeFn": "public location lookup, shared IP rate limit",
+  "src/lib/geocode.functions.ts#reverseGeocodeAddressFn":
+    "public location lookup, shared IP rate limit",
+  "src/lib/geocode.functions.ts#geocodeNorwayAddressFn":
+    "public location lookup, shared IP rate limit",
+  "src/lib/geocode.functions.ts#geocodeStreetAddressFn":
+    "public location lookup, shared IP rate limit",
+
   "src/lib/attribute-bounds.functions.ts#getAttributeRangeBounds": "public read, rate-limited",
   "src/lib/attribute-suggestions.functions.ts#getAttributeValueSuggestions":
     "public read, rate-limited",

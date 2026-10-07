@@ -74,7 +74,7 @@ Appen kjører på `http://localhost:8080`. For fullt oppsett med Supabase i Dock
 
 [TanStack Start](https://tanstack.com/start) (React 19, SSR) · [Tailwind CSS v4](https://tailwindcss.com) · [shadcn/ui](https://ui.shadcn.com) · [Supabase](https://supabase.com) · [Cloudflare Workers, R2 og Turnstile](https://www.cloudflare.com) · [Capacitor](https://capacitorjs.com)
 
-Integrasjoner: [Statens vegvesen](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) (kjøretøyoppslag), [Mistral](https://mistral.ai) (kategoriforslag), [Vipps/MobilePay](https://vipps.no) (betaling), Kartverket og OpenStreetMap (kart og sted). Alle kall til tredjeparter skjer på server-nivå. Se [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Integrasjoner: [Statens vegvesen](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) (kjøretøyoppslag), [Mistral](https://mistral.ai) (kategoriforslag), [Vipps/MobilePay](https://vipps.no) (betaling), Kartverket (kart, stedsnavn og adresser). API-oppslag til tredjeparter skjer på server-nivå; kartfliser lastes direkte i klienten. Se [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Bidra
 

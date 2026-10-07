@@ -84,4 +84,10 @@ describe("buildSecurityHeaders", () => {
     expect(connectSrcDirective).toContain(" ws://127.0.0.1:54321 ");
     expect(buildSecurityHeaders({})["content-security-policy"]).not.toContain("undefined");
   });
+  it("tillater ikke direkte stedsoppslag fra nettleseren", () => {
+    const csp = buildSecurityHeaders({})["content-security-policy"];
+    expect(csp).not.toContain("nominatim.openstreetmap.org");
+    expect(csp).not.toContain("api.kartverket.no");
+    expect(csp).toContain("https://cache.kartverket.no");
+  });
 });

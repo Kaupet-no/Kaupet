@@ -205,3 +205,18 @@ Selve annonsedataene som sendes inn via API-et (tittel, pris, bilder osv.)
 regnes ikke som personopplysninger i seg selv og dekkes for øvrig av § 2
 (annonser) og § 2.1 (bildeopprydning) på samme måte som annonser opprettet i
 veiviseren eller via Excel-import.
+
+## Stedsoppslag og kart fra Kartverket
+
+Stedssøk, postnummer, gateadresse og koordinater for valgt kartpunkt/GPS sendes
+via Kaupets server til Kartverkets åpne stedsnavn-/adresse-API for å vise eller
+fylle ut stedet brukeren velger. Klientens IP-adresse, bruker-ID og sesjon
+videresendes ikke i disse API-kallene. Kartfliser lastes direkte fra Kartverket,
+som da kan se klientens IP-adresse. Kartverket erstatter OpenStreetMap
+Foundation/Nominatim som leverandør av stedsoppslag.
+
+Kaupet oppretter ingen egen søkehistorikk eller generell logging av rå
+søketekst/adresser/koordinater. Utgående oppslags-URL og offentlige
+registersvar kan caches ved Cloudflare-edge med TTL på ett døgn; oppslagsnøkler
+kan inneholde adressetekst eller koordinater. Dette er runtime-cache, ikke en
+Supabase-tabell, og håndteres ikke av databasejobben for sletting.

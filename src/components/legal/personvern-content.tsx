@@ -548,11 +548,12 @@ export function PersonvernContent() {
             .
           </li>
           <li>
-            <strong>Kartverket og OpenStreetMap</strong>: Kartverket leverer kartfliser, mens
-            adressesøk i kartvisningen bruker Nominatim fra OpenStreetMap Foundation, for visning og
-            geokoding av lokasjon på annonser. Adressesøk utføres kun når du eksplisitt trykker
-            «Søk» i et adressefelt. IP-adressen din blir da synlig for OpenStreetMap Foundation.
-            Kartfliser fra Kartverket lastes automatisk når et kart vises.
+            <strong>Kartverket</strong>: Kartverket leverer kartfliser, stedsnavn og
+            adresseopplysninger for visning av steder på annonser og i søk. Stedssøk utføres når du
+            trykker «Søk». Postnummer, valgt kartpunkt eller GPS-posisjon kan også brukes til å
+            hente stedsopplysninger. Oppslagene går via Kaupets server, som sender søket eller
+            koordinatene til Kartverket uten å videresende IP-adressen din. Kartfliser lastes
+            direkte fra Kartverket når et kart vises, og Kartverket kan da se IP-adressen din.
           </li>
         </ul>
       </section>

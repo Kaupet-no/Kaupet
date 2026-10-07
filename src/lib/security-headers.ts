@@ -40,7 +40,7 @@ function connectSrc({ supabaseUrl }: SecurityHeaderEnv): string {
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
     origin,
     origin?.replace(/^http/, "ws"),
-    "https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
+    "https://challenges.cloudflare.com",
   ]
     .filter(Boolean)
     .join(" ");

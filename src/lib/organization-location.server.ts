@@ -1,7 +1,7 @@
 import { toClientError } from "@/lib/to-client-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { lookupPostalCode } from "@/lib/geocode";
+import { lookupPostalCode } from "@/lib/geocode.server";
 
 export type OrganizationListingLocation = {
   postal_code: string | null;
@@ -38,7 +38,7 @@ export async function organizationListingLocation(
   if (location.lat != null && location.lng != null) return location;
   if (!location.postal_code) return location;
 
-  const looked = await lookupPostalCode(location.postal_code);
+  const looked = await lookupPostalCode(location.postal_code).catch(() => null);
   if (!looked) return location;
   const resolved = {
     ...location,

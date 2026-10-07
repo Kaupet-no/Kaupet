@@ -5,6 +5,7 @@ function collectBrowserErrors(page: Page) {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const httpErrors: string[] = [];
+  const externalFrameErrors: string[] = [];
 
   page.on("console", (message) => {
     if (message.type() !== "error") return;
@@ -14,6 +15,17 @@ function collectBrowserErrors(page: Page) {
       /^Failed to load resource: the server responded with a status of 4\d\d/.test(message.text())
     )
       return;
+    // Firefox reports Turnstile's postMessage after its iframe is removed
+    // during navigation. Keep this exact external-frame diagnostic as an
+    // attachment; application errors and other origin mismatches still fail.
+    if (
+      message.text().includes("Failed to execute ‘postMessage’ on ‘DOMWindow’") &&
+      message.text().includes("target origin provided (‘https://challenges.cloudflare.com’)") &&
+      message.text().includes("recipient window’s origin (‘http://localhost:")
+    ) {
+      externalFrameErrors.push(message.text());
+      return;
+    }
     consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.stack ?? error.message));
@@ -24,13 +36,21 @@ function collectBrowserErrors(page: Page) {
     httpErrors.push(`${response.status()} ${response.url()}`);
   });
 
-  return { consoleErrors, pageErrors, httpErrors };
+  return { consoleErrors, pageErrors, httpErrors, externalFrameErrors };
 }
 
 export const test = base.extend({
   page: async ({ page }, fixture, testInfo) => {
-    const { consoleErrors, pageErrors, httpErrors } = collectBrowserErrors(page);
+    const { consoleErrors, pageErrors, httpErrors, externalFrameErrors } =
+      collectBrowserErrors(page);
     await fixture(page);
+
+    if (externalFrameErrors.length > 0) {
+      await testInfo.attach("turnstile-frame-teardown", {
+        body: Buffer.from(externalFrameErrors.join("\n"), "utf8"),
+        contentType: "text/plain",
+      });
+    }
 
     const diagnostics = [
       ...consoleErrors.map((message) => `console.error: ${message}`),

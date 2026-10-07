@@ -458,7 +458,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium firefox webkit
 
       - name: Run e2e tests
         run: bun run test:e2e

@@ -5,6 +5,14 @@ async function waitForHydration(page: Page) {
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
+// Safari on macOS uses Option-Tab for all controls with the default keyboard
+// preference. Use real keyboard navigation without changing the user's OS:
+// https://support.apple.com/en-gb/guide/safari/cpsh003/mac
+function tabKey(browserName: string, reverse = false) {
+  const modifier = browserName === "webkit" && process.platform === "darwin" ? "Alt+" : "";
+  return `${modifier}${reverse ? "Shift+" : ""}Tab`;
+}
+
 test("kritiske offentlige sider har landemerker og ingen nøstede interaksjoner", async ({
   page,
 }) => {
@@ -34,7 +42,10 @@ test("kritiske offentlige sider har landemerker og ingen nøstede interaksjoner"
   ).toBe(0);
 });
 
-test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", async ({ page }) => {
+test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", async ({
+  page,
+  browserName,
+}) => {
   await page.addInitScript(() => {
     localStorage.setItem("kaupet_onboarding_completed_v1", "true");
   });
@@ -48,7 +59,7 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   });
 
   await search.focus();
-  await search.press("Tab");
+  await search.press(tabKey(browserName));
   await expect(location).toBeFocused();
 
   await location.press("Space");
@@ -60,7 +71,10 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await expect(location).toBeFocused();
 });
 
-test("native søkepanel returnerer fokus til filterknappen etter Escape", async ({ page }) => {
+test("native søkepanel returnerer fokus til filterknappen etter Escape", async ({
+  page,
+  browserName,
+}) => {
   await page.goto("/annonser?forcenative=1&q=&category=&sort=new");
   await waitForHydration(page);
 
@@ -70,7 +84,7 @@ test("native søkepanel returnerer fokus til filterknappen etter Escape", async 
   const filter = page.getByRole("button", { name: "Alle filtre", exact: true });
 
   await search.focus();
-  await search.press("Tab");
+  await search.press(tabKey(browserName));
   await expect(filter).toBeFocused();
 
   await filter.press("Enter");
@@ -81,11 +95,14 @@ test("native søkepanel returnerer fokus til filterknappen etter Escape", async 
   await expect(panel).not.toBeVisible();
   await expect(filter).toBeFocused();
 
-  await filter.press("Shift+Tab");
+  await filter.press(tabKey(browserName, true));
   await expect(search).toBeFocused();
 });
 
-test("innloggingens primærhandling nås og aktiveres med tastatur", async ({ page }) => {
+test("innloggingens primærhandling nås og aktiveres med tastatur", async ({
+  page,
+  browserName,
+}) => {
   await page.goto("/auth?mode=signin");
   await waitForHydration(page);
 
@@ -95,7 +112,7 @@ test("innloggingens primærhandling nås og aktiveres med tastatur", async ({ pa
   await expect(submit).toBeEnabled();
 
   await signUp.focus();
-  await signUp.press("Shift+Tab");
+  await signUp.press(tabKey(browserName, true));
   await expect(submit).toBeFocused();
 
   await submit.press("Space");

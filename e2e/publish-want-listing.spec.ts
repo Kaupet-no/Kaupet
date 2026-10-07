@@ -33,7 +33,7 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   await startWantWithoutCategory(page, "E2E ønsker å kjøpe barnestol");
   await advanceWantStep(page, "details");
@@ -68,7 +68,7 @@ test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, test
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   // Uten tittel stopper flyten på tittelsteget, med årsaken både ved feltet
   // og i feiloppsummeringen — ikke først på neste steg.
@@ -84,7 +84,7 @@ test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, t
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse?forcenative=1");
   await goToNewWantListing(page, true);
 
   // Tittelen først — kategoriforslaget bygger på den.
@@ -102,7 +102,7 @@ test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testI
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker treffsjekk");
   await advanceWantStep(page, "category");

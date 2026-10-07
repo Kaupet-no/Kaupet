@@ -4,6 +4,10 @@
 // feilet. Her kan den enhetstestes.
 
 export type SecurityHeaderEnv = {
+  /** Build environment; staging/test responses must never enter search indexes. */
+  environment?: string;
+  /** Local HTTP dev servers have no TLS; WebKit otherwise upgrades localhost assets. */
+  development?: boolean;
   /** Offentlig bildedomene for R2 (`VITE_R2_PUBLIC_BASE_URL`), f.eks.
    * `https://bilder.kaupet.no`. Prod og staging har hvert sitt. */
   r2PublicBaseUrl?: string;
@@ -50,6 +54,9 @@ export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, str
   const scriptNonce = env.scriptNonce ? `'nonce-${env.scriptNonce}'` : undefined;
 
   return {
+    ...(env.environment === "staging" || env.environment === "test"
+      ? { "x-robots-tag": "noindex, nofollow" }
+      : {}),
     // Attribusjon på hvert svar, synlig i DevTools Network. Ren ASCII med vilje:
     // headerverdier er latin-1, så ingen em-dash her (til forskjell fra
     // `<meta name="generator">` og bundle-banneret i vite.config.ts).
@@ -76,9 +83,11 @@ export function buildSecurityHeaders(env: SecurityHeaderEnv): Record<string, str
       connectSrc(env),
       "frame-src https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
-      "upgrade-insecure-requests",
+      !env.development && "upgrade-insecure-requests",
       "report-to csp",
-    ].join("; "),
+    ]
+      .filter(Boolean)
+      .join("; "),
     "reporting-endpoints": 'csp="/api/public/csp-report"',
   };
 }

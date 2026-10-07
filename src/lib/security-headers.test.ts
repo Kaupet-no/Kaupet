@@ -2,6 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import { buildSecurityHeaders } from "./security-headers";
 
+it("lar WebKit laste ressurser fra lokal HTTP-server", () => {
+  expect(buildSecurityHeaders({ development: true })["content-security-policy"]).not.toContain(
+    "upgrade-insecure-requests",
+  );
+  expect(buildSecurityHeaders({ development: false })["content-security-policy"]).toContain(
+    "upgrade-insecure-requests",
+  );
+});
+
+// L40: enforce crawler exclusion in HTTP, before client hydration.
+it.each(["staging", "test"])("utelukker %s fra søkeindekser", (environment) => {
+  expect(buildSecurityHeaders({ environment })["x-robots-tag"]).toBe("noindex, nofollow");
+});
+
+it.each(["production", "development", undefined])(
+  "hindrer ikke indeksering for miljøet %s",
+  (environment) => {
+    expect(buildSecurityHeaders({ environment })["x-robots-tag"]).toBeUndefined();
+  },
+);
+
 describe("buildSecurityHeaders", () => {
   it("tillater SSR-script med nonce uten unsafe-inline", () => {
     const csp = buildSecurityHeaders({ scriptNonce: "abc123" })["content-security-policy"];

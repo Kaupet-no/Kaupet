@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/integrations/supabase/admin";
+import { supabase } from "@/integrations/supabase/client";
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
@@ -23,8 +23,9 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         let listingEntries: SitemapEntry[] = [];
         try {
-          const supabaseAdmin = await getSupabaseAdmin();
-          const { data } = await supabaseAdmin
+          // This server-side client is sessionless and uses the publishable
+          // key. Public RLS applies even when the crawler sends user cookies.
+          const { data } = await supabase
             .from("listings")
             .select("kaupet_code, updated_at")
             .eq("status", "active")
@@ -42,8 +43,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         let categoryEntries: SitemapEntry[] = [];
         try {
-          const supabaseAdmin = await getSupabaseAdmin();
-          const { data } = await supabaseAdmin
+          const { data } = await supabase
             .from("categories")
             .select("id, slug, parent_id, color")
             .eq("is_hidden", false);

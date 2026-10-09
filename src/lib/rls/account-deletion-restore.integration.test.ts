@@ -140,4 +140,25 @@ describe.skipIf(!canRun)("cancel_account_deletion restores original states", () 
       (await admin.from("listings").select("status").eq("id", listing!.id).single()).data?.status,
     ).toBe("disabled");
   });
+  it("gjenoppretter annonser opprettet mellom to slettingsforespørsler", async () => {
+    const owner = await signInWithRetry(email);
+    expect((await owner.rpc("request_account_deletion", { _email: email })).error).toBeNull();
+    const { data: listing, error } = await admin
+      .from("listings")
+      .insert({
+        seller_id: userId,
+        title: "Opprettet mellom forespørslene",
+        status: "active",
+        price_nok: 100,
+        expires_at: new Date(Date.now() + 864e5).toISOString(),
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    expect((await owner.rpc("request_account_deletion", { _email: email })).error).toBeNull();
+    expect((await owner.rpc("cancel_account_deletion")).error).toBeNull();
+    expect(
+      (await admin.from("listings").select("status").eq("id", listing!.id).single()).data?.status,
+    ).toBe("active");
+  });
 });

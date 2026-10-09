@@ -1,4 +1,5 @@
 -- Preserve original states only for new deletion requests. Legacy requests have no recoverable snapshot.
+-- Cancellation after scheduled_purge_at returns false (previously true): the account is already due for purge.
 -- Snapshots inherit account_deletions RLS: users may read/delete their own row, never write snapshots.
 ALTER TABLE public.account_deletions
   ADD COLUMN listing_states jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -48,13 +49,23 @@ BEGIN
     COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id, 'status', status, 'sold_at', sold_at)) FROM public.listings WHERE seller_id = _uid), '[]'::jsonb),
     COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id, 'status', status)) FROM public.wtb_listings WHERE user_id = _uid), '[]'::jsonb)
   )
+  -- A repeated request keeps the original snapshot and only adds rows created since then.
   ON CONFLICT (user_id) DO UPDATE
-    SET requested_at = now(), scheduled_purge_at = now() + interval '7 days', confirmation_email = EXCLUDED.confirmation_email;
+    SET requested_at = now(), scheduled_purge_at = now() + interval '7 days', confirmation_email = EXCLUDED.confirmation_email,
+      listing_states = account_deletions.listing_states || COALESCE((
+        SELECT jsonb_agg(n.value) FROM jsonb_array_elements(EXCLUDED.listing_states) n(value)
+        WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(account_deletions.listing_states) o(value) WHERE o.value->>'id' = n.value->>'id')
+      ), '[]'::jsonb),
+      wtb_states = account_deletions.wtb_states || COALESCE((
+        SELECT jsonb_agg(n.value) FROM jsonb_array_elements(EXCLUDED.wtb_states) n(value)
+        WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(account_deletions.wtb_states) o(value) WHERE o.value->>'id' = n.value->>'id')
+      ), '[]'::jsonb);
 
   UPDATE public.wtb_listings SET status = 'archived' WHERE user_id = _uid AND status <> 'archived';
+  -- Administrator blocks (disabled) stay untouched so cancellation can never lift them.
   UPDATE public.listings
   SET status = 'archived'
-  WHERE seller_id = _uid AND status <> 'archived';
+  WHERE seller_id = _uid AND status NOT IN ('archived', 'disabled');
 
 END;
 $$;

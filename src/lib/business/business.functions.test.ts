@@ -315,12 +315,16 @@ describe("business server functions", () => {
           ],
         },
       }),
-    ).resolves.toEqual({ userId: "invited-user-1", email: "kari@example.com" });
+    ).resolves.toEqual({
+      userId: "invited-user-1",
+      email: "kari@example.com",
+      alreadyInvited: true,
+    });
     expect(supabaseAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
     expect(deletes).not.toHaveBeenCalled();
   });
 
-  it("DEF-INVITE-02: innsettingsfeil sletter aldri Auth-brukeren", async () => {
+  it("DEF-INVITE-02: innsettingsfeil sletter aldri en eksisterende Auth-bruker", async () => {
     buildAdmin({ proff: true });
     const original = supabaseAdmin.from.getMockImplementation()!;
     supabaseAdmin.from.mockImplementation((table: string) => {
@@ -351,6 +355,43 @@ describe("business server functions", () => {
       }),
     ).rejects.toThrow();
     expect(supabaseAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("DEF-INVITE-02: innsettingsfeil ruller tilbake en Auth-bruker opprettet i samme kall", async () => {
+    buildAdmin({ proff: true });
+    supabaseAdmin.auth.admin.inviteUserByEmail = vi.fn().mockResolvedValue({
+      data: { user: { id: "invited-user-1", created_at: new Date().toISOString() } },
+      error: null,
+    });
+    const original = supabaseAdmin.from.getMockImplementation()!;
+    supabaseAdmin.from.mockImplementation((table: string) => {
+      const chain = original(table);
+      if (table === "organization_members") {
+        chain.insert = () => ({
+          then: (resolve: (value: unknown) => unknown) =>
+            resolve({ data: null, error: { code: "XX000", message: "insert failed" } }),
+        });
+      }
+      return chain;
+    });
+    await expect(
+      inviteOrganizationMember({
+        data: {
+          name: "Kari Nordmann",
+          email: "kari@example.com",
+          locationAssignments: [
+            {
+              locationId: memberId,
+              role: "member",
+              listingAccess: "own",
+              listingEditScope: "own",
+              chatAccess: "own",
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow();
+    expect(supabaseAdmin.auth.admin.deleteUser).toHaveBeenCalledWith("invited-user-1");
   });
 
   it("henter annonseverdier med visninger for bedriftens oversikt", async () => {
@@ -818,6 +859,7 @@ describe("business server functions", () => {
     ).resolves.toEqual({
       userId: "invited-user-1",
       email: "kari@example.com",
+      alreadyInvited: false,
     });
     expect(supabaseAdmin.auth.admin.inviteUserByEmail).toHaveBeenCalledWith(
       "kari@example.com",

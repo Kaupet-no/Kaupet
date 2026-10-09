@@ -423,7 +423,11 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
         },
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (result.alreadyInvited)
+        showSuccessToast(
+          "Personen var allerede invitert. Invitasjonen er sendt på nytt med eksisterende rettigheter – endre dem under «Rettigheter».",
+        );
       setName("");
       setEmail("");
       setPermissions(defaultPermissions);

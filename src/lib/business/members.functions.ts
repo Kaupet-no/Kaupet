@@ -82,6 +82,7 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       data.permissions ?? memberPermissionsSchema.parse({}),
     );
     const email = data.email.trim().toLowerCase();
+    const inviteStartedAt = Date.now();
     const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -100,6 +101,13 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     }
     const userId = invited.user?.id;
     if (!userId) throw new Error("Kunne ikke opprette invitasjonen. Prøv igjen.");
+    // Only an account created by this very call may be rolled back; Auth also returns
+    // existing unconfirmed invitees, and those must never be deleted. 60 s covers clock skew.
+    const createdByThisCall =
+      Date.parse(invited.user?.created_at ?? "") >= inviteStartedAt - 60_000;
+    const rollbackNewUser = async () => {
+      if (createdByThisCall) await supabaseAdmin.auth.admin.deleteUser(userId);
+    };
 
     const { error: memberError } = await supabaseAdmin.from("organization_members").insert({
       organization_id: organizationId,
@@ -110,7 +118,6 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       category_access: permissions.categoryAccess,
     });
     if (memberError) {
-      // Auth may return an existing unconfirmed invitee. Never delete that account on rollback.
       if (memberError.code === "23505") {
         const { data: existing, error: lookupError } = await supabaseAdmin
           .from("organization_members")
@@ -119,9 +126,11 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
           .eq("user_id", userId)
           .maybeSingle();
         if (lookupError) throw await toClientError("inviteOrganizationMember.lookup", lookupError);
-        if (existing?.status === "invited") return { userId, email };
+        // Auth has already re-sent the email; the existing permissions are kept unchanged.
+        if (existing?.status === "invited") return { userId, email, alreadyInvited: true };
         throw new ClientError(INVITE_EXISTING_MESSAGE, 409);
       }
+      await rollbackNewUser();
       throw await toClientError("inviteOrganizationMember", memberError);
     }
     if (permissions.categoryAccess === "restricted") {
@@ -140,6 +149,7 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
           user_id: userId,
           status: "invited",
         });
+        await rollbackNewUser();
         throw await toClientError("inviteOrganizationMember", categoryError);
       }
     }
@@ -163,9 +173,10 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         user_id: userId,
         status: "invited",
       });
+      await rollbackNewUser();
       throw await toClientError("inviteOrganizationMember", locationsError);
     }
-    return { userId, email };
+    return { userId, email, alreadyInvited: false };
   });
 
 export const resendOrganizationInvite = createServerFn({ method: "POST" })

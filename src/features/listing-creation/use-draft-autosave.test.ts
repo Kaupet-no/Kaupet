@@ -212,6 +212,25 @@ describe("useDraftAutosave", () => {
     expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).title).toBe("Sykkel til salgs");
   });
 
+  it("sier fra når utkastet allerede er publisert i stedet for å late som det er lagret", async () => {
+    saveDraftListingMock.mockResolvedValue({
+      id: "draft-1",
+      kaupet_code: "ABC123",
+      updated_at: "2026-10-09T10:00:00Z",
+      published: true,
+    });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Sykkel til salgs" }),
+    );
+    let id: string | null = null;
+    await act(async () => {
+      id = await result.current.saveDraftToSupabase();
+    });
+    expect(id).toBe("draft-1");
+    expect(result.current.draftSaveError).toBe(true);
+    expect(result.current.draftSaveMessage).toContain("allerede publisert");
+  });
+
   it("loads a recent draft from localStorage on mount and exposes it as hasDraftData", () => {
     localStorage.setItem(
       DRAFT_KEY,
@@ -227,7 +246,7 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftId).toBe("draft-123");
   });
 
-  it("DEF-DRAFT-01: overtar ikke eldre globale utkast uten kjent eier", () => {
+  it("DEF-DRAFT-01: overtar ikke eldre globale utkast uten kjent eier, men rydder dem bort", () => {
     localStorage.setItem(
       "kaupet_draft_ny_annonse",
       JSON.stringify({ title: "En annen kontos utkast", saved_at: Date.now() }),
@@ -236,7 +255,8 @@ describe("useDraftAutosave", () => {
     const { result } = renderHook(() => useDraftAutosave(baseFields));
     expect(result.current.hasDraftData).toBeNull();
     expect(result.current.draftId).toBeNull();
-    expect(localStorage.getItem("kaupet_draft_id")).toBe("legacy-id");
+    expect(localStorage.getItem("kaupet_draft_id")).toBeNull();
+    expect(localStorage.getItem("kaupet_draft_ny_annonse")).toBeNull();
   });
 
   it("discards a draft older than 7 days instead of surfacing it", () => {

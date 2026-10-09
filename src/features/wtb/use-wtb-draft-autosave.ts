@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { discardWtbDraft, getLatestWtbDraft, saveWtbDraft } from "@/lib/wtb-listings.functions";
 import {
+  clearLegacyDrafts,
   draftStorageKey,
   isDraftFresh,
   readItem,
@@ -88,6 +89,7 @@ export function useWtbDraftAutosave(
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       if (!isCurrent()) return;
+      clearLegacyDrafts();
       if (ownerId && resumeGuest && !readItem(DRAFT_KEY)) {
         const guestKey = draftStorageKey("want", null);
         const guest = readItem(guestKey);

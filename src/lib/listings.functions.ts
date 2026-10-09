@@ -429,6 +429,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           id: existing.id,
           kaupet_code: existing.kaupet_code,
           updated_at: existing.updated_at,
+          published: true as const,
         };
       }
       const orgLocation = await organizationLocationOverride(

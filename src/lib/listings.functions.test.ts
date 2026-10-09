@@ -315,7 +315,7 @@ describe("publisering etter tapt svar", () => {
       updated_at: "2026-10-09T10:00:00Z",
     };
     const saved = await saveDraftListing({ data: { id, title: "Et endret utkast" } });
-    expect(saved).toMatchObject({ id, kaupet_code: "ABC123" });
+    expect(saved).toMatchObject({ id, kaupet_code: "ABC123", published: true });
     const published = await createListing({
       data: { ...listingInput, draftId: id, organization_location_id: null },
     });

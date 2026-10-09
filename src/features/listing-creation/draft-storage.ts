@@ -39,7 +39,24 @@ export function removeItems(...keys: string[]): void {
   }
 }
 
-/** Unscoped legacy drafts have no provable owner and are deliberately left untouched. */
+// ponytail: engangsopprydding av uskoperte utkast fra før oktober 2026. De har
+// ingen bevisbar eier (delt enhet) og gjenopprettes derfor ikke, men skal ikke
+// bli liggende. Lokale utkast utløper etter 7 dager, så dette kan slettes snart.
+const LEGACY_DRAFT_KEYS = [
+  "kaupet_draft_ny_annonse",
+  "kaupet_draft_id",
+  "kaupet_draft_updated_at",
+  "kaupet_draft_sell_listing",
+  "kaupet_draft_sell_listing_id",
+  "kaupet_draft_sell_listing_updated_at",
+  "kaupet_draft_want_listing",
+  "kaupet_draft_want_listing_id",
+];
+export function clearLegacyDrafts(): void {
+  removeItems(...LEGACY_DRAFT_KEYS);
+}
+
+/** Drafts are scoped per account and business so another actor never adopts them. */
 export function draftStorageKey(
   kind: "sell" | "want",
   userId: string | null,

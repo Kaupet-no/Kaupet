@@ -11,6 +11,7 @@ import {
 } from "@/features/listing-creation/draft-image-store";
 import {
   draftStorageKey,
+  clearLegacyDrafts,
   isDraftFresh,
   readItem,
   removeItems,
@@ -155,6 +156,8 @@ export function useDraftAutosave(fields: DraftFields) {
   // Load draft from localStorage on mount
   useEffect(() => {
     try {
+      clearLegacyDrafts();
+      void clearDraftImages("current").catch(() => {});
       if (ownerId && fields.resumeGuest && !readItem(DRAFT_KEY)) {
         const guestKey = draftStorageKey("sell", null);
         const guest = readItem(guestKey);
@@ -391,9 +394,17 @@ export function useDraftAutosave(fields: DraftFields) {
           draftUpdatedAtRef.current = result.updated_at;
         }
         setDraftId(result.id);
+        draftConflictRef.current = false;
+        if ("published" in result && result.published) {
+          // A lost publish response: the listing is live, so these edits were not saved.
+          setDraftSaveMessage(
+            "Annonsen er allerede publisert. Endringer her lagres ikke – rediger den publiserte annonsen.",
+          );
+          setDraftSaveError(true);
+          return result.id;
+        }
         setLastSaved(new Date());
         setDraftSaveError(false);
-        draftConflictRef.current = false;
         setDraftSaveConflict(false);
         if (writeItem(DRAFT_ID_KEY, result.id) && result.updated_at) {
           writeItem(DRAFT_UPDATED_AT_KEY, result.updated_at);

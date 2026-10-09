@@ -12,11 +12,18 @@ test("innlogget Proff-toppfelt har tilgjengelige kontroller uten horisontal scro
 }) => {
   const { users } = JSON.parse(readFileSync(new URL(".auth/user.json", import.meta.url), "utf8"));
   // Proff-logoen er bredere enn privatlogoen og utløste DEF-A11Y-03.
-  await login(page, users["desktop-web"].email, users["desktop-web"].password);
+  await login(
+    page,
+    users["desktop-web"].email,
+    users["desktop-web"].password,
+    "/bedriftsinvitasjon",
+  );
 
   for (const width of [320, 375, 1280]) {
     await page.setViewportSize({ width, height: 812 });
-    await page.goto("/bedriftsinvitasjon");
+    if (new URL(page.url()).pathname !== "/bedriftsinvitasjon") {
+      await page.goto("/bedriftsinvitasjon");
+    }
     await waitForHydration(page);
     const nav = page.getByRole("navigation", { name: "Hovednavigasjon" });
     await expect(nav.getByText("Proff", { exact: true })).toBeVisible();
@@ -69,6 +76,7 @@ test("innlogget Proff-toppfelt har tilgjengelige kontroller uten horisontal scro
 
     await nav.getByRole("link", { name: /^Meldinger/ }).click();
     await expect(page).toHaveURL(/\/meldinger/);
+    await expect(page.getByRole("heading", { level: 1, name: "Meldinger" })).toBeVisible();
   }
 });
 

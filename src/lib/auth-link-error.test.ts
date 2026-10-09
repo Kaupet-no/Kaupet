@@ -8,7 +8,7 @@ describe("DEF-INVITE-01: Auth link errors on every entry route", () => {
     ["?error_description=unknown", ""],
   ])("shows a safe explanation for provider error %s %s", (query, hash) => {
     expect(authLinkError(query, hash)).toContain("utløpt");
-    expect(authLinkError(query, hash)).toContain("sende invitasjonen på nytt");
+    expect(authLinkError(query, hash)).toContain("Be om en ny lenke");
   });
   it.each([
     ["", ""],

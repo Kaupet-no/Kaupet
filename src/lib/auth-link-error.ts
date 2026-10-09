@@ -5,7 +5,7 @@ export function authLinkError(search: string, hash: string): string | null {
     (p) => p.has("error") || p.has("error_code") || p.has("error_description"),
   );
   if (!hasError) return null;
-  return "Lenken er ugyldig, utløpt eller allerede brukt. Be bedriftens superbruker sende invitasjonen på nytt. Ved passordtilbakestilling kan du be om en ny lenke fra innlogging.";
+  return "Lenken er ugyldig, utløpt eller allerede brukt. Be om en ny lenke: ny bekreftelses-e-post eller passordlenke fra innloggingssiden, eller be bedriftens superbruker sende invitasjonen på nytt.";
 }
 
 export const initialAuthLinkError =

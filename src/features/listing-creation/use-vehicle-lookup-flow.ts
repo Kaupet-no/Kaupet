@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { showErrorToast } from "@/lib/toast";
@@ -73,7 +73,10 @@ export function useVehicleLookupFlow(params: {
     goNext,
   } = params;
 
-  const [vehicleRegistered, setVehicleRegistered] = useState(true);
+  const vehicleRegistered = attributes.is_registered !== false;
+  const setVehicleRegistered = (registered: boolean) => {
+    setAttributes({ ...attributes, is_registered: registered });
+  };
   const [vehicleLookupLoading, setVehicleLookupLoading] = useState(false);
   const [vehicleLookupError, setVehicleLookupError] = useState<string | null>(null);
   const [vehicleLookupResult, setVehicleLookupResult] = useState<VehicleLookupResult | null>(null);

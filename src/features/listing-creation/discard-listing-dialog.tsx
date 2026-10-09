@@ -17,6 +17,7 @@ interface DiscardListingDialogProps {
   onSaveDraft: () => Promise<boolean>;
   isSavingDraft: boolean;
   saveDraftLabel?: string;
+  saveErrorMessage?: string | null;
 }
 
 /**
@@ -37,6 +38,7 @@ export function DiscardListingDialog({
   onSaveDraft,
   isSavingDraft,
   saveDraftLabel = "Lagre som kladd",
+  saveErrorMessage,
 }: DiscardListingDialogProps) {
   const [saveFailed, setSaveFailed] = useState(false);
 
@@ -65,8 +67,8 @@ export function DiscardListingDialog({
         <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
           {saveFailed && (
             <p role="alert" className="text-sm text-destructive">
-              Kunne ikke lagre utkastet. Sjekk nettforbindelsen og prøv igjen, eller forkast
-              annonsen.
+              {saveErrorMessage ??
+                "Utkastet kunne ikke lagres. Fortsett å redigere og prøv igjen senere."}
             </p>
           )}
           <Button

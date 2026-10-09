@@ -1,4 +1,7 @@
-﻿import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { BusinessApprovalNotice } from "@/features/business-account/business-approval-notice";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
+import { DRAFT_ACTOR_CHANGED_MESSAGE } from "@/features/listing-creation/use-draft-actor";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -186,7 +189,7 @@ export const Route = createFileRoute("/ny-annonse")({
       { name: "description", content: "Legg ut en gratis annonse på Kaupet.no." },
     ],
   }),
-  component: NewListingPage,
+  component: NewListingPageEntry,
   errorComponent: NewListingError,
 });
 
@@ -213,7 +216,31 @@ function stillBlocks(result: ReturnType<NonNullable<FieldGroup["validateExtra"]>
   return result !== null && result !== "CONFIRM_NO_IMAGE";
 }
 
-function NewListingPage() {
+function NewListingPageEntry() {
+  const { loading, user } = useAuth();
+  const { data: membership, isPending, isError, refetch } = useBusinessMembership();
+  const [ready, setReady] = useState(false);
+  // Resolve the initial actor once; session changes must keep the old composer mounted so it can freeze.
+  if (!ready && !loading && (!user || (!isPending && !isError))) setReady(true);
+  if (!ready) {
+    if (user && isError)
+      return (
+        <div role="alert" className="space-y-3 p-6">
+          <p>Kunne ikke hente kontoen. Prøv igjen før du fortsetter med utkastet.</p>
+          <Button onClick={() => void refetch()}>Prøv igjen</Button>
+        </div>
+      );
+    return (
+      <p role="status" className="p-6">
+        Laster kontoen…
+      </p>
+    );
+  }
+  return <NewListingPage organizationId={membership?.organization_id ?? null} />;
+}
+
+function NewListingPage({ organizationId }: { organizationId: string | null }) {
+  const { data: business } = useBusinessMembership();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
@@ -865,7 +892,7 @@ function NewListingPage() {
     shouldBlockFn: ({ current, next }) =>
       !bypassNavigationBlockerRef.current && shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
-    enableBeforeUnload: shouldBlockNav,
+    enableBeforeUnload: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
   });
 
   const {
@@ -885,6 +912,13 @@ function NewListingPage() {
 
   const {
     draftId,
+    actorChanged,
+    ownerId,
+    ownerOrganizationId,
+    isCurrent,
+    preparePublish,
+    resumeAutosave,
+    draftSaveMessage,
     lastSaved,
     draftSaveError,
     draftSaveConflict,
@@ -921,6 +955,9 @@ function NewListingPage() {
     maintenanceHistory,
     stepKey: currentStepKey,
     authenticated: !!user,
+    userId: user?.id ?? null,
+    organizationId,
+    resumeGuest: resume === "auth-publish",
   });
 
   function restoreDraft() {
@@ -1159,6 +1196,11 @@ function NewListingPage() {
     attributes,
     coords,
     draftId,
+    ownerId,
+    ownerOrganizationId,
+    isCurrent,
+    preparePublish,
+    resumeAutosave,
     clearDraftStorage,
     fieldGroupKeys,
     behavior,
@@ -1630,8 +1672,26 @@ function NewListingPage() {
     </div>
   ) : undefined;
 
+  if (actorChanged)
+    return (
+      <div role="alert" className="mx-auto max-w-lg space-y-4 p-6">
+        <p>{DRAFT_ACTOR_CHANGED_MESSAGE}</p>
+        <Button
+          onClick={() => {
+            bypassNavigationBlockerRef.current = true;
+            window.location.reload();
+          }}
+        >
+          Åpne en ny annonse med denne kontoen
+        </Button>
+      </div>
+    );
+
   return (
     <>
+      <div className="mx-auto max-w-3xl px-4 pt-4">
+        <BusinessApprovalNotice status={business?.organization.verification_status} />
+      </div>
       <form onSubmit={submitComposer} onKeyDown={blockImplicitSubmit}>
         <ListingComposerShell
           title={title}
@@ -1749,7 +1809,7 @@ function NewListingPage() {
                 aria-live="assertive"
                 className="mt-1 text-right text-xs text-destructive"
               >
-                Utkast ble ikke lagret
+                {draftSaveMessage ?? "Utkast ble ikke lagret"}
               </p>
             ) : savedTimeLabel ? (
               <p
@@ -1966,6 +2026,7 @@ function NewListingPage() {
           return true;
         }}
         isSavingDraft={isSavingDraft}
+        saveErrorMessage={draftSaveMessage}
       />
 
       <GuestPublishSheet

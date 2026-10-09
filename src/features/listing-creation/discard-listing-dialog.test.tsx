@@ -28,7 +28,7 @@ describe("DiscardListingDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /lagre som kladd/i }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/kunne ikke lagre utkastet/i);
+    expect(alert.textContent).toMatch(/utkastet kunne ikke lagres/i);
     expect(onReset).not.toHaveBeenCalled();
   });
 

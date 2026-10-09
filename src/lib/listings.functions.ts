@@ -1,3 +1,4 @@
+import { assertDraftActor, assertDraftOrganization } from "@/lib/draft-actor";
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
@@ -77,6 +78,8 @@ async function resolveListingOwnership(
     throw await toClientError("database", error);
   }
   if (!membership) {
+    if (requestedLocationId)
+      throw new ClientError("Du har ikke tilgang til denne bedriftslokasjonen.", 403);
     return { seller_id: userId, organization_id: null, organization_location_id: null };
   }
   if (membership.role === "member") {
@@ -148,7 +151,19 @@ async function resolveListingOwnership(
   if (permissionError) {
     throw await toClientError("database", permissionError);
   }
-  if (!allowed) throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
+  if (!allowed) {
+    const { data: verified, error: verificationError } = await supabaseAdmin.rpc(
+      "organization_is_verified",
+      { _organization_id: membership.organization_id },
+    );
+    if (verificationError) throw await toClientError("database", verificationError);
+    if (!verified)
+      throw new ClientError(
+        "Bedriften venter på godkjenning fra Kaupet. Publisering blir tilgjengelig når bedriften er godkjent.",
+        403,
+      );
+    throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
+  }
   return {
     seller_id: userId,
     organization_id: membership.organization_id,
@@ -347,6 +362,8 @@ export const saveDraftListing = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
+        expected_user_id: z.string().uuid().optional(),
+        expected_organization_id: z.string().uuid().nullable().optional(),
         id: z.string().uuid().optional(),
         expected_updated_at: z.string().datetime({ offset: true }).optional(),
         title: z.string().trim().min(1).max(120),
@@ -377,6 +394,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
@@ -403,6 +421,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     if (data.id) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
+      assertDraftOrganization(data.expected_organization_id, existing.organization_id);
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
@@ -451,6 +470,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       data.category_id ?? null,
       data.organization_location_id,
     );
+    assertDraftOrganization(data.expected_organization_id, ownership.organization_id);
     const orgLocation = await organizationLocationOverride(
       supabaseAdmin,
       ownership.organization_id,
@@ -501,6 +521,8 @@ export const createListing = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
+        expected_user_id: z.string().uuid().optional(),
+        expected_organization_id: z.string().uuid().nullable().optional(),
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
         subtitle: z.string().trim().max(80).nullable().optional(),
@@ -536,6 +558,7 @@ export const createListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
@@ -614,6 +637,7 @@ export const createListing = createServerFn({ method: "POST" })
     };
     if (data.draftId) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
+      assertDraftOrganization(data.expected_organization_id, existing.organization_id);
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
@@ -646,6 +670,7 @@ export const createListing = createServerFn({ method: "POST" })
       data.category_id,
       data.organization_location_id,
     );
+    assertDraftOrganization(data.expected_organization_id, ownership.organization_id);
     const orgLocation = await organizationLocationOverride(
       supabaseAdmin,
       ownership.organization_id,

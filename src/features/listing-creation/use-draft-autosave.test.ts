@@ -1,7 +1,14 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
+import { useEffect, useState } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDraftAutosave } from "./use-draft-autosave";
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }) },
+  },
+}));
 
 vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
@@ -27,9 +34,9 @@ vi.mock("./draft-image-store", () => ({
   clearDraftImages: (...args: unknown[]) => clearDraftImagesMock(...args),
 }));
 
-const DRAFT_KEY = "kaupet_draft_sell_listing";
-const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id";
-const DRAFT_UPDATED_AT_KEY = "kaupet_draft_sell_listing_updated_at";
+const DRAFT_KEY = "kaupet_draft_sell_listing:user-1:private";
+const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id:user-1:private";
+const DRAFT_UPDATED_AT_KEY = "kaupet_draft_sell_listing_updated_at:user-1:private";
 
 const baseFields = {
   title: "",
@@ -51,6 +58,8 @@ const baseFields = {
   setImages: vi.fn(),
   stepKey: "title-photos",
   authenticated: true,
+  userId: "user-1" as string | null,
+  organizationId: null as string | null,
 };
 
 beforeEach(() => {
@@ -67,6 +76,142 @@ afterEach(() => {
 });
 
 describe("useDraftAutosave", () => {
+  it.each(["konto", "medlemskap"])(
+    "avviser et pågående lagringssvar etter endret %s",
+    async (change) => {
+      let resolveSave!: (value: unknown) => void;
+      saveDraftListingMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+      );
+      const fields = { ...baseFields, title: "Utkast før aktørendring" };
+      const { result, rerender } = renderHook((value) => useDraftAutosave(value), {
+        initialProps: fields,
+      });
+      let save!: Promise<string | null>;
+      act(() => {
+        save = result.current.saveDraftToSupabase();
+      });
+      rerender({
+        ...fields,
+        ...(change === "konto" ? { userId: "user-2" } : { organizationId: "new-organization" }),
+      });
+      await act(async () => {
+        resolveSave({ id: "old-actor-draft", updated_at: "2026-10-09T10:00:00Z" });
+        expect(await save).toBeNull();
+      });
+      expect(result.current.actorChanged).toBe(true);
+      expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+      expect(localStorage.getItem("kaupet_draft_sell_listing_id:user-2:private")).toBeNull();
+      expect(
+        localStorage.getItem("kaupet_draft_sell_listing_id:user-1:new-organization"),
+      ).toBeNull();
+    },
+  );
+
+  it("DEF-DRAFT-01: avviser kontobytte uten å skrive hos den nye brukeren", async () => {
+    const { result, rerender } = renderHook((fields) => useDraftAutosave(fields), {
+      initialProps: { ...baseFields, title: "Bedriftens sykkel" },
+    });
+    rerender({ ...baseFields, title: "Bedriftens sykkel", userId: "user-2" });
+    await act(async () => {
+      expect(await result.current.flushLocalDraft()).toBe(false);
+      expect(await result.current.saveDraftToSupabase()).toBeNull();
+    });
+    expect(result.current.actorChanged).toBe(true);
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem("kaupet_draft_sell_listing:user-2:private")).toBeNull();
+  });
+
+  it("DEF-DRAFT-02: publisering bruker lagret ID og hindrer videre autolagring", async () => {
+    saveDraftListingMock.mockResolvedValue({
+      id: "draft-publish",
+      updated_at: "2026-10-09T10:00:00Z",
+    });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Sykkel til salgs" }),
+    );
+    await act(async () => {
+      expect(await result.current.preparePublish()).toBe("draft-publish");
+      expect(await result.current.saveDraftToSupabase()).toBeNull();
+    });
+    expect(saveDraftListingMock).toHaveBeenCalledTimes(1);
+    expect(saveDraftListingMock.mock.calls[0][0].data.expected_user_id).toBe("user-1");
+  });
+
+  it("DEF-DRAFT-02: gjenoppretting beholder server-ID mens bildelageret leses", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Lagret salgsutkast", saved_at: Date.now() }),
+    );
+    localStorage.setItem(DRAFT_ID_KEY, "existing-draft");
+    let resolveImages!: (images: never[]) => void;
+    const pendingImages = new Promise<never[]>((resolve) => {
+      resolveImages = resolve;
+    });
+    loadDraftImagesMock.mockReturnValue(pendingImages);
+    saveDraftListingMock.mockResolvedValue({
+      id: "existing-draft",
+      updated_at: "2026-10-09T10:00:00Z",
+    });
+    const { result } = renderHook(() => {
+      const [title, setTitle] = useState("");
+      const draft = useDraftAutosave({ ...baseFields, title, isFree: true });
+      useEffect(() => {
+        if (draft.hasDraftData && draft.draftId && title) draft.dismissDraftOffer();
+      }, [draft, title]);
+      return { draft, setTitle };
+    });
+    let restore!: Promise<void>;
+    act(() => {
+      restore = result.current.draft.restoreDraft({
+        setValue: (key, value) => {
+          if (key === "title") result.current.setTitle(String(value));
+        },
+        setSelectedParentId: vi.fn(),
+        setLocationMethod: vi.fn(),
+        setAttributes: vi.fn(),
+        setCoords: vi.fn(),
+      });
+    });
+    expect(result.current.draft.draftId).toBe("existing-draft");
+    await act(async () => {
+      resolveImages([]);
+      await restore;
+    });
+    await act(async () => {
+      expect(await result.current.draft.preparePublish()).toBe("existing-draft");
+    });
+    expect(saveDraftListingMock.mock.calls[0][0].data).toMatchObject({
+      id: "existing-draft",
+      is_free: true,
+    });
+  });
+
+  it("publiseringsforberedelse bevarer godkjenningsfeilen fra lagring", async () => {
+    const message = "Bedriften må være godkjent før du kan publisere annonser.";
+    saveDraftListingMock.mockRejectedValue(new Error(message));
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Bedriftens sykkel" }),
+    );
+    await act(async () => {
+      await expect(result.current.preparePublish()).rejects.toThrow(message);
+    });
+  });
+
+  it("DEF-SAVE-01: bevarer lokal kopi og den faktiske rategrensefeilen", async () => {
+    saveDraftListingMock.mockRejectedValue(new Error("For mange lagringer. Prøv igjen senere."));
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Sykkel til salgs" }),
+    );
+    await act(async () => {
+      await result.current.saveDraftToSupabase();
+    });
+    expect(result.current.draftSaveMessage).toBe("For mange lagringer. Prøv igjen senere.");
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).title).toBe("Sykkel til salgs");
+  });
+
   it("loads a recent draft from localStorage on mount and exposes it as hasDraftData", () => {
     localStorage.setItem(
       DRAFT_KEY,
@@ -82,24 +227,16 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftId).toBe("draft-123");
   });
 
-  it("flytter et utkast fra de gamle nøkkelnavnene", () => {
+  it("DEF-DRAFT-01: overtar ikke eldre globale utkast uten kjent eier", () => {
     localStorage.setItem(
       "kaupet_draft_ny_annonse",
-      JSON.stringify({ title: "Sykkel til salgs", saved_at: Date.now() }),
+      JSON.stringify({ title: "En annen kontos utkast", saved_at: Date.now() }),
     );
-    localStorage.setItem("kaupet_draft_id", "draft-123");
-    localStorage.setItem("kaupet_draft_updated_at", "2026-09-25T10:00:00Z");
-
+    localStorage.setItem("kaupet_draft_id", "legacy-id");
     const { result } = renderHook(() => useDraftAutosave(baseFields));
-
-    expect(result.current.hasDraftData).toEqual(
-      expect.objectContaining({ title: "Sykkel til salgs" }),
-    );
-    expect(result.current.draftId).toBe("draft-123");
-    expect(localStorage.getItem(DRAFT_UPDATED_AT_KEY)).toBe("2026-09-25T10:00:00Z");
-    expect(localStorage.getItem("kaupet_draft_ny_annonse")).toBeNull();
-    expect(localStorage.getItem("kaupet_draft_id")).toBeNull();
-    expect(localStorage.getItem("kaupet_draft_updated_at")).toBeNull();
+    expect(result.current.hasDraftData).toBeNull();
+    expect(result.current.draftId).toBeNull();
+    expect(localStorage.getItem("kaupet_draft_id")).toBe("legacy-id");
   });
 
   it("discards a draft older than 7 days instead of surfacing it", () => {
@@ -125,7 +262,12 @@ describe("useDraftAutosave", () => {
 
   it("flushes guest drafts locally without calling Supabase", async () => {
     const { result } = renderHook(() =>
-      useDraftAutosave({ ...baseFields, authenticated: false, title: "En fin sykkel" }),
+      useDraftAutosave({
+        ...baseFields,
+        authenticated: false,
+        userId: null,
+        title: "En fin sykkel",
+      }),
     );
 
     await act(async () => {
@@ -133,7 +275,9 @@ describe("useDraftAutosave", () => {
       expect(await result.current.saveDraftToSupabase()).toBeNull();
     });
 
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}")).toMatchObject({
+    expect(
+      JSON.parse(localStorage.getItem("kaupet_draft_sell_listing:guest:private") ?? "{}"),
+    ).toMatchObject({
       title: "En fin sykkel",
       draft_version: 1,
     });
@@ -142,7 +286,12 @@ describe("useDraftAutosave", () => {
   it("returnerer feil når bildedraft ikke kan flushes", async () => {
     saveDraftImagesMock.mockRejectedValueOnce(new Error("IndexedDB unavailable"));
     const { result } = renderHook(() =>
-      useDraftAutosave({ ...baseFields, authenticated: false, title: "En fin sykkel" }),
+      useDraftAutosave({
+        ...baseFields,
+        authenticated: false,
+        userId: null,
+        title: "En fin sykkel",
+      }),
     );
 
     await act(async () => {

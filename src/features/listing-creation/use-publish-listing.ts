@@ -62,6 +62,11 @@ export function usePublishListing({
   attributes,
   coords,
   draftId,
+  ownerId,
+  ownerOrganizationId,
+  preparePublish,
+  resumeAutosave,
+  isCurrent,
   clearDraftStorage,
   fieldGroupKeys,
   behavior,
@@ -73,6 +78,11 @@ export function usePublishListing({
   attributes: AttributeMap;
   coords: { lat: number; lng: number } | null;
   draftId: string | null | undefined;
+  ownerId: string | null;
+  ownerOrganizationId: string | null;
+  preparePublish: () => Promise<string>;
+  resumeAutosave: () => void;
+  isCurrent: () => boolean;
   clearDraftStorage: (options?: { stopAutosave?: boolean }) => void;
   fieldGroupKeys: string[];
   behavior: CategoryBehavior;
@@ -105,6 +115,10 @@ export function usePublishListing({
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
 
+      if (!isCurrent() || userData.user.id !== ownerId)
+        throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+      const ensuredDraftId = await preparePublish();
+
       const finalCoords =
         coords ??
         (await geocodeNorwayAddress({
@@ -120,9 +134,12 @@ export function usePublishListing({
         ? await turnstileRef.current?.getResponsePromise()
         : null;
 
+      if (!isCurrent()) throw new Error("Kontoen er endret. Publiseringen er stoppet.");
       const listing = await createListing({
         data: {
-          ...(draftId ? { draftId } : {}),
+          expected_user_id: ownerId!,
+          expected_organization_id: ownerOrganizationId,
+          draftId: ensuredDraftId ?? draftId!,
           title: values.title,
           subtitle: values.subtitle || null,
           description: values.description,
@@ -153,6 +170,7 @@ export function usePublishListing({
         },
       });
 
+      if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
       // Upload images in parallel
       if (images.length > 0) {
         setUploadProgress({ done: 0, total: images.length });
@@ -195,6 +213,7 @@ export function usePublishListing({
       return listing;
     },
     onSuccess: (result) => {
+      if (!isCurrent()) return;
       publishAttemptPendingRef.current = false;
       // stopAutosave: the wizard stays mounted behind the success dialog with
       // the form still populated — without this the next autosave tick would
@@ -206,6 +225,7 @@ export function usePublishListing({
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
+      resumeAutosave();
       publishAttemptPendingRef.current = false;
       trackProductEvent("listing_publish_failed", { kind: "sell", step: currentStepKey });
       setUploadProgress(null);

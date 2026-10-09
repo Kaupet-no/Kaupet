@@ -292,8 +292,12 @@ export function LocationGroup(props: WizardSharedProps) {
     locations[0];
 
   useEffect(() => {
-    if (!membership || !selectedLocation || selectedLocationId) return;
-    setValue("organization_location_id", selectedLocation.id, { shouldDirty: false });
+    if (!membership || !selectedLocation) return;
+    if (!selectedLocationId) {
+      setValue("organization_location_id", selectedLocation.id, { shouldDirty: false });
+    }
+    setValue("postal_code", selectedLocation.postal_code ?? "", { shouldValidate: true });
+    setValue("city", selectedLocation.city ?? "", { shouldValidate: true });
   }, [membership, setValue, selectedLocation, selectedLocationId]);
 
   if (membership) {

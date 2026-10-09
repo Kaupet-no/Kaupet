@@ -138,17 +138,28 @@ beforeEach(() => {
 });
 
 describe("organization listing creation authorization (SEC-07)", () => {
+  it("DEF-DRAFT-01: forventet bruker må samsvare før lagring eller publisering", async () => {
+    const input = {
+      ...listingInput,
+      organization_location_id: null,
+      expected_user_id: "00000000-0000-4000-8000-000000000099",
+    };
+    await expect(saveDraftListing({ data: input })).rejects.toMatchObject({ status: 409 });
+    await expect(createListing({ data: input })).rejects.toMatchObject({ status: 409 });
+    expect(db.inserts).toHaveLength(0);
+  });
+
   it.each(["superuser", "member"] as const)(
     "blocks an unverified %s from creating active listings and drafts",
     async (role) => {
       setOrganization(role);
 
       await expect(createListing({ data: listingInput })).rejects.toThrow(
-        "Du har ikke tilgang til å opprette annonser.",
+        "Bedriften venter på godkjenning fra Kaupet.",
       );
       await expect(
         saveDraftListing({ data: { ...listingInput, title: "Utkast" } }),
-      ).rejects.toThrow("Du har ikke tilgang til å opprette annonser.");
+      ).rejects.toThrow("Bedriften venter på godkjenning fra Kaupet.");
 
       expect(db.rpc).toHaveBeenCalledWith("can_create_organization_listing", {
         _organization_id: organizationId,
@@ -190,8 +201,10 @@ describe("organization listing creation authorization (SEC-07)", () => {
   });
 
   it("uses one five-per-hour user bucket before each new listing or draft insert", async () => {
-    await createListing({ data: listingInput });
-    await saveDraftListing({ data: { ...listingInput, title: "Utkast" } });
+    await createListing({ data: { ...listingInput, organization_location_id: null } });
+    await saveDraftListing({
+      data: { ...listingInput, organization_location_id: null, title: "Utkast" },
+    });
 
     expect(assertUserNotRateLimited).toHaveBeenNthCalledWith(
       1,
@@ -214,7 +227,9 @@ describe("organization listing creation authorization (SEC-07)", () => {
   it("stops new listing inserts when the shared bucket rejects the reservation", async () => {
     assertUserNotRateLimited.mockRejectedValue(new Error("limit"));
 
-    await expect(createListing({ data: listingInput })).rejects.toThrow("limit");
+    await expect(
+      createListing({ data: { ...listingInput, organization_location_id: null } }),
+    ).rejects.toThrow("limit");
     expect(db.inserts).toHaveLength(0);
   });
 

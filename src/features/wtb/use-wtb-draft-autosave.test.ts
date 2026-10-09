@@ -7,6 +7,12 @@ const { saveWtbDraftMock, getLatestWtbDraftMock } = vi.hoisted(() => ({
   getLatestWtbDraftMock: vi.fn(),
 }));
 
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }) },
+  },
+}));
+
 vi.mock("@/lib/wtb-listings.functions", () => ({
   saveWtbDraft: saveWtbDraftMock,
   getLatestWtbDraft: getLatestWtbDraftMock,
@@ -44,13 +50,37 @@ describe("useWtbDraftAutosave", () => {
     cleanup();
     vi.useRealTimers();
   });
+  it("DEF-DRAFT-02: ventende lagring og publisering bruker samme ID", async () => {
+    let resolveSave!: (value: { id: string }) => void;
+    saveWtbDraftMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    await act(async () => {
+      const save = result.current.saveToServer();
+      const publish = result.current.preparePublish();
+      resolveSave({ id: "00000000-0000-4000-8000-000000000001" });
+      await save;
+      expect(await publish).toBe("00000000-0000-4000-8000-000000000001");
+    });
+    expect(saveWtbDraftMock).toHaveBeenCalledTimes(1);
+  });
+
   it("lagrer et versjonert kjøpsønske uten å berøre salgsutkastet", () => {
     localStorage.setItem("kaupet_draft_sell_listing", "sell-draft");
-    renderHook(() => useWtbDraftAutosave(fields, true));
+    renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
 
     act(() => vi.advanceTimersByTime(2_001));
 
-    const saved = JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}") as {
+    const saved = JSON.parse(
+      localStorage.getItem("kaupet_draft_want_listing:user-1:private") ?? "{}",
+    ) as {
       draft_kind?: string;
       draft_version?: number;
       title?: string;
@@ -63,13 +93,15 @@ describe("useWtbDraftAutosave", () => {
     expect(localStorage.getItem("kaupet_draft_sell_listing")).toBe("sell-draft");
   });
   it("lagrer gjestedraft lokalt når Supabase ikke er tilgjengelig", () => {
-    const { result } = renderHook(() => useWtbDraftAutosave(fields, false));
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, false, null));
 
     act(() => {
       result.current.flushLocalDraft();
     });
 
-    expect(JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}")).toMatchObject({
+    expect(
+      JSON.parse(localStorage.getItem("kaupet_draft_want_listing:guest:private") ?? "{}"),
+    ).toMatchObject({
       draft_kind: "want",
       title: "Ønsker sykkel",
     });
@@ -77,7 +109,7 @@ describe("useWtbDraftAutosave", () => {
 
   it("tilbyr et gyldig lagret utkast for gjenoppretting", async () => {
     localStorage.setItem(
-      "kaupet_draft_want_listing",
+      "kaupet_draft_want_listing:user-1:private",
       JSON.stringify({
         draft_kind: "want",
         draft_version: 1,
@@ -85,7 +117,7 @@ describe("useWtbDraftAutosave", () => {
         ...fields,
       }),
     );
-    const { result } = renderHook(() => useWtbDraftAutosave(fields, true));
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
 
     await act(() => vi.advanceTimersByTimeAsync(1));
 
@@ -94,15 +126,15 @@ describe("useWtbDraftAutosave", () => {
   });
 
   it("stopper lokal og serverbasert autolagring etter publisering", async () => {
-    const { result } = renderHook(() => useWtbDraftAutosave(fields, true));
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
     await act(() => vi.advanceTimersByTimeAsync(2_001));
-    expect(localStorage.getItem("kaupet_draft_want_listing")).not.toBeNull();
+    expect(localStorage.getItem("kaupet_draft_want_listing:user-1:private")).not.toBeNull();
 
     act(() => result.current.clearAfterPublish());
-    expect(localStorage.getItem("kaupet_draft_want_listing")).toBeNull();
+    expect(localStorage.getItem("kaupet_draft_want_listing:user-1:private")).toBeNull();
 
     await act(() => vi.advanceTimersByTimeAsync(30_001));
-    expect(localStorage.getItem("kaupet_draft_want_listing")).toBeNull();
+    expect(localStorage.getItem("kaupet_draft_want_listing:user-1:private")).toBeNull();
     expect(saveWtbDraftMock).not.toHaveBeenCalled();
   });
 
@@ -118,7 +150,7 @@ describe("useWtbDraftAutosave", () => {
       updated_at: new Date().toISOString(),
     });
 
-    const { result } = renderHook(() => useWtbDraftAutosave(fields, true));
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
     await act(() => vi.advanceTimersByTimeAsync(1));
 
     expect(result.current.restorableDraft).toMatchObject({
@@ -129,7 +161,11 @@ describe("useWtbDraftAutosave", () => {
 
   it("normaliserer makspris fra input-streng før serverlagring", async () => {
     const { result } = renderHook(() =>
-      useWtbDraftAutosave({ ...fields, max_price_nok: "10000", notify_matches: true }, true),
+      useWtbDraftAutosave(
+        { ...fields, max_price_nok: "10000", notify_matches: true },
+        true,
+        "user-1",
+      ),
     );
 
     await act(async () => {
@@ -141,7 +177,11 @@ describe("useWtbDraftAutosave", () => {
     });
 
     const { result: invalidResult } = renderHook(() =>
-      useWtbDraftAutosave({ ...fields, max_price_nok: "10000001", notify_matches: true }, true),
+      useWtbDraftAutosave(
+        { ...fields, max_price_nok: "10000001", notify_matches: true },
+        true,
+        "user-1",
+      ),
     );
     await act(async () => {
       await invalidResult.current.saveToServer();
@@ -152,7 +192,7 @@ describe("useWtbDraftAutosave", () => {
   });
 
   it("flusher en endring innenfor debounce-vinduet til localStorage ved pagehide (J4)", () => {
-    const { rerender } = renderHook((f) => useWtbDraftAutosave(f, true), {
+    const { rerender } = renderHook((f) => useWtbDraftAutosave(f, true, "user-1"), {
       initialProps: fields,
     });
 
@@ -164,7 +204,9 @@ describe("useWtbDraftAutosave", () => {
     });
     act(() => window.dispatchEvent(new Event("pagehide")));
 
-    expect(JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}")).toMatchObject({
+    expect(
+      JSON.parse(localStorage.getItem("kaupet_draft_want_listing:user-1:private") ?? "{}"),
+    ).toMatchObject({
       max_price_nok: 15_000,
     });
   });
@@ -182,8 +224,8 @@ describe("useWtbDraftAutosave", () => {
       attributes: {},
       checked_keys: [],
     };
-    localStorage.setItem("kaupet_draft_want_listing", JSON.stringify(oldDraft));
-    const { result, rerender } = renderHook((f) => useWtbDraftAutosave(f, true), {
+    localStorage.setItem("kaupet_draft_want_listing:user-1:private", JSON.stringify(oldDraft));
+    const { result, rerender } = renderHook((f) => useWtbDraftAutosave(f, true, "user-1"), {
       initialProps: fields,
     });
     await act(() => vi.advanceTimersByTimeAsync(1));
@@ -195,9 +237,9 @@ describe("useWtbDraftAutosave", () => {
     });
     act(() => window.dispatchEvent(new Event("pagehide")));
 
-    expect(JSON.parse(localStorage.getItem("kaupet_draft_want_listing") ?? "{}")).toMatchObject(
-      oldDraft,
-    );
+    expect(
+      JSON.parse(localStorage.getItem("kaupet_draft_want_listing:user-1:private") ?? "{}"),
+    ).toMatchObject(oldDraft);
   });
 
   it("overskriver ikke serverutkast mens restore-valget står åpent", async () => {
@@ -211,7 +253,7 @@ describe("useWtbDraftAutosave", () => {
       attributes: {},
       updated_at: new Date().toISOString(),
     });
-    renderHook(() => useWtbDraftAutosave(fields, true));
+    renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
 
     await act(() => vi.advanceTimersByTimeAsync(1));
     await act(() => vi.advanceTimersByTimeAsync(30_000));

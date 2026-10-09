@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { showSuccessToast } from "@/lib/toast";
 import { discardDraftListing, saveDraftListing } from "@/lib/listings.functions";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
@@ -10,34 +10,17 @@ import {
   saveDraftImages,
 } from "@/features/listing-creation/draft-image-store";
 import {
+  draftStorageKey,
   isDraftFresh,
   readItem,
   removeItems,
   writeItem,
 } from "@/features/listing-creation/draft-storage";
 
-const DRAFT_KEY = "kaupet_draft_sell_listing";
-const DRAFT_ID_KEY = "kaupet_draft_sell_listing_id";
-const DRAFT_UPDATED_AT_KEY = "kaupet_draft_sell_listing_updated_at";
-
-// ponytail: engangsflytting fra de gamle nøkkelnavnene (oktober 2026). Lokale
-// utkast utløper etter 7 dager, så dette kan slettes når det har vært ute
-// en stund.
-const LEGACY_DRAFT_KEYS: [string, string][] = [
-  ["kaupet_draft_ny_annonse", DRAFT_KEY],
-  ["kaupet_draft_id", DRAFT_ID_KEY],
-  ["kaupet_draft_updated_at", DRAFT_UPDATED_AT_KEY],
-];
-
-function migrateLegacyDraftKeys() {
-  for (const [from, to] of LEGACY_DRAFT_KEYS) {
-    const value = readItem(from);
-    if (value === null) continue;
-    if (readItem(to) === null) writeItem(to, value);
-    removeItems(from);
-  }
-}
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+import { useDraftActor } from "./use-draft-actor";
+import { formatErrorMessage } from "@/lib/errors";
 
 type ListingCondition = "new" | "like_new" | "good" | "acceptable" | "for_parts";
 
@@ -67,6 +50,9 @@ type DraftFields = {
    * but every Supabase draft call is skipped (the server functions require
    * auth anyway — see requireSupabaseAuth in listings.functions.ts). */
   authenticated: boolean;
+  userId: string | null;
+  organizationId: string | null;
+  resumeGuest?: boolean;
 };
 
 type RestoreTarget = {
@@ -113,6 +99,18 @@ export function useDraftAutosave(fields: DraftFields) {
     authenticated,
   } = fields;
 
+  const { ownerId, ownerOrganizationId, actorChanged, isCurrent } = useDraftActor(
+    fields.userId,
+    fields.organizationId,
+  );
+  const DRAFT_KEY = draftStorageKey("sell", ownerId, "", ownerOrganizationId);
+  const DRAFT_ID_KEY = draftStorageKey("sell", ownerId, "_id", ownerOrganizationId);
+  const DRAFT_UPDATED_AT_KEY = draftStorageKey("sell", ownerId, "_updated_at", ownerOrganizationId);
+  const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const draftSaveMessageRef = useRef<string | null>(null);
+  const guestTransfer = useRef(false);
+  const publishPaused = useRef(false);
+  const lastServerSnapshot = useRef<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [draftSaveError, setDraftSaveError] = useState(false);
   const [draftSaveConflict, setDraftSaveConflict] = useState(false);
@@ -127,6 +125,7 @@ export function useDraftAutosave(fields: DraftFields) {
   const draftUpdatedAtRef = useRef<string | null>(null);
   const draftConflictRef = useRef(false);
   const draftRestorePending = useRef(false);
+  const restoringDraft = useRef(false);
   // Set by clearDraftStorage({ stopAutosave: true }) on publish: the wizard
   // stays mounted (the success dialog renders on top of it) with the form
   // still populated, so the 30s interval and the visibilitychange handler
@@ -156,7 +155,11 @@ export function useDraftAutosave(fields: DraftFields) {
   // Load draft from localStorage on mount
   useEffect(() => {
     try {
-      migrateLegacyDraftKeys();
+      if (ownerId && fields.resumeGuest && !readItem(DRAFT_KEY)) {
+        const guestKey = draftStorageKey("sell", null);
+        const guest = readItem(guestKey);
+        if (guest && writeItem(DRAFT_KEY, guest)) guestTransfer.current = true;
+      }
       const savedId = readItem(DRAFT_ID_KEY);
       draftUpdatedAtRef.current = readItem(DRAFT_UPDATED_AT_KEY);
       if (savedId) {
@@ -188,16 +191,29 @@ export function useDraftAutosave(fields: DraftFields) {
     } finally {
       setDraftChecked(true);
     }
-  }, []);
+  }, [DRAFT_ID_KEY, DRAFT_KEY, DRAFT_UPDATED_AT_KEY, fields.resumeGuest, ownerId]);
 
   useEffect(() => {
     let cancelled = false;
-    void loadDraftImages()
+    const loadImages = async () => {
+      const stored = await loadDraftImages(DRAFT_KEY);
+      if (stored.length || !guestTransfer.current) return stored;
+      const guestKey = draftStorageKey("sell", null);
+      const guestImages = await loadDraftImages(guestKey);
+      if (guestImages.length) {
+        await saveDraftImages(guestImages, DRAFT_KEY);
+        await clearDraftImages(guestKey);
+      }
+      removeItems(guestKey);
+      return guestImages;
+    };
+    void loadImages()
       .then((stored) => {
         if (cancelled) return;
         restorableImages.current = stored;
         imageStoreReady.current = true;
-        if (latestImages.current.length > 0) return saveDraftImages(latestImages.current);
+        if (latestImages.current.length > 0)
+          return saveDraftImages(latestImages.current, DRAFT_KEY);
       })
       .catch(() => {
         imageStoreReady.current = true;
@@ -205,7 +221,7 @@ export function useDraftAutosave(fields: DraftFields) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [DRAFT_KEY]);
 
   // Scalar/JSON fields live in localStorage. Binary image drafts are stored
   // separately in IndexedDB below.
@@ -265,24 +281,26 @@ export function useDraftAutosave(fields: DraftFields) {
   useEffect(() => {
     if (draftRestorePending.current) return;
     const t = window.setTimeout(() => {
-      if (draftSavingStopped.current) return;
+      if (draftSavingStopped.current || !isCurrent()) return;
       if (writeItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()))) setLastSaved(new Date());
     }, 2000);
     return () => window.clearTimeout(t);
-  }, [buildLocalDraft, hasDraftData]);
+  }, [buildLocalDraft, hasDraftData, DRAFT_KEY, isCurrent]);
 
   useEffect(() => {
     if (!imageStoreReady.current) return;
     const timeout = window.setTimeout(() => {
-      void saveDraftImages(images).catch(() => setDraftSaveError(true));
+      if (!isCurrent() || draftSavingStopped.current) return;
+      void saveDraftImages(images, DRAFT_KEY).catch(() => setDraftSaveError(true));
     }, 750);
     return () => window.clearTimeout(timeout);
-  }, [images]);
+  }, [images, DRAFT_KEY, isCurrent]);
 
   /** Writes the draft locally *now* — no debounce, no server call. Used when
    * a signed-out guest is sent to /auth to publish: the draft has to survive
    * the redirect, and the server would reject an unauthenticated save. */
   async function flushLocalDraft(): Promise<boolean> {
+    if (!isCurrent()) return false;
     if (writeItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()))) {
       setLastSaved(new Date());
     } else {
@@ -290,7 +308,7 @@ export function useDraftAutosave(fields: DraftFields) {
       return false;
     }
     try {
-      await saveDraftImages(latestImages.current);
+      await saveDraftImages(latestImages.current, DRAFT_KEY);
       setDraftSaveError(false);
       return true;
     } catch {
@@ -299,10 +317,11 @@ export function useDraftAutosave(fields: DraftFields) {
     }
   }
   async function saveDraftToSupabase(): Promise<string | null> {
-    if (!authenticated) return null;
+    if (!authenticated || !ownerId || !isCurrent() || publishPaused.current) return null;
     if (draftSavingStopped.current) return null;
     if (draftConflictRef.current) return null;
     if (draftRestorePending.current) return null;
+    draftSaveMessageRef.current = null;
     const saveRevision = localDraftRevision.current;
     if (writeItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()))) {
       setLastSaved(new Date());
@@ -319,11 +338,15 @@ export function useDraftAutosave(fields: DraftFields) {
     // this fallback a vehicle draft could not be saved before that step.
     const effectiveTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
     if (effectiveTitle.length < 5) return null;
+    const snapshot = JSON.stringify({ ...buildLocalDraft(), saved_at: 0 });
+    if (currentDraftId && snapshot === lastServerSnapshot.current) return currentDraftId;
     const generation = saveGeneration.current;
     const save = (async () => {
       try {
         const result = await saveDraftListing({
           data: {
+            expected_user_id: ownerId,
+            expected_organization_id: ownerOrganizationId,
             ...(currentDraftId ? { id: currentDraftId } : {}),
             ...(currentDraftId && draftUpdatedAtRef.current
               ? { expected_updated_at: draftUpdatedAtRef.current }
@@ -352,7 +375,7 @@ export function useDraftAutosave(fields: DraftFields) {
             attributes,
           },
         });
-        if (saveGeneration.current !== generation) return null;
+        if (saveGeneration.current !== generation || !isCurrent()) return null;
         if ("conflict" in result) {
           draftConflictRef.current = true;
           draftUpdatedAtRef.current = result.updated_at;
@@ -361,6 +384,8 @@ export function useDraftAutosave(fields: DraftFields) {
           setDraftSaveConflict(true);
           return null;
         }
+        lastServerSnapshot.current = snapshot;
+        setDraftSaveMessage(null);
         draftIdRef.current = result.id;
         if (result.updated_at) {
           draftUpdatedAtRef.current = result.updated_at;
@@ -374,14 +399,20 @@ export function useDraftAutosave(fields: DraftFields) {
           writeItem(DRAFT_UPDATED_AT_KEY, result.updated_at);
         }
         return result.id;
-      } catch {
-        if (saveGeneration.current === generation) {
+      } catch (error) {
+        if (saveGeneration.current === generation && isCurrent()) {
+          draftSaveMessageRef.current = formatErrorMessage(
+            error,
+            "Utkastet kunne ikke lagres. Innholdet er beholdt lokalt. Prøv igjen senere.",
+          );
+          setDraftSaveMessage(draftSaveMessageRef.current);
           setDraftSaveError(true);
           setDraftSaveConflict(false);
         }
         return null;
       } finally {
         if (
+          isCurrent() &&
           !draftSavingStopped.current &&
           localDraftRevision.current > saveRevision &&
           latestLocalDraft.current
@@ -450,14 +481,14 @@ export function useDraftAutosave(fields: DraftFields) {
   // pagehide firing in that gap would see the ref already cleared but the
   // stale `hasDraftData` state still non-null, and wrongly stay blocked.
   const flushLocalDraftSync = useCallback(() => {
-    if (draftSavingStopped.current || draftRestorePending.current) return;
+    if (!isCurrent() || draftSavingStopped.current || draftRestorePending.current) return;
     if (!latestLocalDraft.current) return;
     if (writeItem(DRAFT_KEY, JSON.stringify(latestLocalDraft.current))) {
       setLastSaved(new Date());
     } else {
       setDraftSaveError(true);
     }
-  }, []);
+  }, [DRAFT_KEY, isCurrent]);
 
   // Save draft when the tab is hidden (switch away, close, or reload) and on
   // pagehide — the reliable unload signal on mobile/iOS Safari, where
@@ -477,7 +508,8 @@ export function useDraftAutosave(fields: DraftFields) {
   }, [flushLocalDraftSync]);
 
   async function restoreDraft(target: RestoreTarget) {
-    if (!hasDraftData) return;
+    if (!isCurrent() || !hasDraftData) return;
+    restoringDraft.current = true;
     const { setValue, setSelectedParentId, setLocationMethod, setAttributes, setCoords } = target;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
     if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
@@ -516,12 +548,16 @@ export function useDraftAutosave(fields: DraftFields) {
       setAttributes(hasDraftData.attributes as AttributeMap);
     if (typeof hasDraftData.known_issues === "string")
       setValue("known_issues", hasDraftData.known_issues);
+    if (typeof hasDraftData.no_known_issues === "boolean")
+      setValue("no_known_issues", hasDraftData.no_known_issues);
     if (typeof hasDraftData.maintenance_history === "string")
       setValue("maintenance_history", hasDraftData.maintenance_history);
     const restoredImages = restorableImages.current.length
       ? restorableImages.current
-      : await loadDraftImages().catch(() => []);
+      : await loadDraftImages(DRAFT_KEY).catch(() => []);
+    if (!isCurrent()) return;
     if (restoredImages.length > 0) setImages(restoredImages);
+    restoringDraft.current = false;
     draftRestorePending.current = false;
     setHasDraftData(null);
     showSuccessToast(
@@ -535,6 +571,9 @@ export function useDraftAutosave(fields: DraftFields) {
    * Left false for "start over" flows, where the same mounted wizard keeps
    * autosaving a fresh draft right afterwards. */
   function clearDraftStorage({ stopAutosave = false }: { stopAutosave?: boolean } = {}) {
+    if (!isCurrent()) return;
+    publishPaused.current = false;
+    lastServerSnapshot.current = null;
     draftSavingStopped.current = stopAutosave;
     saveGeneration.current += 1;
     latestLocalDraft.current = null;
@@ -547,7 +586,7 @@ export function useDraftAutosave(fields: DraftFields) {
     draftIdRef.current = null;
     setHasDraftData(null);
     setDraftId(null);
-    void clearDraftImages();
+    void clearDraftImages(DRAFT_KEY);
   }
 
   /** Stops offering the recoverable draft without discarding or restoring
@@ -556,6 +595,8 @@ export function useDraftAutosave(fields: DraftFields) {
    * writes a *new* draft instead of silently overwriting the declined one
    * with whatever the user types next (see "ikke overskriver..." tests). */
   function dismissDraftOffer() {
+    // Restoring fields can make the form dirty before IndexedDB has finished.
+    if (restoringDraft.current) return;
     draftRestorePending.current = false;
     draftConflictRef.current = false;
     draftIdRef.current = null;
@@ -567,6 +608,7 @@ export function useDraftAutosave(fields: DraftFields) {
   }
 
   async function discardDraft() {
+    if (!isCurrent()) return;
     const id = draftIdRef.current ?? readItem(DRAFT_ID_KEY);
     clearDraftStorage();
     if (!authenticated || !id) return;
@@ -579,7 +621,30 @@ export function useDraftAutosave(fields: DraftFields) {
     }
   }
 
+  async function preparePublish() {
+    if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+    // Finish the existing write before pausing; never publish with a stale render's draftId.
+    if (draftSaveInProgress.current) await draftSaveInProgress.current;
+    const id = await saveDraftToSupabase();
+    if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+    if (!id)
+      throw new Error(
+        draftSaveMessageRef.current ?? "Utkastet må lagres før publisering. Prøv igjen.",
+      );
+    publishPaused.current = true;
+    return id;
+  }
+
   return {
+    actorChanged,
+    ownerId,
+    ownerOrganizationId,
+    isCurrent,
+    preparePublish,
+    resumeAutosave: () => {
+      publishPaused.current = false;
+    },
+    draftSaveMessage,
     draftId,
     draftChecked,
     lastSaved,

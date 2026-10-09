@@ -41,6 +41,7 @@ import {
   listWtbListings,
   matchWtbListingsForListing,
   saveWtbDraft,
+  updateWtbListing,
 } from "./wtb-listings.functions";
 
 const wtbInput = { title: "Ønsker meg en bil" };
@@ -129,5 +130,28 @@ describe("offentlige WTB-lesninger", () => {
     await matchWtbListingsForListing({ data: { title: "Sykkel" } });
 
     expect(assertNotRateLimited).toHaveBeenCalledWith("match-wtb-for-listing", 60, 300);
+  });
+});
+
+describe("gjenåpning av kjøpsønske", () => {
+  it("krever samme eier og oppfylt status, og fornyer utløpet", async () => {
+    const chain = {
+      update: vi.fn(),
+      eq: vi.fn(),
+      select: vi.fn(),
+      single: vi.fn().mockResolvedValue({ data: { id: "wtb-id" }, error: null }),
+    };
+    chain.update.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.select.mockReturnValue(chain);
+    from.mockReturnValue(chain);
+    await updateWtbListing({
+      data: { id: "00000000-0000-0000-0000-000000000001", status: "active" },
+    });
+    expect(chain.eq).toHaveBeenCalledWith("user_id", "user-id");
+    expect(chain.eq).toHaveBeenCalledWith("status", "fulfilled");
+    const update = chain.update.mock.calls[0][0];
+    expect(update.status).toBe("active");
+    expect(new Date(update.expires_at).getTime()).toBeGreaterThan(Date.now() + 29 * 864e5);
   });
 });

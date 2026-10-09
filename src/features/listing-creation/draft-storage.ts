@@ -38,3 +38,13 @@ export function removeItems(...keys: string[]): void {
     }
   }
 }
+
+/** Unscoped legacy drafts have no provable owner and are deliberately left untouched. */
+export function draftStorageKey(
+  kind: "sell" | "want",
+  userId: string | null,
+  suffix = "",
+  organizationId: string | null = null,
+) {
+  return `kaupet_draft_${kind}_listing${suffix}:${userId ?? "guest"}:${organizationId ?? "private"}`;
+}

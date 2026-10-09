@@ -129,6 +129,7 @@ export function BulkListingImport({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [results, setResults] = useState<BulkImportResult[] | null>(null);
   const [mode, setMode] = useState<ImportMode>("upsert");
+  const previewSelection = useRef({ mode, locationId });
   const [preview, setPreview] = useState<BulkImportResult[] | null>(null);
   const createImport = useMutation({
     mutationFn: (variables: {
@@ -259,7 +260,13 @@ export function BulkListingImport({
       setParsed(next);
       const nextImportId = crypto.randomUUID();
       setImportId(nextImportId);
-      if (next.errors.length === 0) runPreview(next.rows, mode, nextImportId);
+      if (next.errors.length === 0)
+        runPreview(
+          next.rows,
+          previewSelection.current.mode,
+          nextImportId,
+          previewSelection.current.locationId,
+        );
     } catch (error) {
       if (generation === fileGeneration.current)
         setFileError(formatErrorMessage(error, "Filen kunne ikke leses."));
@@ -267,6 +274,7 @@ export function BulkListingImport({
   };
 
   const changeMode = (nextMode: ImportMode) => {
+    previewSelection.current.mode = nextMode;
     setMode(nextMode);
     if (parsed && parsed.errors.length === 0) runPreview(parsed.rows, nextMode);
   };
@@ -399,6 +407,7 @@ export function BulkListingImport({
                   <Select
                     value={locationId}
                     onValueChange={(next) => {
+                      previewSelection.current.locationId = next;
                       setLocationId(next);
                       if (parsed && parsed.errors.length === 0)
                         runPreview(parsed.rows, mode, undefined, next);

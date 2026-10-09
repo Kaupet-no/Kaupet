@@ -112,6 +112,7 @@ export function useDraftAutosave(fields: DraftFields) {
   const guestTransfer = useRef(false);
   const publishPaused = useRef(false);
   const lastServerSnapshot = useRef<string | null>(null);
+  const publishedListing = useRef<{ id: string; kaupet_code: string } | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [draftSaveError, setDraftSaveError] = useState(false);
   const [draftSaveConflict, setDraftSaveConflict] = useState(false);
@@ -319,7 +320,7 @@ export function useDraftAutosave(fields: DraftFields) {
       return false;
     }
   }
-  async function saveDraftToSupabase(): Promise<string | null> {
+  async function saveDraftToSupabase({ force = false } = {}): Promise<string | null> {
     if (!authenticated || !ownerId || !isCurrent() || publishPaused.current) return null;
     if (draftSavingStopped.current) return null;
     if (draftConflictRef.current) return null;
@@ -342,7 +343,8 @@ export function useDraftAutosave(fields: DraftFields) {
     const effectiveTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
     if (effectiveTitle.length < 5) return null;
     const snapshot = JSON.stringify({ ...buildLocalDraft(), saved_at: 0 });
-    if (currentDraftId && snapshot === lastServerSnapshot.current) return currentDraftId;
+    if (!force && currentDraftId && snapshot === lastServerSnapshot.current) return currentDraftId;
+    publishedListing.current = null;
     const generation = saveGeneration.current;
     const save = (async () => {
       try {
@@ -387,7 +389,6 @@ export function useDraftAutosave(fields: DraftFields) {
           setDraftSaveConflict(true);
           return null;
         }
-        lastServerSnapshot.current = snapshot;
         setDraftSaveMessage(null);
         draftIdRef.current = result.id;
         if (result.updated_at) {
@@ -397,12 +398,14 @@ export function useDraftAutosave(fields: DraftFields) {
         draftConflictRef.current = false;
         if ("published" in result && result.published) {
           // A lost publish response: the listing is live, so these edits were not saved.
-          setDraftSaveMessage(
-            "Annonsen er allerede publisert. Endringer her lagres ikke – rediger den publiserte annonsen.",
-          );
+          publishedListing.current = { id: result.id, kaupet_code: result.kaupet_code };
+          draftSaveMessageRef.current =
+            "Annonsen er allerede publisert. Endringer her lagres ikke – rediger den publiserte annonsen.";
+          setDraftSaveMessage(draftSaveMessageRef.current);
           setDraftSaveError(true);
-          return result.id;
+          return null;
         }
+        lastServerSnapshot.current = snapshot;
         setLastSaved(new Date());
         setDraftSaveError(false);
         setDraftSaveConflict(false);
@@ -585,6 +588,7 @@ export function useDraftAutosave(fields: DraftFields) {
     if (!isCurrent()) return;
     publishPaused.current = false;
     lastServerSnapshot.current = null;
+    publishedListing.current = null;
     draftSavingStopped.current = stopAutosave;
     saveGeneration.current += 1;
     latestLocalDraft.current = null;
@@ -636,14 +640,18 @@ export function useDraftAutosave(fields: DraftFields) {
     if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
     // Finish the existing write before pausing; never publish with a stale render's draftId.
     if (draftSaveInProgress.current) await draftSaveInProgress.current;
-    const id = await saveDraftToSupabase();
+    const id = await saveDraftToSupabase({ force: true });
     if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+    if (publishedListing.current) {
+      publishPaused.current = true;
+      return { ...publishedListing.current, published: true as const };
+    }
     if (!id)
       throw new Error(
         draftSaveMessageRef.current ?? "Utkastet må lagres før publisering. Prøv igjen.",
       );
     publishPaused.current = true;
-    return id;
+    return { id, published: false as const };
   }
 
   return {

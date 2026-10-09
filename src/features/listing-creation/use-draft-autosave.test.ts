@@ -133,7 +133,10 @@ describe("useDraftAutosave", () => {
       useDraftAutosave({ ...baseFields, title: "Sykkel til salgs" }),
     );
     await act(async () => {
-      expect(await result.current.preparePublish()).toBe("draft-publish");
+      expect(await result.current.preparePublish()).toEqual({
+        id: "draft-publish",
+        published: false,
+      });
       expect(await result.current.saveDraftToSupabase()).toBeNull();
     });
     expect(saveDraftListingMock).toHaveBeenCalledTimes(1);
@@ -181,7 +184,10 @@ describe("useDraftAutosave", () => {
       await restore;
     });
     await act(async () => {
-      expect(await result.current.draft.preparePublish()).toBe("existing-draft");
+      expect(await result.current.draft.preparePublish()).toEqual({
+        id: "existing-draft",
+        published: false,
+      });
     });
     expect(saveDraftListingMock.mock.calls[0][0].data).toMatchObject({
       id: "existing-draft",
@@ -226,9 +232,35 @@ describe("useDraftAutosave", () => {
     await act(async () => {
       id = await result.current.saveDraftToSupabase();
     });
-    expect(id).toBe("draft-1");
+    expect(id).toBeNull();
     expect(result.current.draftSaveError).toBe(true);
     expect(result.current.draftSaveMessage).toContain("allerede publisert");
+  });
+
+  it("kontrollerer publisert status før retry selv når feltene er uendret", async () => {
+    saveDraftListingMock.mockResolvedValueOnce({
+      id: "draft-1",
+      updated_at: "2026-10-09T10:00:00Z",
+    });
+    const { result } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "Sykkel til salgs" }),
+    );
+    await act(async () => {
+      await result.current.saveDraftToSupabase();
+    });
+    saveDraftListingMock.mockResolvedValue({
+      id: "draft-1",
+      kaupet_code: "ABC123",
+      published: true,
+    });
+    await act(async () => {
+      expect(await result.current.preparePublish()).toEqual({
+        id: "draft-1",
+        kaupet_code: "ABC123",
+        published: true,
+      });
+    });
+    expect(saveDraftListingMock).toHaveBeenCalledTimes(2);
   });
 
   it("loads a recent draft from localStorage on mount and exposes it as hasDraftData", () => {

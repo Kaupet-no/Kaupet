@@ -16,7 +16,11 @@ const {
   deleteImages,
   updateImage,
   deleteStoredImage,
+  preparePublish,
+  deleteImageRows,
 } = vi.hoisted(() => ({
+  deleteImageRows: vi.fn(),
+  preparePublish: vi.fn(),
   createListing: vi.fn(),
   getUser: vi.fn(),
   showErrorToast: vi.fn(),
@@ -36,13 +40,16 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       upsert: upsertImages,
       select: () => ({ eq: listImages }),
-      delete: () => ({
-        eq: () =>
-          Object.assign(Promise.resolve({ error: null }), {
-            in: deleteImages,
-            select: async () => ({ data: [], error: null }),
-          }),
-      }),
+      delete: () => {
+        deleteImageRows();
+        return {
+          eq: () =>
+            Object.assign(Promise.resolve({ error: null }), {
+              in: deleteImages,
+              select: async () => ({ data: [], error: null }),
+            }),
+        };
+      },
       update: (fields: unknown) => ({
         eq: (_column: string, id: string) => updateImage(fields, id),
       }),
@@ -92,7 +99,7 @@ function setup(images: import("@/components/image-uploader").PendingImage[] = []
           ownerId: "u1",
           ownerOrganizationId: null,
           isCurrent: () => true,
-          preparePublish: async () => "draft-1",
+          preparePublish,
           resumeAutosave: vi.fn(),
           clearDraftStorage,
           fieldGroupKeys: ["title"],
@@ -110,6 +117,7 @@ function setup(images: import("@/components/image-uploader").PendingImage[] = []
 describe("usePublishListing", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    preparePublish.mockResolvedValue({ id: "draft-1", published: false });
     uploadImage.mockImplementation(async ({ file }) => `draft-1/${file.name}`);
     uploadThumb.mockResolvedValue(undefined);
     upsertImages.mockResolvedValue({ error: null });
@@ -213,6 +221,57 @@ describe("usePublishListing", () => {
       expect(result.current.state.publishedId).toBe("draft-1");
     },
   );
+  it.each([false, true])(
+    "stopper bildeendringer etter tapt publiseringssvar (nye bilder: %s)",
+    async (replaceImage) => {
+      const images = [
+        {
+          id: "a",
+          file: new File(["a"], "a.jpg"),
+          thumbFile: new File(["a"], "a-thumb.jpg"),
+          previewUrl: "",
+        },
+      ];
+      createListing
+        .mockRejectedValueOnce(new Error("Publiseringssvaret gikk tapt"))
+        .mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
+      const { result, rerender } = setup(images);
+      act(() => result.current.publishOnce(values));
+      await waitFor(() => expect(result.current.mutation.isError).toBe(true));
+      const uploads = uploadImage.mock.calls.length;
+      const reads = listImages.mock.calls.length;
+      const inserts = upsertImages.mock.calls.length;
+      images.splice(0, 1);
+      if (replaceImage)
+        images.push({
+          id: "b",
+          file: new File(["b"], "b.jpg"),
+          thumbFile: new File(["b"], "b-thumb.jpg"),
+          previewUrl: "",
+        });
+      rerender();
+      preparePublish.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123", published: true });
+      act(() =>
+        result.current.publishOnce({
+          ...values,
+          title: "Endret etter publisering",
+          price_nok: 2000,
+        }),
+      );
+      await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+      expect(uploadImage).toHaveBeenCalledTimes(uploads);
+      expect(listImages).toHaveBeenCalledTimes(reads);
+      expect(upsertImages).toHaveBeenCalledTimes(inserts);
+      expect(deleteImageRows).not.toHaveBeenCalled();
+      expect(deleteImages).not.toHaveBeenCalled();
+      expect(deleteStoredImage).not.toHaveBeenCalled();
+      expect(updateImage).not.toHaveBeenCalled();
+      expect(createListing).toHaveBeenCalledTimes(1);
+      expect(result.current.state.publishedCode).toBe("ABC123");
+      expect(showErrorToast).toHaveBeenLastCalledWith(expect.stringContaining("ikke lagret"));
+    },
+  );
+
   it("fullfører nytt forsøk med 100 allerede tilknyttede bilder", async () => {
     const rows = new Map<string, { id: string }>();
     listImages.mockImplementation(async () => ({ data: [...rows.values()], error: null }));

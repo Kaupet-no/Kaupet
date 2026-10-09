@@ -15,6 +15,7 @@ import type { AttributeMap } from "@/components/attribute-fields";
 import type { CategoryBehavior } from "@/lib/category-behavior";
 
 import type { ListingFormShape } from "./field-groups/types";
+import type { useDraftAutosave } from "./use-draft-autosave";
 
 /**
  * Publiseringstilstanden til annonseveiviseren. Delt fra
@@ -85,7 +86,7 @@ export function usePublishListing({
   draftId: string | null | undefined;
   ownerId: string | null;
   ownerOrganizationId: string | null;
-  preparePublish: () => Promise<string>;
+  preparePublish: ReturnType<typeof useDraftAutosave>["preparePublish"];
   resumeAutosave: () => void;
   isCurrent: () => boolean;
   clearDraftStorage: (options?: { stopAutosave?: boolean }) => void;
@@ -123,7 +124,14 @@ export function usePublishListing({
 
       if (!isCurrent() || userData.user.id !== ownerId)
         throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
-      const ensuredDraftId = await preparePublish();
+      const prepared = await preparePublish();
+      if (prepared.published) {
+        showErrorToast(
+          "Annonsen er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger den publiserte annonsen.",
+        );
+        return { id: prepared.id, kaupet_code: prepared.kaupet_code };
+      }
+      const ensuredDraftId = prepared.id;
 
       const finalCoords =
         coords ??

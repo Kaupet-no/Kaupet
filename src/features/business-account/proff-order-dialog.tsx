@@ -76,6 +76,8 @@ export function ProffOrderDialog({
             {startsTrial
               ? `Proff er gratis de første 30 dagene. Deretter fortsetter det som ${PROFF_TERMS[term].months === 12 ? "årlig" : "månedlig"} abonnement (${formatProffTermPrice(term)}). Første faktura sendes før prøveperioden utløper, med forfall når den utløper. Betales den ikke, opphører Proff når prøveperioden er over.`
               : `${formatProffTermPrice(term)}. Fakturaen sendes på e-post eller EHF, og Proff aktiveres når betalingen er registrert.`}
+            {startsTrial &&
+              " Prøveperioden starter med en gang, også hvis bedriften fortsatt venter på godkjenning for å publisere annonser."}
           </DialogDescription>
         </DialogHeader>
 

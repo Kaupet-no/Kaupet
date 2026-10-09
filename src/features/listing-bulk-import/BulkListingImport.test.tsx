@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 beforeEach(() => {
@@ -27,11 +27,14 @@ afterEach(cleanup);
 vi.mock("@tanstack/react-query", () => ({
   useMutation: (options: {
     mutationFn: (variables: unknown) => unknown;
-    onSuccess?: (data: unknown) => void;
-    onError?: (error: Error) => void;
+    onSuccess?: (data: unknown, variables: unknown) => void;
+    onError?: (error: Error, variables: unknown) => void;
   }) => {
     const mutate = vi.fn((variables: unknown) => {
-      Promise.resolve(options.mutationFn(variables)).then(options.onSuccess, options.onError);
+      Promise.resolve(options.mutationFn(variables)).then(
+        (data) => options.onSuccess?.(data, variables),
+        (error) => options.onError?.(error, variables),
+      );
     });
     return { isPending: false, mutate, reset: vi.fn() };
   },
@@ -159,6 +162,7 @@ vi.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 import { BulkListingImport } from "./BulkListingImport";
+import { parseImportFile } from "./parse-import-file";
 
 const location = {
   id: "33333333-3333-4333-8333-333333333333",
@@ -178,6 +182,111 @@ async function uploadFile() {
 describe("BulkListingImport", () => {
   beforeEach(() => {
     createListingsFromImportMock.mockClear();
+  });
+
+  it("ignorerer gammel forhåndsvalidering etter filbytte", async () => {
+    let resolveOld!: (
+      value: Array<{ rowNumber: number; externalId: string; status: string }>,
+    ) => void;
+    createListingsFromImportMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    fireEvent.change(screen.getByLabelText("Velg importfil"), {
+      target: { files: [new File(["data"], "gammel.csv")] },
+    });
+    await screen.findByText("2 rader lest · venter på validering");
+    vi.mocked(parseImportFile).mockResolvedValueOnce({
+      fileName: "ny.csv",
+      rows: [],
+      errors: [{ rowNumber: 2, field: "title", message: "Ny fil er ugyldig" }],
+    });
+    fireEvent.change(screen.getByLabelText("Velg importfil"), {
+      target: { files: [new File(["data"], "ny.csv")] },
+    });
+    await screen.findByText("Ny fil er ugyldig");
+    await act(async () => {
+      resolveOld([{ rowNumber: 2, externalId: "id-1", status: "created" }]);
+    });
+    expect(screen.getByText("0 gyldige · 1 ugyldige")).toBeTruthy();
+    expect(screen.queryByText("Validering fullført")).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Start import" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("forklarer delimport når serveren avviser bare én rad", async () => {
+    createListingsFromImportMock.mockImplementationOnce(() =>
+      Promise.resolve([
+        { rowNumber: 2, externalId: "id-1", status: "created" },
+        { rowNumber: 3, externalId: "id-2", status: "failed", message: "Oppgi tilstand" },
+      ]),
+    );
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    fireEvent.change(screen.getByLabelText("Velg importfil"), {
+      target: { files: [new File(["data"], "blandet.csv")] },
+    });
+    await screen.findByText("1 gyldige · 1 ugyldige");
+    expect(
+      (screen.getByRole("button", { name: "Importer 1 rader uten feil" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Importer 1 rader uten feil" }));
+    expect(screen.getAllByText(/1 feiler/).length).toBeGreaterThan(0);
+  });
+
+  it("lar uendrede annonser importeres på nytt for å fornye dem", async () => {
+    createListingsFromImportMock.mockImplementationOnce(() =>
+      Promise.resolve([
+        { rowNumber: 2, externalId: "id-1", status: "unchanged" },
+        { rowNumber: 3, externalId: "id-2", status: "unchanged" },
+      ]),
+    );
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    await uploadFile();
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Start import" }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+  });
+
+  it("teller parserfeil uten å vente på en servervalidering som ikke kjøres", async () => {
+    vi.mocked(parseImportFile).mockResolvedValueOnce({
+      fileName: "feil.csv",
+      rows: [],
+      errors: [{ rowNumber: 2, field: "title", message: "Tittelen må ha minst 5 tegn." }],
+    });
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    fireEvent.change(screen.getByLabelText("Velg importfil"), {
+      target: { files: [new File(["data"], "feil.csv")] },
+    });
+    await screen.findByText("0 gyldige · 1 ugyldige");
+    expect(screen.queryByText(/venter på validering/)).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Start import" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("DEF-IMPORT-01: feil i alle servervaliderte rader blokkerer import", async () => {
+    createListingsFromImportMock.mockImplementationOnce(() =>
+      Promise.resolve([
+        { rowNumber: 2, externalId: "id-1", status: "failed", message: "Oppgi tilstand" },
+        { rowNumber: 3, externalId: "id-2", status: "failed", message: "Oppgi tilstand" },
+      ]),
+    );
+    render(<BulkListingImport open onOpenChange={vi.fn()} locations={[location]} />);
+    fireEvent.change(screen.getByLabelText("Velg importfil"), {
+      target: { files: [new File(["data"], "annonser.csv")] },
+    });
+    await screen.findByText("0 gyldige · 2 ugyldige");
+    expect(
+      (screen.getByRole("button", { name: "Ingen rader kan importeres" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 
   it("kjører dry-run automatisk etter en gyldig fil og viser statusetiketter per rad", async () => {

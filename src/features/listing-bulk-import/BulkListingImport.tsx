@@ -1,3 +1,4 @@
+import { BusinessApprovalNotice } from "@/features/business-account/business-approval-notice";
 import { formatNokNumber } from "@/lib/format";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -91,7 +92,9 @@ export function BulkListingImport({
   locations = [],
   selectedLocationId,
   organizationId,
+  verificationStatus,
 }: {
+  verificationStatus?: "unverified" | "verified";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locations?: Array<{
@@ -117,6 +120,8 @@ export function BulkListingImport({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null);
+  const previewGeneration = useRef(0);
+  const fileGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedBulkImport | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -142,30 +147,39 @@ export function BulkListingImport({
       rows: ParsedBulkImport["rows"];
       locationId: string;
       mode: ImportMode;
-    }) => createListingsFromImport({ data: { ...variables, dryRun: true } }),
-    onSuccess: setPreview,
-    onError: (error: Error) =>
+      generation: number;
+    }) => {
+      const { generation: _generation, ...data } = variables;
+      return createListingsFromImport({ data: { ...data, dryRun: true } });
+    },
+    onSuccess: (result, variables) => {
+      if (variables.generation === previewGeneration.current) setPreview(result);
+    },
+    onError: (error: Error, variables) => {
+      if (variables.generation !== previewGeneration.current) return;
+      setPreview(null);
       showErrorToast(
         formatErrorMessage(error, "Kunne ikke sjekke radene mot eksisterende annonser."),
-      ),
+      );
+    },
   });
-  /** Kjører dry-run mot tjenesten for gjeldende rader og modus. Kalles etter
-   * en gyldig fil er lest inn, og på nytt hver gang modus endres. Tar
-   * `explicitImportId` fordi den kalles rett etter en fil er lest inn, før
-   * `importId`-state-oppdateringen fra samme hendelse har rukket å committe. */
   const runPreview = (
     rows: ParsedBulkImport["rows"],
     nextMode: ImportMode,
     explicitImportId?: string,
+    nextLocationId = locationId,
   ) => {
-    const usedImportId = explicitImportId ?? importId;
-    if (!usedImportId || !locationId || rows.length === 0) return;
+    const generation = ++previewGeneration.current;
     setPreview(null);
+    setConfirmOpen(false);
+    const usedImportId = explicitImportId ?? importId;
+    if (!usedImportId || !nextLocationId || rows.length === 0) return;
     previewImport.mutate({
       importId: usedImportId,
       rows,
-      locationId,
+      locationId: nextLocationId,
       mode: nextMode,
+      generation,
     });
   };
   // Malbyggeren drar med seg logo-PNG-en og OOXML-skriveren, som ingen
@@ -217,6 +231,8 @@ export function BulkListingImport({
 
   const invalidRowNumbers = new Set(parsed?.errors.map((error) => error.rowNumber) ?? []);
   const reset = () => {
+    previewGeneration.current += 1;
+    fileGeneration.current += 1;
     setParsed(null);
     setFileError(null);
     setImportId(null);
@@ -230,18 +246,23 @@ export function BulkListingImport({
 
   const selectFile = async (file: File | undefined) => {
     if (!file) return;
+    const generation = ++fileGeneration.current;
+    previewGeneration.current += 1;
+    setConfirmOpen(false);
     setFileError(null);
     setParsed(null);
     setResults(null);
     setPreview(null);
     try {
       const next = await parseImportFile(file, attributeMetaFromFilters(filters));
+      if (generation !== fileGeneration.current) return;
       setParsed(next);
       const nextImportId = crypto.randomUUID();
       setImportId(nextImportId);
       if (next.errors.length === 0) runPreview(next.rows, mode, nextImportId);
     } catch (error) {
-      setFileError(formatErrorMessage(error, "Filen kunne ikke leses."));
+      if (generation === fileGeneration.current)
+        setFileError(formatErrorMessage(error, "Filen kunne ikke leses."));
     }
   };
 
@@ -259,6 +280,14 @@ export function BulkListingImport({
     duplicate: preview?.filter((result) => result.status === "duplicate").length ?? 0,
     failed: preview?.filter((result) => result.status === "failed").length ?? 0,
   };
+  const processableCount = previewCounts.created + previewCounts.updated + previewCounts.unchanged;
+  const previewReady = preview !== null && !previewImport.isPending;
+  const validCount = previewReady ? (parsed?.rows.length ?? 0) - previewCounts.failed : 0;
+  const canImport =
+    verificationStatus !== "unverified" &&
+    previewReady &&
+    processableCount > 0 &&
+    parsed?.errors.length === 0;
   const previewSummaryParts = [
     previewCounts.created > 0 && `${previewCounts.created} nye`,
     previewCounts.updated > 0 && `${previewCounts.updated} oppdateres`,
@@ -367,7 +396,14 @@ export function BulkListingImport({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="bulk-location">Lokasjon for annonsene</Label>
-                  <Select value={locationId} onValueChange={setLocationId}>
+                  <Select
+                    value={locationId}
+                    onValueChange={(next) => {
+                      setLocationId(next);
+                      if (parsed && parsed.errors.length === 0)
+                        runPreview(parsed.rows, mode, undefined, next);
+                    }}
+                  >
                     <SelectTrigger id="bulk-location">
                       <SelectValue placeholder="Velg lokasjon" />
                     </SelectTrigger>
@@ -523,6 +559,7 @@ export function BulkListingImport({
                   />
                 </div>
               </div>
+              <BusinessApprovalNotice status={verificationStatus} />
               {fileError && (
                 <Alert variant="destructive">
                   <XCircle className="size-4" />
@@ -538,13 +575,25 @@ export function BulkListingImport({
                         Forhåndsvisning: {parsed.fileName}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        {parsed.rows.length} gyldige · {invalidRowNumbers.size} ugyldige
+                        {parsed.errors.length > 0
+                          ? `${parsed.rows.length} gyldige · ${invalidRowNumbers.size} ugyldige`
+                          : previewReady
+                            ? `${validCount} gyldige · ${invalidRowNumbers.size + previewCounts.failed} ugyldige`
+                            : `${parsed.rows.length} rader lest · venter på validering`}
                       </p>
                     </div>
-                    <Badge variant={parsed.errors.length === 0 ? "default" : "destructive"}>
-                      {parsed.errors.length === 0
-                        ? "Klar for oppretting"
-                        : "Rett feil i kildefilen"}
+                    <Badge
+                      variant={
+                        previewReady && previewCounts.failed === 0 && parsed.errors.length === 0
+                          ? "default"
+                          : "destructive"
+                      }
+                    >
+                      {parsed.errors.length > 0 || previewCounts.failed > 0
+                        ? "Rett feil i kildefilen"
+                        : previewReady
+                          ? "Validering fullført"
+                          : "Ikke ferdig validert"}
                     </Badge>
                   </div>
                   {parsed.errors.length > 0 && (
@@ -568,6 +617,11 @@ export function BulkListingImport({
                         </TableBody>
                       </Table>
                     </div>
+                  )}
+                  {previewReady && previewCounts.failed > 0 && processableCount > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Rader med feil blir hoppet over. Rett kildefilen for å importere alle radene.
+                    </p>
                   )}
                   {previewImport.isPending && (
                     <div
@@ -642,15 +696,14 @@ export function BulkListingImport({
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      disabled={
-                        parsed.errors.length > 0 ||
-                        parsed.rows.length === 0 ||
-                        pending ||
-                        previewImport.isPending
-                      }
+                      disabled={!canImport || pending || previewImport.isPending}
                       onClick={() => setConfirmOpen(true)}
                     >
-                      Start import
+                      {previewCounts.failed > 0
+                        ? processableCount > 0
+                          ? `Importer ${processableCount} rader uten feil`
+                          : "Ingen rader kan importeres"
+                        : "Start import"}
                     </Button>
                   </div>
                 </section>
@@ -687,7 +740,7 @@ export function BulkListingImport({
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
-                if (importId && parsed && locationId) {
+                if (canImport && importId && parsed && locationId) {
                   setConfirmOpen(false);
                   createImport.mutate({
                     importId,

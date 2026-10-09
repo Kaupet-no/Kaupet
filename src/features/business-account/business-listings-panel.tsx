@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { NewListingDialog } from "@/components/new-listing-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { ListChecks, Plus, Upload } from "lucide-react";
 
@@ -106,6 +106,7 @@ export function BusinessListingsPanel({
       });
     },
   });
+  const [newListingOpen, setNewListingOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft">("all");
   const listings = listingsQuery.data ?? [];
@@ -132,12 +133,17 @@ export function BusinessListingsPanel({
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           {canCreateListings && (
-            <Button asChild className="flex-1 sm:flex-none">
-              <Link to="/ny-annonse">
+            <>
+              <Button className="flex-1 sm:flex-none" onClick={() => setNewListingOpen(true)}>
                 <Plus className="size-4" aria-hidden="true" />
                 Ny annonse
-              </Link>
-            </Button>
+              </Button>
+              <NewListingDialog
+                open={newListingOpen}
+                onOpenChange={setNewListingOpen}
+                defaultIntent="sell"
+              />
+            </>
           )}
           {canCreateListings && hasEffectiveProffAccess(organization) && (
             <Button

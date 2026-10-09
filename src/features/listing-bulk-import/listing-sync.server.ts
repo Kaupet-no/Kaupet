@@ -152,6 +152,15 @@ export async function resolveOrganizationActor(
   );
   if (accessError) throw accessError;
   if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
+  const { data: verified, error: verificationError } = await supabaseAdmin.rpc(
+    "organization_is_verified",
+    { _organization_id: membership.organization_id },
+  );
+  if (verificationError) throw verificationError;
+  if (!verified)
+    throw new Error(
+      "Bedriften venter på godkjenning fra Kaupet. Import blir tilgjengelig når bedriften er godkjent.",
+    );
 
   return {
     organizationId: membership.organization_id,

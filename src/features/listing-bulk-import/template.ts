@@ -46,8 +46,20 @@ const BASE_COLUMNS: BaseColumn[] = [
   { column: "description", label: "Beskrivelse", required: true, width: 48 },
   { column: "price", label: "Pris (kr)", required: true, width: 12 },
   { column: "subtitle", label: "Undertittel", required: false, width: 24 },
-  { column: "condition", label: "Tilstand", required: false, width: 16, list: "Liste_tilstand" },
-  { column: "can_ship", label: "Kan sendes", required: false, width: 12, list: "Liste_janei" },
+  {
+    column: "condition",
+    label: "Tilstand (kategoriavhengig)",
+    required: false,
+    width: 16,
+    list: "Liste_tilstand",
+  },
+  {
+    column: "can_ship",
+    label: "Kan sendes (kategoriavhengig)",
+    required: false,
+    width: 12,
+    list: "Liste_janei",
+  },
   { column: "known_issues", label: "Kjente feil", required: false, width: 28 },
   {
     column: "no_known_issues",
@@ -201,6 +213,10 @@ function coverSheet(selected: BulkImportTemplateCategory | null, pickableCount: 
     ),
     wide(
       `Status settes til Aktiv hvis den står tom (nye annonser). En annonse kan ikke opprettes som Solgt eller Arkivert — den må finnes fra før. Bilde-URL-er skilles med semikolon (;), må starte med https:// og er maks ${MAX_IMPORT_IMAGES} per annonse.`,
+      STYLE.muted,
+    ),
+    wide(
+      "Tilstand og Kan sendes må fylles ut når kategoriens annonseflyt krever dem. Velg verdiene fra nedtrekkslistene. Etter opplasting kontrollerer Kaupet også kategoriens krav; filen er først klar når forhåndsvalideringen er fullført.",
       STYLE.muted,
     ),
     wide(

@@ -15,13 +15,16 @@ function collectBrowserErrors(page: Page) {
       /^Failed to load resource: the server responded with a status of 4\d\d/.test(message.text())
     )
       return;
-    // Firefox reports Turnstile's postMessage after its iframe is removed
+    // Firefox/WebKit report Turnstile's postMessage after its iframe is removed
     // during navigation. Keep this exact external-frame diagnostic as an
     // attachment; application errors and other origin mismatches still fail.
     if (
-      message.text().includes("Failed to execute ‘postMessage’ on ‘DOMWindow’") &&
-      message.text().includes("target origin provided (‘https://challenges.cloudflare.com’)") &&
-      message.text().includes("recipient window’s origin (‘http://localhost:")
+      (message.text().includes("Failed to execute ‘postMessage’ on ‘DOMWindow’") &&
+        message.text().includes("target origin provided (‘https://challenges.cloudflare.com’)") &&
+        message.text().includes("recipient window’s origin (‘http://localhost:")) ||
+      /^Unable to post message to https:\/\/challenges\.cloudflare\.com\. Recipient has origin http:\/\/localhost:\d+\.\s*$/.test(
+        message.text(),
+      )
     ) {
       externalFrameErrors.push(message.text());
       return;

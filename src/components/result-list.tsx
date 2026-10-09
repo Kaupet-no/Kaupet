@@ -21,7 +21,6 @@ import { ListingCardImages } from "@/components/listing-card-images";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { NativeSheet } from "@/components/ui/native-sheet";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DialogClose, DialogTrigger } from "@/components/ui/dialog";
@@ -390,20 +389,26 @@ export function ResultList({
             </>
           )}
           {!isDesktop && !isNative && (
-            <NativeSheet
-              open={mobileMapOpen}
-              onOpenChange={setMobileMapOpen}
-              title="Kart"
-              titleVisible
-              className="grid h-[88vh] grid-rows-[auto_minmax(0,1fr)] p-4"
-              trigger={
+            <FullscreenOverlay open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+              <DialogTrigger asChild>
                 <Button type="button" variant="outline" size="sm" className="gap-1.5">
                   <MapIcon className="size-4" /> Kart
                 </Button>
-              }
-            >
-              <div className="min-h-0">{mobileMapOpen ? renderMap() : null}</div>
-            </NativeSheet>
+              </DialogTrigger>
+              <FullscreenOverlayContent title="Kart over søkeresultater" edgeToEdge>
+                <div className="flex h-full flex-col bg-background">
+                  <div className="flex shrink-0 items-center justify-between border-b px-4 py-3 pt-safe">
+                    <h2 className="font-semibold">Kart</h2>
+                    <DialogClose asChild>
+                      <Button type="button" variant="ghost" className="min-h-12">
+                        Lukk kart
+                      </Button>
+                    </DialogClose>
+                  </div>
+                  <div className="min-h-0 flex-1">{mobileMapOpen ? renderMap() : null}</div>
+                </div>
+              </FullscreenOverlayContent>
+            </FullscreenOverlay>
           )}
           {(isDesktop || nativeTablet) && (
             <Button

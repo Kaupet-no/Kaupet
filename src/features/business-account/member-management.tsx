@@ -26,6 +26,7 @@ import type {
 } from "@/features/business-account/use-business-membership";
 import {
   inviteOrganizationMember,
+  resendOrganizationInvite,
   removeOrganizationMember,
 } from "@/lib/business/members.functions";
 import { normalizeMemberPermissions, type OrganizationPermissions } from "@/lib/business/schemas";
@@ -33,6 +34,7 @@ import { setOrganizationLocationMember } from "@/lib/business/locations.function
 import { supabase } from "@/integrations/supabase/client";
 import { emailSchema } from "@/lib/auth-schemas";
 import { formatErrorMessage } from "@/lib/errors";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 type Category = { id: string; name_nb: string; parent_id: string | null };
 
 /** Location-scoped access, stored per location assignment. */
@@ -299,6 +301,13 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
   const [editing, setEditing] = useState<OrganizationMember | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<OrganizationMember | null>(null);
+  const callResend = useServerFn(resendOrganizationInvite);
+  const resendMutation = useMutation({
+    mutationFn: (userId: string) => callResend({ data: { userId } }),
+    onSuccess: () => showSuccessToast("Invitasjonen er sendt på nytt"),
+    onError: (error) =>
+      showErrorToast(formatErrorMessage(error, "Kunne ikke sende invitasjonen på nytt.")),
+  });
   const callInvite = useServerFn(inviteOrganizationMember);
   const callRemove = useServerFn(removeOrganizationMember);
   const callUpdate = useServerFn(setOrganizationLocationMember);
@@ -597,6 +606,17 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
                     >
                       Rettigheter
                     </Button>
+                    {member.status === "invited" && canManage && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={resendMutation.isPending}
+                        onClick={() => resendMutation.mutate(member.user_id)}
+                      >
+                        Send invitasjon på nytt
+                      </Button>
+                    )}
                     {member.role === "member" && member.status !== "deactivated" && (
                       <Button
                         type="button"

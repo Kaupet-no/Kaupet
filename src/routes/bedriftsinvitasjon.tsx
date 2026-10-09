@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +43,7 @@ function hasAuthErrorInUrl(): boolean {
 
 function BusinessInvitationPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [state, setState] = useState<InvitationState>("checking");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,6 +109,7 @@ function BusinessInvitationPage() {
       const { error } = await supabase.auth.updateUser({ password: values.password });
       if (error) throw error;
       await acceptOrganizationInvite();
+      await queryClient.invalidateQueries({ queryKey: ["business-membership"] });
       navigate({ to: "/bedrift", search: { tab: "oversikt" }, replace: true });
     } catch (error: unknown) {
       setErrorMessage(formatErrorMessage(error, "Kunne ikke godta invitasjonen. Prøv igjen."));

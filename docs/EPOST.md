@@ -65,6 +65,7 @@ Per prosjekt:
 - `https://staging.kaupet.no/auth**`
 - `https://staging.kaupet.no/tilbakestill-passord`
 - `https://staging.kaupet.no/bekreft-epost`
+- `https://staging.kaupet.no/bedriftsinvitasjon`
 
 Tilsvarende med `https://kaupet.no/…` i produksjonsprosjektet.
 
@@ -152,3 +153,17 @@ prosjektene — en eksakt URL kan ikke matche bekreftelseslenken.
 Lokal Supabase fanger utgående e-post i Inbucket i stedet for å sende den, med
 mindre du eksplisitt konfigurerer SMTP. Test derfor den ekte
 e-postrundturen i staging, alltid mot en kontrollert adresse.
+
+### Medarbeiderinvitasjoner
+
+Ny utsending bruker Supabase Auth sin invitasjonskanal for eksisterende,
+ubekreftede inviterte brukere. Medlemskap og rettigheter beholdes; bare en
+superbruker med aktiv Proff kan sende på nytt. Bekreftede brukere med
+ventende medlemskap logger inn og åpner `/bedriftsinvitasjon`.
+Invitasjonsruten må ligge i redirect-lista i begge hostede prosjekter.
+
+Lokal `supabase/config.toml` tillater også `/bedriftsinvitasjon` for både
+`127.0.0.1:8080` og `localhost:8080`. Restart lokal stack etter endringer i
+redirect-lista. Serverutsendte invitasjoner returnerer token i URL-fragmentet;
+nettleserklienten etablerer sesjonen med SDK-ens `setSession` før fragmentet
+ryddes. PKCE beholdes for vanlige Auth-flyter.

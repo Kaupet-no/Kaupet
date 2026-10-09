@@ -42,7 +42,12 @@ function createSupabaseClient() {
 
   // Nettleseren lagrer sesjonen i informasjonskapsler (ikke localStorage) slik
   // at serveren kan lese den og rendre innlogget tilstand ved første maling.
-  return createBrowserClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const callbackHash = new URLSearchParams(window.location.hash.slice(1));
+  const accessToken = callbackHash.get("access_token");
+  const refreshToken = callbackHash.get("refresh_token");
+  const client = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    // SSR forces PKCE; server-issued invitations have no PKCE verifier.
+    auth: { detectSessionInUrl: (_url, params) => Boolean(params.error_description) },
     cookieOptions: {
       path: "/",
       // SameSite=Lax, ikke Strict: e-postbekreftelse, passordtilbakestilling og
@@ -61,6 +66,17 @@ function createSupabaseClient() {
       secure: window.location.protocol === "https:",
     },
   });
+  if (accessToken && refreshToken) {
+    void client.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (error) return;
+        const url = new URL(window.location.href);
+        url.hash = "";
+        window.history.replaceState(window.history.state, "", url);
+      });
+  }
+  return client;
 }
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;

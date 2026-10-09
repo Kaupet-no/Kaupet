@@ -41,6 +41,7 @@ vi.mock("@/lib/turnstile.server", () => ({
 }));
 vi.mock("@/lib/rate-limit.server", () => ({
   assertNotRateLimited: vi.fn().mockResolvedValue(undefined),
+  assertUserNotRateLimited: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/brreg.server", () => ({ fetchOrganizationFromBrreg: vi.fn() }));
 const sendInternalEmail = vi.fn().mockResolvedValue(undefined);
@@ -61,12 +62,14 @@ const receipts = () =>
 
 const defaultContext = { userId: "superuser-1", supabase: supabaseAdmin };
 
+import { createOrganizationLocation } from "./locations.functions";
 import { getBusinessListingStats, updateBusinessProfile } from "./organization.functions";
 import { requestProffSubscription, setBusinessPlan } from "./plans.functions";
 import { lookupBusinessOrganization } from "./signup.functions";
 import {
   acceptOrganizationInvite,
   inviteOrganizationMember,
+  resendOrganizationInvite,
   removeOrganizationMember,
 } from "./members.functions";
 import { fetchOrganizationFromBrreg } from "@/lib/brreg.server";
@@ -252,6 +255,104 @@ beforeEach(() => {
 });
 
 describe("business server functions", () => {
+  it("DEF-BUS-01: oppretter lokasjon med autentisert brukerklient", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: memberId, error: null });
+    await expect(
+      (createOrganizationLocation as unknown as (input: unknown) => Promise<unknown>)({
+        data: { name: "Oslo", addressLine: "Storgata 1", postalCode: "0150", city: "Oslo" },
+        context: { userId: "superuser-1", supabase: { rpc } },
+      }),
+    ).resolves.toEqual({ location: memberId });
+    expect(rpc).toHaveBeenCalledWith(
+      "create_organization_location",
+      expect.objectContaining({ _organization_id: organizationId }),
+    );
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalledWith(
+      "create_organization_location",
+      expect.anything(),
+    );
+  });
+
+  it("DEF-INVITE-02: duplikat bevarer Auth-bruker og eksisterende medlemsrettigheter", async () => {
+    buildAdmin({ proff: true });
+    const original = supabaseAdmin.from.getMockImplementation()!;
+    const deletes = vi.fn();
+    supabaseAdmin.from.mockImplementation((table: string) => {
+      const chain = original(table);
+      if (table === "organization_members") {
+        let targetLookup = false;
+        chain.select = (columns: string) => {
+          targetLookup = columns === "status";
+          return chain;
+        };
+        chain.maybeSingle = async () => ({
+          data: targetLookup
+            ? { status: "invited" }
+            : { organization_id: organizationId, role: "superuser", status: "active" },
+          error: null,
+        });
+        chain.insert = () => ({
+          then: (resolve: (value: unknown) => unknown) =>
+            resolve({ data: null, error: { code: "23505", message: "duplicate" } }),
+        });
+        chain.delete = deletes;
+      }
+      return chain;
+    });
+    await expect(
+      inviteOrganizationMember({
+        data: {
+          name: "Kari Nordmann",
+          email: "kari@example.com",
+          locationAssignments: [
+            {
+              locationId: memberId,
+              role: "member",
+              listingAccess: "own",
+              listingEditScope: "own",
+              chatAccess: "own",
+            },
+          ],
+        },
+      }),
+    ).resolves.toEqual({ userId: "invited-user-1", email: "kari@example.com" });
+    expect(supabaseAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+    expect(deletes).not.toHaveBeenCalled();
+  });
+
+  it("DEF-INVITE-02: innsettingsfeil sletter aldri Auth-brukeren", async () => {
+    buildAdmin({ proff: true });
+    const original = supabaseAdmin.from.getMockImplementation()!;
+    supabaseAdmin.from.mockImplementation((table: string) => {
+      const chain = original(table);
+      if (table === "organization_members") {
+        chain.insert = () => ({
+          then: (resolve: (value: unknown) => unknown) =>
+            resolve({ data: null, error: { code: "XX000", message: "insert failed" } }),
+        });
+      }
+      return chain;
+    });
+    await expect(
+      inviteOrganizationMember({
+        data: {
+          name: "Kari Nordmann",
+          email: "kari@example.com",
+          locationAssignments: [
+            {
+              locationId: memberId,
+              role: "member",
+              listingAccess: "own",
+              listingEditScope: "own",
+              chatAccess: "own",
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow();
+    expect(supabaseAdmin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+
   it("henter annonseverdier med visninger for bedriftens oversikt", async () => {
     const listingCreatedAt = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
     buildAdmin({
@@ -722,6 +823,19 @@ describe("business server functions", () => {
       "kari@example.com",
       expect.any(Object),
     );
+  });
+
+  it("ny utsending avviser privatkonto og medlemmer uten superbrukertilgang", async () => {
+    for (const membership of [
+      null,
+      { organization_id: organizationId, role: "member", status: "active" },
+    ]) {
+      buildAdmin({ membership, proff: true });
+      await expect(resendOrganizationInvite({ data: { userId: memberId } })).rejects.toMatchObject({
+        status: 403,
+      });
+      expect(supabaseAdmin.auth.admin.inviteUserByEmail).not.toHaveBeenCalled();
+    }
   });
 
   it("delegates member removal and invite acceptance to the guarded database operations", async () => {

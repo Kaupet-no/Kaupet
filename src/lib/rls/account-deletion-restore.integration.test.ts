@@ -63,6 +63,56 @@ describe.skipIf(!canRun)("cancel_account_deletion restores original states", () 
     ).toBe("fulfilled");
     expect((await owner.rpc("cancel_account_deletion")).data).toBe(false);
   });
+  it("bevarer publiseringstid og utløpsdato ved avbrudd uten å endre vanlig publisering", async () => {
+    const publishedAt = new Date(Date.now() - 25 * 864e5).toISOString();
+    const expiresAt = new Date(Date.now() + 5 * 864e5).toISOString();
+    const { data: listing, error } = await admin
+      .from("listings")
+      .insert({
+        seller_id: userId,
+        title: "Beholder opprinnelig annonseperiode",
+        status: "active",
+        price_nok: 100,
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    const original = await admin
+      .from("listings")
+      .update({ published_at: publishedAt, expires_at: expiresAt })
+      .eq("id", listing!.id)
+      .select("published_at, expires_at")
+      .single();
+    expect(original.error).toBeNull();
+    const owner = await signInWithRetry(email);
+    expect((await owner.rpc("request_account_deletion", { _email: email })).error).toBeNull();
+    expect((await owner.rpc("cancel_account_deletion")).error).toBeNull();
+    const restored = await admin
+      .from("listings")
+      .select("published_at, expires_at")
+      .eq("id", listing!.id)
+      .single();
+    expect(restored.error).toBeNull();
+    expect(restored.data).toEqual(original.data);
+    // Once the snapshot is gone, ordinary reactivation still gets a fresh 30-day period.
+    expect(
+      (await admin.from("listings").update({ status: "archived" }).eq("id", listing!.id)).error,
+    ).toBeNull();
+    const renewed = await admin
+      .from("listings")
+      .update({ status: "active" })
+      .eq("id", listing!.id)
+      .select("published_at, expires_at")
+      .single();
+    expect(renewed.error).toBeNull();
+    expect(new Date(renewed.data!.published_at).getTime()).toBeGreaterThan(
+      new Date(publishedAt).getTime(),
+    );
+    expect(new Date(renewed.data!.expires_at).getTime()).toBeGreaterThan(
+      new Date(expiresAt).getTime(),
+    );
+  });
+
   it("gjør ikke en utløpt aktiv annonse aktiv igjen", async () => {
     const { data: listing, error } = await admin
       .from("listings")

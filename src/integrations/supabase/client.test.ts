@@ -20,41 +20,37 @@ afterEach(() => {
 });
 
 describe("Supabase browser auth callbacks", () => {
-  it("DEF-INVITE-02: etablerer sesjon fra serverinvitasjon og rydder tokenfragmentet", async () => {
+  it("DEF-INVITE-02: fanger invitasjonstokens og rydder fragmentet uten å bytte sesjon selv", async () => {
     window.history.replaceState(
       null,
       "",
       "/bedriftsinvitasjon#access_token=local-access&refresh_token=local-refresh&type=invite",
     );
-    const { supabase } = await import("./client");
-    void supabase.auth;
-    await vi.waitFor(() =>
-      expect(setSessionMock).toHaveBeenCalledWith({
-        access_token: "local-access",
-        refresh_token: "local-refresh",
-      }),
-    );
-    await vi.waitFor(() => expect(window.location.hash).toBe(""));
+    const { invitationTokens } = await import("./client");
+    expect(invitationTokens()).toEqual({
+      access_token: "local-access",
+      refresh_token: "local-refresh",
+    });
+    expect(window.location.hash).toBe("");
     expect(window.location.pathname).toBe("/bedriftsinvitasjon");
+    expect(setSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "/#access_token=attacker&refresh_token=attacker&type=invite",
+    "/bedriftsinvitasjon#access_token=attacker&refresh_token=attacker&type=magiclink",
+  ])("ignorerer og fjerner tokens utenfor invitasjonsflyten: %s", async (path) => {
+    window.history.replaceState(null, "", path);
+    const { invitationTokens } = await import("./client");
+    expect(invitationTokens()).toBeNull();
+    expect(window.location.hash).toBe("");
+    expect(setSessionMock).not.toHaveBeenCalled();
   });
 
   it("lar SDK-en håndtere PKCE uten å sette en fragment-sesjon", async () => {
     window.history.replaceState(null, "", "/auth?code=local-code");
-    const { supabase } = await import("./client");
-    void supabase.auth;
-    expect(setSessionMock).not.toHaveBeenCalled();
-  });
-
-  it("beholder ugyldig tokenfragment når SDK-en avviser sesjonen", async () => {
-    setSessionMock.mockResolvedValue({ error: new Error("Invalid token") });
-    window.history.replaceState(
-      null,
-      "",
-      "/bedriftsinvitasjon#access_token=invalid&refresh_token=invalid&type=invite",
-    );
-    const { supabase } = await import("./client");
-    void supabase.auth;
-    await vi.waitFor(() => expect(setSessionMock).toHaveBeenCalled());
-    expect(window.location.hash).toContain("access_token=invalid");
+    const { invitationTokens } = await import("./client");
+    expect(invitationTokens()).toBeNull();
+    expect(window.location.search).toBe("?code=local-code");
   });
 });

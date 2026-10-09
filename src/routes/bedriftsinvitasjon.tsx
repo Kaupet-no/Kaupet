@@ -10,7 +10,8 @@ import type { Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { invitationTokens, supabase } from "@/integrations/supabase/client";
+import { authLinkError } from "@/lib/auth-link-error";
 import { acceptOrganizationInvite } from "@/lib/business/members.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordSchema } from "@/lib/auth-schemas";
@@ -23,22 +24,25 @@ export const Route = createFileRoute("/bedriftsinvitasjon")({
   component: BusinessInvitationPage,
 });
 
-type InvitationState = "checking" | "ready" | "error";
+type InvitationState = "checking" | "conflict" | "ready" | "error";
 const invitationSchema = z.object({ password: passwordSchema });
 type InvitationForm = z.infer<typeof invitationSchema>;
 
-function hasAuthErrorInUrl(): boolean {
-  if (typeof window === "undefined") return false;
-  const query = new URLSearchParams(window.location.search);
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  return Boolean(
-    query.get("error") ||
-    query.get("error_code") ||
-    query.get("error_description") ||
-    hash.get("error") ||
-    hash.get("error_code") ||
-    hash.get("error_description"),
-  );
+/** The `sub` claim of an access token; only compared with the signed-in user, never trusted. */
+function tokenSubject(accessToken: string): string | null {
+  try {
+    const payload = accessToken.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
+    return (JSON.parse(atob(payload)) as { sub?: string }).sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function adoptInvitationSession() {
+  const tokens = invitationTokens();
+  if (!tokens) throw new Error("Invitasjonen er ugyldig, utløpt eller allerede brukt.");
+  const { error } = await supabase.auth.setSession(tokens);
+  if (error) throw error;
 }
 
 function BusinessInvitationPage() {
@@ -67,7 +71,7 @@ function BusinessInvitationPage() {
     };
 
     const checkSession = async () => {
-      if (hasAuthErrorInUrl()) {
+      if (authLinkError(window.location.search, window.location.hash)) {
         setErrorMessage("Invitasjonen er ugyldig, utløpt eller allerede brukt.");
         setState("error");
         return;
@@ -75,6 +79,17 @@ function BusinessInvitationPage() {
       const { data, error } = await supabase.auth.getSession();
       if (cancelled) return;
       if (error) throw error;
+      const tokens = invitationTokens();
+      if (tokens) {
+        const current = data.session?.user.id;
+        if (current && current !== tokenSubject(tokens.access_token)) {
+          setState("conflict");
+          return;
+        }
+        await adoptInvitationSession();
+        if (!cancelled) setState("ready");
+        return;
+      }
       if (data.session) {
         markReady(data.session);
         return;
@@ -101,6 +116,20 @@ function BusinessInvitationPage() {
       subscription?.unsubscribe();
     };
   }, []);
+
+  async function switchToInvitedAccount() {
+    setLoading(true);
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+      await adoptInvitationSession();
+      setState("ready");
+    } catch (error: unknown) {
+      setErrorMessage(formatErrorMessage(error, "Invitasjonen kunne ikke åpnes. Prøv igjen."));
+      setState("error");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const onSubmit = async (values: InvitationForm) => {
     setLoading(true);
@@ -131,6 +160,26 @@ function BusinessInvitationPage() {
             <Loader2 className="size-4 animate-spin" />
             Bekrefter invitasjonen…
           </p>
+        )}
+        {state === "conflict" && (
+          <div className="mt-6 space-y-4">
+            <p role="alert" className="text-sm">
+              Du er logget inn med en annen konto enn den som er invitert. Logg ut for å godta
+              invitasjonen med den inviterte kontoen.
+            </p>
+            <Button
+              type="button"
+              className="w-full gap-2"
+              disabled={loading}
+              onClick={() => void switchToInvitedAccount()}
+            >
+              {loading && <Loader2 className="size-4 animate-spin" />}
+              Logg ut og fortsett
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/">Avbryt</Link>
+            </Button>
+          </div>
         )}
         {state === "error" && (
           <div className="mt-6 space-y-4">

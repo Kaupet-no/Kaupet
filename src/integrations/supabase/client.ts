@@ -66,20 +66,33 @@ function createSupabaseClient() {
       secure: window.location.protocol === "https:",
     },
   });
-  if (accessToken && refreshToken) {
-    void client.auth
-      .setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error }) => {
-        if (error) return;
-        const url = new URL(window.location.href);
-        url.hash = "";
-        window.history.replaceState(window.history.state, "", url);
-      });
+  if (accessToken || refreshToken) {
+    // Tokens never stay in the address bar or history, whether or not they are used.
+    const url = new URL(window.location.href);
+    url.hash = "";
+    window.history.replaceState(window.history.state, "", url);
+    // Only the invitation page may adopt them, and it asks before replacing another
+    // signed-in account (otherwise any link could silently swap the visitor's session).
+    if (
+      accessToken &&
+      refreshToken &&
+      window.location.pathname === "/bedriftsinvitasjon" &&
+      callbackHash.get("type") === "invite"
+    ) {
+      pendingInvitationTokens = { access_token: accessToken, refresh_token: refreshToken };
+    }
   }
   return client;
 }
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
+let pendingInvitationTokens: { access_token: string; refresh_token: string } | null = null;
+
+/** Tokens from a server-issued invitation link, captured when the browser client starts. */
+export function invitationTokens() {
+  void supabase.auth;
+  return pendingInvitationTokens;
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

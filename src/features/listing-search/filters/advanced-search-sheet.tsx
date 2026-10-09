@@ -217,6 +217,7 @@ export function AdvancedSearchSheet({
                 <Input
                   type="number"
                   min={0}
+                  aria-label="Pris fra (NOK)"
                   placeholder="Fra"
                   value={v.min ?? ""}
                   onChange={(e) =>
@@ -227,6 +228,7 @@ export function AdvancedSearchSheet({
                 <Input
                   type="number"
                   min={0}
+                  aria-label="Pris til (NOK)"
                   placeholder="Til"
                   value={v.max ?? ""}
                   onChange={(e) =>

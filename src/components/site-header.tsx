@@ -43,7 +43,7 @@ export function SiteHeader() {
       >
         <Link to="/" className="flex shrink-0 items-baseline gap-1">
           {businessPlan ? (
-            <BusinessPlanLogo plan={businessPlan} />
+            <BusinessPlanLogo plan={businessPlan} compact />
           ) : (
             <>
               <span className="font-display text-2xl font-semibold tracking-tight text-primary">

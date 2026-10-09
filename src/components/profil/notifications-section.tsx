@@ -352,6 +352,7 @@ export function NotificationsSection() {
                   <div className="flex justify-center">
                     <Switch
                       id={`pref-${row.pushKey}`}
+                      aria-label={`Push – ${row.title}`}
                       checked={prefs[row.pushKey]}
                       disabled={mutation.isPending}
                       onCheckedChange={(v) => mutation.mutate({ ...prefs, [row.pushKey]: v })}
@@ -360,6 +361,7 @@ export function NotificationsSection() {
                   <div className="flex justify-center">
                     <Switch
                       id={`pref-${row.emailKey}`}
+                      aria-label={`E-post – ${row.title}`}
                       checked={prefs[row.emailKey]}
                       disabled={mutation.isPending}
                       onCheckedChange={(v) => mutation.mutate({ ...prefs, [row.emailKey]: v })}

@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Bell,
   ChevronRight,
+  Code,
   FlaskConical,
   Heart,
   ListChecks,
@@ -282,6 +283,18 @@ function MegPage() {
                 .
               </p>
             </div>
+            {/* Eksterne lenker åpnes i systemnettleseren i native-appen (Capacitor
+                navigerer bare WebViewen til godkjente verter). */}
+            <a
+              href="https://github.com/Kaupet-no/Kaupet"
+              target="_blank"
+              rel="noreferrer"
+              className="-mx-4 -mb-4 mt-4 flex min-h-12 items-center gap-3 border-t border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <Code className="size-5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="flex-1">Koden er åpen. Se den på GitHub</span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </a>
           </div>
         </div>
 

@@ -116,4 +116,28 @@ describe.skipIf(!canRun)("cancel_account_deletion restores original states", () 
       await admin.from("user_bans").delete().eq("user_id", userId);
     }
   });
+  it("beholder annonsesperren etter gjentatt slettingsforespørsel og avbrudd", async () => {
+    const { data: listing, error } = await admin
+      .from("listings")
+      .insert({
+        seller_id: userId,
+        title: "Sperres mens sletting ventes",
+        status: "active",
+        price_nok: 100,
+        expires_at: new Date(Date.now() + 864e5).toISOString(),
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    const owner = await signInWithRetry(email);
+    expect((await owner.rpc("request_account_deletion", { _email: email })).error).toBeNull();
+    expect(
+      (await admin.from("listings").update({ status: "disabled" }).eq("id", listing!.id)).error,
+    ).toBeNull();
+    expect((await owner.rpc("request_account_deletion", { _email: email })).error).toBeNull();
+    expect((await owner.rpc("cancel_account_deletion")).error).toBeNull();
+    expect(
+      (await admin.from("listings").select("status").eq("id", listing!.id).single()).data?.status,
+    ).toBe("disabled");
+  });
 });

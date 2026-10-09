@@ -37,7 +37,7 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
       _city: data.city,
     });
     if (error) {
-      if (error.code === "P0001" && error.message === "Du har ikke tilgang til dette") {
+      if (error.code === "42501") {
         throw new ClientError(UNAUTHORIZED_MESSAGE, 403);
       }
       throw await toClientError("database", error);

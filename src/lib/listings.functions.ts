@@ -45,6 +45,7 @@ type ListingOwnership = {
 
 type ListingMutationRow = {
   id: string;
+  kaupet_code: string;
   seller_id: string;
   organization_id: string | null;
   organization_location_id: string | null;
@@ -197,7 +198,7 @@ async function authorizeListingMutation(
   const { data: listing, error } = await supabaseAdmin
     .from("listings")
     .select(
-      "id, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes, updated_at",
+      "id, kaupet_code, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes, updated_at",
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -422,6 +423,14 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     if (data.id) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
       assertDraftOrganization(data.expected_organization_id, existing.organization_id);
+      // A lost publish response must not turn the active listing back into a draft.
+      if (existing.status === "active") {
+        return {
+          id: existing.id,
+          kaupet_code: existing.kaupet_code,
+          updated_at: existing.updated_at,
+        };
+      }
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
@@ -638,6 +647,9 @@ export const createListing = createServerFn({ method: "POST" })
     if (data.draftId) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
       assertDraftOrganization(data.expected_organization_id, existing.organization_id);
+      if (existing.status === "active") {
+        return { id: existing.id, kaupet_code: existing.kaupet_code };
+      }
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
@@ -657,9 +669,13 @@ export const createListing = createServerFn({ method: "POST" })
         .eq("id", data.draftId)
         .eq("status", "draft")
         .select("id, kaupet_code")
-        .single();
-      if (error) {
-        throw await toClientError("database", error);
+        .maybeSingle();
+      if (error) throw await toClientError("database", error);
+      if (!listing) {
+        const latest = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
+        assertDraftOrganization(data.expected_organization_id, latest.organization_id);
+        if (latest.status === "active") return { id: latest.id, kaupet_code: latest.kaupet_code };
+        throw new ClientError("Utkastet kan ikke publiseres i denne tilstanden.", 409);
       }
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }

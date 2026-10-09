@@ -89,6 +89,7 @@ export function usePublishListing({
   isVehicle: boolean;
   currentStepKey: string;
 }) {
+  const uploadedImages = useRef(new Map<string, { id: string; path: string }>());
   const navigate = useNavigate();
   const {
     publishedId,
@@ -125,6 +126,91 @@ export function usePublishListing({
           postal_code: values.postal_code,
           city: values.city,
         }));
+
+      if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+      // Attach images to the draft before making it public.
+      if (images.length > 0) {
+        setUploadProgress({ done: 0, total: images.length });
+        let done = 0;
+        const thumbFailures: string[] = [];
+        const thumbPromises: Promise<void>[] = [];
+        const uploads = await Promise.allSettled(
+          images.map(async (img, i) => {
+            const imageKey = `${ensuredDraftId}:${img.id}`;
+            let uploaded = uploadedImages.current.get(imageKey);
+            if (!uploaded) {
+              const path = await uploadListingImage({ listingId: ensuredDraftId, file: img.file });
+              uploaded = { id: crypto.randomUUID(), path };
+              uploadedImages.current.set(imageKey, uploaded);
+            }
+            const { id, path } = uploaded;
+            // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
+            // hvis thumbnailen mangler, så en feil her skal ikke stoppe
+            // publiseringen — men samles opp og vises til brukeren etterpå.
+            thumbPromises.push(
+              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
+                console.warn("Kunne ikke laste opp kort-thumbnail", err);
+                thumbFailures.push(img.file.name);
+              }),
+            );
+            done += 1;
+            setUploadProgress({ done, total: images.length });
+            return { id, storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
+          }),
+        );
+        await Promise.all(thumbPromises);
+        if (thumbFailures.length > 0) {
+          showErrorToast(`Kunne ikke laste opp forhåndsvisning for: ${thumbFailures.join(", ")}`);
+        }
+        if (!isCurrent()) throw new Error("Kontoen er endret. Publiseringen er stoppet.");
+        const results = uploads.map((result) => {
+          if (result.status === "rejected") throw result.reason;
+          return result.value;
+        });
+        setUploadProgress(null);
+        const desired = results.map((u) => ({ ...u, listing_id: ensuredDraftId }));
+        const { data: attached, error: readError } = await supabase
+          .from("listing_images")
+          .select("id, sort_order, caption")
+          .eq("listing_id", ensuredDraftId);
+        if (readError) throw readError;
+        const existing = new Map((attached ?? []).map((row) => [row.id, row]));
+        const removed = [...existing.keys()].filter((id) => !desired.some((row) => row.id === id));
+        if (removed.length) {
+          const { error } = await supabase
+            .from("listing_images")
+            .delete()
+            .eq("listing_id", ensuredDraftId)
+            .in("id", removed);
+          if (error) throw error;
+        }
+        // Existing rows use UPDATE: an UPSERT's INSERT trigger rejects retries at the 100-image limit.
+        await Promise.all(
+          desired
+            .filter((row) => existing.has(row.id))
+            .map(async (row) => {
+              const previous = existing.get(row.id)!;
+              if (previous.sort_order === row.sort_order && previous.caption === row.caption)
+                return;
+              const { error } = await supabase
+                .from("listing_images")
+                .update({ sort_order: row.sort_order, caption: row.caption })
+                .eq("id", row.id);
+              if (error) throw error;
+            }),
+        );
+        const missing = desired.filter((row) => !existing.has(row.id));
+        if (missing.length) {
+          const { error } = await supabase.from("listing_images").upsert(missing);
+          if (error) throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from("listing_images")
+          .delete()
+          .eq("listing_id", ensuredDraftId);
+        if (error) throw error;
+      }
 
       // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og
       // er normalt ferdig lenge før publiseringsklikket. Vi venter på tokenet
@@ -170,51 +256,12 @@ export function usePublishListing({
         },
       });
 
-      if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
-      // Upload images in parallel
-      if (images.length > 0) {
-        setUploadProgress({ done: 0, total: images.length });
-        let done = 0;
-        const thumbFailures: string[] = [];
-        const thumbPromises: Promise<void>[] = [];
-        const results = await Promise.all(
-          images.map(async (img, i) => {
-            const path = await uploadListingImage({ listingId: listing.id, file: img.file });
-            // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
-            // hvis thumbnailen mangler, så en feil her skal ikke stoppe
-            // publiseringen — men samles opp og vises til brukeren etterpå.
-            thumbPromises.push(
-              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
-                console.warn("Kunne ikke laste opp kort-thumbnail", err);
-                thumbFailures.push(img.file.name);
-              }),
-            );
-            done += 1;
-            setUploadProgress({ done, total: images.length });
-            return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
-          }),
-        );
-        await Promise.all(thumbPromises);
-        if (thumbFailures.length > 0) {
-          showErrorToast(`Kunne ikke laste opp forhåndsvisning for: ${thumbFailures.join(", ")}`);
-        }
-        setUploadProgress(null);
-        const { error: imgErr } = await supabase.from("listing_images").insert(
-          results.map((u) => ({
-            listing_id: listing.id,
-            storage_path: u.storage_path,
-            sort_order: u.sort_order,
-            caption: u.caption,
-          })),
-        );
-        if (imgErr) throw imgErr;
-      }
-
       return listing;
     },
     onSuccess: (result) => {
       if (!isCurrent()) return;
       publishAttemptPendingRef.current = false;
+      uploadedImages.current.clear();
       // stopAutosave: the wizard stays mounted behind the success dialog with
       // the form still populated — without this the next autosave tick would
       // INSERT the published listing back as a duplicate draft.

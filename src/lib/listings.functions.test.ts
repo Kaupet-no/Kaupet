@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({
   location: null as Record<string, unknown> | null,
   listing: null as Record<string, unknown> | null,
   rpc: vi.fn(),
+  updates: vi.fn(),
   inserts: [] as Array<{ table: string; value: unknown }>,
 }));
 const assertUserNotRateLimited = vi.hoisted(() => vi.fn());
@@ -60,9 +61,13 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         return { data: [], count: 0, error: null };
       };
       const query: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte", "update"]) {
+      for (const method of ["select", "eq", "gte"]) {
         query[method] = () => query;
       }
+      query.update = (value: unknown) => {
+        db.updates(value);
+        return query;
+      };
       query.insert = (value: unknown) => {
         inserted = value;
         return query;
@@ -134,6 +139,7 @@ beforeEach(() => {
   db.listing = null;
   db.rpc.mockReset();
   db.inserts = [];
+  db.updates.mockReset();
   assertUserNotRateLimited.mockReset().mockResolvedValue(undefined);
 });
 
@@ -293,5 +299,46 @@ describe("updateListingStatus", () => {
         data: { id: "00000000-0000-0000-0000-000000000001", status: "active" },
       }),
     ).toThrow();
+  });
+});
+
+describe("publisering etter tapt svar", () => {
+  it("bekrefter en allerede publisert annonse uten å overskrive den", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "active",
+      kaupet_code: "ABC123",
+      updated_at: "2026-10-09T10:00:00Z",
+    };
+    const saved = await saveDraftListing({ data: { id, title: "Et endret utkast" } });
+    expect(saved).toMatchObject({ id, kaupet_code: "ABC123" });
+    const published = await createListing({
+      data: { ...listingInput, draftId: id, organization_location_id: null },
+    });
+    expect(published).toEqual({ id, kaupet_code: "ABC123" });
+    expect(db.updates).not.toHaveBeenCalled();
+    expect(db.inserts).toHaveLength(0);
+  });
+  it("avviser bekreftelse av en annen brukers aktive annonse", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    db.listing = {
+      id,
+      seller_id: "other-user",
+      organization_id: null,
+      organization_location_id: null,
+      status: "active",
+      kaupet_code: "ABC123",
+    };
+    await expect(saveDraftListing({ data: { id, title: "Et utkast" } })).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      createListing({ data: { ...listingInput, draftId: id, organization_location_id: null } }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(db.updates).not.toHaveBeenCalled();
   });
 });

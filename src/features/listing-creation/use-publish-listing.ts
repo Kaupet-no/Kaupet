@@ -5,7 +5,7 @@ import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
-import { uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
+import { deleteListingImage, uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
 import { geocodeNorwayAddress } from "@/lib/geocode";
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
@@ -55,6 +55,11 @@ export function usePublishState() {
 }
 
 type PublishState = ReturnType<typeof usePublishState>;
+
+/** Best-effort: the rows are already gone, so a failed file delete must not block publishing. */
+async function removeStoredImages(paths: string[]) {
+  await Promise.all(paths.map((path) => deleteListingImage(path).catch(() => {})));
+}
 
 export function usePublishListing({
   state,
@@ -171,7 +176,7 @@ export function usePublishListing({
         const desired = results.map((u) => ({ ...u, listing_id: ensuredDraftId }));
         const { data: attached, error: readError } = await supabase
           .from("listing_images")
-          .select("id, sort_order, caption")
+          .select("id, sort_order, caption, storage_path")
           .eq("listing_id", ensuredDraftId);
         if (readError) throw readError;
         const existing = new Map((attached ?? []).map((row) => [row.id, row]));
@@ -183,6 +188,7 @@ export function usePublishListing({
             .eq("listing_id", ensuredDraftId)
             .in("id", removed);
           if (error) throw error;
+          await removeStoredImages(removed.map((id) => existing.get(id)!.storage_path));
         }
         // Existing rows use UPDATE: an UPSERT's INSERT trigger rejects retries at the 100-image limit.
         await Promise.all(
@@ -205,11 +211,13 @@ export function usePublishListing({
           if (error) throw error;
         }
       } else {
-        const { error } = await supabase
+        const { data: removed, error } = await supabase
           .from("listing_images")
           .delete()
-          .eq("listing_id", ensuredDraftId);
+          .eq("listing_id", ensuredDraftId)
+          .select("storage_path");
         if (error) throw error;
+        await removeStoredImages((removed ?? []).map((row) => row.storage_path));
       }
 
       // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og

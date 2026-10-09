@@ -15,6 +15,7 @@ const {
   listImages,
   deleteImages,
   updateImage,
+  deleteStoredImage,
 } = vi.hoisted(() => ({
   createListing: vi.fn(),
   getUser: vi.fn(),
@@ -25,6 +26,7 @@ const {
   listImages: vi.fn(),
   deleteImages: vi.fn(),
   updateImage: vi.fn(),
+  deleteStoredImage: vi.fn(async () => {}),
 }));
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
@@ -35,7 +37,11 @@ vi.mock("@/integrations/supabase/client", () => ({
       upsert: upsertImages,
       select: () => ({ eq: listImages }),
       delete: () => ({
-        eq: () => Object.assign(Promise.resolve({ error: null }), { in: deleteImages }),
+        eq: () =>
+          Object.assign(Promise.resolve({ error: null }), {
+            in: deleteImages,
+            select: async () => ({ data: [], error: null }),
+          }),
       }),
       update: (fields: unknown) => ({
         eq: (_column: string, id: string) => updateImage(fields, id),
@@ -47,6 +53,7 @@ vi.mock("@/lib/listings.functions", () => ({ createListing }));
 vi.mock("@/lib/storage", () => ({
   uploadListingImage: uploadImage,
   uploadListingImageThumb: uploadThumb,
+  deleteListingImage: deleteStoredImage,
 }));
 vi.mock("@/lib/geocode", () => ({ geocodeNorwayAddress: vi.fn(async () => null) }));
 vi.mock("@/lib/toast", () => ({ showErrorToast }));
@@ -232,7 +239,10 @@ describe("usePublishListing", () => {
     expect(upsertImages).toHaveBeenCalledTimes(1);
   });
   it("tar med fjerning, rekkefølge og bildetekst når brukeren prøver igjen", async () => {
-    const rows = new Map<string, { id: string; sort_order: number; caption: string | null }>();
+    const rows = new Map<
+      string,
+      { id: string; sort_order: number; caption: string | null; storage_path?: string }
+    >();
     listImages.mockImplementation(async () => ({ data: [...rows.values()], error: null }));
     upsertImages.mockImplementation(
       async (images: Array<{ id: string; sort_order: number; caption: string | null }>) => {
@@ -271,5 +281,6 @@ describe("usePublishListing", () => {
     expect([...rows.values()]).toEqual([
       expect.objectContaining({ sort_order: 0, caption: "Ny bildetekst" }),
     ]);
+    expect(deleteStoredImage).toHaveBeenCalledTimes(1);
   });
 });

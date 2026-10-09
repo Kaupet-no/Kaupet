@@ -37,7 +37,7 @@ export async function countDraftListings(
     terms: draft.value.terms,
     limit: 1,
     offset: 0,
-    includeRecentlySold: false,
+    includeRecentlySold: true,
   });
   if (!args) return 0;
   const rows = await runListingsSearch(args, signal);

@@ -51,7 +51,7 @@ export function useListingsQuery({
         terms,
         limit: PAGE_SIZE,
         offset: pageParam,
-        includeRecentlySold: false,
+        includeRecentlySold: true,
       });
       if (!args) return emptyPage;
       const data = await runListingsSearch(args, signal);

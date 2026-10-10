@@ -5,7 +5,7 @@ import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
-import { deleteListingImage, uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
+import { uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
 import { geocodeNorwayAddress } from "@/lib/geocode";
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
@@ -56,11 +56,6 @@ export function usePublishState() {
 }
 
 type PublishState = ReturnType<typeof usePublishState>;
-
-/** Best-effort: the rows are already gone, so a failed file delete must not block publishing. */
-async function removeStoredImages(paths: string[]) {
-  await Promise.all(paths.map((path) => deleteListingImage(path).catch(() => {})));
-}
 
 export function usePublishListing({
   state,
@@ -141,17 +136,16 @@ export function usePublishListing({
         }));
 
       if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
-      // Files uploaded by an earlier attempt for images removed since then may have no row.
       const currentImageKeys = new Set(images.map((img) => `${ensuredDraftId}:${img.id}`));
-      const staleUploads = [...uploadedImages.current].filter(
-        ([key]) => key.startsWith(`${ensuredDraftId}:`) && !currentImageKeys.has(key),
-      );
-      const removeFiles = async (rowPaths: string[]) => {
-        await removeStoredImages([
-          ...new Set([...rowPaths, ...staleUploads.map(([, u]) => u.path)]),
-        ]);
-        for (const [key] of staleUploads) uploadedImages.current.delete(key);
-      };
+      for (const key of uploadedImages.current.keys()) {
+        if (!currentImageKeys.has(key)) uploadedImages.current.delete(key);
+      }
+      let publishImages: Array<{
+        id: string;
+        storage_path: string;
+        sort_order: number;
+        caption: string | null;
+      }> = [];
       // Attach images to the draft before making it public.
       if (images.length > 0) {
         setUploadProgress({ done: 0, total: images.length });
@@ -192,51 +186,7 @@ export function usePublishListing({
           return result.value;
         });
         setUploadProgress(null);
-        const desired = results.map((u) => ({ ...u, listing_id: ensuredDraftId }));
-        const { data: attached, error: readError } = await supabase
-          .from("listing_images")
-          .select("id, sort_order, caption, storage_path")
-          .eq("listing_id", ensuredDraftId);
-        if (readError) throw readError;
-        const existing = new Map((attached ?? []).map((row) => [row.id, row]));
-        const removed = [...existing.keys()].filter((id) => !desired.some((row) => row.id === id));
-        if (removed.length) {
-          const { error } = await supabase
-            .from("listing_images")
-            .delete()
-            .eq("listing_id", ensuredDraftId)
-            .in("id", removed);
-          if (error) throw error;
-        }
-        await removeFiles(removed.map((id) => existing.get(id)!.storage_path));
-        // Existing rows use UPDATE: an UPSERT's INSERT trigger rejects retries at the 100-image limit.
-        await Promise.all(
-          desired
-            .filter((row) => existing.has(row.id))
-            .map(async (row) => {
-              const previous = existing.get(row.id)!;
-              if (previous.sort_order === row.sort_order && previous.caption === row.caption)
-                return;
-              const { error } = await supabase
-                .from("listing_images")
-                .update({ sort_order: row.sort_order, caption: row.caption })
-                .eq("id", row.id);
-              if (error) throw error;
-            }),
-        );
-        const missing = desired.filter((row) => !existing.has(row.id));
-        if (missing.length) {
-          const { error } = await supabase.from("listing_images").upsert(missing);
-          if (error) throw error;
-        }
-      } else {
-        const { data: removed, error } = await supabase
-          .from("listing_images")
-          .delete()
-          .eq("listing_id", ensuredDraftId)
-          .select("storage_path");
-        if (error) throw error;
-        await removeFiles((removed ?? []).map((row) => row.storage_path));
+        publishImages = results;
       }
 
       // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og
@@ -253,6 +203,7 @@ export function usePublishListing({
           expected_user_id: ownerId!,
           expected_organization_id: ownerOrganizationId,
           draftId: ensuredDraftId ?? draftId!,
+          images: publishImages,
           title: values.title,
           subtitle: values.subtitle || null,
           description: values.description,
@@ -283,6 +234,11 @@ export function usePublishListing({
         },
       });
 
+      if ("already_published" in listing && listing.already_published) {
+        showErrorToast(
+          "Annonsen er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger den publiserte annonsen.",
+        );
+      }
       return listing;
     },
     onSuccess: (result) => {

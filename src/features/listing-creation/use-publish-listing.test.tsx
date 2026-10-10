@@ -162,173 +162,72 @@ describe("usePublishListing", () => {
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(result.current.state.publishedId).toBe("l2"));
   });
-  it("beholder annonsen som utkast ved bildefeil og fullfører neste forsøk", async () => {
-    const images = ["a", "b"].map((id) => ({
-      id,
-      file: new File([id], `${id}.jpg`),
-      thumbFile: new File([id], `${id}-thumb.jpg`),
-      previewUrl: "",
-    }));
+  it("beholder utkastet ved opplastingsfeil og gjenbruker vellykkede opplastinger", async () => {
+    const images = pendingImages("a", "b");
     uploadImage.mockRejectedValueOnce(new Error("Nettbrudd"));
     createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
     const { result } = setup(images);
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
     expect(createListing).not.toHaveBeenCalled();
-    expect(result.current.state.publishedOpen).toBe(false);
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
-    expect(upsertImages.mock.calls[0][0]).toHaveLength(2);
-    expect(
-      upsertImages.mock.calls[0][0].every(
-        (row: { listing_id: string }) => row.listing_id === "draft-1",
-      ),
-    ).toBe(true);
+    expect(createListing.mock.calls[0][0].data.images).toHaveLength(2);
     expect(uploadImage.mock.calls.filter(([arg]) => arg.file.name === "b.jpg")).toHaveLength(1);
-    expect(upsertImages.mock.invocationCallOrder[0]).toBeLessThan(
-      createListing.mock.invocationCallOrder[0],
-    );
+    expect(upsertImages).not.toHaveBeenCalled();
   });
 
-  it.each(["bildesvar", "publiseringssvar"])(
-    "gjenbruker samme bilder og annonse etter tapt %s",
-    async (lost) => {
-      const rows = new Map<string, unknown>();
-      let imageAttempt = 0;
-      listImages.mockImplementation(async () => ({ data: [...rows.values()], error: null }));
-      upsertImages.mockImplementation(async (images: Array<{ id: string }>) => {
-        images.forEach((image) => rows.set(image.id, image));
-        if (lost === "bildesvar" && imageAttempt++ === 0) throw new Error("Svaret gikk tapt");
-        return { error: null };
-      });
-      if (lost === "publiseringssvar")
-        createListing.mockRejectedValueOnce(new Error("Svaret gikk tapt"));
-      createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
-      const { result } = setup([
-        {
-          id: "a",
-          file: new File(["a"], "a.jpg"),
-          thumbFile: new File(["a"], "a-thumb.jpg"),
-          previewUrl: "",
-        },
-      ]);
-      act(() => result.current.publishOnce(values));
-      await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
-      act(() => result.current.publishOnce(values));
-      await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
-      expect(rows.size).toBe(1);
-      expect(uploadImage).toHaveBeenCalledTimes(1);
-      expect(result.current.state.publishedId).toBe("draft-1");
-    },
-  );
-  it.each([false, true])(
-    "stopper bildeendringer etter tapt publiseringssvar (nye bilder: %s)",
-    async (replaceImage) => {
-      const images = [
-        {
-          id: "a",
-          file: new File(["a"], "a.jpg"),
-          thumbFile: new File(["a"], "a-thumb.jpg"),
-          previewUrl: "",
-        },
-      ];
-      createListing
-        .mockRejectedValueOnce(new Error("Publiseringssvaret gikk tapt"))
-        .mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
-      const { result, rerender } = setup(images);
-      act(() => result.current.publishOnce(values));
-      await waitFor(() => expect(result.current.mutation.isError).toBe(true));
-      const uploads = uploadImage.mock.calls.length;
-      const reads = listImages.mock.calls.length;
-      const inserts = upsertImages.mock.calls.length;
-      images.splice(0, 1);
-      if (replaceImage)
-        images.push({
-          id: "b",
-          file: new File(["b"], "b.jpg"),
-          thumbFile: new File(["b"], "b-thumb.jpg"),
-          previewUrl: "",
-        });
-      rerender();
-      preparePublish.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123", published: true });
-      act(() =>
-        result.current.publishOnce({
-          ...values,
-          title: "Endret etter publisering",
-          price_nok: 2000,
-        }),
-      );
-      await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
-      expect(uploadImage).toHaveBeenCalledTimes(uploads);
-      expect(listImages).toHaveBeenCalledTimes(reads);
-      expect(upsertImages).toHaveBeenCalledTimes(inserts);
-      expect(deleteImageRows).not.toHaveBeenCalled();
-      expect(deleteImages).not.toHaveBeenCalled();
-      expect(deleteStoredImage).not.toHaveBeenCalled();
-      expect(updateImage).not.toHaveBeenCalled();
-      expect(createListing).toHaveBeenCalledTimes(1);
-      expect(result.current.state.publishedCode).toBe("ABC123");
-      expect(showErrorToast).toHaveBeenLastCalledWith(expect.stringContaining("ikke lagret"));
-    },
-  );
-
-  it("fullfører nytt forsøk med 100 allerede tilknyttede bilder", async () => {
-    const rows = new Map<string, { id: string }>();
-    listImages.mockImplementation(async () => ({ data: [...rows.values()], error: null }));
-    upsertImages.mockImplementation(async (images: Array<{ id: string }>) => {
-      if (rows.size === 100) throw new Error("listing_image_limit");
-      images.forEach((row) => rows.set(row.id, row));
-      return { error: null };
-    });
+  it("gjenbruker bilde-ID og sti etter tapt publiseringssvar", async () => {
     createListing
-      .mockRejectedValueOnce(new Error("Publiseringssvaret gikk tapt"))
-      .mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
-    const images = Array.from({ length: 100 }, (_, i) => ({
-      id: String(i),
-      file: new File(["a"], `${i}.jpg`),
-      thumbFile: new File(["a"], `${i}-thumb.jpg`),
-      previewUrl: "",
-    }));
-    const { result } = setup(images);
+      .mockRejectedValueOnce(new Error("Svaret gikk tapt"))
+      .mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123", already_published: true });
+    const { result } = setup(pendingImages("a"));
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
-    expect(rows.size).toBe(100);
-    expect(upsertImages).toHaveBeenCalledTimes(1);
+    expect(createListing.mock.calls[1][0].data.images).toEqual(
+      createListing.mock.calls[0][0].data.images,
+    );
+    expect(uploadImage).toHaveBeenCalledTimes(1);
+    expect(showErrorToast).toHaveBeenLastCalledWith(expect.stringContaining("ikke lagret"));
   });
-  it("tar med fjerning, rekkefølge og bildetekst når brukeren prøver igjen", async () => {
-    const rows = new Map<
-      string,
-      { id: string; sort_order: number; caption: string | null; storage_path?: string }
-    >();
-    listImages.mockImplementation(async () => ({ data: [...rows.values()], error: null }));
-    upsertImages.mockImplementation(
-      async (images: Array<{ id: string; sort_order: number; caption: string | null }>) => {
-        images.forEach((row) => rows.set(row.id, row));
-        return { error: null };
-      },
-    );
-    deleteImages.mockImplementation(async (_column: string, ids: string[]) => {
-      ids.forEach((id) => rows.delete(id));
-      return { error: null };
-    });
-    updateImage.mockImplementation(
-      async (fields: { sort_order: number; caption: string | null }, id: string) => {
-        rows.set(id, { ...rows.get(id)!, ...fields });
-        return { error: null };
-      },
-    );
+
+  it.each([false, true])(
+    "stopper opplasting når forberedelsen bekrefter publisering (nye bilder: %s)",
+    async (replace) => {
+      const images = pendingImages("a");
+      createListing.mockRejectedValueOnce(new Error("Svaret gikk tapt"));
+      const { result, rerender } = setup(images);
+      act(() => result.current.publishOnce(values));
+      await waitFor(() => expect(result.current.mutation.isError).toBe(true));
+      const uploads = uploadImage.mock.calls.length;
+      images.splice(0, 1, ...(replace ? pendingImages("b") : []));
+      rerender();
+      preparePublish.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123", published: true });
+      act(() => result.current.publishOnce(values));
+      await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+      expect(uploadImage).toHaveBeenCalledTimes(uploads);
+      expect(createListing).toHaveBeenCalledTimes(1);
+      expect(deleteImageRows).not.toHaveBeenCalled();
+      expect(deleteStoredImage).not.toHaveBeenCalled();
+    },
+  );
+
+  it("sender 100 bilder i samme publiseringskall", async () => {
+    createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
+    const { result } = setup(pendingImages(...Array.from({ length: 100 }, (_, i) => String(i))));
+    act(() => result.current.publishOnce(values));
+    await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+    expect(createListing.mock.calls[0][0].data.images).toHaveLength(100);
+    expect(upsertImages).not.toHaveBeenCalled();
+  });
+
+  it("sender gjeldende bildeliste og bildetekst etter mislykket publisering", async () => {
     createListing
       .mockRejectedValueOnce(new Error("Publisering avvist"))
       .mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
-    const images = ["a", "b"].map((id) => ({
-      id,
-      file: new File([id], `${id}.jpg`),
-      thumbFile: new File([id], `${id}-thumb.jpg`),
-      previewUrl: "",
-      caption: "",
-    }));
+    const images = pendingImages("a", "b");
     const { result, rerender } = setup(images);
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
@@ -337,39 +236,48 @@ describe("usePublishListing", () => {
     rerender();
     act(() => result.current.publishOnce(values));
     await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
-    expect([...rows.values()]).toEqual([
-      expect.objectContaining({ sort_order: 0, caption: "Ny bildetekst" }),
+    expect(createListing.mock.calls[1][0].data.images).toEqual([
+      expect.objectContaining({
+        storage_path: "draft-1/b.jpg",
+        sort_order: 0,
+        caption: "Ny bildetekst",
+      }),
     ]);
-    expect(deleteStoredImage).toHaveBeenCalledTimes(1);
+    // Registered, unreferenced files use the existing guarded cleanup job.
+    expect(deleteStoredImage).not.toHaveBeenCalled();
   });
 
-  it("sletter filen til et opplastet bilde som fjernes før radene er lagret", async () => {
-    let failB = true;
-    uploadImage.mockImplementation(async ({ file }) => {
-      if (file.name === "b.jpg" && failB) {
-        failB = false;
-        throw new Error("Nettbrudd");
-      }
-      return `draft-1/${file.name}`;
+  it("lar serveren håndtere en publisering som skjedde mens opplastingen ventet", async () => {
+    let release!: (path: string) => void;
+    uploadImage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    createListing.mockResolvedValue({
+      id: "draft-1",
+      kaupet_code: "ABC123",
+      already_published: true,
     });
-    createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
-    const images = ["a", "b"].map((id) => ({
-      id,
-      file: new File([id], `${id}.jpg`),
-      thumbFile: new File([id], `${id}-thumb.jpg`),
-      previewUrl: "",
-    }));
-    const { result, rerender } = setup(images);
+    const { result } = setup(pendingImages("a"));
     act(() => result.current.publishOnce(values));
-    await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
-    expect(upsertImages).not.toHaveBeenCalled();
-    images.splice(0, 1);
-    rerender();
-    act(() => result.current.publishOnce(values));
+    await waitFor(() => expect(release).toBeTypeOf("function"));
+    await act(async () => release("draft-1/a.jpg"));
     await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
-    expect(deleteStoredImage).toHaveBeenCalledWith("draft-1/a.jpg");
-    expect(upsertImages.mock.calls[0][0]).toEqual([
-      expect.objectContaining({ storage_path: "draft-1/b.jpg" }),
-    ]);
+    expect(deleteImageRows).not.toHaveBeenCalled();
+    expect(upsertImages).not.toHaveBeenCalled();
+    expect(updateImage).not.toHaveBeenCalled();
+    expect(deleteStoredImage).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith(expect.stringContaining("ikke lagret"));
   });
 });
+
+function pendingImages(...ids: string[]): import("@/components/image-uploader").PendingImage[] {
+  return ids.map((id) => ({
+    id,
+    file: new File([id], `${id}.jpg`),
+    thumbFile: new File([id], `${id}-thumb.jpg`),
+    previewUrl: "",
+  }));
+}

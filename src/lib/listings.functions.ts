@@ -562,6 +562,19 @@ export const createListing = createServerFn({ method: "POST" })
       .object({
         expected_user_id: z.string().uuid().optional(),
         expected_organization_id: z.string().uuid().nullable().optional(),
+        images: z
+          .array(
+            z.object({
+              id: z.string().uuid(),
+              storage_path: z
+                .string()
+                .regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
+              sort_order: z.number().int().min(0).max(99),
+              caption: z.string().trim().max(140).nullable(),
+            }),
+          )
+          .max(100)
+          .optional(),
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
         subtitle: z.string().trim().max(80).nullable().optional(),
@@ -586,6 +599,13 @@ export const createListing = createServerFn({ method: "POST" })
         turnstileToken: z.string().nullable().optional(),
       })
       .superRefine((data, ctx) => {
+        if (data.images !== undefined && !data.draftId) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["draftId"],
+            message: "Bildene må tilhøre et utkast.",
+          });
+        }
         if (!data.is_free && data.price_nok == null) {
           ctx.addIssue({
             code: "custom",
@@ -678,7 +698,7 @@ export const createListing = createServerFn({ method: "POST" })
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
       assertDraftOrganization(data.expected_organization_id, existing.organization_id);
       if (existing.status === "active") {
-        return { id: existing.id, kaupet_code: existing.kaupet_code };
+        return { id: existing.id, kaupet_code: existing.kaupet_code, already_published: true };
       }
       // Draft updates never re-check creation rights, so publishing must (category, Proff, approval).
       // The location chosen in the wizard wins over the one the draft was first saved with.
@@ -696,6 +716,33 @@ export const createListing = createServerFn({ method: "POST" })
         existing.organization_id,
         ownership.organization_location_id,
       );
+      if (data.images !== undefined) {
+        const { data: result, error } = await (supabaseAdmin as SupabaseClient).rpc(
+          "publish_listing_draft",
+          {
+            _listing_id: data.draftId,
+            _user_id: userId,
+            _fields: {
+              ...listingFields,
+              ...(existing.organization_id
+                ? {
+                    ...listingLocationFields(orgLocation),
+                    organization_location_id: ownership.organization_location_id,
+                  }
+                : { organization_location_id: null }),
+            },
+            _images: data.images,
+          },
+        );
+        if (error) throw await toClientError("database", error);
+        return z
+          .object({
+            id: z.string().uuid(),
+            kaupet_code: z.string(),
+            already_published: z.boolean(),
+          })
+          .parse(result);
+      }
       const { data: listing, error } = await supabaseAdmin
         .from("listings")
         .update({

@@ -319,7 +319,7 @@ describe("publisering etter tapt svar", () => {
     const published = await createListing({
       data: { ...listingInput, draftId: id, organization_location_id: null },
     });
-    expect(published).toEqual({ id, kaupet_code: "ABC123" });
+    expect(published).toEqual({ id, kaupet_code: "ABC123", already_published: true });
     expect(db.updates).not.toHaveBeenCalled();
     expect(db.inserts).toHaveLength(0);
   });
@@ -403,6 +403,124 @@ describe("publisering etter tapt svar", () => {
     await expect(
       createListing({ data: { ...listingInput, draftId: id, organization_location_id: null } }),
     ).rejects.toMatchObject({ status: 403 });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+});
+
+describe("atomic draft publication (CRE-30..33)", () => {
+  const draftId = "00000000-0000-4000-8000-000000000021";
+  const image = {
+    id: "00000000-0000-4000-8000-000000000022",
+    storage_path: `${draftId}/00000000-0000-4000-8000-000000000022.jpg`,
+    sort_order: 0,
+    caption: "Sykkel 🚲",
+  };
+  beforeEach(() => {
+    db.listing = {
+      id: draftId,
+      kaupet_code: "KPT123",
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "draft",
+    };
+    db.rpc.mockResolvedValue({
+      data: { id: draftId, kaupet_code: "KPT123", already_published: false },
+      error: null,
+    });
+  });
+  it("publiserer et bilde via serverrollen uten direkte tabelloppdatering", async () => {
+    const result = await createListing({ data: { ...listingInput, draftId, images: [image] } });
+    expect(result).toEqual({ id: draftId, kaupet_code: "KPT123", already_published: false });
+    expect(db.rpc).toHaveBeenCalledWith(
+      "publish_listing_draft",
+      expect.objectContaining({
+        _listing_id: draftId,
+        _user_id: "user-id",
+        _images: [image],
+        _fields: expect.objectContaining({ title: listingInput.title, status: "active" }),
+      }),
+    );
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+  it("videresender serverens bekreftelse ved konkurrerende publisering", async () => {
+    db.rpc.mockResolvedValue({
+      data: { id: draftId, kaupet_code: "KPT123", already_published: true },
+      error: null,
+    });
+    await expect(
+      createListing({ data: { ...listingInput, draftId, images: [] } }),
+    ).resolves.toMatchObject({ already_published: true });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+  it.each([true, false])(
+    "beholder opprettingskontroll for bedriftsbilder (tillatt: %s)",
+    async (allowed) => {
+      setOrganization("member");
+      db.listing = {
+        ...db.listing,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+      };
+      db.rpc.mockImplementation(async (name: string) => {
+        if (name === "can_create_organization_listing") return { data: allowed, error: null };
+        if (name === "publish_listing_draft")
+          return {
+            data: { id: draftId, kaupet_code: "KPT123", already_published: false },
+            error: null,
+          };
+        return { data: true, error: null };
+      });
+      const result = createListing({ data: { ...listingInput, draftId, images: [image] } });
+      if (allowed) {
+        await expect(result).resolves.toMatchObject({ id: draftId });
+        expect(db.rpc).toHaveBeenCalledWith(
+          "publish_listing_draft",
+          expect.objectContaining({
+            _fields: expect.objectContaining({
+              organization_location_id: locationId,
+              postal_code: "0123",
+              city: "Oslo",
+            }),
+          }),
+        );
+      } else {
+        await expect(result).rejects.toMatchObject({ status: 403 });
+        expect(db.rpc.mock.calls.some(([name]) => name === "publish_listing_draft")).toBe(false);
+      }
+      expect(db.updates).not.toHaveBeenCalled();
+    },
+  );
+  it.each([101, 1000])("avviser %i bilder før databasekallet", async (count) => {
+    await expect(
+      Promise.resolve().then(() =>
+        createListing({ data: { ...listingInput, draftId, images: Array(count).fill(image) } }),
+      ),
+    ).rejects.toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it.each([
+    null,
+    "image",
+    [{ ...image, caption: "x".repeat(141) }],
+    [{ ...image, sort_order: -1 }],
+    [{ ...image, storage_path: "invalid" }],
+  ])("avviser ugyldig bildeliste: %j", async (images) => {
+    expect(() => createListing({ data: { ...listingInput, draftId, images } })).toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it("krever utkast-ID når bilder sendes", async () => {
+    expect(() => createListing({ data: { ...listingInput, images: [image] } })).toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it("RPC-feil bruker ingen utrygg fallback", async () => {
+    db.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST202", message: "Missing function" },
+    });
+    await expect(
+      createListing({ data: { ...listingInput, draftId, images: [] } }),
+    ).rejects.toThrow();
     expect(db.updates).not.toHaveBeenCalled();
   });
 });

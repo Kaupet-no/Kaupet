@@ -177,6 +177,42 @@ describe("usePublishListing", () => {
     expect(upsertImages).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { elapsed: 23 * 60 * 60 * 1000 - 1, reupload: false },
+    { elapsed: 23 * 60 * 60 * 1000, reupload: true },
+    { elapsed: 25 * 60 * 60 * 1000, reupload: true },
+  ])("fornyer bildeopplasting ved forsinket retry: $elapsed ms", async ({ elapsed, reupload }) => {
+    const startedAt = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(startedAt);
+    try {
+      uploadImage
+        .mockResolvedValueOnce("draft-1/first.jpg")
+        .mockResolvedValueOnce("draft-1/new.jpg");
+      createListing
+        .mockRejectedValueOnce(new Error("Publisering avvist"))
+        .mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
+      const { result } = setup(pendingImages("a"));
+      act(() => result.current.publishOnce(values));
+      await waitFor(() => expect(result.current.mutation.isError).toBe(true));
+
+      clock.mockReturnValue(startedAt + elapsed);
+      act(() => result.current.publishOnce(values));
+      await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+
+      expect(uploadImage).toHaveBeenCalledTimes(reupload ? 2 : 1);
+      const first = createListing.mock.calls[0][0].data.images[0];
+      const retry = createListing.mock.calls[1][0].data.images[0];
+      if (reupload) {
+        expect(retry.storage_path).toBe("draft-1/new.jpg");
+        expect(retry.id).not.toBe(first.id);
+      } else {
+        expect(retry).toEqual(first);
+      }
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("gjenbruker bilde-ID og sti etter tapt publiseringssvar", async () => {
     createListing
       .mockRejectedValueOnce(new Error("Svaret gikk tapt"))

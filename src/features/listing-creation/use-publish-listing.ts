@@ -57,6 +57,9 @@ export function usePublishState() {
 
 type PublishState = ReturnType<typeof usePublishState>;
 
+// Unreferenced uploads can be deleted after 24 hours; leave one hour of margin.
+const UPLOAD_CACHE_TTL_MS = 23 * 60 * 60 * 1000;
+
 export function usePublishListing({
   state,
   images,
@@ -90,7 +93,9 @@ export function usePublishListing({
   isVehicle: boolean;
   currentStepKey: string;
 }) {
-  const uploadedImages = useRef(new Map<string, { id: string; path: string }>());
+  const uploadedImages = useRef(
+    new Map<string, { id: string; path: string; uploadedAt: number }>(),
+  );
   const navigate = useNavigate();
   const {
     publishedId,
@@ -156,9 +161,10 @@ export function usePublishListing({
           images.map(async (img, i) => {
             const imageKey = `${ensuredDraftId}:${img.id}`;
             let uploaded = uploadedImages.current.get(imageKey);
-            if (!uploaded) {
+            const uploadedAt = Date.now();
+            if (!uploaded || uploadedAt - uploaded.uploadedAt >= UPLOAD_CACHE_TTL_MS) {
               const path = await uploadListingImage({ listingId: ensuredDraftId, file: img.file });
-              uploaded = { id: crypto.randomUUID(), path };
+              uploaded = { id: crypto.randomUUID(), path, uploadedAt };
               uploadedImages.current.set(imageKey, uploaded);
             }
             const { id, path } = uploaded;

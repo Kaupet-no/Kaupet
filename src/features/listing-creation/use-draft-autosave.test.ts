@@ -335,6 +335,24 @@ describe("useDraftAutosave", () => {
     });
     expect(saveDraftListingMock).not.toHaveBeenCalled();
   });
+  it.each([
+    ["kontoen har gamle bilder", () => loadDraftImagesMock.mockResolvedValue([{ id: "old" }])],
+    ["IndexedDB feiler", () => loadDraftImagesMock.mockRejectedValue(new Error("blocked"))],
+  ])("fjerner gjesteutkastet etter overføring når %s", async (_case, arrange) => {
+    const guestKey = "kaupet_draft_sell_listing:guest:private";
+    localStorage.setItem(
+      guestKey,
+      JSON.stringify({ title: "Gjestens sykkel", saved_at: Date.now() }),
+    );
+    arrange();
+
+    const { result } = renderHook(() => useDraftAutosave({ ...baseFields, resumeGuest: true }));
+
+    await waitFor(() => expect(result.current.hasDraftData?.title).toBe("Gjestens sykkel"));
+    expect(localStorage.getItem(guestKey)).toBeNull();
+    expect(localStorage.getItem(DRAFT_KEY)).toContain("Gjestens sykkel");
+  });
+
   it("returnerer feil når bildedraft ikke kan flushes", async () => {
     saveDraftImagesMock.mockRejectedValueOnce(new Error("IndexedDB unavailable"));
     const { result } = renderHook(() =>

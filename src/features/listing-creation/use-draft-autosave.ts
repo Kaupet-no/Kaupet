@@ -162,7 +162,11 @@ export function useDraftAutosave(fields: DraftFields) {
       if (ownerId && fields.resumeGuest && !readItem(DRAFT_KEY)) {
         const guestKey = draftStorageKey("sell", null);
         const guest = readItem(guestKey);
-        if (guest && writeItem(DRAFT_KEY, guest)) guestTransfer.current = true;
+        // The guest copy never outlives the transfer, so the next guest on this device cannot adopt it.
+        if (guest && writeItem(DRAFT_KEY, guest)) {
+          removeItems(guestKey);
+          guestTransfer.current = true;
+        }
       }
       const savedId = readItem(DRAFT_ID_KEY);
       draftUpdatedAtRef.current = readItem(DRAFT_UPDATED_AT_KEY);
@@ -200,16 +204,13 @@ export function useDraftAutosave(fields: DraftFields) {
   useEffect(() => {
     let cancelled = false;
     const loadImages = async () => {
-      const stored = await loadDraftImages(DRAFT_KEY);
-      if (stored.length || !guestTransfer.current) return stored;
+      if (!guestTransfer.current) return loadDraftImages(DRAFT_KEY);
+      // The transferred draft is the guest's, so its images replace any leftovers on the account key.
       const guestKey = draftStorageKey("sell", null);
       const guestImages = await loadDraftImages(guestKey);
-      if (guestImages.length) {
-        await saveDraftImages(guestImages, DRAFT_KEY);
-        await clearDraftImages(guestKey);
-      }
-      removeItems(guestKey);
-      return guestImages;
+      if (guestImages.length) await saveDraftImages(guestImages, DRAFT_KEY);
+      await clearDraftImages(guestKey);
+      return guestImages.length ? guestImages : loadDraftImages(DRAFT_KEY);
     };
     void loadImages()
       .then((stored) => {

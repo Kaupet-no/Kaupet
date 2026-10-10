@@ -323,6 +323,36 @@ describe("publisering etter tapt svar", () => {
     expect(db.updates).not.toHaveBeenCalled();
     expect(db.inserts).toHaveLength(0);
   });
+  it("sjekker opprettingsrett på nytt når et bedriftsutkast publiseres", async () => {
+    const id = "00000000-0000-4000-8000-000000000002";
+    setOrganization("member");
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: organizationId,
+      organization_location_id: locationId,
+      status: "draft",
+      kaupet_code: "ABC124",
+      category_id: categoryId,
+    };
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "can_update_organization_listing") return { data: true, error: null };
+      if (name === "organization_has_proff_access") return { data: true, error: null };
+      if (name === "can_create_organization_listing") return { data: false, error: null };
+      if (name === "organization_is_verified") return { data: true, error: null };
+      return { data: null, error: null };
+    });
+    await expect(createListing({ data: { ...listingInput, draftId: id } })).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(db.rpc).toHaveBeenCalledWith("can_create_organization_listing", {
+      _organization_id: organizationId,
+      _location_id: locationId,
+      _category_id: categoryId,
+      _user_id: "user-id",
+    });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
   it("avviser bekreftelse av en annen brukers aktive annonse", async () => {
     const id = "00000000-0000-4000-8000-000000000001";
     db.listing = {

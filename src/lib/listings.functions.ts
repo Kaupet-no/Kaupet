@@ -651,6 +651,14 @@ export const createListing = createServerFn({ method: "POST" })
       if (existing.status === "active") {
         return { id: existing.id, kaupet_code: existing.kaupet_code };
       }
+      // Draft updates never re-check creation rights, so publishing must (category, Proff, approval).
+      const ownership = await resolveListingOwnership(
+        supabaseAdmin,
+        userId,
+        data.category_id,
+        existing.organization_location_id,
+      );
+      assertDraftOrganization(existing.organization_id, ownership.organization_id);
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,

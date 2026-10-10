@@ -342,4 +342,34 @@ describe("usePublishListing", () => {
     ]);
     expect(deleteStoredImage).toHaveBeenCalledTimes(1);
   });
+
+  it("sletter filen til et opplastet bilde som fjernes før radene er lagret", async () => {
+    let failB = true;
+    uploadImage.mockImplementation(async ({ file }) => {
+      if (file.name === "b.jpg" && failB) {
+        failB = false;
+        throw new Error("Nettbrudd");
+      }
+      return `draft-1/${file.name}`;
+    });
+    createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
+    const images = ["a", "b"].map((id) => ({
+      id,
+      file: new File([id], `${id}.jpg`),
+      thumbFile: new File([id], `${id}-thumb.jpg`),
+      previewUrl: "",
+    }));
+    const { result, rerender } = setup(images);
+    act(() => result.current.publishOnce(values));
+    await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
+    expect(upsertImages).not.toHaveBeenCalled();
+    images.splice(0, 1);
+    rerender();
+    act(() => result.current.publishOnce(values));
+    await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+    expect(deleteStoredImage).toHaveBeenCalledWith("draft-1/a.jpg");
+    expect(upsertImages.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ storage_path: "draft-1/b.jpg" }),
+    ]);
+  });
 });

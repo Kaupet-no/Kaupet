@@ -141,6 +141,17 @@ export function usePublishListing({
         }));
 
       if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+      // Files uploaded by an earlier attempt for images removed since then may have no row.
+      const currentImageKeys = new Set(images.map((img) => `${ensuredDraftId}:${img.id}`));
+      const staleUploads = [...uploadedImages.current].filter(
+        ([key]) => key.startsWith(`${ensuredDraftId}:`) && !currentImageKeys.has(key),
+      );
+      const removeFiles = async (rowPaths: string[]) => {
+        await removeStoredImages([
+          ...new Set([...rowPaths, ...staleUploads.map(([, u]) => u.path)]),
+        ]);
+        for (const [key] of staleUploads) uploadedImages.current.delete(key);
+      };
       // Attach images to the draft before making it public.
       if (images.length > 0) {
         setUploadProgress({ done: 0, total: images.length });
@@ -196,8 +207,8 @@ export function usePublishListing({
             .eq("listing_id", ensuredDraftId)
             .in("id", removed);
           if (error) throw error;
-          await removeStoredImages(removed.map((id) => existing.get(id)!.storage_path));
         }
+        await removeFiles(removed.map((id) => existing.get(id)!.storage_path));
         // Existing rows use UPDATE: an UPSERT's INSERT trigger rejects retries at the 100-image limit.
         await Promise.all(
           desired
@@ -225,7 +236,7 @@ export function usePublishListing({
           .eq("listing_id", ensuredDraftId)
           .select("storage_path");
         if (error) throw error;
-        await removeStoredImages((removed ?? []).map((row) => row.storage_path));
+        await removeFiles((removed ?? []).map((row) => row.storage_path));
       }
 
       // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og

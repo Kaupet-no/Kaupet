@@ -30,9 +30,7 @@ export async function advanceWantStep(page: Page, expectedPage: string) {
 
 export async function fillWantMaxPrice(page: Page, value: string) {
   const input = page.getByLabel("Maks pris du vil betale (valgfritt)");
-  // CI's WebKit trace showed an empty number input after a successful fill().
-  await input.fill("");
-  await input.pressSequentially(value);
+  await input.fill(value);
   await expect(input).toHaveValue(value);
 }
 

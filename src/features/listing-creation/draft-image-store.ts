@@ -34,10 +34,31 @@ async function runTransaction<T>(
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, mode);
     const request = execute(transaction.objectStore(STORE_NAME));
-    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
+    transaction.oncomplete = () => {
+      db.close();
+      resolve(request.result);
+    };
+    transaction.onabort = () => {
+      db.close();
+      reject(transaction.error ?? new Error("Bildelagringen ble avbrutt."));
+    };
   });
+}
+
+/** Moving in one transaction leaves the source intact on failure; retries keep the destination. */
+export async function transferDraftImages(sourceKey: string, targetKey: string): Promise<void> {
+  const result = await runTransaction<StoredImage[] | undefined>("readwrite", (store) => {
+    const request = store.get(sourceKey);
+    request.onsuccess = () => {
+      if (request.result !== undefined) {
+        store.put(request.result, targetKey);
+        store.delete(sourceKey);
+      }
+    };
+    return request;
+  });
+  if (result === null) throw new Error("Bildelagringen er ikke tilgjengelig. Prøv igjen senere.");
 }
 
 export async function saveDraftImages(images: PendingImage[], actorKey = "guest"): Promise<void> {

@@ -8,6 +8,7 @@ import {
   clearDraftImages,
   loadDraftImages,
   saveDraftImages,
+  transferDraftImages,
 } from "@/features/listing-creation/draft-image-store";
 import {
   draftStorageKey,
@@ -114,7 +115,7 @@ export function useDraftAutosave(fields: DraftFields) {
     draftStorageKey("sell", ownerId, "_updated_at", ownerOrganizationId) + storageScope;
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
   const draftSaveMessageRef = useRef<string | null>(null);
-  const guestTransfer = useRef(false);
+  const guestTransfer = useRef<string | null>(null);
   const publishPaused = useRef(false);
   const lastServerSnapshot = useRef<string | null>(null);
   const publishedListing = useRef<{ id: string; kaupet_code: string } | null>(null);
@@ -144,7 +145,8 @@ export function useDraftAutosave(fields: DraftFields) {
   const saveDraftToSupabaseRef = useRef<() => Promise<string | null>>(() => Promise.resolve(null));
   const saveGeneration = useRef(0);
   const imageStoreReady = useRef(false);
-  const restorableImages = useRef<PendingImage[]>([]);
+  const imageLoadPromise = useRef<Promise<PendingImage[]> | null>(null);
+  const loadImagesRef = useRef<() => Promise<PendingImage[]>>(() => loadDraftImages(DRAFT_KEY));
   const latestImages = useRef(images);
   const latestLocalDraft = useRef<Record<string, unknown> | null>(null);
   const localDraftRevision = useRef(0);
@@ -164,13 +166,16 @@ export function useDraftAutosave(fields: DraftFields) {
     try {
       clearLegacyDrafts();
       void clearDraftImages("current").catch(() => {});
-      if (ownerId && fields.resumeGuest && !readItem(DRAFT_KEY)) {
+      if (ownerId && storageScope.startsWith(":handoff:")) {
         const guestKey = draftStorageKey("sell", null);
         const guest = readItem(guestKey);
-        // The guest copy never outlives the transfer, so the next guest on this device cannot adopt it.
-        if (guest && writeItem(DRAFT_KEY, guest)) {
-          removeItems(guestKey);
-          guestTransfer.current = true;
+        // Retain the source until the images commit, so a reload can retry the same handoff.
+        if (
+          guest &&
+          storageScope === `:handoff:${JSON.parse(guest).saved_at}` &&
+          (readItem(DRAFT_KEY) || writeItem(DRAFT_KEY, guest))
+        ) {
+          guestTransfer.current = guest;
         }
       }
       const savedId = readItem(DRAFT_ID_KEY);
@@ -204,34 +209,45 @@ export function useDraftAutosave(fields: DraftFields) {
     } finally {
       setDraftChecked(true);
     }
-  }, [DRAFT_ID_KEY, DRAFT_KEY, DRAFT_UPDATED_AT_KEY, fields.resumeGuest, ownerId]);
+  }, [DRAFT_ID_KEY, DRAFT_KEY, DRAFT_UPDATED_AT_KEY, ownerId, storageScope]);
 
   useEffect(() => {
     let cancelled = false;
     const loadImages = async () => {
-      if (!guestTransfer.current) return loadDraftImages(DRAFT_KEY);
-      // The transferred draft is the guest's, so its images replace any leftovers on the account key.
-      const guestKey = draftStorageKey("sell", null);
-      const guestImages = await loadDraftImages(guestKey);
-      await saveDraftImages(guestImages, DRAFT_KEY);
-      await clearDraftImages(guestKey);
-      return guestImages;
+      if (guestTransfer.current) {
+        const guestKey = draftStorageKey("sell", null);
+        if (JSON.parse(guestTransfer.current).image_count === 0) {
+          await clearDraftImages(guestKey);
+        } else {
+          await transferDraftImages(guestKey, DRAFT_KEY);
+        }
+        if (cancelled || !isCurrent()) return [];
+        if (readItem(guestKey) === guestTransfer.current) removeItems(guestKey);
+        guestTransfer.current = null;
+      }
+      const stored = await loadDraftImages(DRAFT_KEY);
+      if (cancelled || !isCurrent()) return [];
+      imageStoreReady.current = true;
+      return stored;
     };
-    void loadImages()
-      .then((stored) => {
-        if (cancelled) return;
-        restorableImages.current = stored;
-        imageStoreReady.current = true;
+    loadImagesRef.current = loadImages;
+    imageLoadPromise.current = loadImages();
+    void imageLoadPromise.current
+      .then(() => {
+        if (cancelled || !isCurrent()) return;
         if (latestImages.current.length > 0)
           return saveDraftImages(latestImages.current, DRAFT_KEY);
       })
       .catch(() => {
-        imageStoreReady.current = true;
+        if (cancelled || !isCurrent()) return;
+        imageLoadPromise.current = null;
+        setDraftSaveError(true);
+        setDraftSaveMessage("Bildene kunne ikke gjenopprettes. Utkastet er beholdt. Prøv igjen.");
       });
     return () => {
       cancelled = true;
     };
-  }, [DRAFT_KEY]);
+  }, [DRAFT_KEY, isCurrent]);
 
   // Scalar/JSON fields live in localStorage. Binary image drafts are stored
   // separately in IndexedDB below.
@@ -572,11 +588,19 @@ export function useDraftAutosave(fields: DraftFields) {
       setValue("no_known_issues", hasDraftData.no_known_issues);
     if (typeof hasDraftData.maintenance_history === "string")
       setValue("maintenance_history", hasDraftData.maintenance_history);
-    const restoredImages = restorableImages.current.length
-      ? restorableImages.current
-      : await loadDraftImages(DRAFT_KEY).catch(() => []);
+    let restoredImages: PendingImage[];
+    try {
+      restoredImages = await (imageLoadPromise.current ?? loadImagesRef.current());
+    } catch {
+      restoringDraft.current = false;
+      setDraftSaveError(true);
+      setDraftSaveMessage("Bildene kunne ikke gjenopprettes. Utkastet er beholdt. Prøv igjen.");
+      return;
+    }
     if (!isCurrent()) return;
     if (restoredImages.length > 0) setImages(restoredImages);
+    setDraftSaveError(false);
+    setDraftSaveMessage(null);
     restoringDraft.current = false;
     draftRestorePending.current = false;
     setHasDraftData(null);

@@ -28,10 +28,12 @@ vi.mock("@/lib/vehicle/vehicle-title", () => ({
 const loadDraftImagesMock = vi.fn().mockResolvedValue([]);
 const saveDraftImagesMock = vi.fn().mockResolvedValue(undefined);
 const clearDraftImagesMock = vi.fn().mockResolvedValue(undefined);
+const transferDraftImagesMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("./draft-image-store", () => ({
   loadDraftImages: (...args: unknown[]) => loadDraftImagesMock(...args),
   saveDraftImages: (...args: unknown[]) => saveDraftImagesMock(...args),
   clearDraftImages: (...args: unknown[]) => clearDraftImagesMock(...args),
+  transferDraftImages: (...args: unknown[]) => transferDraftImagesMock(...args),
 }));
 
 const DRAFT_KEY = "kaupet_draft_sell_listing:user-1:private";
@@ -67,7 +69,8 @@ beforeEach(() => {
   saveDraftListingMock.mockReset();
   discardDraftListingMock.mockReset();
   loadDraftImagesMock.mockReset().mockResolvedValue([]);
-  saveDraftImagesMock.mockClear();
+  saveDraftImagesMock.mockReset().mockResolvedValue(undefined);
+  transferDraftImagesMock.mockReset().mockResolvedValue(undefined);
   clearDraftImagesMock.mockClear();
 });
 
@@ -335,28 +338,132 @@ describe("useDraftAutosave", () => {
     });
     expect(saveDraftListingMock).not.toHaveBeenCalled();
   });
-  it.each([
-    ["kontoen har gamle bilder", () => loadDraftImagesMock.mockResolvedValue([{ id: "old" }])],
-    ["IndexedDB feiler", () => loadDraftImagesMock.mockRejectedValue(new Error("blocked"))],
-  ])("fjerner gjesteutkastet etter overføring når %s", async (_case, arrange) => {
+  it("venter på bildeoverføringen før gjesteutkastet gjenopprettes", async () => {
+    const guestKey = "kaupet_draft_sell_listing:guest:private";
+    const savedAt = Date.now();
+    const targetKey = `${DRAFT_KEY}:handoff:${savedAt}`;
+    const image = { id: "guest-image" };
+    let commit!: () => void;
+    let transferred = false;
+    transferDraftImagesMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          commit = () => {
+            transferred = true;
+            resolve();
+          };
+        }),
+    );
+    loadDraftImagesMock.mockImplementation((key: string) =>
+      Promise.resolve(key === targetKey && transferred ? [image] : []),
+    );
+    localStorage.setItem(
+      guestKey,
+      JSON.stringify({ title: "Gjestens sykkel", saved_at: savedAt, image_count: 1 }),
+    );
+    const setImages = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, resumeGuest: true, setImages }),
+    );
+    let restored = false;
+    let restore!: Promise<void>;
+    await act(async () => {
+      restore = result.current
+        .restoreDraft({
+          setValue: vi.fn(),
+          setSelectedParentId: vi.fn(),
+          setLocationMethod: vi.fn(),
+          setAttributes: vi.fn(),
+          setCoords: vi.fn(),
+        })
+        .then(() => {
+          restored = true;
+        });
+      await Promise.resolve();
+    });
+    expect(restored).toBe(false);
+    expect(localStorage.getItem(guestKey)).not.toBeNull();
+    await act(async () => {
+      commit();
+      await restore;
+    });
+    expect(setImages).toHaveBeenCalledWith([image]);
+    expect(localStorage.getItem(guestKey)).toBeNull();
+    expect(result.current.hasDraftData).toBeNull();
+    unmount();
+  });
+
+  it("gjenoppretter et gjesteutkast uten bilder når bildelagring ikke er tilgjengelig", async () => {
     const guestKey = "kaupet_draft_sell_listing:guest:private";
     localStorage.setItem(
       guestKey,
-      JSON.stringify({ title: "Gjestens sykkel", saved_at: Date.now() }),
+      JSON.stringify({ title: "Gjestens sykkel", saved_at: Date.now(), image_count: 0 }),
     );
-    arrange();
-
-    const { result } = renderHook(() => useDraftAutosave({ ...baseFields, resumeGuest: true }));
-
-    await waitFor(() => expect(result.current.hasDraftData?.title).toBe("Gjestens sykkel"));
+    transferDraftImagesMock.mockRejectedValue(new Error("IndexedDB unavailable"));
+    const { result, unmount } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, resumeGuest: true }),
+    );
+    await act(async () => {
+      await result.current.restoreDraft({
+        setValue: vi.fn(),
+        setSelectedParentId: vi.fn(),
+        setLocationMethod: vi.fn(),
+        setAttributes: vi.fn(),
+        setCoords: vi.fn(),
+      });
+    });
+    expect(result.current.hasDraftData).toBeNull();
+    expect(result.current.draftSaveError).toBe(false);
     expect(localStorage.getItem(guestKey)).toBeNull();
-    expect(
-      Object.entries(localStorage).some(
-        ([key, value]) =>
-          key.startsWith(`${DRAFT_KEY}:handoff:`) && value.includes("Gjestens sykkel"),
-      ),
-    ).toBe(true);
+    unmount();
   });
+
+  it.each([false, true])(
+    "beholder gjestebildene etter feil og gjenopptar overføringen, reload=%s",
+    async (reload) => {
+      const guestKey = "kaupet_draft_sell_listing:guest:private";
+      const savedAt = Date.now();
+      const targetKey = `${DRAFT_KEY}:handoff:${savedAt}`;
+      const image = { id: "guest-image" };
+      let transferred = false;
+      transferDraftImagesMock.mockRejectedValueOnce(new Error("QuotaExceededError"));
+      transferDraftImagesMock.mockImplementation(() => {
+        transferred = true;
+        return Promise.resolve();
+      });
+      loadDraftImagesMock.mockImplementation((key: string) =>
+        Promise.resolve(key === targetKey && transferred ? [image] : []),
+      );
+      localStorage.setItem(
+        guestKey,
+        JSON.stringify({ title: "Gjestens sykkel", saved_at: savedAt, image_count: 1 }),
+      );
+      const setImages = vi.fn();
+      let hook = renderHook(() =>
+        useDraftAutosave({ ...baseFields, resumeGuest: true, setImages }),
+      );
+      await waitFor(() => expect(hook.result.current.draftSaveError).toBe(true));
+      expect(hook.result.current.hasDraftData?.image_count).toBe(1);
+      expect(localStorage.getItem(guestKey)).not.toBeNull();
+      if (reload) {
+        hook.unmount();
+        hook = renderHook(() => useDraftAutosave({ ...baseFields, setImages }));
+      }
+      await act(async () => {
+        await hook.result.current.restoreDraft({
+          setValue: vi.fn(),
+          setSelectedParentId: vi.fn(),
+          setLocationMethod: vi.fn(),
+          setAttributes: vi.fn(),
+          setCoords: vi.fn(),
+        });
+      });
+      expect(setImages).toHaveBeenCalledWith([image]);
+      expect(hook.result.current.draftSaveError).toBe(false);
+      expect(localStorage.getItem(guestKey)).toBeNull();
+      hook.unmount();
+    },
+  );
 
   it("returnerer feil når bildedraft ikke kan flushes", async () => {
     saveDraftImagesMock.mockRejectedValueOnce(new Error("IndexedDB unavailable"));
@@ -1020,7 +1127,7 @@ it.each([null, "organization-1"])(
       useDraftAutosave({ ...baseFields, organizationId, resumeGuest: true }),
     );
     await waitFor(() => expect(result.current.hasDraftData?.title).toBe("Gjestens nye utkast"));
-    await waitFor(() => expect(saveDraftImagesMock).toHaveBeenCalledWith([], handoffKey));
+    await waitFor(() => expect(localStorage.getItem(guestKey)).toBeNull());
     expect(result.current.draftId).toBeNull();
     expect(localStorage.getItem(guestKey)).toBeNull();
     expect(localStorage.getItem(accountKey)).toBe(oldDraft);

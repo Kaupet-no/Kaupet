@@ -65,3 +65,42 @@ export function draftStorageKey(
 ) {
   return `kaupet_draft_${kind}_listing${suffix}:${userId ?? "guest"}:${organizationId ?? "private"}`;
 }
+
+/** Keep authenticated guest handoffs separate from existing account drafts. */
+export function draftStorageScope(
+  kind: "sell" | "want",
+  userId: string | null,
+  organizationId: string | null,
+  resumeGuest: boolean,
+): string {
+  if (!userId) return "";
+  const baseKey = draftStorageKey(kind, userId, "", organizationId);
+  const savedAt = (key: string): number => {
+    try {
+      const draft = JSON.parse(readItem(key) ?? "null");
+      return draft && typeof draft.saved_at === "number" && isDraftFresh(draft.saved_at)
+        ? draft.saved_at
+        : 0;
+    } catch {
+      return 0;
+    }
+  };
+  const guestSavedAt = resumeGuest ? savedAt(draftStorageKey(kind, null)) : 0;
+  if (guestSavedAt) return `:handoff:${guestSavedAt}`;
+  let newest = savedAt(baseKey);
+  let scope = "";
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(`${baseKey}:handoff:`)) continue;
+      const time = savedAt(key);
+      if (time > newest) {
+        newest = time;
+        scope = key.slice(baseKey.length);
+      }
+    }
+  } catch {
+    // Unavailable browser storage: the existing save paths report the failure.
+  }
+  return scope;
+}

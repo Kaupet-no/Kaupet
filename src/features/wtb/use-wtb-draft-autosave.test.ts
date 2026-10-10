@@ -72,6 +72,55 @@ describe("useWtbDraftAutosave", () => {
     expect(saveWtbDraftMock).toHaveBeenCalledTimes(1);
   });
 
+  it("gjesteoverføring bevarer kontoutkastet og kobler ikke til et annet serverutkast", async () => {
+    const accountKey = "kaupet_draft_want_listing:user-1:private";
+    const accountIdKey = "kaupet_draft_want_listing_id:user-1:private";
+    const guestKey = "kaupet_draft_want_listing:guest:private";
+    const savedAt = Date.now();
+    const oldDraft = JSON.stringify({
+      ...fields,
+      title: "Kontoens gamle ønske",
+      draft_kind: "want",
+      draft_version: 1,
+      saved_at: savedAt - 60000,
+    });
+    const guest = {
+      ...fields,
+      title: "Gjestens nye ønske",
+      draft_kind: "want",
+      draft_version: 1,
+      saved_at: savedAt,
+    };
+    localStorage.setItem(accountKey, oldDraft);
+    localStorage.setItem(accountIdKey, "old-server-id");
+    localStorage.setItem(guestKey, JSON.stringify(guest));
+    getLatestWtbDraftMock.mockResolvedValue({
+      ...fields,
+      id: "old-server-id",
+      updated_at: new Date(savedAt + 1000).toISOString(),
+    });
+    const { result, unmount } = renderHook(() => useWtbDraftAutosave(guest, true, "user-1", true));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(result.current.restorableDraft?.title).toBe("Gjestens nye ønske");
+    expect(result.current.draftId).toBeNull();
+    expect(getLatestWtbDraftMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem(guestKey)).toBeNull();
+    expect(localStorage.getItem(accountKey)).toBe(oldDraft);
+    expect(localStorage.getItem(accountIdKey)).toBe("old-server-id");
+    unmount();
+    const resumed = renderHook(() => useWtbDraftAutosave(guest, true, "user-1"));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(resumed.result.current.restorableDraft?.title).toBe("Gjestens nye ønske");
+    await act(async () => {
+      await resumed.result.current.preparePublish();
+    });
+    expect(saveWtbDraftMock.mock.calls[0][0].data.id).toBeUndefined();
+    act(() => resumed.result.current.clearAfterPublish());
+    expect(localStorage.getItem(`${accountKey}:handoff:${savedAt}`)).toBeNull();
+    expect(localStorage.getItem(accountKey)).toBe(oldDraft);
+    expect(localStorage.getItem(accountIdKey)).toBe("old-server-id");
+  });
+
   it("lagrer et versjonert kjøpsønske uten å berøre salgsutkastet", () => {
     localStorage.setItem("kaupet_draft_sell_listing:user-1:private", "sell-draft");
     renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));

@@ -4,6 +4,7 @@ import { discardWtbDraft, getLatestWtbDraft, saveWtbDraft } from "@/lib/wtb-list
 import {
   clearLegacyDrafts,
   draftStorageKey,
+  draftStorageScope,
   isDraftFresh,
   readItem,
   removeItems,
@@ -59,8 +60,9 @@ export function useWtbDraftAutosave(
   resumeGuest = false,
 ) {
   const { ownerId, actorChanged, isCurrent } = useDraftActor(userId);
-  const DRAFT_KEY = draftStorageKey("want", ownerId);
-  const DRAFT_ID_KEY = draftStorageKey("want", ownerId, "_id");
+  const [storageScope] = useState(() => draftStorageScope("want", ownerId, null, resumeGuest));
+  const DRAFT_KEY = draftStorageKey("want", ownerId) + storageScope;
+  const DRAFT_ID_KEY = draftStorageKey("want", ownerId, "_id") + storageScope;
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
   const publishPaused = useRef(false);
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export function useWtbDraftAutosave(
       const local = loadRestorableDraft(DRAFT_KEY);
       rememberDraftId(readItem(DRAFT_ID_KEY));
       setRestorableDraft(local);
-      if (!authenticated) return;
+      if (!authenticated || storageScope) return;
       void getLatestWtbDraft()
         .then((server) => {
           if (!server || !isCurrent()) return;
@@ -130,7 +132,16 @@ export function useWtbDraftAutosave(
         });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [authenticated, DRAFT_ID_KEY, DRAFT_KEY, isCurrent, ownerId, resumeGuest, rememberDraftId]);
+  }, [
+    authenticated,
+    DRAFT_ID_KEY,
+    DRAFT_KEY,
+    isCurrent,
+    ownerId,
+    resumeGuest,
+    rememberDraftId,
+    storageScope,
+  ]);
 
   /** Returns false when the browser refused the write (private mode, quota) —
    * the guest publish handoff must not navigate away on a lost draft. */

@@ -11,6 +11,7 @@ import {
 } from "@/features/listing-creation/draft-image-store";
 import {
   draftStorageKey,
+  draftStorageScope,
   clearLegacyDrafts,
   isDraftFresh,
   readItem,
@@ -104,9 +105,13 @@ export function useDraftAutosave(fields: DraftFields) {
     fields.userId,
     fields.organizationId,
   );
-  const DRAFT_KEY = draftStorageKey("sell", ownerId, "", ownerOrganizationId);
-  const DRAFT_ID_KEY = draftStorageKey("sell", ownerId, "_id", ownerOrganizationId);
-  const DRAFT_UPDATED_AT_KEY = draftStorageKey("sell", ownerId, "_updated_at", ownerOrganizationId);
+  const [storageScope] = useState(() =>
+    draftStorageScope("sell", ownerId, ownerOrganizationId, !!fields.resumeGuest),
+  );
+  const DRAFT_KEY = draftStorageKey("sell", ownerId, "", ownerOrganizationId) + storageScope;
+  const DRAFT_ID_KEY = draftStorageKey("sell", ownerId, "_id", ownerOrganizationId) + storageScope;
+  const DRAFT_UPDATED_AT_KEY =
+    draftStorageKey("sell", ownerId, "_updated_at", ownerOrganizationId) + storageScope;
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
   const draftSaveMessageRef = useRef<string | null>(null);
   const guestTransfer = useRef(false);
@@ -208,9 +213,9 @@ export function useDraftAutosave(fields: DraftFields) {
       // The transferred draft is the guest's, so its images replace any leftovers on the account key.
       const guestKey = draftStorageKey("sell", null);
       const guestImages = await loadDraftImages(guestKey);
-      if (guestImages.length) await saveDraftImages(guestImages, DRAFT_KEY);
+      await saveDraftImages(guestImages, DRAFT_KEY);
       await clearDraftImages(guestKey);
-      return guestImages.length ? guestImages : loadDraftImages(DRAFT_KEY);
+      return guestImages;
     };
     void loadImages()
       .then((stored) => {

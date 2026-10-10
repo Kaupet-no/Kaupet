@@ -350,7 +350,12 @@ describe("useDraftAutosave", () => {
 
     await waitFor(() => expect(result.current.hasDraftData?.title).toBe("Gjestens sykkel"));
     expect(localStorage.getItem(guestKey)).toBeNull();
-    expect(localStorage.getItem(DRAFT_KEY)).toContain("Gjestens sykkel");
+    expect(
+      Object.entries(localStorage).some(
+        ([key, value]) =>
+          key.startsWith(`${DRAFT_KEY}:handoff:`) && value.includes("Gjestens sykkel"),
+      ),
+    ).toBe(true);
   });
 
   it("returnerer feil når bildedraft ikke kan flushes", async () => {
@@ -992,3 +997,63 @@ describe("useDraftAutosave", () => {
     expect(saved.attributes).toEqual({ brand: "Trek" });
   });
 });
+
+it.each([null, "organization-1"])(
+  "gjesteoverføring bevarer kontoutkast og bilder for bedrift %s",
+  async (organizationId) => {
+    const accountKey = `kaupet_draft_sell_listing:user-1:${organizationId ?? "private"}`;
+    const accountIdKey = `kaupet_draft_sell_listing_id:user-1:${organizationId ?? "private"}`;
+    const guestKey = "kaupet_draft_sell_listing:guest:private";
+    const savedAt = Date.now();
+    const handoffKey = `${accountKey}:handoff:${savedAt}`;
+    const oldDraft = JSON.stringify({ title: "Kontoens gamle utkast", saved_at: savedAt - 60000 });
+    localStorage.setItem(accountKey, oldDraft);
+    localStorage.setItem(accountIdKey, "old-server-id");
+    localStorage.setItem(
+      guestKey,
+      JSON.stringify({ title: "Gjestens nye utkast", saved_at: savedAt }),
+    );
+    loadDraftImagesMock.mockImplementation(async (key) =>
+      key === accountKey ? [{ id: "old-image" }] : [],
+    );
+    const { result, unmount } = renderHook(() =>
+      useDraftAutosave({ ...baseFields, organizationId, resumeGuest: true }),
+    );
+    await waitFor(() => expect(result.current.hasDraftData?.title).toBe("Gjestens nye utkast"));
+    await waitFor(() => expect(saveDraftImagesMock).toHaveBeenCalledWith([], handoffKey));
+    expect(result.current.draftId).toBeNull();
+    expect(localStorage.getItem(guestKey)).toBeNull();
+    expect(localStorage.getItem(accountKey)).toBe(oldDraft);
+    expect(localStorage.getItem(accountIdKey)).toBe("old-server-id");
+    expect(clearDraftImagesMock).not.toHaveBeenCalledWith(accountKey);
+    unmount();
+    const resumed = renderHook(() =>
+      useDraftAutosave({ ...baseFields, organizationId, title: "Gjestens nye utkast" }),
+    );
+    await waitFor(() =>
+      expect(resumed.result.current.hasDraftData?.title).toBe("Gjestens nye utkast"),
+    );
+    await act(async () => {
+      await resumed.result.current.restoreDraft({
+        setValue: vi.fn(),
+        setSelectedParentId: vi.fn(),
+        setLocationMethod: vi.fn(),
+        setAttributes: vi.fn(),
+        setCoords: vi.fn(),
+      });
+    });
+    saveDraftListingMock.mockResolvedValue({ id: "new-server-id" });
+    await act(async () => {
+      expect(await resumed.result.current.preparePublish()).toEqual({
+        id: "new-server-id",
+        published: false,
+      });
+    });
+    expect(saveDraftListingMock.mock.calls[0][0].data.id).toBeUndefined();
+    act(() => resumed.result.current.clearDraftStorage({ stopAutosave: true }));
+    expect(localStorage.getItem(handoffKey)).toBeNull();
+    expect(localStorage.getItem(accountKey)).toBe(oldDraft);
+    expect(localStorage.getItem(accountIdKey)).toBe("old-server-id");
+    resumed.unmount();
+  },
+);

@@ -38,7 +38,7 @@ it("gir innholdssidene de fire delte oppgavenavnene", () => {
   const pages = resolveWizardPages(DEFAULT_FIELD_GROUPS, { native: false });
 
   expect(pages.map((keys) => pageLabel(fieldGroupsForKeys(keys)))).toEqual([
-    "Bilder",
+    "Tittel og bilder",
     "Om tingen",
     "Pris og henting",
     "Se over",

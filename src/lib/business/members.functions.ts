@@ -35,6 +35,7 @@ async function businessInvitationRedirect(): Promise<string> {
       host === "kaupet.no" ||
       host === "www.kaupet.no" ||
       host === "test.kaupet.no" ||
+      host === "staging.kaupet.no" ||
       host.startsWith("localhost:") ||
       host.startsWith("127.0.0.1:");
     if (allowedHost) {
@@ -75,6 +76,8 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
       throw new Error(PROFF_REQUIRED_MESSAGE);
     }
+    const { assertUserNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertUserNotRateLimited(context.userId, "business_invite", 5, 3600);
     const permissions = normalizeMemberPermissions(
       data.permissions ?? memberPermissionsSchema.parse({}),
     );
@@ -97,6 +100,7 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     }
     const userId = invited.user?.id;
     if (!userId) throw new Error("Kunne ikke opprette invitasjonen. Prøv igjen.");
+    // Auth does not prove whether this call created the account; never delete it on membership errors.
 
     const { error: memberError } = await supabaseAdmin.from("organization_members").insert({
       organization_id: organizationId,
@@ -107,8 +111,18 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       category_access: permissions.categoryAccess,
     });
     if (memberError) {
-      await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (memberError.code === "23505") throw new Error(INVITE_EXISTING_MESSAGE);
+      if (memberError.code === "23505") {
+        const { data: existing, error: lookupError } = await supabaseAdmin
+          .from("organization_members")
+          .select("status")
+          .eq("organization_id", organizationId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (lookupError) throw await toClientError("inviteOrganizationMember.lookup", lookupError);
+        // Auth has already re-sent the email; the existing permissions are kept unchanged.
+        if (existing?.status === "invited") return { userId, email, alreadyInvited: true };
+        throw new ClientError(INVITE_EXISTING_MESSAGE, 409);
+      }
       throw await toClientError("inviteOrganizationMember", memberError);
     }
     if (permissions.categoryAccess === "restricted") {
@@ -125,8 +139,8 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         await supabaseAdmin.from("organization_members").delete().match({
           organization_id: organizationId,
           user_id: userId,
+          status: "invited",
         });
-        await supabaseAdmin.auth.admin.deleteUser(userId);
         throw await toClientError("inviteOrganizationMember", categoryError);
       }
     }
@@ -148,11 +162,45 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       await supabaseAdmin.from("organization_members").delete().match({
         organization_id: organizationId,
         user_id: userId,
+        status: "invited",
       });
-      await supabaseAdmin.auth.admin.deleteUser(userId);
       throw await toClientError("inviteOrganizationMember", locationsError);
     }
-    return { userId, email };
+    return { userId, email, alreadyInvited: false };
+  });
+
+export const resendOrganizationInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ userId: uuid }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
+      throw new ClientError(PROFF_REQUIRED_MESSAGE, 403);
+    }
+    const { data: member, error: memberError } = await supabaseAdmin
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", data.userId)
+      .eq("status", "invited")
+      .maybeSingle();
+    if (memberError) throw await toClientError("resendOrganizationInvite.lookup", memberError);
+    if (!member) throw new ClientError("Invitasjonen finnes ikke eller er allerede godtatt.", 409);
+    const { assertUserNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertUserNotRateLimited(context.userId, "business_invite", 5, 3600);
+    const { data: target, error: targetError } = await supabaseAdmin.auth.admin.getUserById(
+      data.userId,
+    );
+    if (targetError) throw await toClientError("resendOrganizationInvite.user", targetError);
+    if (!target.user?.email) throw new ClientError("Invitasjonen har ingen gyldig mottaker.", 409);
+    const redirectTo = await businessInvitationRedirect();
+    // Opening the invite link confirms the email before a password is chosen, and Auth refuses
+    // to re-invite confirmed users. A recovery link lands on the same page to set it and accept.
+    const { error } = target.user.email_confirmed_at
+      ? await supabaseAdmin.auth.resetPasswordForEmail(target.user.email, { redirectTo })
+      : await supabaseAdmin.auth.admin.inviteUserByEmail(target.user.email, { redirectTo });
+    if (error) throw await toClientError("resendOrganizationInvite.send", error);
+    return { userId: data.userId };
   });
 
 export const acceptOrganizationInvite = createServerFn({ method: "POST" })

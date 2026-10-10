@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { discardWtbDraft, getLatestWtbDraft, saveWtbDraft } from "@/lib/wtb-listings.functions";
 import {
+  clearLegacyDrafts,
+  draftStorageKey,
+  draftStorageScope,
   isDraftFresh,
   readItem,
   removeItems,
@@ -9,8 +12,8 @@ import {
 } from "@/features/listing-creation/draft-storage";
 import type { WtbAttributeMap } from "./wtb-criteria-types";
 
-const DRAFT_KEY = "kaupet_draft_want_listing";
-const DRAFT_ID_KEY = "kaupet_draft_want_listing_id";
+import { useDraftActor } from "@/features/listing-creation/use-draft-actor";
+import { formatErrorMessage } from "@/lib/errors";
 const DRAFT_VERSION = 1;
 
 export type WtbDraftData = {
@@ -32,7 +35,7 @@ export type WtbDraftData = {
   radius_km?: number | null;
 };
 
-function loadRestorableDraft(): WtbDraftData | null {
+function loadRestorableDraft(DRAFT_KEY: string): WtbDraftData | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = readItem(DRAFT_KEY);
@@ -53,8 +56,24 @@ function loadRestorableDraft(): WtbDraftData | null {
 export function useWtbDraftAutosave(
   fields: Omit<WtbDraftData, "draft_kind" | "draft_version" | "saved_at">,
   authenticated: boolean,
+  userId: string | null,
+  resumeGuest = false,
 ) {
+  const { ownerId, actorChanged, isCurrent } = useDraftActor(userId);
+  const [storageScope] = useState(() => draftStorageScope("want", ownerId, null, resumeGuest));
+  const DRAFT_KEY = draftStorageKey("want", ownerId) + storageScope;
+  const DRAFT_ID_KEY = draftStorageKey("want", ownerId, "_id") + storageScope;
+  const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const publishPaused = useRef(false);
   const [draftId, setDraftId] = useState<string | null>(null);
+  const draftIdRef = useRef<string | null>(null);
+  const lastServerSnapshot = useRef<string | null>(null);
+  const publishedId = useRef<string | null>(null);
+  const rememberDraftId = useCallback((id: string | null) => {
+    draftIdRef.current = id;
+    setDraftId(id);
+    if (!id) lastServerSnapshot.current = null;
+  }, []);
   const [restorableDraft, setRestorableDraft] = useState<WtbDraftData | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [draftSaveError, setDraftSaveError] = useState(false);
@@ -72,15 +91,22 @@ export function useWtbDraftAutosave(
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const local = loadRestorableDraft();
-      setDraftId(readItem(DRAFT_ID_KEY));
+      if (!isCurrent()) return;
+      clearLegacyDrafts();
+      if (ownerId && resumeGuest && !readItem(DRAFT_KEY)) {
+        const guestKey = draftStorageKey("want", null);
+        const guest = readItem(guestKey);
+        if (guest && writeItem(DRAFT_KEY, guest)) removeItems(guestKey);
+      }
+      const local = loadRestorableDraft(DRAFT_KEY);
+      rememberDraftId(readItem(DRAFT_ID_KEY));
       setRestorableDraft(local);
-      if (!authenticated) return;
+      if (!authenticated || storageScope) return;
       void getLatestWtbDraft()
         .then((server) => {
-          if (!server) return;
+          if (!server || !isCurrent()) return;
           const savedAt = new Date(server.updated_at).getTime();
-          setDraftId(server.id);
+          rememberDraftId(server.id);
           writeItem(DRAFT_ID_KEY, server.id);
           if (local && local.saved_at >= savedAt) return;
           const attributes = (server.attributes ?? {}) as WtbAttributeMap;
@@ -107,11 +133,21 @@ export function useWtbDraftAutosave(
         });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [authenticated]);
+  }, [
+    authenticated,
+    DRAFT_ID_KEY,
+    DRAFT_KEY,
+    isCurrent,
+    ownerId,
+    resumeGuest,
+    rememberDraftId,
+    storageScope,
+  ]);
 
   /** Returns false when the browser refused the write (private mode, quota) —
    * the guest publish handoff must not navigate away on a lost draft. */
-  function saveLocal(): boolean {
+  const saveLocal = useCallback((): boolean => {
+    if (!isCurrent()) return false;
     if (savingStopped.current) return true;
     const ok = writeItem(
       DRAFT_KEY,
@@ -125,13 +161,13 @@ export function useWtbDraftAutosave(
     if (ok) setLastSaved(new Date());
     setDraftSaveError(!ok);
     return ok;
-  }
+  }, [DRAFT_KEY, isCurrent]);
 
   useEffect(() => {
     if (restorableDraft) return;
     const timeout = window.setTimeout(saveLocal, 2_000);
     return () => window.clearTimeout(timeout);
-  }, [fields, restorableDraft]);
+  }, [fields, restorableDraft, saveLocal]);
 
   // Flush the newest fields straight into localStorage, synchronously and
   // unconditionally except for the two guards below — mirrors
@@ -149,7 +185,7 @@ export function useWtbDraftAutosave(
   const flushLocalDraftSync = useCallback(() => {
     if (savingStopped.current || restorableDraftRef.current) return;
     saveLocal();
-  }, []);
+  }, [saveLocal]);
 
   // Save locally when the tab is hidden (switch away, close, or reload) and
   // on pagehide — the reliable unload signal on mobile/iOS Safari, where
@@ -170,16 +206,19 @@ export function useWtbDraftAutosave(
   }, [flushLocalDraftSync]);
 
   async function saveToServer(): Promise<string | null> {
-    if (savingStopped.current) return draftId;
-    if (restorableDraftRef.current) return draftId;
+    if (!isCurrent() || publishPaused.current) return null;
+    if (savingStopped.current) return draftIdRef.current;
+    if (restorableDraftRef.current) return draftIdRef.current;
     saveLocal();
-    if (!authenticated) return draftId;
+    if (!authenticated || !ownerId) return draftIdRef.current;
     // share the in-flight promise instead of one of them bailing out with a
     // stale draftId, which would otherwise leave the concurrent save's
     // draft row orphaned (see saveWtbDraft/createWtbListing).
     if (saveInProgress.current) return saveInProgress.current;
     const currentFields = fieldsRef.current;
-    if (currentFields.title.trim().length < 3) return draftId;
+    if (currentFields.title.trim().length < 3) return draftIdRef.current;
+    const snapshot = JSON.stringify(currentFields);
+    if (draftIdRef.current && lastServerSnapshot.current === snapshot) return draftIdRef.current;
     const rawMaxPrice = currentFields.max_price_nok;
     const parsedMaxPrice =
       typeof rawMaxPrice === "number"
@@ -195,11 +234,13 @@ export function useWtbDraftAutosave(
         ? parsedMaxPrice
         : null;
     setIsSaving(true);
+    publishedId.current = null;
     const promise = (async () => {
       try {
         const result = await saveWtbDraft({
           data: {
-            ...(draftId ? { id: draftId } : {}),
+            expected_user_id: ownerId,
+            ...(draftIdRef.current ? { id: draftIdRef.current } : {}),
             title: currentFields.title,
             description: currentFields.description || undefined,
             category_id: currentFields.category_id,
@@ -216,12 +257,31 @@ export function useWtbDraftAutosave(
             radius_km: currentFields.radius_km ?? null,
           },
         });
-        setDraftId(result.id);
+        if (!isCurrent()) return null;
+        if ("published" in result && result.published) {
+          // A lost publish response: the want listing is live, so these edits were not saved.
+          publishedId.current = result.id;
+          setDraftSaveMessage(
+            "Kjøpsønsket er allerede publisert. Endringer her lagres ikke – rediger det publiserte kjøpsønsket.",
+          );
+          setDraftSaveError(true);
+          return result.id;
+        }
+        setDraftSaveMessage(null);
+        rememberDraftId(result.id);
+        lastServerSnapshot.current = snapshot;
         writeItem(DRAFT_ID_KEY, result.id);
         setLastSaved(new Date());
         setDraftSaveError(false);
         return result.id;
-      } catch {
+      } catch (error) {
+        if (!isCurrent()) return null;
+        setDraftSaveMessage(
+          formatErrorMessage(
+            error,
+            "Utkastet kunne ikke lagres. Innholdet er beholdt lokalt. Prøv igjen senere.",
+          ),
+        );
         setDraftSaveError(true);
         return null;
       } finally {
@@ -253,7 +313,28 @@ export function useWtbDraftAutosave(
     removeItems(DRAFT_KEY, DRAFT_ID_KEY);
   }
 
+  async function preparePublish() {
+    // Publishing the current form declines an unanswered restore offer; otherwise saveToServer skips the save.
+    if (restorableDraftRef.current) {
+      restorableDraftRef.current = null;
+      setRestorableDraft(null);
+    }
+    if (saveInProgress.current) await saveInProgress.current;
+    const id = await saveToServer();
+    if (!id || !isCurrent()) throw new Error("Utkastet må lagres før publisering. Prøv igjen.");
+    publishPaused.current = true;
+    return { id, published: publishedId.current === id };
+  }
+
   return {
+    actorChanged,
+    ownerId,
+    isCurrent,
+    draftSaveMessage,
+    preparePublish,
+    resumeAutosave: () => {
+      publishPaused.current = false;
+    },
     draftId,
     restorableDraft,
     lastSaved,
@@ -263,10 +344,11 @@ export function useWtbDraftAutosave(
     saveToServer,
     dismissRestore: () => setRestorableDraft(null),
     discardDraft: async () => {
-      const id = draftId;
+      if (!isCurrent()) return;
+      const id = draftIdRef.current;
       clearStorage();
       setRestorableDraft(null);
-      setDraftId(null);
+      rememberDraftId(null);
       if (!id || !authenticated) return;
       try {
         await discardWtbDraft({ data: { id } });
@@ -275,10 +357,11 @@ export function useWtbDraftAutosave(
       }
     },
     clearAfterPublish: () => {
+      if (!isCurrent()) return;
       savingStopped.current = true;
       clearStorage();
       setRestorableDraft(null);
-      setDraftId(null);
+      rememberDraftId(null);
     },
   };
 }

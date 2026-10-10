@@ -323,7 +323,7 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
  * web next-button. Structural category/registration pages keep their own
  * labels outside the four content tasks. */
 const LISTING_TASK_LABEL_NB: Record<ListingTask, string> = {
-  showcase: "Bilder",
+  showcase: "Tittel og bilder",
   searchable: "Om tingen",
   trade: "Pris og henting",
   review: "Se over",

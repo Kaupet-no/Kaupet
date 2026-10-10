@@ -67,6 +67,37 @@ afterEach(() => {
 });
 
 describe("ListingComposerShell", () => {
+  it("beholder fokus når brukeren begynner å skrive før stegets fokusramme kjører", () => {
+    let focusPage: FrameRequestCallback | undefined;
+    const frame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      focusPage = callback;
+      return 1;
+    });
+    try {
+      render(
+        <ListingComposerShell
+          title="Ønskes kjøpt"
+          pageKey="details"
+          pageTitle="Siste detaljer"
+          native={false}
+          onCancel={vi.fn()}
+          firstStep={false}
+          footer={null}
+        >
+          <label htmlFor="price">Maks pris</label>
+          <input id="price" type="number" />
+        </ListingComposerShell>,
+      );
+      const input = screen.getByLabelText("Maks pris");
+      input.focus();
+      fireEvent.input(input, { target: { value: "1" } });
+      focusPage?.(0);
+      expect(document.activeElement).toBe(input);
+    } finally {
+      frame.mockRestore();
+    }
+  });
+
   it("flytter fokus til sidetittelen når første steg åpnes", () => {
     const requestAnimationFrame = vi
       .spyOn(window, "requestAnimationFrame")

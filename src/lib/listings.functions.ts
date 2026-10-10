@@ -1,3 +1,4 @@
+import { assertDraftActor, assertDraftOrganization } from "@/lib/draft-actor";
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
@@ -44,6 +45,7 @@ type ListingOwnership = {
 
 type ListingMutationRow = {
   id: string;
+  kaupet_code: string;
   seller_id: string;
   organization_id: string | null;
   organization_location_id: string | null;
@@ -77,6 +79,8 @@ async function resolveListingOwnership(
     throw await toClientError("database", error);
   }
   if (!membership) {
+    if (requestedLocationId)
+      throw new ClientError("Du har ikke tilgang til denne bedriftslokasjonen.", 403);
     return { seller_id: userId, organization_id: null, organization_location_id: null };
   }
   if (membership.role === "member") {
@@ -148,12 +152,46 @@ async function resolveListingOwnership(
   if (permissionError) {
     throw await toClientError("database", permissionError);
   }
-  if (!allowed) throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
+  if (!allowed) {
+    const { data: verified, error: verificationError } = await supabaseAdmin.rpc(
+      "organization_is_verified",
+      { _organization_id: membership.organization_id },
+    );
+    if (verificationError) throw await toClientError("database", verificationError);
+    if (!verified)
+      throw new ClientError(
+        "Bedriften venter på godkjenning fra Kaupet. Publisering blir tilgjengelig når bedriften er godkjent.",
+        403,
+      );
+    throw new ClientError("Du har ikke tilgang til å opprette annonser.", 403);
+  }
   return {
     seller_id: userId,
     organization_id: membership.organization_id,
     organization_location_id: requestedLocationId,
   };
+}
+
+/** A business draft may move to another location; creation rights are checked for the new one. */
+async function draftLocationId(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  existing: ListingMutationRow,
+  requestedLocationId: string | null | undefined,
+  categoryId: string | null,
+): Promise<string | null> {
+  if (!existing.organization_id) return null;
+  if (!requestedLocationId || requestedLocationId === existing.organization_location_id) {
+    return existing.organization_location_id;
+  }
+  const ownership = await resolveListingOwnership(
+    supabaseAdmin,
+    userId,
+    categoryId,
+    requestedLocationId,
+  );
+  assertDraftOrganization(existing.organization_id, ownership.organization_id);
+  return ownership.organization_location_id;
 }
 
 async function organizationLocationOverride(
@@ -182,7 +220,7 @@ async function authorizeListingMutation(
   const { data: listing, error } = await supabaseAdmin
     .from("listings")
     .select(
-      "id, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes, updated_at",
+      "id, kaupet_code, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes, updated_at",
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -347,6 +385,8 @@ export const saveDraftListing = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
+        expected_user_id: z.string().uuid().optional(),
+        expected_organization_id: z.string().uuid().nullable().optional(),
         id: z.string().uuid().optional(),
         expected_updated_at: z.string().datetime({ offset: true }).optional(),
         title: z.string().trim().min(1).max(120),
@@ -377,6 +417,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
@@ -403,10 +444,27 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     if (data.id) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
+      assertDraftOrganization(data.expected_organization_id, existing.organization_id);
+      // A lost publish response must not turn the active listing back into a draft.
+      if (existing.status === "active") {
+        return {
+          id: existing.id,
+          kaupet_code: existing.kaupet_code,
+          updated_at: existing.updated_at,
+          published: true as const,
+        };
+      }
+      const locationId = await draftLocationId(
+        supabaseAdmin,
+        userId,
+        existing,
+        data.organization_location_id,
+        data.category_id !== undefined ? data.category_id : existing.category_id,
+      );
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
-        existing.organization_location_id,
+        locationId,
       );
       let query = supabaseAdmin
         .from("listings")
@@ -415,7 +473,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           ...(existing.organization_id
             ? {
                 ...listingLocationFields(orgLocation),
-                organization_location_id: existing.organization_location_id,
+                organization_location_id: locationId,
               }
             : { organization_location_id: null }),
           draft_expiry_notified_at: null,
@@ -451,6 +509,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       data.category_id ?? null,
       data.organization_location_id,
     );
+    assertDraftOrganization(data.expected_organization_id, ownership.organization_id);
     const orgLocation = await organizationLocationOverride(
       supabaseAdmin,
       ownership.organization_id,
@@ -501,6 +560,21 @@ export const createListing = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
+        expected_user_id: z.string().uuid().optional(),
+        expected_organization_id: z.string().uuid().nullable().optional(),
+        images: z
+          .array(
+            z.object({
+              id: z.string().uuid(),
+              storage_path: z
+                .string()
+                .regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
+              sort_order: z.number().int().min(0).max(99),
+              caption: z.string().trim().max(140).nullable(),
+            }),
+          )
+          .max(100)
+          .optional(),
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
         subtitle: z.string().trim().max(80).nullable().optional(),
@@ -525,6 +599,13 @@ export const createListing = createServerFn({ method: "POST" })
         turnstileToken: z.string().nullable().optional(),
       })
       .superRefine((data, ctx) => {
+        if (data.images !== undefined && !data.draftId) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["draftId"],
+            message: "Bildene må tilhøre et utkast.",
+          });
+        }
         if (!data.is_free && data.price_nok == null) {
           ctx.addIssue({
             code: "custom",
@@ -536,6 +617,7 @@ export const createListing = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
@@ -614,11 +696,53 @@ export const createListing = createServerFn({ method: "POST" })
     };
     if (data.draftId) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
+      assertDraftOrganization(data.expected_organization_id, existing.organization_id);
+      if (existing.status === "active") {
+        return { id: existing.id, kaupet_code: existing.kaupet_code, already_published: true };
+      }
+      // Draft updates never re-check creation rights, so publishing must (category, Proff, approval).
+      // The location chosen in the wizard wins over the one the draft was first saved with.
+      const ownership = await resolveListingOwnership(
+        supabaseAdmin,
+        userId,
+        data.category_id,
+        existing.organization_id
+          ? (data.organization_location_id ?? existing.organization_location_id)
+          : existing.organization_location_id,
+      );
+      assertDraftOrganization(existing.organization_id, ownership.organization_id);
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
-        existing.organization_location_id,
+        ownership.organization_location_id,
       );
+      if (data.images !== undefined) {
+        const { data: result, error } = await (supabaseAdmin as SupabaseClient).rpc(
+          "publish_listing_draft",
+          {
+            _listing_id: data.draftId,
+            _user_id: userId,
+            _fields: {
+              ...listingFields,
+              ...(existing.organization_id
+                ? {
+                    ...listingLocationFields(orgLocation),
+                    organization_location_id: ownership.organization_location_id,
+                  }
+                : { organization_location_id: null }),
+            },
+            _images: data.images,
+          },
+        );
+        if (error) throw await toClientError("database", error);
+        return z
+          .object({
+            id: z.string().uuid(),
+            kaupet_code: z.string(),
+            already_published: z.boolean(),
+          })
+          .parse(result);
+      }
       const { data: listing, error } = await supabaseAdmin
         .from("listings")
         .update({
@@ -626,16 +750,20 @@ export const createListing = createServerFn({ method: "POST" })
           ...(existing.organization_id
             ? {
                 ...listingLocationFields(orgLocation),
-                organization_location_id: existing.organization_location_id,
+                organization_location_id: ownership.organization_location_id,
               }
             : { organization_location_id: null }),
         })
         .eq("id", data.draftId)
         .eq("status", "draft")
         .select("id, kaupet_code")
-        .single();
-      if (error) {
-        throw await toClientError("database", error);
+        .maybeSingle();
+      if (error) throw await toClientError("database", error);
+      if (!listing) {
+        const latest = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
+        assertDraftOrganization(data.expected_organization_id, latest.organization_id);
+        if (latest.status === "active") return { id: latest.id, kaupet_code: latest.kaupet_code };
+        throw new ClientError("Utkastet kan ikke publiseres i denne tilstanden.", 409);
       }
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }
@@ -646,6 +774,7 @@ export const createListing = createServerFn({ method: "POST" })
       data.category_id,
       data.organization_location_id,
     );
+    assertDraftOrganization(data.expected_organization_id, ownership.organization_id);
     const orgLocation = await organizationLocationOverride(
       supabaseAdmin,
       ownership.organization_id,

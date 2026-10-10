@@ -100,6 +100,13 @@ beforeEach(() => {
   invalidateQueriesMock.mockReset();
 });
 
+it("gjenoppretter Ikke registrert fra utkastets attributter", () => {
+  const { result } = renderHook(() =>
+    useVehicleLookupFlow(makeParams({ attributes: { is_registered: false } })),
+  );
+  expect(result.current.vehicleRegistered).toBe(false);
+});
+
 describe("useVehicleLookupFlow", () => {
   it.each(["AB12345", "AB 12345", "AB1234", "A123456", "123456", "CD12345", "MIN BIL"])(
     "godtar norsk kjennemerkeformat %s",

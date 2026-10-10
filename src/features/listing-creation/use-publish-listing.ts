@@ -15,6 +15,7 @@ import type { AttributeMap } from "@/components/attribute-fields";
 import type { CategoryBehavior } from "@/lib/category-behavior";
 
 import type { ListingFormShape } from "./field-groups/types";
+import type { useDraftAutosave } from "./use-draft-autosave";
 
 /**
  * Publiseringstilstanden til annonseveiviseren. Delt fra
@@ -62,6 +63,11 @@ export function usePublishListing({
   attributes,
   coords,
   draftId,
+  ownerId,
+  ownerOrganizationId,
+  preparePublish,
+  resumeAutosave,
+  isCurrent,
   clearDraftStorage,
   fieldGroupKeys,
   behavior,
@@ -73,12 +79,18 @@ export function usePublishListing({
   attributes: AttributeMap;
   coords: { lat: number; lng: number } | null;
   draftId: string | null | undefined;
+  ownerId: string | null;
+  ownerOrganizationId: string | null;
+  preparePublish: ReturnType<typeof useDraftAutosave>["preparePublish"];
+  resumeAutosave: () => void;
+  isCurrent: () => boolean;
   clearDraftStorage: (options?: { stopAutosave?: boolean }) => void;
   fieldGroupKeys: string[];
   behavior: CategoryBehavior;
   isVehicle: boolean;
   currentStepKey: string;
 }) {
+  const uploadedImages = useRef(new Map<string, { id: string; path: string }>());
   const navigate = useNavigate();
   const {
     publishedId,
@@ -105,12 +117,77 @@ export function usePublishListing({
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
 
+      if (!isCurrent() || userData.user.id !== ownerId)
+        throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+      const prepared = await preparePublish();
+      if (prepared.published) {
+        showErrorToast(
+          "Annonsen er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger den publiserte annonsen.",
+        );
+        return { id: prepared.id, kaupet_code: prepared.kaupet_code };
+      }
+      const ensuredDraftId = prepared.id;
+
       const finalCoords =
         coords ??
         (await geocodeNorwayAddress({
           postal_code: values.postal_code,
           city: values.city,
         }));
+
+      if (!isCurrent()) throw new Error("Kontoen er endret. Logg inn med opprinnelig konto.");
+      const currentImageKeys = new Set(images.map((img) => `${ensuredDraftId}:${img.id}`));
+      for (const key of uploadedImages.current.keys()) {
+        if (!currentImageKeys.has(key)) uploadedImages.current.delete(key);
+      }
+      let publishImages: Array<{
+        id: string;
+        storage_path: string;
+        sort_order: number;
+        caption: string | null;
+      }> = [];
+      // Attach images to the draft before making it public.
+      if (images.length > 0) {
+        setUploadProgress({ done: 0, total: images.length });
+        let done = 0;
+        const thumbFailures: string[] = [];
+        const thumbPromises: Promise<void>[] = [];
+        const uploads = await Promise.allSettled(
+          images.map(async (img, i) => {
+            const imageKey = `${ensuredDraftId}:${img.id}`;
+            let uploaded = uploadedImages.current.get(imageKey);
+            if (!uploaded) {
+              const path = await uploadListingImage({ listingId: ensuredDraftId, file: img.file });
+              uploaded = { id: crypto.randomUUID(), path };
+              uploadedImages.current.set(imageKey, uploaded);
+            }
+            const { id, path } = uploaded;
+            // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
+            // hvis thumbnailen mangler, så en feil her skal ikke stoppe
+            // publiseringen — men samles opp og vises til brukeren etterpå.
+            thumbPromises.push(
+              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
+                console.warn("Kunne ikke laste opp kort-thumbnail", err);
+                thumbFailures.push(img.file.name);
+              }),
+            );
+            done += 1;
+            setUploadProgress({ done, total: images.length });
+            return { id, storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
+          }),
+        );
+        await Promise.all(thumbPromises);
+        if (thumbFailures.length > 0) {
+          showErrorToast(`Kunne ikke laste opp forhåndsvisning for: ${thumbFailures.join(", ")}`);
+        }
+        if (!isCurrent()) throw new Error("Kontoen er endret. Publiseringen er stoppet.");
+        const results = uploads.map((result) => {
+          if (result.status === "rejected") throw result.reason;
+          return result.value;
+        });
+        setUploadProgress(null);
+        publishImages = results;
+      }
 
       // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og
       // er normalt ferdig lenge før publiseringsklikket. Vi venter på tokenet
@@ -120,9 +197,13 @@ export function usePublishListing({
         ? await turnstileRef.current?.getResponsePromise()
         : null;
 
+      if (!isCurrent()) throw new Error("Kontoen er endret. Publiseringen er stoppet.");
       const listing = await createListing({
         data: {
-          ...(draftId ? { draftId } : {}),
+          expected_user_id: ownerId!,
+          expected_organization_id: ownerOrganizationId,
+          draftId: ensuredDraftId ?? draftId!,
+          images: publishImages,
           title: values.title,
           subtitle: values.subtitle || null,
           description: values.description,
@@ -153,49 +234,17 @@ export function usePublishListing({
         },
       });
 
-      // Upload images in parallel
-      if (images.length > 0) {
-        setUploadProgress({ done: 0, total: images.length });
-        let done = 0;
-        const thumbFailures: string[] = [];
-        const thumbPromises: Promise<void>[] = [];
-        const results = await Promise.all(
-          images.map(async (img, i) => {
-            const path = await uploadListingImage({ listingId: listing.id, file: img.file });
-            // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
-            // hvis thumbnailen mangler, så en feil her skal ikke stoppe
-            // publiseringen — men samles opp og vises til brukeren etterpå.
-            thumbPromises.push(
-              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
-                console.warn("Kunne ikke laste opp kort-thumbnail", err);
-                thumbFailures.push(img.file.name);
-              }),
-            );
-            done += 1;
-            setUploadProgress({ done, total: images.length });
-            return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
-          }),
+      if ("already_published" in listing && listing.already_published) {
+        showErrorToast(
+          "Annonsen er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger den publiserte annonsen.",
         );
-        await Promise.all(thumbPromises);
-        if (thumbFailures.length > 0) {
-          showErrorToast(`Kunne ikke laste opp forhåndsvisning for: ${thumbFailures.join(", ")}`);
-        }
-        setUploadProgress(null);
-        const { error: imgErr } = await supabase.from("listing_images").insert(
-          results.map((u) => ({
-            listing_id: listing.id,
-            storage_path: u.storage_path,
-            sort_order: u.sort_order,
-            caption: u.caption,
-          })),
-        );
-        if (imgErr) throw imgErr;
       }
-
       return listing;
     },
     onSuccess: (result) => {
+      if (!isCurrent()) return;
       publishAttemptPendingRef.current = false;
+      uploadedImages.current.clear();
       // stopAutosave: the wizard stays mounted behind the success dialog with
       // the form still populated — without this the next autosave tick would
       // INSERT the published listing back as a duplicate draft.
@@ -206,6 +255,7 @@ export function usePublishListing({
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
+      resumeAutosave();
       publishAttemptPendingRef.current = false;
       trackProductEvent("listing_publish_failed", { kind: "sell", step: currentStepKey });
       setUploadProgress(null);

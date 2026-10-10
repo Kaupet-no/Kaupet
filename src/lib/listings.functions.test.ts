@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({
   location: null as Record<string, unknown> | null,
   listing: null as Record<string, unknown> | null,
   rpc: vi.fn(),
+  updates: vi.fn(),
   inserts: [] as Array<{ table: string; value: unknown }>,
 }));
 const assertUserNotRateLimited = vi.hoisted(() => vi.fn());
@@ -60,9 +61,13 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         return { data: [], count: 0, error: null };
       };
       const query: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte", "update"]) {
+      for (const method of ["select", "eq", "gte"]) {
         query[method] = () => query;
       }
+      query.update = (value: unknown) => {
+        db.updates(value);
+        return query;
+      };
       query.insert = (value: unknown) => {
         inserted = value;
         return query;
@@ -134,21 +139,33 @@ beforeEach(() => {
   db.listing = null;
   db.rpc.mockReset();
   db.inserts = [];
+  db.updates.mockReset();
   assertUserNotRateLimited.mockReset().mockResolvedValue(undefined);
 });
 
 describe("organization listing creation authorization (SEC-07)", () => {
+  it("DEF-DRAFT-01: forventet bruker må samsvare før lagring eller publisering", async () => {
+    const input = {
+      ...listingInput,
+      organization_location_id: null,
+      expected_user_id: "00000000-0000-4000-8000-000000000099",
+    };
+    await expect(saveDraftListing({ data: input })).rejects.toMatchObject({ status: 409 });
+    await expect(createListing({ data: input })).rejects.toMatchObject({ status: 409 });
+    expect(db.inserts).toHaveLength(0);
+  });
+
   it.each(["superuser", "member"] as const)(
     "blocks an unverified %s from creating active listings and drafts",
     async (role) => {
       setOrganization(role);
 
       await expect(createListing({ data: listingInput })).rejects.toThrow(
-        "Du har ikke tilgang til å opprette annonser.",
+        "Bedriften venter på godkjenning fra Kaupet.",
       );
       await expect(
         saveDraftListing({ data: { ...listingInput, title: "Utkast" } }),
-      ).rejects.toThrow("Du har ikke tilgang til å opprette annonser.");
+      ).rejects.toThrow("Bedriften venter på godkjenning fra Kaupet.");
 
       expect(db.rpc).toHaveBeenCalledWith("can_create_organization_listing", {
         _organization_id: organizationId,
@@ -190,8 +207,10 @@ describe("organization listing creation authorization (SEC-07)", () => {
   });
 
   it("uses one five-per-hour user bucket before each new listing or draft insert", async () => {
-    await createListing({ data: listingInput });
-    await saveDraftListing({ data: { ...listingInput, title: "Utkast" } });
+    await createListing({ data: { ...listingInput, organization_location_id: null } });
+    await saveDraftListing({
+      data: { ...listingInput, organization_location_id: null, title: "Utkast" },
+    });
 
     expect(assertUserNotRateLimited).toHaveBeenNthCalledWith(
       1,
@@ -214,7 +233,9 @@ describe("organization listing creation authorization (SEC-07)", () => {
   it("stops new listing inserts when the shared bucket rejects the reservation", async () => {
     assertUserNotRateLimited.mockRejectedValue(new Error("limit"));
 
-    await expect(createListing({ data: listingInput })).rejects.toThrow("limit");
+    await expect(
+      createListing({ data: { ...listingInput, organization_location_id: null } }),
+    ).rejects.toThrow("limit");
     expect(db.inserts).toHaveLength(0);
   });
 
@@ -278,5 +299,228 @@ describe("updateListingStatus", () => {
         data: { id: "00000000-0000-0000-0000-000000000001", status: "active" },
       }),
     ).toThrow();
+  });
+});
+
+describe("publisering etter tapt svar", () => {
+  it("bekrefter en allerede publisert annonse uten å overskrive den", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "active",
+      kaupet_code: "ABC123",
+      updated_at: "2026-10-09T10:00:00Z",
+    };
+    const saved = await saveDraftListing({ data: { id, title: "Et endret utkast" } });
+    expect(saved).toMatchObject({ id, kaupet_code: "ABC123", published: true });
+    const published = await createListing({
+      data: { ...listingInput, draftId: id, organization_location_id: null },
+    });
+    expect(published).toEqual({ id, kaupet_code: "ABC123", already_published: true });
+    expect(db.updates).not.toHaveBeenCalled();
+    expect(db.inserts).toHaveLength(0);
+  });
+  it("sjekker opprettingsrett på nytt når et bedriftsutkast publiseres", async () => {
+    const id = "00000000-0000-4000-8000-000000000002";
+    setOrganization("member");
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: organizationId,
+      organization_location_id: locationId,
+      status: "draft",
+      kaupet_code: "ABC124",
+      category_id: categoryId,
+    };
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "can_update_organization_listing") return { data: true, error: null };
+      if (name === "organization_has_proff_access") return { data: true, error: null };
+      if (name === "can_create_organization_listing") return { data: false, error: null };
+      if (name === "organization_is_verified") return { data: true, error: null };
+      return { data: null, error: null };
+    });
+    await expect(createListing({ data: { ...listingInput, draftId: id } })).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(db.rpc).toHaveBeenCalledWith("can_create_organization_listing", {
+      _organization_id: organizationId,
+      _location_id: locationId,
+      _category_id: categoryId,
+      _user_id: "user-id",
+    });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+  it("flytter et bedriftsutkast til lokasjonen som er valgt etter første lagring", async () => {
+    const id = "00000000-0000-4000-8000-000000000003";
+    const newLocationId = "00000000-0000-0000-0000-000000000014";
+    setOrganization("superuser");
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: organizationId,
+      organization_location_id: locationId,
+      status: "draft",
+      kaupet_code: "ABC125",
+      category_id: categoryId,
+      updated_at: "2026-10-09T10:00:00Z",
+    };
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "can_update_organization_listing") return { data: true, error: null };
+      if (name === "can_create_organization_listing") return { data: true, error: null };
+      return { data: null, error: null };
+    });
+    await saveDraftListing({
+      data: { ...listingInput, id, title: "Utkast", organization_location_id: newLocationId },
+    });
+    await createListing({
+      data: { ...listingInput, draftId: id, organization_location_id: newLocationId },
+    });
+    expect(db.updates).toHaveBeenCalledTimes(2);
+    for (const [fields] of db.updates.mock.calls) {
+      expect(fields).toMatchObject({ organization_location_id: newLocationId });
+    }
+    expect(db.rpc).toHaveBeenCalledWith(
+      "can_create_organization_listing",
+      expect.objectContaining({ _location_id: newLocationId }),
+    );
+  });
+  it("avviser bekreftelse av en annen brukers aktive annonse", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    db.listing = {
+      id,
+      seller_id: "other-user",
+      organization_id: null,
+      organization_location_id: null,
+      status: "active",
+      kaupet_code: "ABC123",
+    };
+    await expect(saveDraftListing({ data: { id, title: "Et utkast" } })).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      createListing({ data: { ...listingInput, draftId: id, organization_location_id: null } }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+});
+
+describe("atomic draft publication (CRE-30..33)", () => {
+  const draftId = "00000000-0000-4000-8000-000000000021";
+  const image = {
+    id: "00000000-0000-4000-8000-000000000022",
+    storage_path: `${draftId}/00000000-0000-4000-8000-000000000022.jpg`,
+    sort_order: 0,
+    caption: "Sykkel 🚲",
+  };
+  beforeEach(() => {
+    db.listing = {
+      id: draftId,
+      kaupet_code: "KPT123",
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "draft",
+    };
+    db.rpc.mockResolvedValue({
+      data: { id: draftId, kaupet_code: "KPT123", already_published: false },
+      error: null,
+    });
+  });
+  it("publiserer et bilde via serverrollen uten direkte tabelloppdatering", async () => {
+    const result = await createListing({ data: { ...listingInput, draftId, images: [image] } });
+    expect(result).toEqual({ id: draftId, kaupet_code: "KPT123", already_published: false });
+    expect(db.rpc).toHaveBeenCalledWith(
+      "publish_listing_draft",
+      expect.objectContaining({
+        _listing_id: draftId,
+        _user_id: "user-id",
+        _images: [image],
+        _fields: expect.objectContaining({ title: listingInput.title, status: "active" }),
+      }),
+    );
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+  it("videresender serverens bekreftelse ved konkurrerende publisering", async () => {
+    db.rpc.mockResolvedValue({
+      data: { id: draftId, kaupet_code: "KPT123", already_published: true },
+      error: null,
+    });
+    await expect(
+      createListing({ data: { ...listingInput, draftId, images: [] } }),
+    ).resolves.toMatchObject({ already_published: true });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+  it.each([true, false])(
+    "beholder opprettingskontroll for bedriftsbilder (tillatt: %s)",
+    async (allowed) => {
+      setOrganization("member");
+      db.listing = {
+        ...db.listing,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+      };
+      db.rpc.mockImplementation(async (name: string) => {
+        if (name === "can_create_organization_listing") return { data: allowed, error: null };
+        if (name === "publish_listing_draft")
+          return {
+            data: { id: draftId, kaupet_code: "KPT123", already_published: false },
+            error: null,
+          };
+        return { data: true, error: null };
+      });
+      const result = createListing({ data: { ...listingInput, draftId, images: [image] } });
+      if (allowed) {
+        await expect(result).resolves.toMatchObject({ id: draftId });
+        expect(db.rpc).toHaveBeenCalledWith(
+          "publish_listing_draft",
+          expect.objectContaining({
+            _fields: expect.objectContaining({
+              organization_location_id: locationId,
+              postal_code: "0123",
+              city: "Oslo",
+            }),
+          }),
+        );
+      } else {
+        await expect(result).rejects.toMatchObject({ status: 403 });
+        expect(db.rpc.mock.calls.some(([name]) => name === "publish_listing_draft")).toBe(false);
+      }
+      expect(db.updates).not.toHaveBeenCalled();
+    },
+  );
+  it.each([101, 1000])("avviser %i bilder før databasekallet", async (count) => {
+    await expect(
+      Promise.resolve().then(() =>
+        createListing({ data: { ...listingInput, draftId, images: Array(count).fill(image) } }),
+      ),
+    ).rejects.toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it.each([
+    null,
+    "image",
+    [{ ...image, caption: "x".repeat(141) }],
+    [{ ...image, sort_order: -1 }],
+    [{ ...image, storage_path: "invalid" }],
+  ])("avviser ugyldig bildeliste: %j", async (images) => {
+    expect(() => createListing({ data: { ...listingInput, draftId, images } })).toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it("krever utkast-ID når bilder sendes", async () => {
+    expect(() => createListing({ data: { ...listingInput, images: [image] } })).toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it("RPC-feil bruker ingen utrygg fallback", async () => {
+    db.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST202", message: "Missing function" },
+    });
+    await expect(
+      createListing({ data: { ...listingInput, draftId, images: [] } }),
+    ).rejects.toThrow();
+    expect(db.updates).not.toHaveBeenCalled();
   });
 });

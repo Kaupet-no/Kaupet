@@ -165,6 +165,8 @@ site_url = "http://127.0.0.1:8080"
 additional_redirect_urls = [
   "http://127.0.0.1:8080/auth**",
   "http://localhost:8080/auth**",
+  "http://127.0.0.1:8080/bedriftsinvitasjon",
+  "http://localhost:8080/bedriftsinvitasjon",
   "http://127.0.0.1:8080/tilbakestill-passord",
   "http://localhost:8080/tilbakestill-passord",
 ]

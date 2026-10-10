@@ -12,6 +12,7 @@ import {
 } from "./pages/listing-wizard";
 import {
   advanceWantStep,
+  fillWantMaxPrice,
   openWantCategoryPicker,
   publishWantAndExpectSuccess,
   startWantWithoutCategory,
@@ -39,7 +40,7 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   await advanceWantStep(page, "details");
 
   await page.getByLabel("Beskrivelse / krav (valgfritt)").fill("Må være hel og i god stand.");
-  await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("1500");
+  await fillWantMaxPrice(page, "1500");
   await advanceWantStep(page, "review");
 
   // Se over viser kjøpsønsket slik selgerne ser det; hver del tar deg til
@@ -47,8 +48,7 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   await expect(page.getByText(/^1\s500 kr$/)).toBeVisible();
   await page.getByRole("button", { name: /Endre maks pris/ }).click();
   await composerPage(page, "details").waitFor();
-  const maxPrice = page.getByLabel("Maks pris du vil betale (valgfritt)");
-  await maxPrice.fill("1200");
+  await fillWantMaxPrice(page, "1200");
   await advanceWantStep(page, "review");
   await expect(page.getByText(/^1\s200 kr$/)).toBeVisible();
 
@@ -118,7 +118,7 @@ test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testI
   ).toBeVisible();
 
   await advanceWantStep(page, "details");
-  await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("150");
+  await fillWantMaxPrice(page, "150");
   await expect(
     page.getByText("2 annonser til salgs matcher allerede det du leter etter."),
   ).toBeVisible();

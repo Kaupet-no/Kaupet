@@ -552,7 +552,7 @@ function AuthPage() {
                 ) : (
                   isSignUp && (
                     <p id="password-hint" className="text-xs text-muted-foreground">
-                      Minst 8 tegn
+                      Minst 10 tegn
                     </p>
                   )
                 )}

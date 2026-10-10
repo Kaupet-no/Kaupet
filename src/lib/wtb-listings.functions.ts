@@ -1,6 +1,7 @@
+import { assertDraftActor } from "@/lib/draft-actor";
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -99,6 +100,7 @@ function locationFields(data: z.infer<typeof wtbLocationSchema>) {
 }
 
 const wtbInputSchema = wtbLocationSchema.extend({
+  expected_user_id: z.string().uuid().optional(),
   draftId: z.string().uuid().optional(),
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
   subtitle: z.string().trim().max(80, "Maks 80 tegn").nullable().optional(),
@@ -110,10 +112,26 @@ const wtbInputSchema = wtbLocationSchema.extend({
   attributes: wtbAttributesSchema.optional(),
 });
 
+async function wtbDraftStatus(
+  supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>,
+  id: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("wtb_listings")
+    .select("status")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw await toClientError("database", error);
+  return (data?.status as string | undefined) ?? null;
+}
+
 export const createWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => wtbInputSchema.parse(input))
   .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
@@ -136,11 +154,16 @@ export const createWtbListing = createServerFn({ method: "POST" })
         .eq("user_id", userId)
         .eq("status", "draft")
         .select("id")
-        .single();
+        .maybeSingle();
       if (error) {
         throw await toClientError("database", error);
       }
-      return { id: row.id as string };
+      if (row) return { id: row.id as string };
+      // A lost publish response: confirm the live want listing instead of failing the retry.
+      if ((await wtbDraftStatus(supabaseAdmin, data.draftId, userId)) === "active") {
+        return { id: data.draftId };
+      }
+      throw new ClientError("Utkastet kan ikke publiseres i denne tilstanden.", 409);
     }
 
     await assertWtbCreationAllowed(userId);
@@ -170,6 +193,7 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
     const supabaseAdmin = await getSupabaseAdmin();
     const fields = {
       title: data.title,
@@ -193,11 +217,15 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
         .eq("user_id", context.userId)
         .eq("status", "draft")
         .select("id")
-        .single();
+        .maybeSingle();
       if (error) {
         throw await toClientError("database", error);
       }
-      return { id: row.id as string };
+      if (row) return { id: row.id as string };
+      if ((await wtbDraftStatus(supabaseAdmin, data.id, context.userId)) === "active") {
+        return { id: data.id, published: true as const };
+      }
+      throw new ClientError("Utkastet finnes ikke lenger.", 404);
     }
 
     await assertWtbCreationAllowed(context.userId);
@@ -280,14 +308,20 @@ export const updateWtbListing = createServerFn({ method: "POST" })
       ...(data.max_price_nok !== undefined && { max_price_nok: data.max_price_nok }),
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       ...(data.status !== undefined && { status: data.status }),
+      // Same lifetime as a new want listing (column default), so reopening never shortens it.
+      ...(data.status === "active" && {
+        expires_at: new Date(Date.now() + 90 * 864e5).toISOString(),
+      }),
       ...(data.postal_code !== undefined && locationFields(data)),
     };
 
-    const { error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("wtb_listings")
       .update(fields)
       .eq("id", data.id)
       .eq("user_id", userId);
+    if (data.status === "active") query = query.eq("status", "fulfilled");
+    const { error } = await query.select("id").single();
     if (error) {
       throw await toClientError("database", error);
     }

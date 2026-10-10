@@ -174,14 +174,14 @@ export function PersonvernContent() {
               fargetema. Forlater ikke enheten din.
             </li>
             <li>
-              <strong>kaupet_draft_sell_listing</strong>,{" "}
-              <strong>kaupet_draft_sell_listing_id</strong>,{" "}
-              <strong>kaupet_draft_sell_listing_updated_at</strong>,{" "}
-              <strong>kaupet_draft_want_listing</strong> og{" "}
-              <strong>kaupet_draft_want_listing_id</strong>: Utkast til salgsannonse eller «ønskes
+              <strong>kaupet_draft_sell_listing…</strong> og{" "}
+              <strong>kaupet_draft_want_listing…</strong>: Utkast til salgsannonse eller «ønskes
               kjøpt»-annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du fyller ut
-              registreringen, slik at du ikke mister innholdet ved utilsiktet lukking. Slettes når
-              annonsen er publisert eller forkastet.
+              registreringen, slik at du ikke mister innholdet ved utilsiktet lukking. Nøkkelen
+              inneholder bruker-ID-en din og eventuell bedrifts-ID, slik at et utkast aldri vises
+              for en annen konto på samme enhet. Bilder i utkastet lagres i nettleserens
+              IndexedDB-database <strong>kaupet-listing-drafts</strong>. Slettes når annonsen er
+              publisert eller forkastet.
             </li>
             <li>
               <strong>kaupet_push_msg_hint_dismissed_v1</strong>,{" "}

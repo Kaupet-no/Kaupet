@@ -82,6 +82,7 @@ export function useWtbDraftAutosave(
   const savingStopped = useRef(false);
   const restorableDraftRef = useRef<WtbDraftData | null>(null);
   const fieldsRef = useRef(fields);
+  const [initialFields] = useState(() => JSON.stringify(fields));
   useEffect(() => {
     fieldsRef.current = fields;
   }, [fields]);
@@ -105,6 +106,10 @@ export function useWtbDraftAutosave(
       void getLatestWtbDraft()
         .then((server) => {
           if (!server || !isCurrent()) return;
+          // Brukeren har begynt på et nytt kjøpsønske før svaret kom. Et sent
+          // tilbud ville skjøvet skjemaet under fingeren, og å overta id-en
+          // ville latt autolagringen overskrive det gamle utkastet.
+          if (JSON.stringify(fieldsRef.current) !== initialFields) return;
           const savedAt = new Date(server.updated_at).getTime();
           rememberDraftId(server.id);
           writeItem(DRAFT_ID_KEY, server.id);
@@ -137,6 +142,7 @@ export function useWtbDraftAutosave(
     authenticated,
     DRAFT_ID_KEY,
     DRAFT_KEY,
+    initialFields,
     isCurrent,
     ownerId,
     resumeGuest,

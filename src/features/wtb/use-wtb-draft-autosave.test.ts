@@ -246,6 +246,39 @@ describe("useWtbDraftAutosave", () => {
     });
   });
 
+  it("tilbyr ikke et sent serverutkast etter at brukeren har begynt å skrive", async () => {
+    let resolveLatest!: (value: unknown) => void;
+    getLatestWtbDraftMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLatest = resolve;
+      }),
+    );
+    const { result, rerender } = renderHook((f) => useWtbDraftAutosave(f, true, "user-1"), {
+      initialProps: { ...fields, title: "" },
+    });
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    rerender({ ...fields, title: "Ønsker ny sykkel" });
+    await act(async () => {
+      resolveLatest({
+        id: "00000000-0000-4000-8000-000000000002",
+        title: "Gammelt utkast",
+        description: "",
+        category_id: null,
+        max_price_nok: null,
+        notify_matches: true,
+        attributes: {},
+        updated_at: new Date().toISOString(),
+      });
+    });
+
+    expect(result.current.restorableDraft).toBeNull();
+    expect(result.current.draftId).toBeNull();
+    await act(async () => {
+      await result.current.saveToServer();
+    });
+    expect(saveWtbDraftMock.mock.calls[0][0].data).not.toHaveProperty("id");
+  });
+
   it("normaliserer makspris fra input-streng før serverlagring", async () => {
     const { result } = renderHook(() =>
       useWtbDraftAutosave(

@@ -353,6 +353,40 @@ describe("publisering etter tapt svar", () => {
     });
     expect(db.updates).not.toHaveBeenCalled();
   });
+  it("flytter et bedriftsutkast til lokasjonen som er valgt etter første lagring", async () => {
+    const id = "00000000-0000-4000-8000-000000000003";
+    const newLocationId = "00000000-0000-0000-0000-000000000014";
+    setOrganization("superuser");
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: organizationId,
+      organization_location_id: locationId,
+      status: "draft",
+      kaupet_code: "ABC125",
+      category_id: categoryId,
+      updated_at: "2026-10-09T10:00:00Z",
+    };
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "can_update_organization_listing") return { data: true, error: null };
+      if (name === "can_create_organization_listing") return { data: true, error: null };
+      return { data: null, error: null };
+    });
+    await saveDraftListing({
+      data: { ...listingInput, id, title: "Utkast", organization_location_id: newLocationId },
+    });
+    await createListing({
+      data: { ...listingInput, draftId: id, organization_location_id: newLocationId },
+    });
+    expect(db.updates).toHaveBeenCalledTimes(2);
+    for (const [fields] of db.updates.mock.calls) {
+      expect(fields).toMatchObject({ organization_location_id: newLocationId });
+    }
+    expect(db.rpc).toHaveBeenCalledWith(
+      "can_create_organization_listing",
+      expect.objectContaining({ _location_id: newLocationId }),
+    );
+  });
   it("avviser bekreftelse av en annen brukers aktive annonse", async () => {
     const id = "00000000-0000-4000-8000-000000000001";
     db.listing = {

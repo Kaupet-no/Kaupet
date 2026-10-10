@@ -172,6 +172,28 @@ async function resolveListingOwnership(
   };
 }
 
+/** A business draft may move to another location; creation rights are checked for the new one. */
+async function draftLocationId(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  existing: ListingMutationRow,
+  requestedLocationId: string | null | undefined,
+  categoryId: string | null,
+): Promise<string | null> {
+  if (!existing.organization_id) return null;
+  if (!requestedLocationId || requestedLocationId === existing.organization_location_id) {
+    return existing.organization_location_id;
+  }
+  const ownership = await resolveListingOwnership(
+    supabaseAdmin,
+    userId,
+    categoryId,
+    requestedLocationId,
+  );
+  assertDraftOrganization(existing.organization_id, ownership.organization_id);
+  return ownership.organization_location_id;
+}
+
 async function organizationLocationOverride(
   supabaseAdmin: SupabaseClient,
   organizationId: string | null,
@@ -432,10 +454,17 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           published: true as const,
         };
       }
+      const locationId = await draftLocationId(
+        supabaseAdmin,
+        userId,
+        existing,
+        data.organization_location_id,
+        data.category_id !== undefined ? data.category_id : existing.category_id,
+      );
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
-        existing.organization_location_id,
+        locationId,
       );
       let query = supabaseAdmin
         .from("listings")
@@ -444,7 +473,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           ...(existing.organization_id
             ? {
                 ...listingLocationFields(orgLocation),
-                organization_location_id: existing.organization_location_id,
+                organization_location_id: locationId,
               }
             : { organization_location_id: null }),
           draft_expiry_notified_at: null,
@@ -652,17 +681,20 @@ export const createListing = createServerFn({ method: "POST" })
         return { id: existing.id, kaupet_code: existing.kaupet_code };
       }
       // Draft updates never re-check creation rights, so publishing must (category, Proff, approval).
+      // The location chosen in the wizard wins over the one the draft was first saved with.
       const ownership = await resolveListingOwnership(
         supabaseAdmin,
         userId,
         data.category_id,
-        existing.organization_location_id,
+        existing.organization_id
+          ? (data.organization_location_id ?? existing.organization_location_id)
+          : existing.organization_location_id,
       );
       assertDraftOrganization(existing.organization_id, ownership.organization_id);
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
-        existing.organization_location_id,
+        ownership.organization_location_id,
       );
       const { data: listing, error } = await supabaseAdmin
         .from("listings")
@@ -671,7 +703,7 @@ export const createListing = createServerFn({ method: "POST" })
           ...(existing.organization_id
             ? {
                 ...listingLocationFields(orgLocation),
-                organization_location_id: existing.organization_location_id,
+                organization_location_id: ownership.organization_location_id,
               }
             : { organization_location_id: null }),
         })

@@ -122,8 +122,19 @@ export function ListingComposerShell({
     const pageChanged = previousPageRef.current !== pageKey;
     previousPageRef.current = pageKey;
     window.scrollTo({ top: 0 });
-    requestAnimationFrame(() => pageHeadingRef.current?.focus());
+    const frame = requestAnimationFrame(() => {
+      // A fast user may already be typing when this deferred focus runs.
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        scrollContainerRef.current?.contains(active) &&
+        active.matches("input, textarea, select, [contenteditable='true']")
+      )
+        return;
+      pageHeadingRef.current?.focus();
+    });
     if (native && pageChanged) void hapticSelection();
+    return () => cancelAnimationFrame(frame);
   }, [native, pageKey]);
 
   useEffect(() => {

@@ -58,7 +58,9 @@ describe("WTB creation quota", () => {
         eq: () => ({
           eq: () => ({
             eq: () => ({
-              select: () => ({ single: async () => ({ data: { id: "wtb-id" }, error: null }) }),
+              select: () => ({
+                maybeSingle: async () => ({ data: { id: "wtb-id" }, error: null }),
+              }),
             }),
           }),
         }),
@@ -102,6 +104,54 @@ describe("WTB creation quota", () => {
 
     await expect(saveWtbDraft({ data: wtbInput })).rejects.toThrow("limit");
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe("kjøpsønske etter tapt publiseringssvar", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  function rowStatus(status: string | null) {
+    const update = vi.fn();
+    from.mockImplementation(() => {
+      const chain: Record<string, unknown> = {};
+      let lookup = false;
+      chain.update = (fields: unknown) => {
+        update(fields);
+        return chain;
+      };
+      chain.select = (columns: string) => {
+        lookup = columns === "status";
+        return chain;
+      };
+      chain.eq = () => chain;
+      // The draft update matches nothing: the row is no longer a draft.
+      chain.maybeSingle = async () => ({
+        data: lookup && status ? { status } : null,
+        error: null,
+      });
+      return chain;
+    });
+    return update;
+  }
+  beforeEach(() => vi.clearAllMocks());
+
+  it("bekrefter et allerede aktivt kjøpsønske i stedet for å feile", async () => {
+    rowStatus("active");
+    await expect(createWtbListing({ data: { ...wtbInput, draftId: id } })).resolves.toEqual({ id });
+    await expect(saveWtbDraft({ data: { ...wtbInput, id } })).resolves.toEqual({
+      id,
+      published: true,
+    });
+  });
+
+  it("avviser publisering av et utkast i annen tilstand", async () => {
+    rowStatus("archived");
+    await expect(createWtbListing({ data: { ...wtbInput, draftId: id } })).rejects.toMatchObject({
+      status: 409,
+    });
+    rowStatus(null);
+    await expect(saveWtbDraft({ data: { ...wtbInput, id } })).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });
 

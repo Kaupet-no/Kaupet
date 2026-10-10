@@ -1,7 +1,7 @@
 import { assertDraftActor } from "@/lib/draft-actor";
 import { getSupabaseAdmin } from "@/integrations/supabase/admin";
 import { getSupabaseServerClient } from "@/integrations/supabase/session.server";
-import { toClientError } from "@/lib/to-client-error";
+import { ClientError, toClientError } from "@/lib/to-client-error";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -112,6 +112,21 @@ const wtbInputSchema = wtbLocationSchema.extend({
   attributes: wtbAttributesSchema.optional(),
 });
 
+async function wtbDraftStatus(
+  supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>,
+  id: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("wtb_listings")
+    .select("status")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw await toClientError("database", error);
+  return (data?.status as string | undefined) ?? null;
+}
+
 export const createWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => wtbInputSchema.parse(input))
@@ -139,11 +154,16 @@ export const createWtbListing = createServerFn({ method: "POST" })
         .eq("user_id", userId)
         .eq("status", "draft")
         .select("id")
-        .single();
+        .maybeSingle();
       if (error) {
         throw await toClientError("database", error);
       }
-      return { id: row.id as string };
+      if (row) return { id: row.id as string };
+      // A lost publish response: confirm the live want listing instead of failing the retry.
+      if ((await wtbDraftStatus(supabaseAdmin, data.draftId, userId)) === "active") {
+        return { id: data.draftId };
+      }
+      throw new ClientError("Utkastet kan ikke publiseres i denne tilstanden.", 409);
     }
 
     await assertWtbCreationAllowed(userId);
@@ -197,11 +217,15 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
         .eq("user_id", context.userId)
         .eq("status", "draft")
         .select("id")
-        .single();
+        .maybeSingle();
       if (error) {
         throw await toClientError("database", error);
       }
-      return { id: row.id as string };
+      if (row) return { id: row.id as string };
+      if ((await wtbDraftStatus(supabaseAdmin, data.id, context.userId)) === "active") {
+        return { id: data.id, published: true as const };
+      }
+      throw new ClientError("Utkastet finnes ikke lenger.", 404);
     }
 
     await assertWtbCreationAllowed(context.userId);

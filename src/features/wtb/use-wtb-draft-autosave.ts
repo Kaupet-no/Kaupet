@@ -68,6 +68,7 @@ export function useWtbDraftAutosave(
   const [draftId, setDraftId] = useState<string | null>(null);
   const draftIdRef = useRef<string | null>(null);
   const lastServerSnapshot = useRef<string | null>(null);
+  const publishedId = useRef<string | null>(null);
   const rememberDraftId = useCallback((id: string | null) => {
     draftIdRef.current = id;
     setDraftId(id);
@@ -233,6 +234,7 @@ export function useWtbDraftAutosave(
         ? parsedMaxPrice
         : null;
     setIsSaving(true);
+    publishedId.current = null;
     const promise = (async () => {
       try {
         const result = await saveWtbDraft({
@@ -256,6 +258,15 @@ export function useWtbDraftAutosave(
           },
         });
         if (!isCurrent()) return null;
+        if ("published" in result && result.published) {
+          // A lost publish response: the want listing is live, so these edits were not saved.
+          publishedId.current = result.id;
+          setDraftSaveMessage(
+            "Kjøpsønsket er allerede publisert. Endringer her lagres ikke – rediger det publiserte kjøpsønsket.",
+          );
+          setDraftSaveError(true);
+          return result.id;
+        }
         setDraftSaveMessage(null);
         rememberDraftId(result.id);
         lastServerSnapshot.current = snapshot;
@@ -312,7 +323,7 @@ export function useWtbDraftAutosave(
     const id = await saveToServer();
     if (!id || !isCurrent()) throw new Error("Utkastet må lagres før publisering. Prøv igjen.");
     publishPaused.current = true;
-    return id;
+    return { id, published: publishedId.current === id };
   }
 
   return {

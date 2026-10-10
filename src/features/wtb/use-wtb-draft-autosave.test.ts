@@ -67,9 +67,25 @@ describe("useWtbDraftAutosave", () => {
       const publish = result.current.preparePublish();
       resolveSave({ id: "00000000-0000-4000-8000-000000000001" });
       await save;
-      expect(await publish).toBe("00000000-0000-4000-8000-000000000001");
+      expect(await publish).toEqual({
+        id: "00000000-0000-4000-8000-000000000001",
+        published: false,
+      });
     });
     expect(saveWtbDraftMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("melder fra når utkastet allerede er publisert etter tapt svar", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    saveWtbDraftMock.mockResolvedValue({ id, published: true });
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    await act(async () => {
+      expect(await result.current.preparePublish()).toEqual({ id, published: true });
+    });
+    expect(result.current.draftSaveMessage).toMatch(/allerede publisert/);
   });
 
   it("gjesteoverføring bevarer kontoutkastet og kobler ikke til et annet serverutkast", async () => {
@@ -185,7 +201,10 @@ describe("useWtbDraftAutosave", () => {
     expect(result.current.restorableDraft).not.toBeNull();
 
     await act(async () => {
-      expect(await result.current.preparePublish()).toBe("00000000-0000-4000-8000-000000000001");
+      expect(await result.current.preparePublish()).toEqual({
+        id: "00000000-0000-4000-8000-000000000001",
+        published: false,
+      });
     });
     expect(saveWtbDraftMock).toHaveBeenCalledWith({
       data: expect.objectContaining({ title: "Ønsker ski" }),

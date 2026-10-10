@@ -462,12 +462,18 @@ function NewWtbPage() {
   const createFn = useServerFn(createWtbListing);
   const { mutate: publish, isPending } = useMutation({
     mutationFn: async (values: WtbForm) => {
-      const ensuredDraftId = await preparePublish();
+      const prepared = await preparePublish();
       if (!isCurrent()) throw new Error(DRAFT_ACTOR_CHANGED_MESSAGE);
+      if (prepared.published) {
+        showErrorToast(
+          "Kjøpsønsket er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger det publiserte kjøpsønsket.",
+        );
+        return prepared.id;
+      }
       const result = await createFn({
         data: {
           expected_user_id: ownerId!,
-          ...(ensuredDraftId ? { draftId: ensuredDraftId } : {}),
+          draftId: prepared.id,
           title: values.title,
           subtitle: null,
           description: values.description || undefined,

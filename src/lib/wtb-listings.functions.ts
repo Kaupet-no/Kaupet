@@ -284,8 +284,9 @@ export const updateWtbListing = createServerFn({ method: "POST" })
       ...(data.max_price_nok !== undefined && { max_price_nok: data.max_price_nok }),
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       ...(data.status !== undefined && { status: data.status }),
+      // Same lifetime as a new want listing (column default), so reopening never shortens it.
       ...(data.status === "active" && {
-        expires_at: new Date(Date.now() + 30 * 864e5).toISOString(),
+        expires_at: new Date(Date.now() + 90 * 864e5).toISOString(),
       }),
       ...(data.postal_code !== undefined && locationFields(data)),
     };

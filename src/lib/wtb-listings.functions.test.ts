@@ -152,6 +152,6 @@ describe("gjenåpning av kjøpsønske", () => {
     expect(chain.eq).toHaveBeenCalledWith("status", "fulfilled");
     const update = chain.update.mock.calls[0][0];
     expect(update.status).toBe("active");
-    expect(new Date(update.expires_at).getTime()).toBeGreaterThan(Date.now() + 29 * 864e5);
+    expect(new Date(update.expires_at).getTime()).toBeGreaterThan(Date.now() + 89 * 864e5);
   });
 });

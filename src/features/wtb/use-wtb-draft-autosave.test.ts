@@ -125,6 +125,25 @@ describe("useWtbDraftAutosave", () => {
     expect(result.current.restorableDraft?.notify_matches).toBe(false);
   });
 
+  it("publiserer gjeldende skjema selv om gjenopprettingstilbudet ikke er besvart", async () => {
+    localStorage.setItem(
+      "kaupet_draft_want_listing:user-1:private",
+      JSON.stringify({ draft_kind: "want", draft_version: 1, saved_at: Date.now(), ...fields }),
+    );
+    const current = { ...fields, title: "Ønsker ski" };
+    const { result } = renderHook(() => useWtbDraftAutosave(current, true, "user-1"));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(result.current.restorableDraft).not.toBeNull();
+
+    await act(async () => {
+      expect(await result.current.preparePublish()).toBe("00000000-0000-4000-8000-000000000001");
+    });
+    expect(saveWtbDraftMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ title: "Ønsker ski" }),
+    });
+    expect(result.current.restorableDraft).toBeNull();
+  });
+
   it("stopper lokal og serverbasert autolagring etter publisering", async () => {
     const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
     await act(() => vi.advanceTimersByTimeAsync(2_001));

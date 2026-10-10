@@ -292,6 +292,11 @@ export function useWtbDraftAutosave(
   }
 
   async function preparePublish() {
+    // Publishing the current form declines an unanswered restore offer; otherwise saveToServer skips the save.
+    if (restorableDraftRef.current) {
+      restorableDraftRef.current = null;
+      setRestorableDraft(null);
+    }
     if (saveInProgress.current) await saveInProgress.current;
     const id = await saveToServer();
     if (!id || !isCurrent()) throw new Error("Utkastet må lagres før publisering. Prøv igjen.");

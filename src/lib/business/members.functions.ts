@@ -193,15 +193,12 @@ export const resendOrganizationInvite = createServerFn({ method: "POST" })
     );
     if (targetError) throw await toClientError("resendOrganizationInvite.user", targetError);
     if (!target.user?.email) throw new ClientError("Invitasjonen har ingen gyldig mottaker.", 409);
-    if (target.user.email_confirmed_at) {
-      throw new ClientError(
-        "Brukeren har allerede bekreftet e-postadressen. Logg inn og åpne bedriftsinvitasjonen for å godta den.",
-        409,
-      );
-    }
-    const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(target.user.email, {
-      redirectTo: await businessInvitationRedirect(),
-    });
+    const redirectTo = await businessInvitationRedirect();
+    // Opening the invite link confirms the email before a password is chosen, and Auth refuses
+    // to re-invite confirmed users. A recovery link lands on the same page to set it and accept.
+    const { error } = target.user.email_confirmed_at
+      ? await supabaseAdmin.auth.resetPasswordForEmail(target.user.email, { redirectTo })
+      : await supabaseAdmin.auth.admin.inviteUserByEmail(target.user.email, { redirectTo });
     if (error) throw await toClientError("resendOrganizationInvite.send", error);
     return { userId: data.userId };
   });

@@ -935,6 +935,34 @@ describe("business server functions", () => {
     }
   });
 
+  it("ny utsending når også inviterte som har åpnet lenken uten å godta", async () => {
+    buildAdmin({ proff: true });
+    const resetPasswordForEmail = vi.fn().mockResolvedValue({ error: null });
+    Object.assign(supabaseAdmin.auth, { resetPasswordForEmail });
+    supabaseAdmin.auth.admin.getUserById = vi.fn().mockResolvedValue({
+      data: { user: { email: "kari@example.com", email_confirmed_at: "2026-10-09T10:00:00Z" } },
+      error: null,
+    });
+    await expect(resendOrganizationInvite({ data: { userId: memberId } })).resolves.toEqual({
+      userId: memberId,
+    });
+    expect(resetPasswordForEmail).toHaveBeenCalledWith("kari@example.com", {
+      redirectTo: expect.stringContaining("/bedriftsinvitasjon"),
+    });
+    expect(supabaseAdmin.auth.admin.inviteUserByEmail).not.toHaveBeenCalled();
+
+    supabaseAdmin.auth.admin.getUserById = vi.fn().mockResolvedValue({
+      data: { user: { email: "kari@example.com", email_confirmed_at: null } },
+      error: null,
+    });
+    resetPasswordForEmail.mockClear();
+    await resendOrganizationInvite({ data: { userId: memberId } });
+    expect(supabaseAdmin.auth.admin.inviteUserByEmail).toHaveBeenCalledWith("kari@example.com", {
+      redirectTo: expect.stringContaining("/bedriftsinvitasjon"),
+    });
+    expect(resetPasswordForEmail).not.toHaveBeenCalled();
+  });
+
   it("delegates member removal and invite acceptance to the guarded database operations", async () => {
     const rpc = supabaseAdmin.rpc;
     buildAdmin({ proff: true });

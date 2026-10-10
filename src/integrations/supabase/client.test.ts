@@ -20,24 +20,28 @@ afterEach(() => {
 });
 
 describe("Supabase browser auth callbacks", () => {
-  it("DEF-INVITE-02: fanger invitasjonstokens og rydder fragmentet uten å bytte sesjon selv", async () => {
-    window.history.replaceState(
-      null,
-      "",
-      "/bedriftsinvitasjon#access_token=local-access&refresh_token=local-refresh&type=invite",
-    );
-    const { invitationTokens } = await import("./client");
-    expect(invitationTokens()).toEqual({
-      access_token: "local-access",
-      refresh_token: "local-refresh",
-    });
-    expect(window.location.hash).toBe("");
-    expect(window.location.pathname).toBe("/bedriftsinvitasjon");
-    expect(setSessionMock).not.toHaveBeenCalled();
-  });
+  it.each(["invite", "recovery"])(
+    "DEF-INVITE-02: fanger invitasjonstokens (type=%s) og rydder fragmentet uten å bytte sesjon selv",
+    async (type) => {
+      window.history.replaceState(
+        null,
+        "",
+        `/bedriftsinvitasjon#access_token=local-access&refresh_token=local-refresh&type=${type}`,
+      );
+      const { invitationTokens } = await import("./client");
+      expect(invitationTokens()).toEqual({
+        access_token: "local-access",
+        refresh_token: "local-refresh",
+      });
+      expect(window.location.hash).toBe("");
+      expect(window.location.pathname).toBe("/bedriftsinvitasjon");
+      expect(setSessionMock).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     "/#access_token=attacker&refresh_token=attacker&type=invite",
+    "/tilbakestill-passord#access_token=attacker&refresh_token=attacker&type=recovery",
     "/bedriftsinvitasjon#access_token=attacker&refresh_token=attacker&type=magiclink",
   ])("ignorerer og fjerner tokens utenfor invitasjonsflyten: %s", async (path) => {
     window.history.replaceState(null, "", path);

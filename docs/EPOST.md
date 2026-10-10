@@ -158,8 +158,10 @@ e-postrundturen i staging, alltid mot en kontrollert adresse.
 
 Ny utsending bruker Supabase Auth sin invitasjonskanal for eksisterende,
 ubekreftede inviterte brukere. Medlemskap og rettigheter beholdes; bare en
-superbruker med aktiv Proff kan sende på nytt. Bekreftede brukere med
-ventende medlemskap logger inn og åpner `/bedriftsinvitasjon`.
+superbruker med aktiv Proff kan sende på nytt. Har den inviterte allerede
+åpnet lenken (Auth markerer e-posten som bekreftet før passord er valgt),
+sendes i stedet en passordlenke (Reset password-malen) til
+`/bedriftsinvitasjon`, der personen velger passord og godtar invitasjonen.
 Invitasjonsruten må ligge i redirect-lista i begge hostede prosjekter.
 
 Lokal `supabase/config.toml` tillater også `/bedriftsinvitasjon` for både

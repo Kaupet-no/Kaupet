@@ -77,7 +77,8 @@ function createSupabaseClient() {
       accessToken &&
       refreshToken &&
       window.location.pathname === "/bedriftsinvitasjon" &&
-      callbackHash.get("type") === "invite"
+      // recovery: resent invitations to users who opened the first link without accepting.
+      ["invite", "recovery"].includes(callbackHash.get("type") ?? "")
     ) {
       pendingInvitationTokens = { access_token: accessToken, refresh_token: refreshToken };
     }

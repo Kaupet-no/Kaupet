@@ -33,3 +33,14 @@ it("kan lukkes", () => {
   act(() => fireEvent.click(screen.getByRole("button", { name: "Lukk meldingen" })));
   expect(screen.queryByRole("alert")).toBeNull();
 });
+
+it.each(["/bekreft-epost", "/bedriftsinvitasjon", "/tilbakestill-passord"])(
+  "viker for sidens egen lenkefeil på %s",
+  (pathname) => {
+    window.history.replaceState(null, "", pathname);
+    location.pathname = pathname;
+    render(<AuthLinkErrorBanner />);
+    expect(screen.queryByRole("alert")).toBeNull();
+    window.history.replaceState(null, "", "/");
+  },
+);

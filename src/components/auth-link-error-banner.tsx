@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { authLinkError, initialAuthLinkError } from "@/lib/auth-link-error";
 
 // These pages explain their own link errors.
-const PAGES_WITH_OWN_ERROR = new Set(["/bedriftsinvitasjon", "/tilbakestill-passord"]);
+const PAGES_WITH_OWN_ERROR = new Set([
+  "/bedriftsinvitasjon",
+  "/bekreft-epost",
+  "/tilbakestill-passord",
+]);
 
 export function AuthLinkErrorBanner() {
   const pathname = useLocation({ select: (location) => location.pathname });

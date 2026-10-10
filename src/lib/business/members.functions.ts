@@ -49,6 +49,10 @@ async function businessInvitationRedirect(): Promise<string> {
   return "https://kaupet.no/bedriftsinvitasjon";
 }
 
+// Invitations and resends share one bucket. High enough to onboard a whole team in one
+// sitting, low enough to stop Auth e-mail abuse from a compromised superuser account.
+const BUSINESS_INVITE_LIMIT = 30;
+
 export const inviteOrganizationMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
@@ -77,7 +81,7 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       throw new Error(PROFF_REQUIRED_MESSAGE);
     }
     const { assertUserNotRateLimited } = await import("@/lib/rate-limit.server");
-    await assertUserNotRateLimited(context.userId, "business_invite", 5, 3600);
+    await assertUserNotRateLimited(context.userId, "business_invite", BUSINESS_INVITE_LIMIT, 3600);
     const permissions = normalizeMemberPermissions(
       data.permissions ?? memberPermissionsSchema.parse({}),
     );
@@ -187,7 +191,7 @@ export const resendOrganizationInvite = createServerFn({ method: "POST" })
     if (memberError) throw await toClientError("resendOrganizationInvite.lookup", memberError);
     if (!member) throw new ClientError("Invitasjonen finnes ikke eller er allerede godtatt.", 409);
     const { assertUserNotRateLimited } = await import("@/lib/rate-limit.server");
-    await assertUserNotRateLimited(context.userId, "business_invite", 5, 3600);
+    await assertUserNotRateLimited(context.userId, "business_invite", BUSINESS_INVITE_LIMIT, 3600);
     const { data: target, error: targetError } = await supabaseAdmin.auth.admin.getUserById(
       data.userId,
     );

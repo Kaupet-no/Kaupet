@@ -51,6 +51,18 @@ describe("Supabase browser auth callbacks", () => {
     expect(setSessionMock).not.toHaveBeenCalled();
   });
 
+  it("glemmer invitasjonstokens etter at de er tatt i bruk", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/bedriftsinvitasjon#access_token=a&refresh_token=r&type=invite",
+    );
+    const { clearInvitationTokens, invitationTokens } = await import("./client");
+    expect(invitationTokens()).not.toBeNull();
+    clearInvitationTokens();
+    expect(invitationTokens()).toBeNull();
+  });
+
   it("lar SDK-en håndtere PKCE uten å sette en fragment-sesjon", async () => {
     window.history.replaceState(null, "", "/auth?code=local-code");
     const { invitationTokens } = await import("./client");

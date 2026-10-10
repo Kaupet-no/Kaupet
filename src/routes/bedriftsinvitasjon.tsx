@@ -10,7 +10,7 @@ import type { Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { invitationTokens, supabase } from "@/integrations/supabase/client";
+import { clearInvitationTokens, invitationTokens, supabase } from "@/integrations/supabase/client";
 import { authLinkError } from "@/lib/auth-link-error";
 import { acceptOrganizationInvite } from "@/lib/business/members.functions";
 import { formatErrorMessage } from "@/lib/errors";
@@ -43,6 +43,7 @@ async function adoptInvitationSession() {
   if (!tokens) throw new Error("Invitasjonen er ugyldig, utløpt eller allerede brukt.");
   const { error } = await supabase.auth.setSession(tokens);
   if (error) throw error;
+  clearInvitationTokens();
 }
 
 function BusinessInvitationPage() {

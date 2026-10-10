@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   setSession: vi.fn(),
   signOut: vi.fn(),
   tokens: vi.fn(),
+  clearTokens: vi.fn(),
 }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => ({ options }),
@@ -20,6 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   invitationTokens: mocks.tokens,
+  clearInvitationTokens: mocks.clearTokens,
   supabase: {
     auth: {
       getSession: mocks.getSession,
@@ -76,6 +78,7 @@ it("tar i bruk invitasjonssesjonen direkte når ingen andre er innlogget", async
   );
   await screen.findByLabelText("Nytt passord");
   expect(mocks.setSession).toHaveBeenCalledWith(tokens);
+  expect(mocks.clearTokens).toHaveBeenCalled();
   expect(mocks.signOut).not.toHaveBeenCalled();
 });
 

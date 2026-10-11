@@ -488,6 +488,11 @@ function NewWtbPage() {
           radius_km: radiusKm,
         },
       });
+      if ("already_published" in result && result.already_published) {
+        showErrorToast(
+          "Kjøpsønsket er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger det publiserte kjøpsønsket.",
+        );
+      }
       return result.id;
     },
     onSuccess: (id) => {

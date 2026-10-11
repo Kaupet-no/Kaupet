@@ -136,7 +136,10 @@ describe("kjøpsønske etter tapt publiseringssvar", () => {
 
   it("bekrefter et allerede aktivt kjøpsønske i stedet for å feile", async () => {
     rowStatus("active");
-    await expect(createWtbListing({ data: { ...wtbInput, draftId: id } })).resolves.toEqual({ id });
+    await expect(createWtbListing({ data: { ...wtbInput, draftId: id } })).resolves.toEqual({
+      id,
+      already_published: true,
+    });
     await expect(saveWtbDraft({ data: { ...wtbInput, id } })).resolves.toEqual({
       id,
       published: true,

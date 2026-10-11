@@ -161,7 +161,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
       if (row) return { id: row.id as string };
       // A lost publish response: confirm the live want listing instead of failing the retry.
       if ((await wtbDraftStatus(supabaseAdmin, data.draftId, userId)) === "active") {
-        return { id: data.draftId };
+        return { id: data.draftId, already_published: true };
       }
       throw new ClientError("Utkastet kan ikke publiseres i denne tilstanden.", 409);
     }

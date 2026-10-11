@@ -81,6 +81,7 @@ export function useWtbDraftAutosave(
   const saveInProgress = useRef<Promise<string | null> | null>(null);
   const savingStopped = useRef(false);
   const restorableDraftRef = useRef<WtbDraftData | null>(null);
+  const draftOfferDismissed = useRef(false);
   const fieldsRef = useRef(fields);
   const [initialFields] = useState(() => JSON.stringify(fields));
   useEffect(() => {
@@ -105,7 +106,7 @@ export function useWtbDraftAutosave(
       if (!authenticated || storageScope) return;
       void getLatestWtbDraft()
         .then((server) => {
-          if (!server || !isCurrent()) return;
+          if (!server || !isCurrent() || draftOfferDismissed.current) return;
           // Brukeren har begynt på et nytt kjøpsønske før svaret kom. Et sent
           // tilbud ville skjøvet skjemaet under fingeren, og å overta id-en
           // ville latt autolagringen overskrive det gamle utkastet.
@@ -319,12 +320,18 @@ export function useWtbDraftAutosave(
     removeItems(DRAFT_KEY, DRAFT_ID_KEY);
   }
 
+  const dismissDraftOffer = useCallback(() => {
+    if (!isCurrent() || !restorableDraftRef.current) return;
+    draftOfferDismissed.current = true;
+    restorableDraftRef.current = null;
+    setRestorableDraft(null);
+    rememberDraftId(null);
+    removeItems(DRAFT_ID_KEY);
+  }, [DRAFT_ID_KEY, isCurrent, rememberDraftId]);
+
   async function preparePublish() {
-    // Publishing the current form declines an unanswered restore offer; otherwise saveToServer skips the save.
-    if (restorableDraftRef.current) {
-      restorableDraftRef.current = null;
-      setRestorableDraft(null);
-    }
+    // New content gets its own server draft; the declined draft stays untouched.
+    dismissDraftOffer();
     if (saveInProgress.current) await saveInProgress.current;
     const id = await saveToServer();
     if (!id || !isCurrent()) throw new Error("Utkastet må lagres før publisering. Prøv igjen.");
@@ -348,7 +355,11 @@ export function useWtbDraftAutosave(
     flushLocalDraft: saveLocal,
     isSaving,
     saveToServer,
-    dismissRestore: () => setRestorableDraft(null),
+    dismissDraftOffer,
+    dismissRestore: () => {
+      restorableDraftRef.current = null;
+      setRestorableDraft(null);
+    },
     discardDraft: async () => {
       if (!isCurrent()) return;
       const id = draftIdRef.current;

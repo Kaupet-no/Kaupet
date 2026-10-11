@@ -9,6 +9,15 @@ const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   errorToast: vi.fn(),
   clearAfterPublish: vi.fn(),
+  dismissDraftOffer: vi.fn(),
+  restorableDraft: null as null | { title: string },
+  actorChanged: false,
+  useBlocker: vi.fn(
+    (_options: {
+      enableBeforeUnload: boolean | (() => boolean);
+      shouldBlockFn: () => boolean;
+    }) => ({ status: "idle" }),
+  ),
 }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => ({
@@ -17,7 +26,7 @@ vi.mock("@tanstack/react-router", () => ({
   }),
   useNavigate: () => vi.fn(),
   useRouter: () => ({ history: { back: vi.fn(), length: 1 } }),
-  useBlocker: () => ({ status: "idle" }),
+  useBlocker: mocks.useBlocker,
 }));
 vi.mock("@tanstack/react-start", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-start")>()),
@@ -49,6 +58,9 @@ vi.mock("@/features/wtb/use-wtb-draft-autosave", () => ({
     preparePublish: mocks.prepare,
     clearAfterPublish: mocks.clearAfterPublish,
     resumeAutosave: vi.fn(),
+    restorableDraft: mocks.restorableDraft,
+    dismissDraftOffer: mocks.dismissDraftOffer,
+    actorChanged: mocks.actorChanged,
   }),
 }));
 vi.mock("@/lib/wtb-listings.functions", () => ({ createWtbListing: mocks.create }));
@@ -60,9 +72,43 @@ const WantPage = Route.options.component as ComponentType;
 afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.restorableDraft = null;
+  mocks.actorChanged = false;
   window.scrollTo = vi.fn();
   HTMLElement.prototype.scrollTo = vi.fn();
   mocks.prepare.mockResolvedValue({ id: "wtb-1", published: false });
+});
+
+it("omgår avslutningsvernet når brukeren starter på nytt etter kontobytte", () => {
+  mocks.actorChanged = true;
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WantPage />
+    </QueryClientProvider>,
+  );
+  const options = mocks.useBlocker.mock.calls.at(-1)![0];
+  const beforeUnloadEnabled = () =>
+    typeof options.enableBeforeUnload === "function"
+      ? options.enableBeforeUnload()
+      : options.enableBeforeUnload;
+  expect(beforeUnloadEnabled()).toBe(true);
+  expect(options.shouldBlockFn()).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Åpne en ny annonse med denne kontoen" }));
+  expect(beforeUnloadEnabled()).toBe(false);
+  expect(options.shouldBlockFn()).toBe(false);
+});
+
+it("avviser utkasttilbudet uten ekstra valg når brukeren går videre med nytt innhold", async () => {
+  mocks.restorableDraft = { title: "Tidligere kjøpsønske" };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WantPage />
+    </QueryClientProvider>,
+  );
+  expect(screen.getByRole("button", { name: "Gjenopprett" })).toBeTruthy();
+  expect(mocks.dismissDraftOffer).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: /^Neste:/ }));
+  await waitFor(() => expect(mocks.dismissDraftOffer).toHaveBeenCalled());
 });
 
 it.each([false, true])(

@@ -262,7 +262,7 @@ function NewWtbPage() {
     trigger,
     control,
     setValue,
-    formState: { errors, touchedFields, dirtyFields, isSubmitted },
+    formState: { errors, touchedFields, dirtyFields, isSubmitted, isDirty },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
@@ -357,6 +357,7 @@ function NewWtbPage() {
     saveToServer,
     flushLocalDraft,
     dismissRestore,
+    dismissDraftOffer,
     discardDraft,
     clearAfterPublish,
     actorChanged,
@@ -456,7 +457,7 @@ function NewWtbPage() {
   const blocker = useBlocker({
     shouldBlockFn: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
     withResolver: true,
-    enableBeforeUnload: shouldBlockNav,
+    enableBeforeUnload: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
   });
 
   const createFn = useServerFn(createWtbListing);
@@ -659,11 +660,20 @@ function NewWtbPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, restorableDraft]);
 
+  useEffect(() => {
+    if (restorableDraft && (isDirty || stepIndex > 0)) dismissDraftOffer();
+  }, [restorableDraft, isDirty, stepIndex, dismissDraftOffer]);
+
   if (actorChanged)
     return (
       <div role="alert" className="mx-auto max-w-lg space-y-4 p-6">
         <p>{DRAFT_ACTOR_CHANGED_MESSAGE}</p>
-        <Button onClick={() => window.location.reload()}>
+        <Button
+          onClick={() => {
+            bypassNavigationBlockerRef.current = true;
+            window.location.reload();
+          }}
+        >
           Åpne en ny annonse med denne kontoen
         </Button>
       </div>

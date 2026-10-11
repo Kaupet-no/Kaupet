@@ -191,6 +191,8 @@ describe("useWtbDraftAutosave", () => {
   });
 
   it("publiserer gjeldende skjema selv om gjenopprettingstilbudet ikke er besvart", async () => {
+    const oldId = "00000000-0000-4000-8000-000000000003";
+    localStorage.setItem("kaupet_draft_want_listing_id:user-1:private", oldId);
     localStorage.setItem(
       "kaupet_draft_want_listing:user-1:private",
       JSON.stringify({ draft_kind: "want", draft_version: 1, saved_at: Date.now(), ...fields }),
@@ -209,7 +211,71 @@ describe("useWtbDraftAutosave", () => {
     expect(saveWtbDraftMock).toHaveBeenCalledWith({
       data: expect.objectContaining({ title: "Ønsker ski" }),
     });
+    expect(saveWtbDraftMock.mock.calls[0][0].data).not.toHaveProperty("id");
     expect(result.current.restorableDraft).toBeNull();
+  });
+
+  it("erstatter lokal kopi og oppretter et nytt serverutkast når tilbudet avvises", async () => {
+    const idKey = "kaupet_draft_want_listing_id:user-1:private";
+    const draftKey = "kaupet_draft_want_listing:user-1:private";
+    localStorage.setItem(idKey, "00000000-0000-4000-8000-000000000003");
+    localStorage.setItem(
+      draftKey,
+      JSON.stringify({ draft_kind: "want", draft_version: 1, saved_at: Date.now(), ...fields }),
+    );
+    const current = { ...fields, title: "Ønsker ski" };
+    const { result } = renderHook(() => useWtbDraftAutosave(current, true, "user-1"));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    act(() => result.current.dismissDraftOffer());
+    expect(result.current.restorableDraft).toBeNull();
+    expect(result.current.draftId).toBeNull();
+    expect(localStorage.getItem(idKey)).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    expect(JSON.parse(localStorage.getItem(draftKey)!)).toMatchObject({ title: "Ønsker ski" });
+    expect(saveWtbDraftMock.mock.calls[0][0].data).not.toHaveProperty("id");
+  });
+
+  it("beholder server-ID-en ved eksplisitt gjenoppretting", async () => {
+    const oldId = "00000000-0000-4000-8000-000000000003";
+    localStorage.setItem("kaupet_draft_want_listing_id:user-1:private", oldId);
+    localStorage.setItem(
+      "kaupet_draft_want_listing:user-1:private",
+      JSON.stringify({ draft_kind: "want", draft_version: 1, saved_at: Date.now(), ...fields }),
+    );
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    await act(async () => {
+      result.current.dismissRestore();
+      // The route's decline effect may still see the old offer in this render.
+      result.current.dismissDraftOffer();
+      await result.current.preparePublish();
+    });
+    expect(saveWtbDraftMock.mock.calls[0][0].data.id).toBe(oldId);
+  });
+
+  it("overtar ikke et sent serverutkast etter at det lokale tilbudet er avvist", async () => {
+    let resolveLatest!: (value: unknown) => void;
+    getLatestWtbDraftMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLatest = resolve;
+      }),
+    );
+    localStorage.setItem(
+      "kaupet_draft_want_listing:user-1:private",
+      JSON.stringify({ draft_kind: "want", draft_version: 1, saved_at: Date.now(), ...fields }),
+    );
+    const { result } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    act(() => result.current.dismissDraftOffer());
+    await act(async () => {
+      resolveLatest({ ...fields, id: "old-server-id", updated_at: new Date().toISOString() });
+    });
+    expect(result.current.restorableDraft).toBeNull();
+    expect(result.current.draftId).toBeNull();
+    await act(async () => {
+      await result.current.saveToServer();
+    });
+    expect(saveWtbDraftMock.mock.calls[0][0].data).not.toHaveProperty("id");
   });
 
   it("stopper lokal og serverbasert autolagring etter publisering", async () => {

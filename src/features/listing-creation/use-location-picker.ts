@@ -35,29 +35,39 @@ export function useLocationPicker(params: {
     // the lookup below is still in flight or ends up failing.
     setValue("city", "", { shouldValidate: false });
     if (!/^\d{4}$/.test(p)) return;
+    let active = true;
     const t = window.setTimeout(async () => {
       const r = await lookupPostalCode(p);
+      if (!active) return;
       if (!r) {
-        showErrorToast("Fant ikke sted for dette postnummeret. Sjekk at det stemmer.");
+        showErrorToast("Kunne ikke hente sted for dette postnummeret. Oppgi stedet manuelt.");
         return;
       }
       if (r.city) setValue("city", r.city, { shouldValidate: false });
       if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
     }, 500);
-    return () => window.clearTimeout(t);
+    return () => {
+      active = false;
+      window.clearTimeout(t);
+    };
   }, [postalCode, setValue]);
 
   // Reverse-geocode map position
   useEffect(() => {
     if (lastEditedRef.current !== "map" || !coords) return;
+    let active = true;
     const t = window.setTimeout(async () => {
       const r = await reverseGeocodeAddress(coords);
+      if (!active) return;
       if (r.city) setValue("city", r.city, { shouldValidate: false });
       if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
         setValue("postal_code", r.postal_code, { shouldValidate: false });
       }
     }, 300);
-    return () => window.clearTimeout(t);
+    return () => {
+      active = false;
+      window.clearTimeout(t);
+    };
   }, [coords, setValue]);
 
   function resetLocationMethod() {

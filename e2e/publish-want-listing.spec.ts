@@ -12,6 +12,7 @@ import {
 } from "./pages/listing-wizard";
 import {
   advanceWantStep,
+  fillWantMaxPrice,
   openWantCategoryPicker,
   publishWantAndExpectSuccess,
   startWantWithoutCategory,
@@ -33,13 +34,13 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   await startWantWithoutCategory(page, "E2E ønsker å kjøpe barnestol");
   await advanceWantStep(page, "details");
 
   await page.getByLabel("Beskrivelse / krav (valgfritt)").fill("Må være hel og i god stand.");
-  await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("1500");
+  await fillWantMaxPrice(page, "1500");
   await advanceWantStep(page, "review");
 
   // Se over viser kjøpsønsket slik selgerne ser det; hver del tar deg til
@@ -47,8 +48,7 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   await expect(page.getByText(/^1\s500 kr$/)).toBeVisible();
   await page.getByRole("button", { name: /Endre maks pris/ }).click();
   await composerPage(page, "details").waitFor();
-  const maxPrice = page.getByLabel("Maks pris du vil betale (valgfritt)");
-  await maxPrice.fill("1200");
+  await fillWantMaxPrice(page, "1200");
   await advanceWantStep(page, "review");
   await expect(page.getByText(/^1\s200 kr$/)).toBeVisible();
 
@@ -68,7 +68,7 @@ test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, test
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   // Uten tittel stopper flyten på tittelsteget, med årsaken både ved feltet
   // og i feiloppsummeringen — ikke først på neste steg.
@@ -84,7 +84,7 @@ test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, t
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse?forcenative=1");
   await goToNewWantListing(page, true);
 
   // Tittelen først — kategoriforslaget bygger på den.
@@ -102,7 +102,7 @@ test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testI
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker treffsjekk");
   await advanceWantStep(page, "category");
@@ -118,7 +118,7 @@ test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testI
   ).toBeVisible();
 
   await advanceWantStep(page, "details");
-  await page.getByLabel("Maks pris du vil betale (valgfritt)").fill("150");
+  await fillWantMaxPrice(page, "150");
   await expect(
     page.getByText("2 annonser til salgs matcher allerede det du leter etter."),
   ).toBeVisible();

@@ -7,12 +7,12 @@ import { useIsNative } from "@/hooks/use-is-native";
  * Store 3.1.1 kill switch. Always true on web; on native it's gated by
  * site_settings.native_promotion_enabled, so it can be turned off without a
  * new app build. Mirrors useDefaultSearchExamples's direct-read pattern —
- * site_settings is readable by anyone via RLS. Missing value/error defaults
- * to allowed, same as the DB column's own default.
+ * site_settings is readable by anyone via RLS. Native purchases require an
+ * explicit enabled value; loading, missing settings and errors block them.
  */
 export function useNativePromotionAllowed(): boolean {
   const native = useIsNative();
-  const { data } = useQuery({
+  const { data, isError } = useQuery({
     queryKey: ["site-settings", "native-promotion-enabled"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -21,10 +21,10 @@ export function useNativePromotionAllowed(): boolean {
         .eq("id", true)
         .maybeSingle();
       if (error) throw error;
-      return data?.native_promotion_enabled ?? true;
+      return data?.native_promotion_enabled === true;
     },
     enabled: native,
     staleTime: 5 * 60 * 1000,
   });
-  return !native || data !== false;
+  return !native || (data === true && !isError);
 }

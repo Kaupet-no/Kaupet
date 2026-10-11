@@ -40,7 +40,7 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
     users[testInfo.project.name === "desktop-web" ? "desktop-publish" : testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
   const { email, password } = credentials;
-  await login(page, email, password);
+  await login(page, email, password, "/ny-annonse?type=sell");
   await goToNewListing(page);
 
   // Category must be chosen first — it's always the wizard's first step.
@@ -80,13 +80,13 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
 
 test("maser ikke om felt brukeren ikke har kommet til ennå", async ({ page }, testInfo) => {
   test.skip(
-    testInfo.project.name !== "desktop-web",
+    testInfo.project.name === "mobile-web",
     "Annonsestyrke-indikatoren ligger i desktop-sidepanelet",
   );
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-annonse?type=sell");
   await goToNewListing(page);
   await chooseCategory(page, TEST_CATEGORY_NAME);
   await wizardStep(page, "photos").waitFor();

@@ -16,6 +16,8 @@ const FILTER_FIXTURE_QUERY = "e2efilterfixture";
 const PUBLISH_PROJECTS = [
   "desktop-web",
   "mobile-web",
+  "firefox",
+  "webkit",
   "visual-web",
   "visual-phone",
   "visual-landscape",

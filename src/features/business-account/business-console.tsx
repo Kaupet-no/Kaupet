@@ -1,3 +1,4 @@
+import { BusinessApprovalNotice } from "./business-approval-notice";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -263,6 +264,9 @@ export function BusinessConsole({
   }, [activeTab]);
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-background">
+      <div className="mx-auto max-w-7xl px-4 pt-4">
+        <BusinessApprovalNotice status={organization.verification_status} />
+      </div>
       <header className="border-b border-border bg-card/80">
         <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="min-w-0">
@@ -413,6 +417,7 @@ export function BusinessConsole({
       </div>
       {effectiveProff && (
         <BulkListingImport
+          verificationStatus={organization.verification_status}
           open={importOpen}
           onOpenChange={setImportOpen}
           locations={locations}

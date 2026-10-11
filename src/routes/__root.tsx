@@ -1,3 +1,4 @@
+import { AuthLinkErrorBanner } from "@/components/auth-link-error-banner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
@@ -415,6 +416,7 @@ function RootBody({ native }: { native: boolean }) {
         id="main-content"
         className={`flex-1${native && !keyboardVisible && !bottomNavHidden ? " pb-bottom-nav" : ""}`}
       >
+        <AuthLinkErrorBanner />
         <Outlet />
       </main>
 

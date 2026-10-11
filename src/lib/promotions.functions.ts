@@ -8,6 +8,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdminOrDemoRole } from "@/lib/admin-auth.server";
 import { isTestHost } from "@/lib/env";
 import { logServerError } from "@/lib/server-error-log";
+import {
+  PROMOTION_PURCHASE_ACCEPTANCE_TEXT,
+  PROMOTION_PURCHASE_TERMS_VERSION,
+} from "@/lib/promotion-purchase-terms";
 import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
 
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
@@ -30,6 +34,8 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .object({
         listing_id: z.string().uuid(),
         duration_days: z.number().int().positive().max(60),
+        purchase_terms_accepted: z.literal(true),
+        purchase_terms_version: z.literal(PROMOTION_PURCHASE_TERMS_VERSION),
       })
       .parse(input),
   )
@@ -75,12 +81,13 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (!pricing) throw new ClientError("Ugyldig pakkevarighet", 400);
 
     // Block if an active or pending promotion exists
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from("listing_promotions")
       .select("id, status")
       .eq("listing_id", data.listing_id)
       .in("status", ["active", "pending", "gifted"])
       .maybeSingle();
+    if (existingError) throw await toClientError("database", existingError);
     if (existing) {
       throw new ClientError("Denne annonsen har allerede en aktiv eller ventende fremheving", 409);
     }
@@ -98,6 +105,9 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         status: "pending",
         vipps_reference: reference,
         vipps_mode: vippsMode,
+        purchase_terms_version: data.purchase_terms_version,
+        purchase_terms_accepted_at: new Date().toISOString(),
+        purchase_acceptance_text: PROMOTION_PURCHASE_ACCEPTANCE_TEXT,
       })
       .select("id")
       .single();
@@ -160,7 +170,7 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
     const { data: promo, error } = await supabase
       .from("listing_promotions")
       .select(
-        "id, status, duration_days, price_nok, starts_at, expires_at, created_at, vipps_reference, user_id, listing_id, listings:listings!inner(id, title, kaupet_code)",
+        "id, status, duration_days, price_nok, starts_at, expires_at, created_at, vipps_reference, user_id, listing_id, purchase_terms_version, purchase_terms_accepted_at, purchase_acceptance_text, listings:listings!inner(id, title, kaupet_code)",
       )
       .eq("id", data.promotion_id)
       .maybeSingle();
@@ -179,6 +189,9 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
       expires_at: promo.expires_at,
       created_at: promo.created_at,
       vipps_reference: promo.vipps_reference,
+      purchase_terms_version: promo.purchase_terms_version,
+      purchase_terms_accepted_at: promo.purchase_terms_accepted_at,
+      purchase_acceptance_text: promo.purchase_acceptance_text,
       listing: {
         id: listing?.id ?? promo.listing_id,
         title: listing?.title ?? "",

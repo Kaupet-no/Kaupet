@@ -98,6 +98,7 @@ function setup({ membership = true, duplicate = false } = {}) {
   });
   let createCalls = 0;
   supabaseAdmin.rpc.mockImplementation(async (name: string) => {
+    if (name === "organization_is_verified") return { data: true, error: null };
     if (name === "organization_has_proff_access") return { data: true, error: null };
     if (name === "sync_organization_entitlements") return { data: null, error: null };
     if (name === "upsert_listing_from_external") {

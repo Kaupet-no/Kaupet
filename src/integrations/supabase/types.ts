@@ -936,6 +936,9 @@ export type Database = {
           is_gift: boolean
           listing_id: string
           price_nok: number
+          purchase_acceptance_text: string | null
+          purchase_terms_accepted_at: string | null
+          purchase_terms_version: string | null
           refunded_at: string | null
           starts_at: string | null
           status: Database["public"]["Enums"]["promotion_status"]
@@ -955,6 +958,9 @@ export type Database = {
           is_gift?: boolean
           listing_id: string
           price_nok: number
+          purchase_acceptance_text?: string | null
+          purchase_terms_accepted_at?: string | null
+          purchase_terms_version?: string | null
           refunded_at?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["promotion_status"]
@@ -974,6 +980,9 @@ export type Database = {
           is_gift?: boolean
           listing_id?: string
           price_nok?: number
+          purchase_acceptance_text?: string | null
+          purchase_terms_accepted_at?: string | null
+          purchase_terms_version?: string | null
           refunded_at?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["promotion_status"]
@@ -3843,6 +3852,10 @@ export type Database = {
           total_views: number
           views_last_week: number
         }[]
+      }
+      publish_listing_draft: {
+        Args: { _fields: Json; _images: Json; _listing_id: string; _user_id: string }
+        Returns: Json
       }
       purge_expired_accounts: { Args: never; Returns: number }
       purge_expired_personal_data: { Args: never; Returns: Json }

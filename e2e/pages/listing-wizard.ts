@@ -6,7 +6,7 @@
  */
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 
-export async function login(page: Page, email: string, password: string) {
+export async function login(page: Page, email: string, password: string, returnTo?: string) {
   // Permanent (not error-triggered) console/pageerror capture — a login
   // flake was observed a few times across CI runs (never reproduced or
   // root-caused beyond "click completed, page stayed on /auth"), so this
@@ -22,25 +22,35 @@ export async function login(page: Page, email: string, password: string) {
   // Going straight to the canonical URL avoids that race entirely (it only
   // surfaced once Turnstile's load time gave the redirect time to land
   // between fill and click).
-  await page.goto("/auth?mode=signin");
+  await page.goto(
+    `/auth?mode=signin${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`,
+  );
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord", { exact: true }).fill(password);
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-  await expect(page).toHaveURL(/\/(?:bedrift)?(?:\?.*)?$/, { timeout: 10_000 });
+  await page.waitForURL(
+    returnTo ? new URL(returnTo, page.url()).href : /\/(?:bedrift)?(?:\?.*)?$/,
+    { timeout: 10_000, waitUntil: "load" },
+  );
+  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
 }
 
 /** type=sell is required — without it the route redirects to "/". */
 export async function goToNewListing(page: Page, title?: string) {
   const suffix = title ? `&title=${encodeURIComponent(title)}` : "";
-  await page.goto(`/ny-annonse?type=sell${suffix}`);
+  const target = `/ny-annonse?type=sell${suffix}`;
+  if (page.url() === "about:blank" || page.url() !== new URL(target, page.url()).href)
+    await page.goto(target);
   // See goToNewWantListing: the category search box is present pre-hydration,
   // so filling it too early can be silently discarded once React hydrates.
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
 export async function goToNewWantListing(page: Page, native = false) {
-  await page.goto(`/ny-ok-annonse${native ? "?forcenative=1" : ""}`);
+  const target = `/ny-ok-annonse${native ? "?forcenative=1" : ""}`;
+  if (page.url() === "about:blank" || page.url() !== new URL(target, page.url()).href)
+    await page.goto(target);
   // The "Tittel" input is present in the pre-hydration SSR markup,
   // so a fill() right after goto() can land before React attaches its
   // listeners — the value (and the following click) is then silently lost

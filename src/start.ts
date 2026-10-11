@@ -14,16 +14,22 @@ import { describeSafeError } from "@/lib/safe-error";
 const cspNonceMiddleware = createMiddleware().server(async ({ next }) => {
   const nonce = crypto.randomUUID().replaceAll("-", "");
   const headers = buildSecurityHeaders({
+    environment: import.meta.env.VITE_ENVIRONMENT,
+    development: import.meta.env.DEV,
     r2PublicBaseUrl: import.meta.env.VITE_R2_PUBLIC_BASE_URL,
     r2AccountId: import.meta.env.R2_ACCOUNT_ID,
     supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
     scriptNonce: nonce,
   });
   const response = await next({ context: { cspNonce: nonce } });
+  if (headers["x-robots-tag"]) setResponseHeader("x-robots-tag", headers["x-robots-tag"]);
   if (response instanceof Response) {
     response.headers.set("content-security-policy", headers["content-security-policy"]);
+    if (headers["x-robots-tag"]) response.headers.set("x-robots-tag", headers["x-robots-tag"]);
   } else if (response?.response instanceof Response) {
     response.response.headers.set("content-security-policy", headers["content-security-policy"]);
+    if (headers["x-robots-tag"])
+      response.response.headers.set("x-robots-tag", headers["x-robots-tag"]);
   } else {
     setResponseHeader("content-security-policy", headers["content-security-policy"]);
   }

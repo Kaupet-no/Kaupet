@@ -12,6 +12,11 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { useListingPreview } from "@/hooks/use-listing-preview";
+import { useNativePromotionAllowed } from "@/hooks/use-native-promotion-allowed";
+import {
+  PROMOTION_PURCHASE_ACCEPTANCE_TEXT,
+  PROMOTION_PURCHASE_TERMS_VERSION,
+} from "@/lib/promotion-purchase-terms";
 
 type Props = {
   listingId: string;
@@ -22,6 +27,14 @@ type Props = {
 export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (!open) setAccepted(false);
+  }
+  const [acceptancePrefix, acceptanceSuffix] =
+    PROMOTION_PURCHASE_ACCEPTANCE_TEXT.split("vilkår for kjøp");
+  const promotionAllowed = useNativePromotionAllowed();
 
   const fetchPricing = useServerFn(getPromotionPricing);
   const { data: pricing } = useQuery({
@@ -35,7 +48,14 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const startCheckout = useServerFn(createPromotionCheckout);
   const checkout = useMutation({
     mutationFn: async (duration_days: number) =>
-      startCheckout({ data: { listing_id: listingId, duration_days } }),
+      startCheckout({
+        data: {
+          listing_id: listingId,
+          duration_days,
+          purchase_terms_accepted: true,
+          purchase_terms_version: PROMOTION_PURCHASE_TERMS_VERSION,
+        },
+      }),
     onSuccess: (res) => {
       window.location.href = res.redirect_url;
     },
@@ -122,12 +142,11 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             className="mt-0.5"
           />
           <span>
-            Jeg har lest{" "}
+            {acceptancePrefix}
             <a href="/vilkar#kjopsvilkar" target="_blank" className="underline">
               vilkår for kjøp
-            </a>{" "}
-            og samtykker til at fremhevingen leveres umiddelbart, slik at angreretten bortfaller
-            (angrerettloven § 22 bokstav n).
+            </a>
+            {acceptanceSuffix}
           </span>
         </label>
 
@@ -136,9 +155,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             Avbryt
           </Button>
           <Button
-            disabled={!selected || !accepted || isPending}
+            disabled={!selected || !accepted || isPending || !promotionAllowed}
             onClick={() => {
-              if (!selected) return;
+              if (!selected || !accepted || !promotionAllowed) return;
               checkout.mutate(selected);
             }}
           >

@@ -157,6 +157,15 @@ function ReceiptPage() {
             />
           )}
         </dl>
+        {data.purchase_terms_accepted_at && (
+          <div className="mt-4 border-t border-border pt-4 text-sm">
+            <p>
+              Kjøpsvilkår versjon {data.purchase_terms_version} akseptert{" "}
+              {new Date(data.purchase_terms_accepted_at).toLocaleString("nb-NO")}.
+            </p>
+            <p className="mt-2 text-muted-foreground">{data.purchase_acceptance_text}</p>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">

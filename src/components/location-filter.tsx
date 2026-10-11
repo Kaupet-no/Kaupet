@@ -9,7 +9,7 @@ import {
   getCurrentPosition,
   requestLocationPermission,
 } from "@/lib/native";
-import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
+import { usePlaceSearch, type PlaceSearchResult } from "@/hooks/use-place-search";
 import type { LocationValue } from "@/lib/advanced-search-value";
 
 export type { LocationValue } from "@/lib/advanced-search-value";
@@ -25,7 +25,7 @@ type LocationPickerProps = {
 
 export function LocationPicker({ value, onChange, onDone, autoFocus = true }: LocationPickerProps) {
   const [query, setQuery] = useState(value.label ?? "");
-  const { results, loading, searchedQuery, search, clear: clearSearch } = useNominatimSearch();
+  const { results, loading, error, searchedQuery, search, clear: clearSearch } = usePlaceSearch();
   const [locationPermission, setLocationPermission] = useState<"granted" | "denied" | null>(null);
 
   useEffect(() => {
@@ -40,12 +40,12 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
     setQuery(value.label ?? "");
   }
 
-  const pick = (r: NominatimResult) => {
+  const pick = (r: PlaceSearchResult) => {
     onChange({
       ...value,
-      lat: parseFloat(r.lat),
-      lng: parseFloat(r.lon),
-      label: r.display_name.split(",").slice(0, 2).join(", "),
+      lat: r.lat,
+      lng: r.lng,
+      label: r.label,
     });
     onDone?.();
   };
@@ -121,7 +121,16 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
         </Button>
       </form>
       <p className="text-xs text-muted-foreground">
-        Søket sendes til OpenStreetMap når du trykker Søk.
+        Stedsopplysninger fra{" "}
+        <a
+          href="https://www.kartverket.no/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2"
+        >
+          © Kartverket
+        </a>
+        . Søket sendes når du trykker Søk.
       </p>
       <Button
         type="button"
@@ -138,19 +147,24 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
         {locationPermission === "denied" ? "Posisjon ikke tillatt" : "Bruk min posisjon"}
       </Button>
       <div className="max-h-[260px] overflow-y-auto">
+        {error && (
+          <p role="alert" className="px-2 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
         {loading && <div className="px-2 py-2 text-sm text-muted-foreground">Søker…</div>}
-        {!loading && searchedQuery === query.trim() && results.length === 0 && (
+        {!loading && !error && searchedQuery === query.trim() && results.length === 0 && (
           <div className="px-2 py-2 text-sm text-muted-foreground">Ingen treff</div>
         )}
         {results.map((r) => (
           <button
-            key={r.place_id}
+            key={r.id}
             type="button"
             onClick={() => pick(r)}
             className="native-touch-target flex min-h-14 w-full items-start gap-2 rounded-lg px-3 py-3 text-left text-sm hover:bg-muted"
           >
             <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <span className="line-clamp-2">{r.display_name}</span>
+            <span className="line-clamp-2">{r.label}</span>
           </button>
         ))}
       </div>

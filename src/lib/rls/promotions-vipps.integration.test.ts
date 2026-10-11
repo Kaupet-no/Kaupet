@@ -26,6 +26,7 @@ describe.skipIf(!canRun)(
     };
 
     const userIds: string[] = [];
+    const listingIds: string[] = [];
     let ownerId: string;
     let pendingPromoId: string;
     let activePromoId: string;
@@ -55,6 +56,7 @@ describe.skipIf(!canRun)(
           .select("id")
           .single();
         if (error) throw error;
+        listingIds.push(data.id);
         return data.id;
       };
       const pendingListingId = await mkListing("RLS promo pending listing");
@@ -68,6 +70,9 @@ describe.skipIf(!canRun)(
           duration_days: 3,
           price_nok: 49,
           status: "pending",
+          purchase_terms_version: "2.0",
+          purchase_terms_accepted_at: "2026-10-07T12:00:00Z",
+          purchase_acceptance_text: "Jeg har lest vilkår for kjøp — testaksept.",
         })
         .select("id")
         .single();
@@ -92,7 +97,50 @@ describe.skipIf(!canRun)(
 
     afterAll(async () => {
       if (!canRun) return;
+      await admin.from("listing_promotions").delete().in("id", [pendingPromoId, activePromoId]);
+      await admin.from("listings").delete().in("id", listingIds);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    // PAY-16: purchase evidence follows the existing owner/admin RLS.
+    it("eieren kan lese sin registrerte kjøpsaksept", async () => {
+      const owner = await signIn(emails.owner);
+      const { data, error } = await owner
+        .from("listing_promotions")
+        .select("purchase_terms_version, purchase_terms_accepted_at, purchase_acceptance_text")
+        .eq("id", pendingPromoId)
+        .single();
+      expect(error).toBeNull();
+      expect(data?.purchase_terms_version).toBe("2.0");
+      expect(data?.purchase_acceptance_text).toBe("Jeg har lest vilkår for kjøp — testaksept.");
+      expect(Date.parse(data!.purchase_terms_accepted_at!)).toBe(
+        Date.parse("2026-10-07T12:00:00Z"),
+      );
+    });
+
+    it("eieren kan ikke endre kjøpsbevis eller betalingsstatus direkte", async () => {
+      const owner = await signIn(emails.owner);
+      const { data } = await owner
+        .from("listing_promotions")
+        .update({ status: "active", purchase_terms_version: "forfalsket" })
+        .eq("id", pendingPromoId)
+        .select("id");
+      expect(data ?? []).toHaveLength(0);
+      const { data: stored, error } = await admin
+        .from("listing_promotions")
+        .select("status, purchase_terms_version")
+        .eq("id", pendingPromoId)
+        .single();
+      expect(error).toBeNull();
+      expect(stored).toMatchObject({ status: "pending", purchase_terms_version: "2.0" });
+    });
+
+    it("databasen avviser ufullstendig kjøpsaksept", async () => {
+      const { error } = await admin
+        .from("listing_promotions")
+        .update({ purchase_terms_accepted_at: null })
+        .eq("id", pendingPromoId);
+      expect(error?.code).toBe("23514");
     });
 
     it("lets the owner see both their pending and active promotion", async () => {

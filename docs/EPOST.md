@@ -32,13 +32,12 @@ lagringstid) er dokumentert i
 | `RESEND_API_KEY`    | Både applikasjonen og lokal Supabase Auth SMTP | Server-only. Legg den aldri i en `VITE_*`-variabel         |
 | `RESEND_FROM_EMAIL` | `src/lib/email.server.ts`                      | Faller tilbake til `Kaupet.no <ikkesvar@varsel.kaupet.no>` |
 
-Nøkkelen settes på workeren med
-`wrangler secret put RESEND_API_KEY --name <worker>`, eller i Supabases
-SMTP-innstilling for auth-kanalen. Aldri i git.
+Nøkkelen administreres i Doppler (`kaupet/stg` og `kaupet/prd`) og synkes
+til Worker og Supabase Auth SMTP av miljøets deployskript. Aldri i git.
 
-Uten `RESEND_API_KEY` logger `email.server.ts` en feil og hopper over
-utsendingen — den kaster ikke. Lokal utvikling sender altså ingenting med
-mindre nøkkelen er satt.
+Uten `RESEND_API_KEY` kaster `email.server.ts` `Missing RESEND_API_KEY`.
+Varselutsendingen fanger og registrerer feilen per mottaker; øvrige kallere
+må håndtere den. Lokal utvikling sender ingenting uten nøkkelen.
 
 ## Kanal 1 — Supabase Auth
 
@@ -66,6 +65,7 @@ Per prosjekt:
 - `https://staging.kaupet.no/auth**`
 - `https://staging.kaupet.no/tilbakestill-passord`
 - `https://staging.kaupet.no/bekreft-epost`
+- `https://staging.kaupet.no/bedriftsinvitasjon`
 
 Tilsvarende med `https://kaupet.no/…` i produksjonsprosjektet.
 
@@ -153,3 +153,19 @@ prosjektene — en eksakt URL kan ikke matche bekreftelseslenken.
 Lokal Supabase fanger utgående e-post i Inbucket i stedet for å sende den, med
 mindre du eksplisitt konfigurerer SMTP. Test derfor den ekte
 e-postrundturen i staging, alltid mot en kontrollert adresse.
+
+### Medarbeiderinvitasjoner
+
+Ny utsending bruker Supabase Auth sin invitasjonskanal for eksisterende,
+ubekreftede inviterte brukere. Medlemskap og rettigheter beholdes; bare en
+superbruker med aktiv Proff kan sende på nytt. Har den inviterte allerede
+åpnet lenken (Auth markerer e-posten som bekreftet før passord er valgt),
+sendes i stedet en passordlenke (Reset password-malen) til
+`/bedriftsinvitasjon`, der personen velger passord og godtar invitasjonen.
+Invitasjonsruten må ligge i redirect-lista i begge hostede prosjekter.
+
+Lokal `supabase/config.toml` tillater også `/bedriftsinvitasjon` for både
+`127.0.0.1:8080` og `localhost:8080`. Restart lokal stack etter endringer i
+redirect-lista. Serverutsendte invitasjoner returnerer token i URL-fragmentet;
+nettleserklienten etablerer sesjonen med SDK-ens `setSession` før fragmentet
+ryddes. PKCE beholdes for vanlige Auth-flyter.

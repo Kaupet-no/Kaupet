@@ -27,6 +27,8 @@ export default defineConfig(({ command, mode }) => {
   envDefine["import.meta.env.R2_ACCOUNT_ID"] = JSON.stringify(allEnv.R2_ACCOUNT_ID);
 
   const securityHeaders = buildSecurityHeaders({
+    environment: env.VITE_ENVIRONMENT,
+    development: command === "serve",
     r2PublicBaseUrl: env.VITE_R2_PUBLIC_BASE_URL,
     r2AccountId: allEnv.R2_ACCOUNT_ID,
     supabaseUrl: env.VITE_SUPABASE_URL,

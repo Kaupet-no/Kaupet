@@ -1,189 +1,65 @@
-/**
- * Best-effort geocoding for norske adresser via Nominatim (OpenStreetMap).
- * Returnerer null hvis ingenting kunne finnes, eller hvis et nettverkskall feiler.
- * Blokker aldri en publisering på dette — koordinater kan settes senere.
- */
+import {
+  geocodeNorwayAddressFn,
+  geocodeStreetAddressFn,
+  lookupPostalCodeFn,
+  reverseGeocodeAddressFn,
+  searchPlacesFn,
+} from "@/lib/geocode.functions";
+
+export type PlaceSearchResult = { id: string; label: string; lat: number; lng: number };
+
+/** Explicit search; failures reach the search UI so they're not shown as empty results. */
+export function searchPlaces(query: string, limit = 6): Promise<PlaceSearchResult[]> {
+  return searchPlacesFn({ data: { query, limit } });
+}
+
+/** Best-effort helpers: location lookup must never block publication. */
 export async function geocodeNorwayAddress(input: {
   postal_code?: string | null;
   city?: string | null;
 }): Promise<{ lat: number; lng: number } | null> {
-  const postal = (input.postal_code ?? "").trim();
-  const city = (input.city ?? "").trim();
-  if (!postal && !city) return null;
-
-  const queries: string[] = [];
-  if (postal && city) queries.push(`${postal} ${city}, Norge`);
-  if (city) queries.push(`${city}, Norge`);
-  if (postal) queries.push(`${postal}, Norge`);
-
-  for (const q of queries) {
-    try {
-      const url = new URL("https://nominatim.openstreetmap.org/search");
-      url.searchParams.set("q", q);
-      url.searchParams.set("format", "json");
-      url.searchParams.set("countrycodes", "no");
-      url.searchParams.set("limit", "1");
-      url.searchParams.set("addressdetails", "0");
-      const res = await fetch(url.toString(), {
-        headers: { "Accept-Language": "nb" },
-      });
-      if (!res.ok) continue;
-      const data: Array<{ lat: string; lon: string }> = await res.json();
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-          return { lat, lng };
-        }
-      }
-    } catch {
-      // Prøv neste variant
-    }
-  }
-  return null;
-}
-
-/**
- * Reverse-geocode et punkt til et lesbart stedsnavn i Norge (best-effort).
- * Returnerer f.eks. "Fjellhamar, Lørenskog" eller null hvis ingenting funnet.
- */
-export async function reverseGeocode(input: { lat: number; lng: number }): Promise<string | null> {
+  if (!input.postal_code?.trim() && !input.city?.trim()) return null;
   try {
-    const url = new URL("https://nominatim.openstreetmap.org/reverse");
-    url.searchParams.set("lat", String(input.lat));
-    url.searchParams.set("lon", String(input.lng));
-    url.searchParams.set("format", "json");
-    url.searchParams.set("zoom", "12");
-    url.searchParams.set("addressdetails", "1");
-    const res = await fetch(url.toString(), {
-      headers: { "Accept-Language": "nb" },
+    return await geocodeNorwayAddressFn({
+      data: { postal_code: input.postal_code?.trim() || null, city: input.city?.trim() || null },
     });
-    if (!res.ok) return null;
-    const data: {
-      address?: {
-        city?: string;
-        town?: string;
-        village?: string;
-        suburb?: string;
-        municipality?: string;
-        county?: string;
-        country_code?: string;
-      };
-    } = await res.json();
-    const a = data.address ?? {};
-    if (a.country_code && a.country_code !== "no") return null;
-    const primary = a.city ?? a.town ?? a.village ?? a.suburb ?? a.municipality;
-    const secondary = a.municipality && a.municipality !== primary ? a.municipality : a.county;
-    if (primary && secondary && primary !== secondary) return `${primary}, ${secondary}`;
-    if (primary) return primary;
-    if (secondary) return secondary;
-    return null;
   } catch {
     return null;
   }
 }
 
-/**
- * Reverse-geocode et punkt og hent ut sted + postnummer (best-effort).
- */
+export async function reverseGeocode(input: { lat: number; lng: number }): Promise<string | null> {
+  return (await reverseGeocodeAddress(input)).city;
+}
+
 export async function reverseGeocodeAddress(input: {
   lat: number;
   lng: number;
 }): Promise<{ city: string | null; postal_code: string | null }> {
   try {
-    const url = new URL("https://nominatim.openstreetmap.org/reverse");
-    url.searchParams.set("lat", String(input.lat));
-    url.searchParams.set("lon", String(input.lng));
-    url.searchParams.set("format", "json");
-    url.searchParams.set("zoom", "12");
-    url.searchParams.set("addressdetails", "1");
-    const res = await fetch(url.toString(), {
-      headers: { "Accept-Language": "nb" },
-    });
-    if (!res.ok) return { city: null, postal_code: null };
-    const data: {
-      address?: {
-        city?: string;
-        town?: string;
-        village?: string;
-        suburb?: string;
-        municipality?: string;
-        postcode?: string;
-        country_code?: string;
-      };
-    } = await res.json();
-    const a = data.address ?? {};
-    if (a.country_code && a.country_code !== "no") return { city: null, postal_code: null };
-    const city = a.city ?? a.town ?? a.village ?? a.suburb ?? a.municipality ?? null;
-    const postal_code = a.postcode ?? null;
-    return { city, postal_code };
+    return await reverseGeocodeAddressFn({ data: input });
   } catch {
     return { city: null, postal_code: null };
   }
 }
 
-/**
- * Slå opp et norsk postnummer → city + koordinater.
- */
-export async function lookupPostalCode(postal: string): Promise<{
-  city: string;
-  lat: number;
-  lng: number;
-} | null> {
-  const p = postal.trim();
-  if (!/^\d{4}$/.test(p)) return null;
+export async function lookupPostalCode(
+  postal: string,
+): Promise<{ city: string; lat: number; lng: number } | null> {
+  if (!/^\d{4}$/.test(postal.trim())) return null;
   try {
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("postalcode", p);
-    url.searchParams.set("country", "Norway");
-    url.searchParams.set("format", "json");
-    url.searchParams.set("addressdetails", "1");
-    url.searchParams.set("limit", "1");
-    const res = await fetch(url.toString(), { headers: { "Accept-Language": "nb" } });
-    if (!res.ok) return null;
-    const data: Array<{
-      lat: string;
-      lon: string;
-      address?: {
-        city?: string;
-        town?: string;
-        village?: string;
-        municipality?: string;
-        suburb?: string;
-      };
-    }> = await res.json();
-    if (data.length === 0) return null;
-    const a = data[0].address ?? {};
-    const city = a.city ?? a.town ?? a.village ?? a.suburb ?? a.municipality ?? "";
-    const lat = parseFloat(data[0].lat);
-    const lng = parseFloat(data[0].lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { city, lat, lng };
+    return await lookupPostalCodeFn({ data: { postal } });
   } catch {
     return null;
   }
 }
 
-/**
- * Eksakte koordinater for en norsk gateadresse via Kartverkets adresse-API
- * (matrikkelen). Best-effort: null ved ukjent adresse eller nettverksfeil.
- */
 export async function geocodeStreetAddress(input: {
   address_line: string;
   postal_code: string;
 }): Promise<{ lat: number; lng: number } | null> {
   try {
-    const url = new URL("https://ws.geonorge.no/adresser/v1/sok");
-    url.searchParams.set("sok", input.address_line.trim());
-    url.searchParams.set("postnummer", input.postal_code.trim());
-    url.searchParams.set("treffPerSide", "1");
-    const res = await fetch(url.toString());
-    if (!res.ok) return null;
-    const data: { adresser?: Array<{ representasjonspunkt?: { lat?: number; lon?: number } }> } =
-      await res.json();
-    const point = data.adresser?.[0]?.representasjonspunkt;
-    if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lon)) return null;
-    return { lat: point!.lat!, lng: point!.lon! };
+    return await geocodeStreetAddressFn({ data: input });
   } catch {
     return null;
   }

@@ -14,7 +14,9 @@ function run(command, args, options = {}) {
     cwd: root,
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
-    env: options.env ?? process.env,
+    // `bun run` imports the developer's .env, including SUPABASE_PROJECT_ID.
+    // That variable overrides config.toml in the Supabase CLI.
+    env: { ...(options.env ?? process.env), SUPABASE_PROJECT_ID: projectId },
   });
 }
 
@@ -58,13 +60,17 @@ function localSupabaseStatus(workdir) {
 
 const e2eRoot = mkdtempSync(path.join(tmpdir(), "kaupet-e2e-"));
 const e2eSupabaseDir = path.join(e2eRoot, "supabase");
-cpSync(path.join(root, "supabase"), e2eSupabaseDir, { recursive: true });
+// Never inherit linked-project metadata into the disposable local stack.
+cpSync(path.join(root, "supabase"), e2eSupabaseDir, {
+  recursive: true,
+  filter: (source) => ![".temp", ".branches"].includes(path.basename(source)),
+});
 const configPath = path.join(e2eSupabaseDir, "config.toml");
 const portOffset = 1000 + Math.floor(Math.random() * 7000);
 const port = (original) => String(original + portOffset);
 const projectId = `kaupet-e2e-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 const isolatedConfig = readFileSync(configPath, "utf8")
-  .replace('project_id = "Kaupet"', `project_id = "${projectId}"`)
+  .replace(/^project_id\s*=\s*"[^"]+"/m, `project_id = "${projectId}"`)
   .replaceAll("54320", port(54320))
   .replaceAll("54321", port(54321))
   .replaceAll("54322", port(54322))

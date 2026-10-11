@@ -210,13 +210,13 @@ Foreslått testnivå for regresjonsvern: unit|component|rls|e2e
 ```
 
 **Dekningsratchet.** Terskelen i `vitest.config.ts` står i dag på
-statements 36 / branches 31 / functions 31 / lines 38. Den er et _gulv_, ikke et
+statements 40 / branches 34 / functions 33 / lines 41. Den er et _gulv_, ikke et
 mål. Ratchet-regel: når en modul får ny testdekning, hev terskelen til
 nærmeste hele prosent under målt verdi i samme PR. Terskelen skal aldri
 senkes; en senking krever eksplisitt godkjenning fra testleder i PR-teksten.
 
-Måltrapp: 9 % → 20 % (Q+1) → 35 % (Q+2) på statements, med prioritert
-rekkefølge `src/lib/` → `src/features/*/` (domenehooks) → `src/routes/`.
+Den tidligere måltrappen 9 % → 20 % → 35 % på statements er passert.
+Videre økning følger målt dekning og risiko, med prioritert rekkefølge `src/lib/` → `src/features/*/` (domenehooks) → `src/routes/`.
 
 ---
 
@@ -422,7 +422,7 @@ tilgang til implementasjonen.
 | AUTH-03 | U    | P0  | `auth-return.ts` returnerer bare til interne stier          | Absolutte eksterne URL-er, `//evil.no` og `javascript:` avvises → open redirect umulig                                                                        |
 | AUTH-04 | U    | P1  | `pending-auth-intent.ts` lagrer og henter intensjon én gang | `take…` tømmer lageret; utløpt/ugyldig payload gir `null` uten kast                                                                                           |
 | AUTH-05 | E    | P0  | Innlogging og redirect tilbake til opprinnelig side         | Bruker som klikket «favoritt» anonymt havner tilbake på samme annonse, med handlingen fullført                                                                |
-| AUTH-06 | E    | P0  | Beskyttede ruter krever sesjon                              | Anonym på `/mine-annonser`, `/meldinger`, `/ny-annonse` sendes til auth, ikke til feilside                                                                    |
+| AUTH-06 | E    | P0  | Beskyttede ruter krever sesjon                              | Anonym på `/mine-annonser`, `/meldinger` og `/favoritter` sendes til auth, ikke til feilside; `/ny-annonse` er bevisst gjesteflyt                             |
 | AUTH-07 | E    | P1  | Passordtilbakestilling                                      | Ugyldig/utløpt token gir forklarende melding, ikke stack trace; gyldig token setter nytt passord og logger inn                                                |
 | AUTH-08 | R    | P0  | Utestengt bruker (`user_bans`)                              | Kan ikke opprette annonse, melding eller anmeldelse; eksisterende data er fortsatt skjult/vist etter policy                                                   |
 | AUTH-09 | R    | P0  | Suspendert bruker (`user_suspensions`)                      | Skrivetilgang blokkert i suspensjonsperioden, gjenopprettes automatisk etter utløp                                                                            |
@@ -501,23 +501,23 @@ Høyeste testintensitet. Dekker `src/features/listing-creation/` og
 
 ### 11.4 Kjøretøy (bil, MC, båt) — R6
 
-| ID     | Nivå | P   | Tittel                                               | Forventet resultat                                                                                                        |
-| ------ | ---- | --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| VEH-01 | U    | P0  | `parse-vehicle-lookup.ts` mot ekte SVV-responsformer | Manglende felt, null-verdier og uventede enum-verdier gir delvis utfylt resultat, aldri kast                              |
-| VEH-02 | U    | P0  | `vehicle-classification.ts`                          | Kjøretøygruppe utledes korrekt; ukjent kode gir definert «ukjent», ikke feil kategori                                     |
-| VEH-03 | U    | P0  | `vehicle-brand-match.ts`                             | Fuzzy-match på skrivefeil, store/små bokstaver og bindestrek; ingen falsk match på ulike merker med lik prefiks           |
-| VEH-04 | U    | P0  | `first-registration.ts` / `vehicle-date.ts`          | Grenser: årsskifte, skuddår, fremtidig dato avvises, tidsone påvirker ikke resultatet                                     |
-| VEH-05 | U    | P1  | `body-type-search-expansion.ts`                      | Ett karosseri-søk utvides til forventede synonymer uten å dra inn urelaterte                                              |
-| VEH-06 | U    | P0  | `vehicle-lookup.server.ts` feilhåndtering            | Timeout, 4xx, 5xx og ugyldig JSON fra SVV gir kontrollert feil, brukbar melding og ingen PII i logg                       |
-| VEH-07 | E    | P0  | Kjøretøyoppslag utilgjengelig                        | Brukeren kan fortsette manuelt; flyten blokkeres ikke                                                                     |
-| VEH-08 | U    | P1  | `vehicle-options.ts` / `vehicle-title.ts`            | Generert tittel er stabil og uten dobbelt mellomrom/tomme segmenter                                                       |
-| VEH-09 | U    | P1  | `vehicle-360.functions.ts`                           | Token-basert opplasting: ugyldig/utløpt token avvises; rammer lagres i riktig rekkefølge                                  |
-| VEH-10 | E    | P1  | 360-opptak via `/360-opptak/$token`                  | Uautentisert enhet med gyldig token kan laste opp; token kan ikke gjenbrukes på annen annonse                             |
-| VEH-11 | C    | P1  | `vehicle-registration` feltgruppe                    | Ugyldig regnr-format gir feltfeil før nettverkskall                                                                       |
-| VEH-12 | C    | P1  | `vehicle-price` og `omregistreringsavgift`           | Avgiftsboks vises kun når relevant; beregning avrundes og formateres som norsk valuta                                     |
-| VEH-13 | C    | P1  | `vehicle-equipment` / `vehicle-condition`            | Valgt utstyr overlever navigasjon frem/tilbake; «Tilstand» vises i teknisk informasjon på detaljsiden                     |
-| VEH-14 | R    | P1  | `vehicle_lookup_log`                                 | Vanlig bruker kan ikke lese andres oppslagslogg; regnr logges ikke sammen med bruker-ID i klartekst der policy forbyr det |
-| VEH-15 | U    | P2  | `admin-vehicle-brands` / `vehicle_models`            | Admin-CRUD validerer duplikater og bevarer referanser fra eksisterende annonser                                           |
+| ID     | Nivå | P   | Tittel                                      | Forventet resultat                                                                                                        |
+| ------ | ---- | --- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| VEH-01 | U    | P0  | SVV-mapping i `vehicle-lookup.server.ts`    | Manglende felt, null-verdier og uventede enum-verdier gir delvis utfylt resultat, aldri kast                              |
+| VEH-02 | U    | P0  | `vehicle-classification.ts`                 | Kjøretøygruppe utledes korrekt; ukjent kode gir definert «ukjent», ikke feil kategori                                     |
+| VEH-03 | U    | P0  | `vehicle-brand-match.ts`                    | Fuzzy-match på skrivefeil, store/små bokstaver og bindestrek; ingen falsk match på ulike merker med lik prefiks           |
+| VEH-04 | U    | P0  | `first-registration.ts` / `vehicle-date.ts` | Grenser: årsskifte, skuddår, fremtidig dato avvises, tidsone påvirker ikke resultatet                                     |
+| VEH-05 | U    | P1  | `body-type-search-expansion.ts`             | Ett karosseri-søk utvides til forventede synonymer uten å dra inn urelaterte                                              |
+| VEH-06 | U    | P0  | `vehicle-lookup.server.ts` feilhåndtering   | Timeout, 4xx, 5xx og ugyldig JSON fra SVV gir kontrollert feil, brukbar melding og ingen PII i logg                       |
+| VEH-07 | E    | P0  | Kjøretøyoppslag utilgjengelig               | Brukeren kan fortsette manuelt; flyten blokkeres ikke                                                                     |
+| VEH-08 | U    | P1  | `vehicle-options.ts` / `vehicle-title.ts`   | Generert tittel er stabil og uten dobbelt mellomrom/tomme segmenter                                                       |
+| VEH-09 | U    | P1  | `vehicle-360.functions.ts`                  | Token-basert opplasting: ugyldig/utløpt token avvises; rammer lagres i riktig rekkefølge                                  |
+| VEH-10 | E    | P1  | 360-opptak via `/360-opptak/$token`         | Uautentisert enhet med gyldig token kan laste opp; token kan ikke gjenbrukes på annen annonse                             |
+| VEH-11 | C    | P1  | `vehicle-registration` feltgruppe           | Ugyldig regnr-format gir feltfeil før nettverkskall                                                                       |
+| VEH-12 | C    | P1  | `vehicle-price` og `omregistreringsavgift`  | Avgiftsboks vises kun når relevant; beregning avrundes og formateres som norsk valuta                                     |
+| VEH-13 | C    | P1  | `vehicle-equipment` / `vehicle-condition`   | Valgt utstyr overlever navigasjon frem/tilbake; «Tilstand» vises i teknisk informasjon på detaljsiden                     |
+| VEH-14 | R    | P1  | `vehicle_lookup_log`                        | Vanlig bruker kan ikke lese andres oppslagslogg; regnr logges ikke sammen med bruker-ID i klartekst der policy forbyr det |
+| VEH-15 | U    | P2  | `admin-vehicle-brands` / `vehicle_models`   | Admin-CRUD validerer duplikater og bevarer referanser fra eksisterende annonser                                           |
 
 ### 11.5 Kjøpsønske (WTB)
 
@@ -626,23 +626,24 @@ Høyeste testintensitet. Dekker `src/features/listing-creation/` og
 Ingen test skal treffe Vipps' produksjonsendepunkt. Alt kjøres i testmodus
 eller mot mock.
 
-| ID     | Nivå | P   | Tittel                                                                      | Forventet resultat                                                                                                                              |
-| ------ | ---- | --- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| PAY-01 | U    | P0  | `verifyVippsWebhookSignature`                                               | Gyldig signatur godtas; endret payload, feil hemmelighet, manglende header og replay av gammel timestamp avvises. Sammenligning er tidskonstant |
-| PAY-02 | U    | P0  | `assertVippsConfigured` / `getVippsMode`                                    | Manglende konfigurasjon feiler tydelig ved oppstart av kallet, ikke halvveis i en betaling                                                      |
-| PAY-03 | U    | P0  | `createPromotionCheckout`                                                   | Idempotens: to raske kall for samme annonse gir én betaling, ikke to                                                                            |
-| PAY-04 | U    | P0  | `createVippsPayment` feilbaner                                              | Timeout/5xx fra Vipps gir ingen lokal «betalt»-tilstand                                                                                         |
-| PAY-05 | U    | P0  | `captureVippsPayment`                                                       | Capture skjer nøyaktig én gang per autorisasjon; dobbel capture avvises                                                                         |
-| PAY-06 | U    | P0  | `refundVippsPayment`                                                        | Refusjon over beløpsgrensen avvises; delvis refusjon regnskapsføres korrekt                                                                     |
-| PAY-07 | U    | P0  | `reconcilePromotionPayment`                                                 | Avstemming er idempotent og konvergerer mot Vipps' status som fasit ved uenighet                                                                |
-| PAY-08 | U    | P0  | Webhook-håndtering (`api/public/vipps/webhook.ts`) + `vipps_webhook_events` | Duplikat webhook-ID behandles én gang; ukjent event-type logges og ignoreres uten 500                                                           |
-| PAY-09 | R    | P0  | `vipps_webhook_secrets`                                                     | Ikke lesbar for noen klientrolle overhodet                                                                                                      |
-| PAY-10 | U    | P0  | `getPromotionPricing` / `promotion_pricing`                                 | Pris hentes server-side; klient-manipulert beløp ignoreres                                                                                      |
-| PAY-11 | R    | P0  | `listing_promotions`                                                        | Kun eier ser egen promoteringsstatus; ingen kan sette status direkte fra klienten                                                               |
-| PAY-12 | E    | P0  | Betalingsreise: promoter → betal (test) → kvittering                        | `/bekrefter/$promoId` og `/kvittering/$promoId` viser korrekt status; avbrutt betaling gir ikke aktiv promotering                               |
-| PAY-13 | E    | P1  | Retur fra Vipps med nettbrudd                                               | Bruker som ikke returnerer får likevel riktig status via webhook/avstemming                                                                     |
-| PAY-14 | U    | P1  | `getFeaturedListings`                                                       | Kun aktive, betalte promoteringer vises; utløpt promotering forsvinner ved grensen (tidssone-uavhengig)                                         |
-| PAY-15 | M    | P1  | Betaling avbrutt i Vipps-appen                                              | Ingen belastning, tydelig melding, annonsen er uendret                                                                                          |
+| ID     | Nivå  | P   | Tittel                                                                      | Forventet resultat                                                                                                                                    |
+| ------ | ----- | --- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PAY-01 | U     | P0  | `verifyVippsWebhookSignature`                                               | Gyldig signatur godtas; endret payload, feil hemmelighet, manglende header og replay av gammel timestamp avvises. Sammenligning er tidskonstant       |
+| PAY-02 | U     | P0  | `assertVippsConfigured` / `getVippsMode`                                    | Manglende konfigurasjon feiler tydelig ved oppstart av kallet, ikke halvveis i en betaling                                                            |
+| PAY-03 | U     | P0  | `createPromotionCheckout`                                                   | Idempotens: to raske kall for samme annonse gir én betaling, ikke to                                                                                  |
+| PAY-04 | U     | P0  | `createVippsPayment` feilbaner                                              | Timeout/5xx fra Vipps gir ingen lokal «betalt»-tilstand                                                                                               |
+| PAY-05 | U     | P0  | `captureVippsPayment`                                                       | Capture skjer nøyaktig én gang per autorisasjon; dobbel capture avvises                                                                               |
+| PAY-06 | U     | P0  | `refundVippsPayment`                                                        | Refusjon over beløpsgrensen avvises; delvis refusjon regnskapsføres korrekt                                                                           |
+| PAY-07 | U     | P0  | `reconcilePromotionPayment`                                                 | Avstemming er idempotent og konvergerer mot Vipps' status som fasit ved uenighet                                                                      |
+| PAY-08 | U     | P0  | Webhook-håndtering (`api/public/vipps/webhook.ts`) + `vipps_webhook_events` | Duplikat webhook-ID behandles én gang; ukjent event-type logges og ignoreres uten 500                                                                 |
+| PAY-09 | R     | P0  | `vipps_webhook_secrets`                                                     | Ikke lesbar for noen klientrolle overhodet                                                                                                            |
+| PAY-10 | U     | P0  | `getPromotionPricing` / `promotion_pricing`                                 | Pris hentes server-side; klient-manipulert beløp ignoreres                                                                                            |
+| PAY-11 | R     | P0  | `listing_promotions`                                                        | Kun eier ser egen promoteringsstatus; ingen kan sette status direkte fra klienten                                                                     |
+| PAY-12 | E     | P0  | Betalingsreise: promoter → betal (test) → kvittering                        | `/bekrefter/$promoId` og `/kvittering/$promoId` viser korrekt status; avbrutt betaling gir ikke aktiv promotering                                     |
+| PAY-13 | E     | P1  | Retur fra Vipps med nettbrudd                                               | Bruker som ikke returnerer får likevel riktig status via webhook/avstemming                                                                           |
+| PAY-14 | U     | P1  | `getFeaturedListings`                                                       | Kun aktive, betalte promoteringer vises; utløpt promotering forsvinner ved grensen (tidssone-uavhengig)                                               |
+| PAY-15 | M     | P1  | Betaling avbrutt i Vipps-appen                                              | Ingen belastning, tydelig melding, annonsen er uendret                                                                                                |
+| PAY-16 | U / R | P0  | Kjøpsaksept ved fremheving                                                  | Manglende/feil aksept og foreldet versjon avvises før betaling; versjon, server-tidspunkt og teksten lagres før Vipps-kallet; kun eier/admin får lese |
 
 ### 11.10 Varsler og push — R9
 
@@ -697,24 +698,24 @@ tabeller/scenarioer. Kravet er _fullstendig_ dekning av tabellene under.
 
 ### 11.13 Sikkerhet — R4/R13
 
-| ID     | Nivå    | P   | Tittel                                  | Forventet resultat                                                                                                  |
-| ------ | ------- | --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| SEC-01 | Statisk | P0  | `bun run check:server-boundary`         | Ingen klientmodul importerer `*.server.ts`/`*.functions.ts`-internals i strid med regelen                           |
-| SEC-02 | Statisk | P0  | Hemmeligheter ikke i klientbundle       | Grep i `dist/client` etter service-role-mønstre, `SUPABASE_SERVICE_ROLE`, Vipps-nøkler, HF-token → null treff       |
-| SEC-03 | Statisk | P0  | Kun `VITE_*` er offentlig               | Ingen hemmelighet ligger i en `VITE_`-variabel; sops-secrets er ikke committet i klartekst                          |
-| SEC-04 | U       | P0  | `env.server.ts` / `config.server.ts`    | Manglende obligatorisk variabel feiler tydelig ved oppstart, ikke som `undefined` senere                            |
-| SEC-05 | E       | P0  | CSRF-beskyttelse på serverfunksjoner    | Kall med feil/uten origin avvises; rammeverkets advarsel er ikke deaktivert                                         |
-| SEC-06 | U       | P0  | Alle serverfunksjoner validerer input   | For hver `*.functions.ts`-eksport: manipulert/uventet payload avvises med Zod-feil før sideeffekt                   |
-| SEC-07 | U       | P0  | Autorisasjon gjentas server-side        | Ingen serverfunksjon stoler på klientsendt bruker-ID/rolle                                                          |
-| SEC-08 | E       | P0  | IDOR-sonde                              | Bytt ut ID i URL/payload med annen brukers ressurs (annonse, samtale, promo, utkast) → avvist, ikke lekket          |
-| SEC-09 | C       | P1  | XSS-sonde                               | Brukertekst med `<script>`, `javascript:`-lenker og markdown-lignende input rendres som tekst                       |
-| SEC-10 | U       | P0  | Ingen PII i `product-analytics`         | Kun kontrollerte nøkler/enums; rå feltverdier avvises av typer eller runtime-sjekk                                  |
-| SEC-11 | U       | P0  | Ingen PII i feillogg                    | Regnr, adresse, e-post, fritekst og tokens filtreres i `error-capture.ts`/`server-error-log.ts`                     |
-| SEC-12 | M       | P1  | Personvernkrav                          | `/personvern` og `/vilkar` er oppdatert mot faktisk databehandling og tredjeparter (Vipps, SVV, Turnstile, Mistral) |
-| SEC-13 | CI      | P0  | `bun audit --audit-level=high` + CodeQL | Ingen høy/kritisk sårbarhet; funn trieres innen én uke                                                              |
-| SEC-14 | U       | P1  | Turnstile-verifisering server-side      | Klientens «ok» alene er aldri tilstrekkelig                                                                         |
-| SEC-15 | U       | P1  | Rate-limiting og bot-beskyttelse        | Rask gjentatt publisering, rapportering, feedback og søk begrenses server-side                                      |
-| SEC-16 | U       | P1  | `category-suggestion-ai.server.ts`      | Kall skjer kun server-side; prompt inneholder ikke PII; feil/timeout faller tilbake til vote-basert forslag         |
+| ID     | Nivå    | P   | Tittel                                  | Forventet resultat                                                                                                                        |
+| ------ | ------- | --- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| SEC-01 | Statisk | P0  | `bun run check:server-boundary`         | Ingen klientmodul importerer `*.server.ts`/`*.functions.ts`-internals i strid med regelen                                                 |
+| SEC-02 | Statisk | P0  | Hemmeligheter ikke i klientbundle       | Grep i `dist/client` etter service-role-mønstre, `SUPABASE_SERVICE_ROLE`, Vipps-nøkler, HF-token → null treff                             |
+| SEC-03 | Statisk | P0  | Kun `VITE_*` er offentlig               | Ingen hemmelighet ligger i en `VITE_`-variabel; sops-secrets er ikke committet i klartekst                                                |
+| SEC-04 | U       | P0  | Miljøvalidering i serverklienter        | Manglende obligatorisk variabel gir tydelig feil før leverandørkall; faktiske Supabase-/Vipps-/R2-klienter testes uten ekte hemmeligheter |
+| SEC-05 | E       | P0  | CSRF-beskyttelse på serverfunksjoner    | Kall med feil/uten origin avvises; rammeverkets advarsel er ikke deaktivert                                                               |
+| SEC-06 | U       | P0  | Alle serverfunksjoner validerer input   | For hver `*.functions.ts`-eksport: manipulert/uventet payload avvises med Zod-feil før sideeffekt                                         |
+| SEC-07 | U       | P0  | Autorisasjon gjentas server-side        | Ingen serverfunksjon stoler på klientsendt bruker-ID/rolle                                                                                |
+| SEC-08 | E       | P0  | IDOR-sonde                              | Bytt ut ID i URL/payload med annen brukers ressurs (annonse, samtale, promo, utkast) → avvist, ikke lekket                                |
+| SEC-09 | C       | P1  | XSS-sonde                               | Brukertekst med `<script>`, `javascript:`-lenker og markdown-lignende input rendres som tekst                                             |
+| SEC-10 | U       | P0  | Ingen PII i `product-analytics`         | Kun kontrollerte nøkler/enums; rå feltverdier avvises av typer eller runtime-sjekk                                                        |
+| SEC-11 | U       | P0  | Ingen PII i feillogg                    | Regnr, adresse, e-post, fritekst og tokens filtreres i `error-capture.ts`/`server-error-log.ts`                                           |
+| SEC-12 | M       | P1  | Personvernkrav                          | `/personvern` og `/vilkar` er oppdatert mot faktisk databehandling og tredjeparter (Vipps, SVV, Turnstile, Mistral)                       |
+| SEC-13 | CI      | P0  | `bun audit --audit-level=high` + CodeQL | Ingen høy/kritisk sårbarhet; funn trieres innen én uke                                                                                    |
+| SEC-14 | U       | P1  | Turnstile-verifisering server-side      | Klientens «ok» alene er aldri tilstrekkelig                                                                                               |
+| SEC-15 | U       | P1  | Rate-limiting og bot-beskyttelse        | Rask gjentatt publisering, rapportering, feedback og søk begrenses server-side                                                            |
+| SEC-16 | U       | P1  | `category-suggestion-ai.server.ts`      | Kall skjer kun server-side; prompt inneholder ikke PII; feil/timeout faller tilbake til vote-basert forslag                               |
 
 ### 11.14 Ytelse — R10
 
@@ -873,10 +874,10 @@ gjennomføringsrekkefølge for agenter.
 | 2   | Vipps har tester for konkurrerende checkout og webhook-retry, men mangler samtidige webhook-kall og full avstemming | PAY-05, PAY-07, PAY-08       | M       |
 | 3   | Ingen automatisert IDOR-/hemmelighetssonde                                                                          | SEC-02, SEC-08               | M       |
 | 4   | Ingen målte Web Vitals; kun bundle-budsjett                                                                         | PERF-02, PERF-03             | M       |
-| 5   | A11y dekket av én semantisk E2E-spec; mangler feltnivå-assertions                                                   | A11Y-02, A11Y-03, A11Y-04    | M       |
-| 6   | Dekningsterskel på 9 % gir svakt regresjonsvern                                                                     | § 9 ratchet                  | L       |
-| 7   | Ingen testdekning av varselutsending og dedupe                                                                      | NOTIF-03, NOTIF-06, NOTIF-07 | M       |
-| 8   | Polish-sjekklisten er ikke knyttet til PR-malen                                                                     | § 11.17                      | S       |
+| 5   | Semantikk, søk og composer har automatiserte a11y-assertions; skjermleser og reflow må testes manuelt               | A11Y-02, A11Y-03, A11Y-04    | M       |
+| 6   | Tersklene er 40/34/33/41 %; ratchet og risikobasert dekning videreføres                                             | § 9 ratchet                  | L       |
+| 7   | Varselutsending og dedupe har tester i `api/public/push/-dispatch.test.ts`; hosted levering gjenstår                | NOTIF-03, NOTIF-06, NOTIF-07 | M       |
+| 8   | Polish-sjekklisten er knyttet til PR-malen; manuell vurdering kreves                                                | § 11.17                      | S       |
 
 ## 15. Oppgavemal for tildeling til AI-agent
 

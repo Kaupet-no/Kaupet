@@ -37,6 +37,18 @@ export default defineConfig({
       use: { ...devices["Pixel 7"] },
     },
     {
+      name: "firefox",
+      testMatch:
+        /(?:browse-search|semantic-quality|publish-listing|publish-vehicle-listing|publish-want-listing)\.spec\.ts/,
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "webkit",
+      testMatch:
+        /(?:browse-search|semantic-quality|publish-listing|publish-vehicle-listing|publish-want-listing)\.spec\.ts/,
+      use: { ...devices["Desktop Safari"] },
+    },
+    {
       name: "visual-web",
       testMatch: /.*\.visual\.spec\.ts/,
       use: {

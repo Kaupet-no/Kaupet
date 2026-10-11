@@ -28,8 +28,8 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => locationInputSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
-    const { data: location, error } = await supabaseAdmin.rpc("create_organization_location", {
+    const { organizationId } = await requireSuperuserOrganization(context.userId);
+    const { data: location, error } = await context.supabase.rpc("create_organization_location", {
       _organization_id: organizationId,
       _name: data.name,
       _address_line: data.addressLine,
@@ -37,6 +37,9 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
       _city: data.city,
     });
     if (error) {
+      if (error.code === "42501") {
+        throw new ClientError(UNAUTHORIZED_MESSAGE, 403);
+      }
       throw await toClientError("database", error);
     }
     return { location };
@@ -47,11 +50,11 @@ export const updateOrganizationLocation = createServerFn({ method: "POST" })
   .validator((input: unknown) => locationInputSchema.extend({ locationId: uuid }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
-    const { geocodeStreetAddress } = await import("@/lib/geocode");
+    const { geocodeStreetAddress } = await import("@/lib/geocode.server");
     const visiting = await geocodeStreetAddress({
       address_line: data.addressLine,
       postal_code: data.postalCode,
-    });
+    }).catch(() => null);
     const { data: location, error } = await supabaseAdmin
       .from("organization_locations")
       .update({
@@ -165,11 +168,11 @@ export const updateLocationContacts = createServerFn({ method: "POST" })
       location.address_line &&
       location.postal_code
     ) {
-      const { geocodeStreetAddress } = await import("@/lib/geocode");
+      const { geocodeStreetAddress } = await import("@/lib/geocode.server");
       visiting = await geocodeStreetAddress({
         address_line: location.address_line,
         postal_code: location.postal_code,
-      });
+      }).catch(() => null);
     }
     const { error: updateError } = await supabaseAdmin
       .from("organization_locations")

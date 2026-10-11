@@ -60,7 +60,8 @@ export function ReviewForm({
       <div>
         <p className="text-sm font-medium">Gi {otherName} en vurdering</p>
         <p className="text-xs text-muted-foreground">
-          1–5 stjerner og en kort kommentar (valgfri). Vurderingen er endelig.
+          1–5 stjerner og en kort kommentar (valgfri). Vurderingen er endelig. Etter at en vurdering
+          er publisert, kan salget ikke angres.
         </p>
       </div>
       <StarRating value={rating} onChange={setRating} size={28} />

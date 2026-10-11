@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLocationPicker } from "./use-location-picker";
 
 vi.mock("@/lib/toast", () => ({
@@ -30,6 +30,8 @@ beforeEach(() => {
   requestLocationPermissionMock.mockReset();
   isNativeMock.mockReset().mockReturnValue(false);
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe("useLocationPicker", () => {
   it("switchToPostal clears fields and coords, and selects postal method", () => {
@@ -142,5 +144,55 @@ describe("useLocationPicker", () => {
     await new Promise((r) => setTimeout(r, 600));
 
     expect(lookupPostalCodeMock).not.toHaveBeenCalled();
+  });
+  it("ignores an old postal response after the postal code changes", async () => {
+    vi.useFakeTimers();
+    let resolveOld!: (value: { city: string; lat: number; lng: number }) => void;
+    lookupPostalCodeMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    const setValue = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ postalCode }) => useLocationPicker({ postalCode, setValue }),
+      { initialProps: { postalCode: "" } },
+    );
+    act(() => {
+      result.current.lastEditedRef.current = "postal_code";
+    });
+    rerender({ postalCode: "0152" });
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    rerender({ postalCode: "5003" });
+    await act(async () => {
+      resolveOld({ city: "Oslo", lat: 59.91, lng: 10.75 });
+    });
+    expect(setValue).not.toHaveBeenCalledWith("city", "Oslo", { shouldValidate: false });
+    expect(result.current.coords).toBeNull();
+  });
+
+  it("ignores an old reverse lookup after the marker moves again", async () => {
+    vi.useFakeTimers();
+    let resolveOld!: (value: { city: string; postal_code: string }) => void;
+    reverseGeocodeAddressMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    const setValue = vi.fn();
+    const { result } = renderHook(() => useLocationPicker({ postalCode: "", setValue }));
+    act(() => {
+      result.current.lastEditedRef.current = "map";
+      result.current.setCoords({ lat: 59.91, lng: 10.75 });
+    });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    act(() => result.current.setCoords({ lat: 60.4, lng: 5.3 }));
+    await act(async () => {
+      resolveOld({ city: "Oslo", postal_code: "0152" });
+    });
+    expect(setValue).not.toHaveBeenCalledWith("city", "Oslo", { shouldValidate: false });
+    expect(result.current.coords).toEqual({ lat: 60.4, lng: 5.3 });
   });
 });

@@ -26,11 +26,11 @@ const TEST_REGISTRATION = "AB12345";
 test("registrert kjøretøy går fra oppslag til review og publisering", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-web", "Statuspanelet ligger i desktop-sidepanelet");
+  test.skip(testInfo.project.name === "mobile-web", "Statuspanelet ligger i desktop-sidepanelet");
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
-  await login(page, credentials.email, credentials.password);
+  await login(page, credentials.email, credentials.password, "/ny-annonse?type=sell");
   await goToNewListing(page);
 
   const categorySearch = page.getByTestId("category-search-input");

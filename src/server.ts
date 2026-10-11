@@ -42,16 +42,16 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const applyFallbackSecurityHeaders = (response: Response) => {
-      if (response.headers.has("content-security-policy")) return response;
-
-      response.headers.set(
-        "content-security-policy",
-        buildSecurityHeaders({
-          r2PublicBaseUrl: import.meta.env.VITE_R2_PUBLIC_BASE_URL,
-          r2AccountId: import.meta.env.R2_ACCOUNT_ID,
-          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-        })["content-security-policy"],
-      );
+      const headers = buildSecurityHeaders({
+        environment: import.meta.env.VITE_ENVIRONMENT,
+        development: import.meta.env.DEV,
+        r2PublicBaseUrl: import.meta.env.VITE_R2_PUBLIC_BASE_URL,
+        r2AccountId: import.meta.env.R2_ACCOUNT_ID,
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      });
+      for (const [name, value] of Object.entries(headers)) {
+        if (!response.headers.has(name)) response.headers.set(name, value);
+      }
       return response;
     };
 

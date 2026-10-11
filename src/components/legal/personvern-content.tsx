@@ -93,7 +93,8 @@ export function PersonvernContent() {
             <li>
               <strong>Betaling og annonsepromotering</strong>: Hvis du betaler for å fremheve en
               annonse, lagres transaksjonsdata fra betalingsleverandøren Vipps, samt hvilken annonse
-              betalingen gjelder.
+              betalingen gjelder. Vi lagrer også hvilken versjon av kjøpsvilkårene du aksepterte,
+              aksepttidspunktet og teksten i kjøpsaksepten.
             </li>
             <li>
               <strong>Varsler om prisendringer</strong>: Hvis du har lagt til en annonse som
@@ -173,14 +174,14 @@ export function PersonvernContent() {
               fargetema. Forlater ikke enheten din.
             </li>
             <li>
-              <strong>kaupet_draft_sell_listing</strong>,{" "}
-              <strong>kaupet_draft_sell_listing_id</strong>,{" "}
-              <strong>kaupet_draft_sell_listing_updated_at</strong>,{" "}
-              <strong>kaupet_draft_want_listing</strong> og{" "}
-              <strong>kaupet_draft_want_listing_id</strong>: Utkast til salgsannonse eller «ønskes
+              <strong>kaupet_draft_sell_listing…</strong> og{" "}
+              <strong>kaupet_draft_want_listing…</strong>: Utkast til salgsannonse eller «ønskes
               kjøpt»-annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du fyller ut
-              registreringen, slik at du ikke mister innholdet ved utilsiktet lukking. Slettes når
-              annonsen er publisert eller forkastet.
+              registreringen, slik at du ikke mister innholdet ved utilsiktet lukking. Nøkkelen
+              inneholder bruker-ID-en din og eventuell bedrifts-ID, slik at et utkast aldri vises
+              for en annen konto på samme enhet. Bilder i utkastet lagres i nettleserens
+              IndexedDB-database <strong>kaupet-listing-drafts</strong>. Slettes når annonsen er
+              publisert eller forkastet.
             </li>
             <li>
               <strong>kaupet_push_msg_hint_dismissed_v1</strong>,{" "}
@@ -548,11 +549,12 @@ export function PersonvernContent() {
             .
           </li>
           <li>
-            <strong>Kartverket og OpenStreetMap</strong>: Kartverket leverer kartfliser, mens
-            adressesøk i kartvisningen bruker Nominatim fra OpenStreetMap Foundation, for visning og
-            geokoding av lokasjon på annonser. Adressesøk utføres kun når du eksplisitt trykker
-            «Søk» i et adressefelt. IP-adressen din blir da synlig for OpenStreetMap Foundation.
-            Kartfliser fra Kartverket lastes automatisk når et kart vises.
+            <strong>Kartverket</strong>: Kartverket leverer kartfliser, stedsnavn og
+            adresseopplysninger for visning av steder på annonser og i søk. Stedssøk utføres når du
+            trykker «Søk». Postnummer, valgt kartpunkt eller GPS-posisjon kan også brukes til å
+            hente stedsopplysninger. Oppslagene går via Kaupets server, som sender søket eller
+            koordinatene til Kartverket uten å videresende IP-adressen din. Kartfliser lastes
+            direkte fra Kartverket når et kart vises, og Kartverket kan da se IP-adressen din.
           </li>
         </ul>
       </section>

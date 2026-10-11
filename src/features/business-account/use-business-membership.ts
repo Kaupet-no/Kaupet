@@ -1,3 +1,4 @@
+import { UNAUTHORIZED_MESSAGE } from "@/lib/business/schemas";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -39,6 +40,7 @@ export type BusinessLocationContact = {
 };
 
 export type BusinessOrganization = {
+  verification_status?: "unverified" | "verified";
   id: string;
   organization_number: string;
   legal_name: string;
@@ -101,7 +103,10 @@ export function useBusinessMembership() {
     staleTime: 30_000,
     queryFn: async (): Promise<BusinessMembership | null> => {
       if (!user) return null;
-      const response = (await loadBusinessOrganization()) as BusinessOrganizationResponse;
+      const response = (await loadBusinessOrganization().catch((error: unknown) => {
+        if (error instanceof Error && error.message === UNAUTHORIZED_MESSAGE) return null;
+        throw error;
+      })) as BusinessOrganizationResponse | null;
       if (!response?.membership || response.membership.status !== "active") return null;
       return {
         ...response.membership,

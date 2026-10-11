@@ -146,6 +146,7 @@
   },
   "overrides": {
     "tar": "^7.5.22",
+    "handlebars": "^4.7.10",
     "minimatch": "^9.0.5",
     "uuid": "^11.1.1",
     "esbuild": "^0.28.1",

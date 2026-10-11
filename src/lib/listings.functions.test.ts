@@ -6,6 +6,8 @@ const db = vi.hoisted(() => ({
   listing: null as Record<string, unknown> | null,
   rpc: vi.fn(),
   updates: vi.fn(),
+  /** Overrides the row an update query returns (null = the guarded update matched nothing). */
+  updateResult: undefined as Record<string, unknown> | null | undefined,
   inserts: [] as Array<{ table: string; value: unknown }>,
 }));
 const assertUserNotRateLimited = vi.hoisted(() => vi.fn());
@@ -44,7 +46,10 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: (table: string) => {
       let inserted: unknown;
+      let updating = false;
       const result = () => {
+        if (updating && db.updateResult !== undefined)
+          return { data: db.updateResult, error: null };
         if (table === "organization_members") return { data: db.membership, error: null };
         if (table === "organization_locations") return { data: db.location, error: null };
         if (table === "organization_location_members") {
@@ -65,6 +70,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         query[method] = () => query;
       }
       query.update = (value: unknown) => {
+        updating = true;
         db.updates(value);
         return query;
       };
@@ -135,6 +141,7 @@ function setOrganization(role: "superuser" | "member") {
 
 beforeEach(() => {
   db.membership = null;
+  db.updateResult = undefined;
   db.location = null;
   db.listing = null;
   db.rpc.mockReset();
@@ -322,6 +329,27 @@ describe("publisering etter tapt svar", () => {
     expect(published).toEqual({ id, kaupet_code: "ABC123", already_published: true });
     expect(db.updates).not.toHaveBeenCalled();
     expect(db.inserts).toHaveLength(0);
+  });
+
+  it("melder allerede publisert når en samtidig publisering vant mellom kontroll og oppdatering", async () => {
+    const id = "00000000-0000-4000-8000-000000000002";
+    db.listing = {
+      id,
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "draft",
+      kaupet_code: "ABC123",
+      updated_at: "2026-10-09T10:00:00Z",
+    };
+    db.updateResult = null;
+    db.updates.mockImplementationOnce(() => {
+      db.listing = { ...db.listing, status: "active" };
+    });
+    const published = await createListing({
+      data: { ...listingInput, draftId: id, organization_location_id: null },
+    });
+    expect(published).toEqual({ id, kaupet_code: "ABC123", already_published: true });
   });
   it("sjekker opprettingsrett på nytt når et bedriftsutkast publiseres", async () => {
     const id = "00000000-0000-4000-8000-000000000002";

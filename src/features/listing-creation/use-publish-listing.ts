@@ -248,8 +248,8 @@ export function usePublishListing({
       return listing;
     },
     onSuccess: (result) => {
-      if (!isCurrent()) return;
       publishAttemptPendingRef.current = false;
+      if (!isCurrent()) return;
       uploadedImages.current.clear();
       // stopAutosave: the wizard stays mounted behind the success dialog with
       // the form still populated — without this the next autosave tick would

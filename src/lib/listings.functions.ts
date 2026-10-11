@@ -717,23 +717,20 @@ export const createListing = createServerFn({ method: "POST" })
         ownership.organization_location_id,
       );
       if (data.images !== undefined) {
-        const { data: result, error } = await (supabaseAdmin as SupabaseClient).rpc(
-          "publish_listing_draft",
-          {
-            _listing_id: data.draftId,
-            _user_id: userId,
-            _fields: {
-              ...listingFields,
-              ...(existing.organization_id
-                ? {
-                    ...listingLocationFields(orgLocation),
-                    organization_location_id: ownership.organization_location_id,
-                  }
-                : { organization_location_id: null }),
-            },
-            _images: data.images,
+        const { data: result, error } = await supabaseAdmin.rpc("publish_listing_draft", {
+          _listing_id: data.draftId,
+          _user_id: userId,
+          _fields: {
+            ...listingFields,
+            ...(existing.organization_id
+              ? {
+                  ...listingLocationFields(orgLocation),
+                  organization_location_id: ownership.organization_location_id,
+                }
+              : { organization_location_id: null }),
           },
-        );
+          _images: data.images,
+        });
         if (error) throw await toClientError("database", error);
         return z
           .object({
@@ -762,7 +759,8 @@ export const createListing = createServerFn({ method: "POST" })
       if (!listing) {
         const latest = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
         assertDraftOrganization(data.expected_organization_id, latest.organization_id);
-        if (latest.status === "active") return { id: latest.id, kaupet_code: latest.kaupet_code };
+        if (latest.status === "active")
+          return { id: latest.id, kaupet_code: latest.kaupet_code, already_published: true };
         throw new ClientError("Utkastet kan ikke publiseres i denne tilstanden.", 409);
       }
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };

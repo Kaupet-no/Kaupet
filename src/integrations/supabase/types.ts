@@ -3853,6 +3853,10 @@ export type Database = {
           views_last_week: number
         }[]
       }
+      publish_listing_draft: {
+        Args: { _fields: Json; _images: Json; _listing_id: string; _user_id: string }
+        Returns: Json
+      }
       purge_expired_accounts: { Args: never; Returns: number }
       purge_expired_personal_data: { Args: never; Returns: Json }
       reserve_standard_upload_quota: {

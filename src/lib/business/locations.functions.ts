@@ -28,8 +28,8 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => locationInputSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
-    const { data: location, error } = await supabaseAdmin.rpc("create_organization_location", {
+    const { organizationId } = await requireSuperuserOrganization(context.userId);
+    const { data: location, error } = await context.supabase.rpc("create_organization_location", {
       _organization_id: organizationId,
       _name: data.name,
       _address_line: data.addressLine,
@@ -37,6 +37,9 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
       _city: data.city,
     });
     if (error) {
+      if (error.code === "42501") {
+        throw new ClientError(UNAUTHORIZED_MESSAGE, 403);
+      }
       throw await toClientError("database", error);
     }
     return { location };

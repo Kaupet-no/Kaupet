@@ -141,6 +141,9 @@ har en egen Access-app med Bypass, slik at pg_net og webhooks når Workeren
   egne default privileges og må kontrolleres separat.
 - Auth-innstillinger (passordkrav, HIBP, captcha, redirect-URL-er, SMTP via
   Resend) ligger i dashbordet, se STAGING.md og EPOST.md.
+- Lokal Auth-redirect til `/bedriftsinvitasjon` er tillatt for både
+  `127.0.0.1:8080` og `localhost:8080` i `supabase/config.toml`. Endringer
+  krever restart av lokal stack; hostede redirect-lister styres separat.
 - Sesjonen ligger i informasjonskapsler (`@supabase/ssr`). Nettleserklienten
   (`src/integrations/supabase/client.ts`) er sesjonsløs på serveren; serverkode
   som trenger brukerens sesjon bruker `getSupabaseServerClient()`

@@ -28,6 +28,12 @@ export async function advanceWantStep(page: Page, expectedPage: string) {
   await composerPage(page, expectedPage).waitFor();
 }
 
+export async function fillWantMaxPrice(page: Page, value: string) {
+  const input = page.getByLabel("Maks pris du vil betale (valgfritt)");
+  await input.fill(value);
+  await expect(input).toHaveValue(value);
+}
+
 export async function publishWantAndExpectSuccess(page: Page) {
   await page.getByRole("button", { name: /^(Publiser|Publiser kjøpsønske)/ }).click();
   await expect(

@@ -287,7 +287,7 @@ export function NotificationsBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{bellTrigger}</PopoverTrigger>
-      <PopoverContent align="end" className="w-[360px] p-0">
+      <PopoverContent align="end" className="w-[360px] max-w-[calc(100vw-1rem)] p-0">
         {notifList}
       </PopoverContent>
     </Popover>

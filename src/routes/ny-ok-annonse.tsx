@@ -1,3 +1,4 @@
+import { DRAFT_ACTOR_CHANGED_MESSAGE } from "@/features/listing-creation/use-draft-actor";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { createFileRoute, useBlocker, useNavigate } from "@tanstack/react-router";
@@ -108,7 +109,7 @@ export const Route = createFileRoute("/ny-ok-annonse")({
       },
     ],
   }),
-  component: NewWtbPage,
+  component: NewWtbPageEntry,
   errorComponent: NewListingError,
 });
 
@@ -166,6 +167,17 @@ const RADIUS_OPTIONS: { value: number | null; label: string }[] = [
   { value: 100, label: "100 km" },
   { value: null, label: "Hele landet" },
 ];
+
+function NewWtbPageEntry() {
+  const { loading } = useAuth();
+  if (loading)
+    return (
+      <p role="status" className="p-6">
+        Laster kontoen…
+      </p>
+    );
+  return <NewWtbPage />;
+}
 
 function NewWtbPage() {
   const native = useIsNative();
@@ -250,7 +262,7 @@ function NewWtbPage() {
     trigger,
     control,
     setValue,
-    formState: { errors, touchedFields, dirtyFields, isSubmitted },
+    formState: { errors, touchedFields, dirtyFields, isSubmitted, isDirty },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
@@ -338,7 +350,6 @@ function NewWtbPage() {
     ],
   );
   const {
-    draftId,
     restorableDraft,
     lastSaved,
     draftSaveError,
@@ -346,9 +357,16 @@ function NewWtbPage() {
     saveToServer,
     flushLocalDraft,
     dismissRestore,
+    dismissDraftOffer,
     discardDraft,
     clearAfterPublish,
-  } = useWtbDraftAutosave(draftFields, !!user);
+    actorChanged,
+    ownerId,
+    isCurrent,
+    preparePublish,
+    resumeAutosave,
+    draftSaveMessage,
+  } = useWtbDraftAutosave(draftFields, !!user, user?.id ?? null, resume === "auth-publish");
 
   const vehicleGroup = useMemo(
     () => vehicleCategoryGroupFor(categoryId ?? null, allFilters ?? [], categoriesById),
@@ -439,16 +457,24 @@ function NewWtbPage() {
   const blocker = useBlocker({
     shouldBlockFn: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
     withResolver: true,
-    enableBeforeUnload: shouldBlockNav,
+    enableBeforeUnload: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
   });
 
   const createFn = useServerFn(createWtbListing);
   const { mutate: publish, isPending } = useMutation({
     mutationFn: async (values: WtbForm) => {
-      const ensuredDraftId = draftId ?? (await saveToServer());
+      const prepared = await preparePublish();
+      if (!isCurrent()) throw new Error(DRAFT_ACTOR_CHANGED_MESSAGE);
+      if (prepared.published) {
+        showErrorToast(
+          "Kjøpsønsket er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger det publiserte kjøpsønsket.",
+        );
+        return prepared.id;
+      }
       const result = await createFn({
         data: {
-          ...(ensuredDraftId ? { draftId: ensuredDraftId } : {}),
+          expected_user_id: ownerId!,
+          draftId: prepared.id,
           title: values.title,
           subtitle: null,
           description: values.description || undefined,
@@ -463,15 +489,22 @@ function NewWtbPage() {
           radius_km: radiusKm,
         },
       });
+      if ("already_published" in result && result.already_published) {
+        showErrorToast(
+          "Kjøpsønsket er allerede publisert. Endringer fra dette forsøket er ikke lagret. Rediger det publiserte kjøpsønsket.",
+        );
+      }
       return result.id;
     },
     onSuccess: (id) => {
+      if (!isCurrent()) return;
       clearAfterPublish();
       void import("@/lib/haptics").then((module) => module.hapticNotification("success"));
       setCreatedId(id);
       setPublished(true);
     },
     onError: (err) => {
+      resumeAutosave();
       trackProductEvent("listing_publish_failed", { kind: "want", step });
       void import("@/lib/haptics").then((module) => module.hapticNotification("error"));
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen."));
@@ -593,7 +626,7 @@ function NewWtbPage() {
   }
 
   function restoreDraft() {
-    if (!restorableDraft) return;
+    if (!isCurrent() || !restorableDraft) return;
     setValue("title", restorableDraft.title);
     setValue("description", restorableDraft.description);
     setValue("category_id", restorableDraft.category_id);
@@ -626,6 +659,25 @@ function NewWtbPage() {
     requestAnimationFrame(() => setStepIndex(steps.length - 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, restorableDraft]);
+
+  useEffect(() => {
+    if (restorableDraft && (isDirty || stepIndex > 0)) dismissDraftOffer();
+  }, [restorableDraft, isDirty, stepIndex, dismissDraftOffer]);
+
+  if (actorChanged)
+    return (
+      <div role="alert" className="mx-auto max-w-lg space-y-4 p-6">
+        <p>{DRAFT_ACTOR_CHANGED_MESSAGE}</p>
+        <Button
+          onClick={() => {
+            bypassNavigationBlockerRef.current = true;
+            window.location.reload();
+          }}
+        >
+          Åpne en ny annonse med denne kontoen
+        </Button>
+      </div>
+    );
 
   if (published) {
     return (
@@ -1228,6 +1280,7 @@ function NewWtbPage() {
           return true;
         }}
         isSavingDraft={isSaving}
+        saveErrorMessage={draftSaveMessage}
         saveDraftLabel="Lagre som utkast"
       />
 

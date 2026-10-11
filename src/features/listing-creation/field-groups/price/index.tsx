@@ -1,7 +1,8 @@
-﻿import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -270,6 +271,19 @@ export function Price({
           </label>
         )}
       </div>
+      {!isVehicle && !isFree && priceNok === 0 && lockedFree !== "sell" && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          Vil du gi varen bort gratis?
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setValue("is_free", true)}
+          >
+            Velg Gis bort
+          </Button>
+        </div>
+      )}
       {errors.price_nok && (
         <p id="price-error" className="text-sm text-destructive">
           {errors.price_nok.message as string}

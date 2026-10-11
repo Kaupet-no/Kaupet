@@ -113,6 +113,16 @@ function WtbListingPage() {
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere status")),
   });
 
+  const reopen = useMutation({
+    mutationFn: () => updateFn({ data: { id, status: "active" } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-wtb-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["wtb-listing", id] });
+      showSuccessToast("Kjøpsønsket er åpnet igjen");
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kjøpsønsket")),
+  });
+
   const { mutate: contact, isPending: contactPending } = useMutation({
     mutationFn: async () => {
       if (!listing) return null;
@@ -220,6 +230,18 @@ function WtbListingPage() {
             locale: nb,
           })}
         </p>
+
+        {isOwner && listing.status === "fulfilled" && (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={() => reopen.mutate()}
+            disabled={reopen.isPending}
+          >
+            Åpne kjøpsønsket igjen
+          </Button>
+        )}
 
         {isOwner && listing.status !== "fulfilled" && (
           <div className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">

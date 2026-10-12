@@ -607,16 +607,42 @@ export async function replaceListingImagesApi(params: {
   const { auth, externalRef, body } = params;
   const urls = assertImageUrls(asRecord(body).urls);
 
-  const { supabaseAdmin } = await resolveActorOnly(auth, undefined);
+  const { supabaseAdmin, actor } = await resolveActorOnly(auth, undefined);
   const { data: listing, error } = await supabaseAdmin
     .from("listings")
-    .select("id")
+    .select("id, organization_location_id, seller_id, status, category_id")
     .eq("organization_id", auth.organizationId)
     .eq("external_ref", externalRef)
     .maybeSingle();
   if (error) throw error;
   if (!listing)
     throw new ListingApiError(404, "not_found", "Fant ingen annonse med denne referansen.");
+  // Aktøren må ha endringsrett til akkurat denne annonsen, ikke bare til
+  // nøkkelens standardlokasjon (KG-08-F03). Samme kontrakt som upsert.
+  const { data: canUpdate, error: accessError } = await supabaseAdmin.rpc(
+    "can_update_organization_listing",
+    {
+      _organization_id: auth.organizationId,
+      // Typene sier string, men funksjonen tåler null (gir false for ikke-superbruker).
+      _location_id: listing.organization_location_id as string,
+      _seller_id: listing.seller_id,
+      _status: listing.status,
+      _category_id: listing.category_id as string,
+      _user_id: actor.userId,
+    },
+  );
+  if (accessError) throw accessError;
+  if (!canUpdate) {
+    throw new ListingApiError(403, "forbidden", "Du har ikke tilgang til å endre denne annonsen.");
+  }
+  if (listing.status === "disabled") {
+    throw new ListingApiError(
+      422,
+      "validation_error",
+      "Annonsen er deaktivert av moderator og kan ikke oppdateres.",
+      "images",
+    );
+  }
 
   const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
     _organization_id: auth.organizationId,

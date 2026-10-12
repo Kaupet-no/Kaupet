@@ -20,6 +20,7 @@ import { useBusinessMembership } from "@/features/business-account/use-business-
 import { ModerationBanner } from "@/components/moderation-banner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
+import { createAuthQueryCacheHandler } from "@/lib/auth-query-cache";
 import { getSessionUser } from "@/lib/current-user.functions";
 import { flushAuthCookies } from "@/lib/native-cookies";
 import { clearMessageAttachmentUrlCache } from "@/lib/storage";
@@ -278,12 +279,12 @@ function RootComponent() {
   }, []);
 
   useEffect(() => {
-    // Only invalidate on real sign-in / sign-out — NOT on INITIAL_SESSION or
-    // TOKEN_REFRESHED, which fire on every mount/tab-focus and would refetch
-    // every query in the app, causing the UI to feel slow and unstable.
+    // Cachen tømmes ved identitetsbytte og invalideres ellers bare ved ekte
+    // inn-/utlogging — se createAuthQueryCacheHandler.
+    const syncQueryCache = createAuthQueryCacheHandler(queryClient);
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       // Sesjonskapselen er nettopp skrevet, fornyet eller slettet. På Android
       // ligger den bare i minnet til WebViewen flusher, og onPause kjører
       // ikke hvis prosessen dør i forgrunnen — da mistet vi en fersk
@@ -292,10 +293,7 @@ function RootComponent() {
       if (event !== "INITIAL_SESSION") void flushAuthCookies();
 
       if (event === "SIGNED_OUT") clearMessageAttachmentUrlCache();
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        router.invalidate();
-        queryClient.invalidateQueries();
-      }
+      if (syncQueryCache(event, session)) router.invalidate();
       if (event === "SIGNED_IN") {
         // Onboarding can grant OS permission before the user signs in. Retry
         // the account-bound subscription now without showing another prompt.

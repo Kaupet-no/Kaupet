@@ -13,6 +13,7 @@ import { getMyListingRows } from "@/lib/my-listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
+import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,10 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
   // Annonsene hentes på serveren slik at siden har innhold ved første maling.
   // Uten denne lå de i en useQuery som først kjørte etter hydrering, og body
   // var tom til da.
-  loader: () => getMyListingRows(),
+  loader: async ({ context }) => ({
+    userId: context.user.id,
+    rows: await getMyListingRows(),
+  }),
   head: () => ({
     meta: [
       { title: "Mine annonser — Kaupet.no" },
@@ -59,6 +63,7 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
 });
 
 function MyListingsPage() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"all" | "active" | "sold" | "draft" | "wtb">("all");
@@ -125,12 +130,14 @@ function MyListingsPage() {
   // Serveren har allerede hentet radene (se loader over). initialData gjør at
   // første render — også server-renderet — har dataene, mens TanStack Query
   // fortsatt eier invalidering etter mutasjoner.
-  const initialRows = Route.useLoaderData();
+  const initial = Route.useLoaderData();
   const fetchMyListings = useServerFn(getMyListingRows);
   const { data: rows } = useQuery({
-    queryKey: ["my-listings"],
+    queryKey: ["my-listings", user?.id],
+    enabled: !!user,
     queryFn: () => fetchMyListings(),
-    initialData: initialRows,
+    // Ved kontobytte kan forrige loaders data finnes til den nye er ferdig.
+    initialData: initial.userId === user?.id ? initial.rows : undefined,
   });
 
   const deleteListing = useMutation({

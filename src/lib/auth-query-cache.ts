@@ -22,6 +22,16 @@ export function createAuthQueryCacheHandler(queryClient: QueryClient) {
 
     if (previousUserId !== null && previousUserId !== nextUserId) {
       void queryClient.cancelQueries();
+      // clear() alene varsler ikke monterte observers om at private data er borte.
+      for (const query of queryClient.getQueryCache().getAll()) {
+        query.setState({
+          data: undefined,
+          dataUpdatedAt: 0,
+          error: null,
+          status: "pending",
+          fetchStatus: "idle",
+        });
+      }
       queryClient.clear();
       return "cleared";
     }

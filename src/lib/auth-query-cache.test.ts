@@ -39,6 +39,25 @@ describe("createAuthQueryCacheHandler", () => {
     expect(observer.getCurrentResult().data).toBeUndefined();
   });
 
+  it("nullstiller en aktiv observer ved identitetsbytte (tilstandsovergang)", () => {
+    const qc = new QueryClient();
+    const handle = createAuthQueryCacheHandler(qc);
+    handle("INITIAL_SESSION", session("A"));
+    seed(qc);
+    const observer = new QueryObserver(qc, {
+      queryKey: ["my-blocks"],
+      queryFn: () => new Promise<never>(() => {}),
+      staleTime: 60_000,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    expect(observer.getCurrentResult().data).toEqual([{ blocked_id: "X" }]);
+
+    handle("SIGNED_IN", session("B"));
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    unsubscribe();
+    qc.clear();
+  });
+
   it("beholder cachen ved token-fornyelse og ny innlogging for samme bruker", () => {
     const qc = new QueryClient();
     const handle = createAuthQueryCacheHandler(qc);

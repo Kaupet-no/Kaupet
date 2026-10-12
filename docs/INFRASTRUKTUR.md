@@ -326,6 +326,9 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 | `deploy`          | Push til `main`: bygger og deployer `kaupet-no`                                                                              |
 | `android-release` | Push: legger Android-preview-bygg under GitHub Releases                                                                      |
 
+Dependabot grupperer alle `github/codeql-action/*`-oppdateringer i én PR,
+slik at `init` og `analyze` alltid oppdateres til samme versjon.
+
 I tillegg: `codeql.yml` (sikkerhetsskanning), `.github/workflows/release-native.yml`
 (produksjonsutgivelser til butikkene, se § 9), og lokale hooks via
 `lefthook.yml` (lint før commit, typecheck før push).

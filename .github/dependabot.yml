@@ -53,3 +53,7 @@ updates:
       timezone: Europe/Oslo
     labels:
       - dependencies
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"

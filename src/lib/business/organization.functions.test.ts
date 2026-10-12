@@ -45,15 +45,43 @@ vi.mock("@/lib/business/organization-access", async (importOriginal) => ({
 import { getBusinessListingStats } from "./organization.functions";
 
 /** Thenable spørringsbygger som returnerer `rows` for tabellen. */
-function table(rows: unknown[]) {
+function table(rows: Record<string, unknown>[], filterListings = false) {
   const query: Record<string, unknown> = {};
   for (const method of ["select", "eq", "in", "gte", "order"]) query[method] = () => query;
-  query.then = (resolve: (value: unknown) => unknown) => resolve({ data: rows, error: null });
+  const filters: Array<(row: Record<string, unknown>) => boolean> = [];
+  if (filterListings) {
+    query.eq = (column: string, value: unknown) => {
+      filters.push((row) => row[column] === value);
+      return query;
+    };
+    query.in = (column: string, values: unknown[]) => {
+      filters.push((row) => values.includes(row[column]));
+      return query;
+    };
+    query.or = (expression: string) => {
+      const match = expression.match(
+        /^organization_location_id\.in\.\(([^)]+)\),seller_id\.eq\.(.+)$/,
+      );
+      if (!match) throw new Error(`Uventet filter: ${expression}`);
+      filters.push(
+        (row) =>
+          match[1].split(",").includes(row.organization_location_id as string) ||
+          row.seller_id === match[2],
+      );
+      return query;
+    };
+  }
+  query.then = (resolve: (value: unknown) => unknown) =>
+    resolve({
+      data: rows.filter((row) => filters.every((filter) => filter(row))).slice(0, 1000),
+      error: null,
+    });
   return query;
 }
 
 const listing = (id: string, location: string, seller: string) => ({
   id,
+  organization_id: "org-1",
   status: "draft",
   seller_id: seller,
   organization_location_id: location,
@@ -72,11 +100,14 @@ beforeEach(() => {
       ]);
     }
     if (name === "listings") {
-      return table([
-        listing("a-other", "loc-a", "other-user"),
-        listing("b-own", "loc-b", "user-1"),
-        listing("b-other-draft", "loc-b", "other-user"),
-      ]);
+      return table(
+        [
+          listing("a-other", "loc-a", "other-user"),
+          listing("b-own", "loc-b", "user-1"),
+          listing("b-other-draft", "loc-b", "other-user"),
+        ],
+        true,
+      );
     }
     return table([]);
   });
@@ -108,5 +139,19 @@ describe("getBusinessListingStats innsyn per lokasjon", () => {
     const stats = await call();
     expect(JSON.stringify(stats)).toContain("b-other-draft");
     expect(hasEffectiveProffAccess).not.toHaveBeenCalled();
+  });
+  it("henter egne annonser før radgrensen ved over 1000 kollegaannonser (grenseverdi)", async () => {
+    const rows = [
+      ...Array.from({ length: 1000 }, (_, i) => listing(`other-${i}`, "loc-b", "other-user")),
+      listing("b-own-after-limit", "loc-b", "user-1"),
+    ];
+    supabaseAdmin.from.mockImplementation((name: string) => {
+      if (name === "organization_location_members")
+        return table([{ location_id: "loc-b", listing_access: "own" }]);
+      if (name === "listings") return table(rows, true);
+      return table([]);
+    });
+    const stats = (await call()) as { current: Array<{ id: string }> };
+    expect(stats.current.map((row) => row.id)).toEqual(["b-own-after-limit"]);
   });
 });

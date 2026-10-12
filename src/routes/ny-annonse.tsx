@@ -341,7 +341,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     control,
     watch,
     trigger,
-    formState: { errors, touchedFields, isDirty },
+    formState: { errors, touchedFields },
   } = useForm<ListingForm>({
     resolver: zodResolver(listingSchema),
     mode: "onTouched",
@@ -931,7 +931,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
     discardDraft,
-    dismissDraftOffer,
   } = useDraftAutosave({
     title,
     subtitle,
@@ -973,29 +972,12 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     });
   }
 
-  // Utkasttilbudet ("Du har et tidligere utkast: ... / Fortsett / Forkast") skal vises
-  // ÉN gang, ved start — ikke henge igjen på hvert steg. Så snart brukeren
-  // begynner å redigere (et felt blir "dirty") eller går videre til neste
-  // steg uten å ta et aktivt valg, forsvinner tilbudet for resten av
-  // økten. dismissDraftOffer lar det gamle utkastet ligge urørt (verken
-  // gjenopprettet eller slettet) — kun kobler fra den lagrede draftId-en,
-  // slik at autolagringen som fortsetter ikke overskriver det stille.
-  //
-  // Dette er kun trygt når det avviste utkastet allerede har en server-kopi
-  // (draftId) — da ligger dataene trygt hos Supabase uansett hva som skjer
-  // lokalt etterpå. Et utkast som KUN finnes i localStorage/IndexedDB ville
-  // blitt overskrevet stille av den nye annonsens autolagring (samme
-  // DRAFT_KEY/bildelager) hvis vi auto-avviste det samme veien — se
-  // draftDecisionRequired/goToNextPage, som i stedet tvinger et eksplisitt
-  // valg før brukeren kan forlate steg 1.
-  useEffect(() => {
-    if (!hasDraftData || !draftId) return;
-    if (isDirty || step > 1) dismissDraftOffer();
-  }, [hasDraftData, draftId, isDirty, step, dismissDraftOffer]);
-
-  // Utkast som bare finnes lokalt: brukeren må aktivt velge Fortsett/Forkast
-  // før hen forlater steg 1 — se blokkeringen i goToNextPage.
-  const draftDecisionRequired = !!hasDraftData && !draftId;
+  // Utkasttilbudet krever et eksplisitt Fortsett/Forkast før brukeren forlater
+  // steg 1 — også når utkastet har server-ID. Serverkopien har ikke bildene
+  // (de lastes først opp ved publisering) og kan være eldre enn den lokale,
+  // så automatisk avvisning lot den nye annonsen overskrive gamle bilder og
+  // lokal tilstand på samme nøkkel (KG-18-F02). Se blokkeringen i goToNextPage.
+  const draftDecisionRequired = !!hasDraftData;
   const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
   const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -1085,10 +1067,9 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
 
-    // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
-    // skrive over stille — hold brukeren på steg 1 til hen har tatt et
-    // eksplisitt valg om det tilbudte utkastet, i stedet for å bare varsle
-    // med en toast.
+    // Et tilbudt utkast er ikke trygt å la autolagring skrive over stille —
+    // hold brukeren på steg 1 til hen har tatt et eksplisitt valg om det, i
+    // stedet for å bare varsle med en toast.
     if (isFirst && draftDecisionRequired) {
       setDraftDecisionPrompt(true);
       requestAnimationFrame(() => continueDraftButtonRef.current?.focus());

@@ -133,7 +133,6 @@ export function useDraftAutosave(fields: DraftFields) {
   const draftUpdatedAtRef = useRef<string | null>(null);
   const draftConflictRef = useRef(false);
   const draftRestorePending = useRef(false);
-  const restoringDraft = useRef(false);
   // Set by clearDraftStorage({ stopAutosave: true }) on publish: the wizard
   // stays mounted (the success dialog renders on top of it) with the form
   // still populated, so the 30s interval and the visibilitychange handler
@@ -234,7 +233,7 @@ export function useDraftAutosave(fields: DraftFields) {
     imageLoadPromise.current = loadImages();
     void imageLoadPromise.current
       .then(() => {
-        if (cancelled || !isCurrent()) return;
+        if (cancelled || !isCurrent() || draftRestorePending.current) return;
         if (latestImages.current.length > 0)
           return saveDraftImages(latestImages.current, DRAFT_KEY);
       })
@@ -316,11 +315,13 @@ export function useDraftAutosave(fields: DraftFields) {
   useEffect(() => {
     if (!imageStoreReady.current) return;
     const timeout = window.setTimeout(() => {
-      if (!isCurrent() || draftSavingStopped.current) return;
+      // Som for feltene: et ubesvart utkasttilbud eier fortsatt bildelageret
+      // på DRAFT_KEY, så nye bilder venter til brukeren har valgt (KG-18-F02).
+      if (!isCurrent() || draftSavingStopped.current || draftRestorePending.current) return;
       void saveDraftImages(images, DRAFT_KEY).catch(() => setDraftSaveError(true));
     }, 750);
     return () => window.clearTimeout(timeout);
-  }, [images, DRAFT_KEY, isCurrent]);
+  }, [images, hasDraftData, DRAFT_KEY, isCurrent]);
 
   /** Writes the draft locally *now* — no debounce, no server call. Used when
    * a signed-out guest is sent to /auth to publish: the draft has to survive
@@ -545,7 +546,6 @@ export function useDraftAutosave(fields: DraftFields) {
 
   async function restoreDraft(target: RestoreTarget) {
     if (!isCurrent() || !hasDraftData) return;
-    restoringDraft.current = true;
     const { setValue, setSelectedParentId, setLocationMethod, setAttributes, setCoords } = target;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
     if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
@@ -592,7 +592,6 @@ export function useDraftAutosave(fields: DraftFields) {
     try {
       restoredImages = await (imageLoadPromise.current ?? loadImagesRef.current());
     } catch {
-      restoringDraft.current = false;
       setDraftSaveError(true);
       setDraftSaveMessage("Bildene kunne ikke gjenopprettes. Utkastet er beholdt. Prøv igjen.");
       return;
@@ -601,7 +600,6 @@ export function useDraftAutosave(fields: DraftFields) {
     if (restoredImages.length > 0) setImages(restoredImages);
     setDraftSaveError(false);
     setDraftSaveMessage(null);
-    restoringDraft.current = false;
     draftRestorePending.current = false;
     setHasDraftData(null);
     showSuccessToast(
@@ -632,24 +630,6 @@ export function useDraftAutosave(fields: DraftFields) {
     setHasDraftData(null);
     setDraftId(null);
     void clearDraftImages(DRAFT_KEY);
-  }
-
-  /** Stops offering the recoverable draft without discarding or restoring
-   * it — the on-disk/server row is left untouched — but detaches the
-   * wizard's own draftId from it, so any autosave that runs from here on
-   * writes a *new* draft instead of silently overwriting the declined one
-   * with whatever the user types next (see "ikke overskriver..." tests). */
-  function dismissDraftOffer() {
-    // Restoring fields can make the form dirty before IndexedDB has finished.
-    if (restoringDraft.current) return;
-    draftRestorePending.current = false;
-    draftConflictRef.current = false;
-    draftIdRef.current = null;
-    draftUpdatedAtRef.current = null;
-    setDraftSaveConflict(false);
-    setDraftId(null);
-    setHasDraftData(null);
-    removeItems(DRAFT_ID_KEY, DRAFT_UPDATED_AT_KEY);
   }
 
   async function discardDraft() {
@@ -707,6 +687,5 @@ export function useDraftAutosave(fields: DraftFields) {
     restoreDraft,
     clearDraftStorage,
     discardDraft,
-    dismissDraftOffer,
   };
 }

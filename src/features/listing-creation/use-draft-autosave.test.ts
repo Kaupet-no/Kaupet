@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDraftAutosave } from "./use-draft-autosave";
@@ -164,9 +164,6 @@ describe("useDraftAutosave", () => {
     const { result } = renderHook(() => {
       const [title, setTitle] = useState("");
       const draft = useDraftAutosave({ ...baseFields, title, isFree: true });
-      useEffect(() => {
-        if (draft.hasDraftData && draft.draftId && title) draft.dismissDraftOffer();
-      }, [draft, title]);
       return { draft, setTitle };
     });
     let restore!: Promise<void>;
@@ -1057,39 +1054,31 @@ describe("useDraftAutosave", () => {
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
   });
 
-  it("dismissDraftOffer leaves the old draft untouched but lets a new title autosave into a fresh row (ny tittel ≠ lagret utkast)", async () => {
-    localStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({ title: "Vintage lenestol i eik", saved_at: Date.now() }),
-    );
+  // KG-18-F02: ruten avviste tilbudet automatisk for utkast med server-ID, og
+  // nye bilder ble skrevet til samme bildenøkkel som det gamle utkastets.
+  it("skriver ikke nye bilder over et ubesvart utkasttilbud med server-ID", async () => {
+    const oldDraft = { title: "Vintage lenestol i eik", image_count: 1, saved_at: Date.now() };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(oldDraft));
     localStorage.setItem(DRAFT_ID_KEY, "old-draft-id");
-    saveDraftListingMock.mockResolvedValue({ id: "new-draft-id", kaupet_code: "ABC123" });
-    const { result } = renderHook(() =>
-      useDraftAutosave({ ...baseFields, title: "Brompton sykkel" }),
-    );
-
+    const newImage = { id: "new-photo" } as never;
+    const { result, rerender } = renderHook((fields) => useDraftAutosave(fields), {
+      initialProps: { ...baseFields, title: "Brompton sykkel" },
+    });
     await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
-    // Without a decision, saving is still blocked — the mismatched title
-    // must not silently overwrite the offered draft.
-    expect(await act(() => result.current.saveDraftToSupabase())).toBeNull();
-    expect(saveDraftListingMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    vi.useFakeTimers();
+    rerender({ ...baseFields, title: "Brompton sykkel", images: [newImage] });
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
 
-    // The user ignores the offer and keeps typing the new listing — the
-    // route dismisses the offer instead of restoring or discarding.
-    act(() => result.current.dismissDraftOffer());
-
-    expect(result.current.hasDraftData).toBeNull();
-    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
-
-    const id = await act(() => result.current.saveDraftToSupabase());
-    expect(id).toBe("new-draft-id");
-    // A fresh row is created — the old draft's id is never reused, so its
-    // server-side row is never overwritten by the new listing's content.
-    expect(saveDraftListingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.not.objectContaining({ id: "old-draft-id" }),
-      }),
-    );
+    expect(saveDraftImagesMock).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}")).toMatchObject(oldDraft);
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("old-draft-id");
+    expect(result.current.draftId).toBe("old-draft-id");
   });
 
   it("persists attributes into the localStorage draft", () => {

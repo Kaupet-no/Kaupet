@@ -4,13 +4,30 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
+type MockDraft = {
+  title: string;
+  description: string;
+  category_id: string | null;
+  max_price_nok: string;
+  notify_matches: boolean;
+  attributes: Record<string, unknown>;
+  checked_keys: string[];
+  postal_code: string;
+  radius_km: number;
+};
+
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   prepare: vi.fn(),
   errorToast: vi.fn(),
   clearAfterPublish: vi.fn(),
-  dismissDraftOffer: vi.fn(),
-  restorableDraft: null as null | { title: string },
+  dismissRestore: vi.fn(() => {
+    mocks.restorableDraft = null;
+  }),
+  discardDraft: vi.fn(() => {
+    mocks.restorableDraft = null;
+  }),
+  restorableDraft: null as null | MockDraft,
   actorChanged: false,
   useBlocker: vi.fn(
     (_options: {
@@ -59,7 +76,8 @@ vi.mock("@/features/wtb/use-wtb-draft-autosave", () => ({
     clearAfterPublish: mocks.clearAfterPublish,
     resumeAutosave: vi.fn(),
     restorableDraft: mocks.restorableDraft,
-    dismissDraftOffer: mocks.dismissDraftOffer,
+    dismissRestore: mocks.dismissRestore,
+    discardDraft: mocks.discardDraft,
     actorChanged: mocks.actorChanged,
   }),
 }));
@@ -78,6 +96,20 @@ beforeEach(() => {
   HTMLElement.prototype.scrollTo = vi.fn();
   mocks.prepare.mockResolvedValue({ id: "wtb-1", published: false });
 });
+
+function setMockDraft() {
+  mocks.restorableDraft = {
+    title: "Tidligere kjøpsønske",
+    description: "",
+    category_id: null,
+    max_price_nok: "",
+    notify_matches: true,
+    attributes: {},
+    checked_keys: [],
+    postal_code: "",
+    radius_km: 50,
+  };
+}
 
 it("omgår avslutningsvernet når brukeren starter på nytt etter kontobytte", () => {
   mocks.actorChanged = true;
@@ -98,17 +130,62 @@ it("omgår avslutningsvernet når brukeren starter på nytt etter kontobytte", (
   expect(options.shouldBlockFn()).toBe(false);
 });
 
-it("avviser utkasttilbudet uten ekstra valg når brukeren går videre med nytt innhold", async () => {
-  mocks.restorableDraft = { title: "Tidligere kjøpsønske" };
+it("blokkerer videre navigasjon mens utkasttilbudet står ubesvart", async () => {
+  setMockDraft();
   render(
     <QueryClientProvider client={new QueryClient()}>
       <WantPage />
     </QueryClientProvider>,
   );
   expect(screen.getByRole("button", { name: "Gjenopprett" })).toBeTruthy();
-  expect(mocks.dismissDraftOffer).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: /^Neste:/ }));
-  await waitFor(() => expect(mocks.dismissDraftOffer).toHaveBeenCalled());
+  // Blokkert med hint — tilbudet avvises ikke automatisk (samme regel som
+  // salgsflyten, KG-18-F02), og vi blir på første steg.
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain("Velg «Gjenopprett» eller «Forkast»");
+  expect(screen.getByText("Steg 1 av 4")).toBeTruthy();
+  expect(
+    screen.queryByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }),
+  ).toBeNull();
+});
+
+it("gjenoppretter utkastet ved eksplisitt valg og lar brukeren gå videre", async () => {
+  setMockDraft();
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WantPage />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Gjenopprett" }));
+  await waitFor(() => expect(mocks.dismissRestore).toHaveBeenCalled());
+  // Tilbudet er borte etter valget, og videre navigasjon er fri igjen.
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Gjenopprett" })).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: /^Neste:/ }));
+  expect(
+    await screen.findByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }),
+  ).toBeTruthy();
+});
+
+it("forkaster utkastet ved eksplisitt valg og lar brukeren gå videre", async () => {
+  setMockDraft();
+  const view = render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WantPage />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Forkast" }));
+  expect(mocks.discardDraft).toHaveBeenCalledOnce();
+  // Hooken nullstiller utkastet — simuler re-render med oppdatert tilstand.
+  view.rerender(
+    <QueryClientProvider client={new QueryClient()}>
+      <WantPage />
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Gjenopprett" })).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: /^Neste:/ }));
+  expect(
+    await screen.findByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }),
+  ).toBeTruthy();
 });
 
 it.each([false, true])(

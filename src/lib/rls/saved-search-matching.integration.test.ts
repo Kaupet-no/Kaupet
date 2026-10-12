@@ -196,3 +196,105 @@ describe.skipIf(!canRun)("Saved-search matching: internal access and new matches
     expect(await notificationCount(textSearchId, id)).toBe(1);
   });
 });
+
+// KG-26-F01: ett ugyldig lagret søk eller kjøpsønske kastet i matcheren som
+// listing-triggerne kaller synkront, og rullet tilbake andres publisering.
+describe.skipIf(!canRun)("Saved-search/WTB matching: invalid criteria are isolated", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const sellerEmail = `rls-invalid-seller-${suffix}@example.com`;
+  const buyerEmail = `rls-invalid-buyer-${suffix}@example.com`;
+  const userIds: string[] = [];
+  const listingIds: string[] = [];
+  const wtbIds: string[] = [];
+  let sellerId: string;
+  let buyerId: string;
+  let categoryId: string;
+
+  beforeAll(async () => {
+    sellerId = await createRlsUser(admin, sellerEmail, userIds);
+    buyerId = await createRlsUser(admin, buyerEmail, userIds);
+    const { data, error } = await admin.from("categories").select("id").limit(1).single();
+    if (error) throw error;
+    categoryId = data.id;
+  });
+
+  afterAll(async () => {
+    if (wtbIds.length) {
+      await admin.from("wtb_match_notifications").delete().in("wtb_listing_id", wtbIds);
+      await admin.from("wtb_listings").delete().in("id", wtbIds);
+    }
+    await admin.from("saved_searches").delete().eq("user_id", buyerId);
+    if (listingIds.length) await admin.from("listings").delete().in("id", listingIds);
+    for (const id of userIds) await admin.auth.admin.deleteUser(id);
+  });
+
+  it.each([
+    { name: "pris", criteria: { min: "oops" } },
+    { name: "array", criteria: { categories: "bil" } },
+    { name: "geo", criteria: { lat: "nord", lng: 10 } },
+    { name: "flervalg", criteria: { attributes: { fuel: { kind: "multiselect", values: "x" } } } },
+  ])("avviser ugyldig $name-kriterium ved lagring", async ({ criteria }) => {
+    const buyer = await signInWithRetry(buyerEmail);
+    const { error } = await buyer
+      .from("saved_searches")
+      .insert({ user_id: buyerId, name: "Ugyldig", criteria, notify: true });
+    expect(error?.code).toBe("23514");
+  });
+
+  it("lagrer fortsatt gyldige søk", async () => {
+    const buyer = await signInWithRetry(buyerEmail);
+    const { error } = await buyer.from("saved_searches").insert({
+      user_id: buyerId,
+      name: "Gyldig",
+      criteria: { q: "bil", min: 100, max: null, includeFree: true, lat: 59.9, lng: 10.7 },
+      notify: true,
+    });
+    expect(error).toBeNull();
+  });
+
+  it("publisering går gjennom selv om et kjøpsønske har ugyldig dato", async () => {
+    const wtb = async (minDate: string) => {
+      const { data, error } = await admin
+        .from("wtb_listings")
+        .insert({
+          user_id: buyerId,
+          title: `RLS ugyldig dato ${minDate}`,
+          status: "active",
+          notify_matches: true,
+          category_id: categoryId,
+          attributes: { next_eu_control: { minDate } },
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      wtbIds.push(data.id);
+      return data.id;
+    };
+    await wtb("2026-99-99");
+    const validId = await wtb("2026-01-01");
+
+    const { data, error } = await admin
+      .from("listings")
+      .insert({
+        seller_id: sellerId,
+        title: "RLS bil med EU-kontroll",
+        status: "active",
+        price_nok: 100,
+        category_id: categoryId,
+        attributes: { next_eu_control: "2026-12-01" },
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    listingIds.push(data!.id);
+
+    const { data: notified, error: notifiedError } = await admin
+      .from("wtb_match_notifications")
+      .select("wtb_listing_id")
+      .eq("listing_id", data!.id)
+      .in("wtb_listing_id", wtbIds);
+    expect(notifiedError).toBeNull();
+    expect(notified?.map((row) => row.wtb_listing_id)).toEqual([validId]);
+  });
+});

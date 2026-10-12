@@ -55,6 +55,10 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
   .validator((input: unknown) => businessListingStatsInput.parse(input))
   .handler(async ({ data, context }): Promise<BusinessListingStats> => {
     const { supabaseAdmin, organizationId, role } = await requireOrganizationMember(context.userId);
+    // Medlemmer ser bare det can_view_organization_listing gir: per lokasjon
+    // («all» eller egne annonser) og bare med aktiv Proff (KG-06-F04).
+    // null = superbruker, ser alt.
+    let viewAllLocations: Set<string> | null = null;
     let listingQuery = supabaseAdmin
       .from("listings")
       .select(
@@ -78,22 +82,35 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
         throw await toClientError("database", assignmentsError);
       }
       if (!assignments?.length) throw new Error(UNAUTHORIZED_MESSAGE);
-      const canViewAll = assignments.some((assignment) => assignment.listing_access === "all");
+      if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
+        throw new Error(PROFF_REQUIRED_MESSAGE);
+      }
+      viewAllLocations = new Set(
+        assignments.filter((a) => a.listing_access === "all").map((a) => a.location_id as string),
+      );
       const locationIds = assignments.map((assignment) => assignment.location_id as string);
       listingQuery = listingQuery.in("organization_location_id", locationIds);
-      if (!canViewAll) listingQuery = listingQuery.eq("seller_id", context.userId);
     }
 
     const { data: listings, error: listingsError } = await listingQuery;
     if (listingsError) {
       throw await toClientError("database", listingsError);
     }
-    const rawListings = (listings ?? []) as unknown as Array<{
-      id: string;
-      status: Database["public"]["Enums"]["listing_status"];
-      created_at: string;
-      listing_view_totals: { total_views: number } | { total_views: number }[] | null;
-    }>;
+    const rawListings = (
+      (listings ?? []) as unknown as Array<{
+        id: string;
+        status: Database["public"]["Enums"]["listing_status"];
+        seller_id: string;
+        organization_location_id: string | null;
+        created_at: string;
+        listing_view_totals: { total_views: number } | { total_views: number }[] | null;
+      }>
+    ).filter(
+      (listing) =>
+        !viewAllLocations ||
+        viewAllLocations.has(listing.organization_location_id ?? "") ||
+        listing.seller_id === context.userId,
+    );
     const listingIds = rawListings.map((listing) => listing.id);
     const historyStart = new Date(Date.now() - (BUSINESS_HISTORY_DAYS - 1) * DAY_MS);
     const salesStart = new Date(Date.now() - BUSINESS_MAX_SOLD_DAYS * DAY_MS);

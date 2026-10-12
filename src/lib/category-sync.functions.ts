@@ -29,28 +29,34 @@ function assertProductionEnvironment() {
 
 const SYNC_PAGE_SIZE = 500;
 
-/** Henter HELE tabellen. PostgREST kapper hvert svar på max-rows (1000), og
- * synk-RPC-en sletter produksjonsrader som mangler i payloaden — en avkortet
- * henting ville slettet kategorioppsett (KG-06-F02). Sider med stabil
- * rekkefølge til antallet stemmer med count, og avviser ellers. */
-async function fetchAllRows<T>(
+/** Offset-paging kan hoppe over rader når staging redigeres under henting.
+ * Bruk siste ID som markør og avvis endret antall før synken kan slette noe. */
+async function fetchAllRows<T extends { id: string }>(
   client: SupabaseClient<Database>,
   table: "categories" | "category_filters" | "category_flows" | "filter_synonyms",
 ): Promise<T[]> {
   const rows: T[] = [];
-  let total: number;
-  do {
-    const { data, error, count } = await client
-      .from(table)
-      .select("*", { count: "exact" })
-      .order("id")
-      .range(rows.length, rows.length + SYNC_PAGE_SIZE - 1);
+  const readCount = async () => {
+    const { count, error } = await client.from(table).select("id", { count: "exact", head: true });
     if (error) throw await toClientError("database", error);
-    total = count ?? -1;
-    if (!data?.length) break;
-    rows.push(...(data as T[]));
-  } while (rows.length < total);
-  if (rows.length !== total) {
+    return count ?? -1;
+  };
+  const total = await readCount();
+  let hasMore: boolean;
+  do {
+    let query = client
+      .from(table)
+      .select("*")
+      .order("id")
+      .range(0, SYNC_PAGE_SIZE - 1);
+    const lastId = rows.at(-1)?.id;
+    if (lastId) query = query.gt("id", lastId);
+    const { data, error } = await query;
+    if (error) throw await toClientError("database", error);
+    rows.push(...((data ?? []) as unknown as T[]));
+    hasMore = data?.length === SYNC_PAGE_SIZE;
+  } while (hasMore && rows.length <= total);
+  if (rows.length !== total || (await readCount()) !== total) {
     throw new Error(
       `Kunne ikke hente hele ${table} (${rows.length} av ${total} rader). Synken er avbrutt.`,
     );

@@ -27,6 +27,18 @@ BEGIN
     RAISE EXCEPTION 'Server access required';
   END IF;
 
+  -- Et lån som går ut skyldes en worker som døde uten å nå catch-grenen
+  -- (f.eks. minne- eller tidsgrense), så workerens 24-timersgrense slår
+  -- aldri inn. Samme grense håndheves her, ellers ville en jobb som alltid
+  -- dreper workeren bli claimet hvert tiende minutt for alltid.
+  UPDATE public.listing_image_jobs
+  SET status = 'failed',
+      customer_error = 'Bildet kunne ikke behandles på grunn av en feil hos Kaupet. Vi følger opp.',
+      internal_error = 'lease_expired_after_24h'
+  WHERE status = 'processing'
+    AND updated_at < now() - interval '10 minutes'
+    AND created_at < now() - interval '24 hours';
+
   RETURN QUERY
   UPDATE public.listing_image_jobs
   SET status = 'processing', attempts = attempts + 1
@@ -72,9 +84,10 @@ BEGIN
     RAISE EXCEPTION 'Server access required';
   END IF;
 
-  -- Annonsen låses først, i en modus som venter på enqueue_listing_image_jobs
-  -- (FOR SHARE). Ellers kunne en erstattende synk slette bilderadene før
-  -- denne bilderaden var synlig, og så slette jobben etter at den var lagret.
+  -- Annonsen låses først med FOR NO KEY UPDATE, som venter på (og
+  -- blokkerer) FOR SHARE-låsen enqueue_listing_image_jobs tar på annonsen.
+  -- Ellers kunne en erstattende synk slette bilderadene før denne bilderaden
+  -- var synlig, og så slette jobben etter at den var lagret.
   PERFORM 1 FROM public.listings l
   JOIN public.listing_image_jobs j ON j.listing_id = l.id
   WHERE j.id = _job_id

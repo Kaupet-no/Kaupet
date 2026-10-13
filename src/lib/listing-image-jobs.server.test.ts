@@ -57,7 +57,9 @@ function fakeTransformer(bytes = new Uint8Array(100)): ImageTransformer {
   return { transform: vi.fn().mockResolvedValue({ bytes, contentType: "image/webp" }) };
 }
 
-function buildAdmin(options: { registrationError?: Error; insertError?: Error } = {}) {
+function buildAdmin(
+  options: { registrationError?: Error; insertError?: Error; existingImage?: { id: string } } = {},
+) {
   const updates: Array<{ table: string; payload: unknown }> = [];
   const registered: string[] = [];
   const admin = {
@@ -70,6 +72,16 @@ function buildAdmin(options: { registrationError?: Error; insertError?: Error } 
       throw new Error(`unexpected RPC: ${name}`);
     },
     from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            limit: () => ({
+              maybeSingle: () =>
+                Promise.resolve({ data: options.existingImage ?? null, error: null }),
+            }),
+          }),
+        }),
+      }),
       insert: (payload: unknown) => {
         uploadEvents.push("insert");
         return Promise.resolve({ data: null, error: options.insertError ?? null, payload, table });
@@ -116,6 +128,23 @@ describe("processListingImageJob", () => {
     expect(
       uploadEvents.filter((event) => event === "register_standard_upload_object"),
     ).toHaveLength(2);
+  });
+
+  it("legger ikke inn en ny bilderad når et tidligere claim allerede gjorde det", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jpegResponse());
+    const { admin, updates } = buildAdmin({ existingImage: { id: "img-1" } });
+
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl,
+    });
+
+    expect(result.outcome).toBe("done");
+    expect(uploadEvents).not.toContain("insert");
+    expect(updates.find((u) => u.table === "listing_image_jobs")?.payload).toMatchObject({
+      status: "done",
+    });
   });
 
   it("registreringsfeil gir retry uten å skrive noen objekter", async () => {

@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(14);
+SELECT plan(16);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-4000-8000-00000000e001', 'image-jobs-pgtap@example.com');
@@ -76,6 +76,22 @@ SELECT is(public.complete_listing_image_job('00000000-0000-4000-8000-00000000e30
 SELECT is((SELECT count(*)::int FROM public.listing_images
   WHERE source_url = 'https://example.com/b.jpg'), 0,
   'Erstattet jobb legger ikke gamle bilder tilbake');
+
+-- En jobb som dreper workeren hver gang gis opp etter 24 timer i stedet
+-- for å claimes hvert tiende minutt for alltid.
+ALTER TABLE public.listing_image_jobs DISABLE TRIGGER listing_image_jobs_set_updated_at;
+INSERT INTO public.listing_image_jobs
+  (id, organization_id, listing_id, source_url, status, attempts, created_at, updated_at)
+VALUES ('00000000-0000-4000-8000-00000000e303', '00000000-0000-4000-8000-00000000e101',
+  '00000000-0000-4000-8000-00000000e201', 'https://example.com/c.jpg', 'processing', 40,
+  now() - interval '25 hours', now() - interval '11 minutes');
+ALTER TABLE public.listing_image_jobs ENABLE TRIGGER listing_image_jobs_set_updated_at;
+SELECT is((SELECT count(*)::int FROM public.claim_listing_image_jobs(100)
+  WHERE id = '00000000-0000-4000-8000-00000000e303'), 0,
+  'Utløpt lån eldre enn 24 timer claimes ikke');
+SELECT is((SELECT status FROM public.listing_image_jobs
+  WHERE id = '00000000-0000-4000-8000-00000000e303'), 'failed',
+  'Utløpt lån eldre enn 24 timer markeres failed');
 
 SELECT * FROM finish();
 ROLLBACK;

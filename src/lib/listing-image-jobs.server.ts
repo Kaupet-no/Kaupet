@@ -347,13 +347,26 @@ export async function processListingImageJob(
     await putObject("BILDER", key, compressed.main.bytes, compressed.main.contentType);
     await putObject("BILDER", thumbKey, compressed.thumb.bytes, compressed.thumb.contentType);
 
-    const { error: insertError } = await deps.supabaseAdmin.from("listing_images").insert({
-      listing_id: job.listing_id,
-      storage_path: key,
-      sort_order: job.sort_order,
-      source_url: job.source_url,
-    });
-    if (insertError) throw new Error(`Kunne ikke lagre bilderad: ${insertError.message}`);
+    // Et utløpt lån kan claimes på nytt mens den første workeren fortsatt
+    // kjører; samme regel som complete_listing_image_job: én bilderad per
+    // kilde-URL i annonsen. Fjernes når workeren går over til RPC-en (B5b).
+    const { data: existingImage, error: existingError } = await deps.supabaseAdmin
+      .from("listing_images")
+      .select("id")
+      .eq("listing_id", job.listing_id)
+      .eq("source_url", job.source_url)
+      .limit(1)
+      .maybeSingle();
+    if (existingError) throw new Error(`Kunne ikke sjekke bilderad: ${existingError.message}`);
+    if (!existingImage) {
+      const { error: insertError } = await deps.supabaseAdmin.from("listing_images").insert({
+        listing_id: job.listing_id,
+        storage_path: key,
+        sort_order: job.sort_order,
+        source_url: job.source_url,
+      });
+      if (insertError) throw new Error(`Kunne ikke lagre bilderad: ${insertError.message}`);
+    }
 
     const { error: updateError } = await deps.supabaseAdmin
       .from("listing_image_jobs")

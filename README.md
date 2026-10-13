@@ -12,7 +12,7 @@ Dette repoet inneholder kode for Kaupet.no på web, Kaupet-appen på iOS og Andr
 
 **Annonser.** Last opp bilder, skriv litt om det du selger, og fyll inn opplysningene som passer. Blir du avbrutt, kan du fortsette fra et utkast senere. Om ønskelig, kan Kaupet foreslå kategori, tittel og annonseinnhold basert på bildene som lastes opp.
 
-**Kjøp.** Finner du ikke det du trenger? Legg ut et kjøpsønske, så kan de som har det, finne deg. Dersom noen oppretter en annonse som treffer kriteriene, varsles de med en gang, før annonsen publiseres.
+**Kjøp.** Finner du ikke det du trenger? Legg ut et kjøpsønske, så kan de som har det, finne deg. Dersom noen publiserer en annonse som treffer kriteriene, varsles de med en gang. Selgeren ser allerede mens annonsen lages hvor mange som ønsker å kjøpe noe lignende.
 
 **Snakk sammen.** Send en melding, still spørsmål og avtal videre med kjøper eller selger. Meldinger sorteres etter annonse, slik at det er enkelt å få oversikt over hvilke meldinger som hører til hvilke annonser.
 

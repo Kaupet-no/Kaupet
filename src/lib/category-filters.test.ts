@@ -331,6 +331,9 @@ describe("normalisering av tallattributter (ekvivalensklasser)", () => {
     ["2020", 2020],
     ["0", 0],
     ["-12.5", -12.5],
+    ["150 000", 150000],
+    ["1\u00a0500", 1500],
+    ["12,5", 12.5],
     [2020, 2020],
   ])("normaliserer gyldig tall %j til %j", (year, expected) => {
     const attributes = { year, brand: "2020" };

@@ -115,6 +115,24 @@ $$;
 
 -- Normaliser og rydd bare tallfelt i annonsens effektive kategori. Barnets
 -- filtertype overstyrer forelderen; samme nøkkel i andre kategorier er irrelevant.
+-- Tallstrenger med mellomrom som tusenskille («150 000») og desimalkomma
+-- («12,5») normaliseres i stedet for å fjernes, samme regel som
+-- normalizeNumericAttributes. Bare tallområder som fortsatt ikke er tall
+-- fjernes. Opprinnelige attributter for hver endret annonse lagres i
+-- listing_attribute_cleanup_backup, og updated_at beholdes: dette er en
+-- dataopprydding, ikke en endring eieren har gjort.
+CREATE TABLE public.listing_attribute_cleanup_backup (
+  listing_id uuid PRIMARY KEY REFERENCES public.listings(id) ON DELETE CASCADE,
+  attributes jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.listing_attribute_cleanup_backup ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.listing_attribute_cleanup_backup FROM PUBLIC, anon, authenticated;
+COMMENT ON TABLE public.listing_attribute_cleanup_backup IS
+  'Engangskopi av annonseattributter før tallryddingen i 20261013170000 (B16). Kun service role. Kan slettes når ryddingen er verifisert i produksjon.';
+
+ALTER TABLE public.listings DISABLE TRIGGER listings_set_updated_at;
+
 WITH RECURSIVE ancestors AS (
   SELECT id AS category_id, id AS ancestor_id, parent_id, 0 AS depth
   FROM public.categories
@@ -125,32 +143,47 @@ WITH RECURSIVE ancestors AS (
   SELECT DISTINCT ON (a.category_id, cf.key) a.category_id, cf.key, cf.type
   FROM ancestors a JOIN public.category_filters cf ON cf.category_id = a.ancestor_id
   ORDER BY a.category_id, cf.key, a.depth
-), corrected AS (
-  SELECT l.id, jsonb_object_agg(attr.key,
-    CASE WHEN f.type IN ('number', 'range')
-      AND jsonb_typeof(attr.value) = 'string'
-      AND attr.value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$'
-      AND pg_input_is_valid(attr.value #>> '{}', 'double precision')
-      AND pg_input_is_valid(attr.value #>> '{}', 'numeric')
-      THEN to_jsonb((attr.value #>> '{}')::numeric)
-      ELSE attr.value
-    END
-  ) FILTER (WHERE NOT (
-    COALESCE(f.type = 'range', false)
-    AND jsonb_typeof(attr.value) <> 'number'
-    AND NOT (jsonb_typeof(attr.value) = 'string'
-      AND attr.value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$')
-  )) AS attributes
+), attrs AS (
+  SELECT l.id, attr.key, attr.value, f.type,
+    CASE WHEN f.type IN ('number', 'range') AND jsonb_typeof(attr.value) = 'string'
+      THEN regexp_replace(
+        regexp_replace(attr.value #>> '{}', '[[:space:]   ]', '', 'g'),
+        '^(-?[0-9]+),([0-9]+)$', '\1.\2')
+    END AS cleaned
   FROM public.listings l
   CROSS JOIN LATERAL jsonb_each(l.attributes) attr
   LEFT JOIN effective_filters f ON f.category_id = l.category_id AND f.key = attr.key
   WHERE jsonb_typeof(l.attributes) = 'object'
-  GROUP BY l.id
+), corrected AS (
+  SELECT id, jsonb_object_agg(key,
+    CASE WHEN cleaned ~ '^-?[0-9]+(\.[0-9]+)?$'
+      AND pg_input_is_valid(cleaned, 'double precision')
+      AND pg_input_is_valid(cleaned, 'numeric')
+      THEN to_jsonb(cleaned::numeric)
+      ELSE value
+    END
+  ) FILTER (WHERE NOT (
+    COALESCE(type = 'range', false)
+    AND jsonb_typeof(value) <> 'number'
+    AND NOT COALESCE(cleaned ~ '^-?[0-9]+(\.[0-9]+)?$', false)
+  )) AS attributes
+  FROM attrs
+  GROUP BY id
+), changed AS (
+  SELECT l.id, l.attributes AS previous, COALESCE(c.attributes, '{}'::jsonb) AS next
+  FROM public.listings l
+  JOIN corrected c ON c.id = l.id
+  WHERE l.attributes IS DISTINCT FROM COALESCE(c.attributes, '{}'::jsonb)
+), backup AS (
+  INSERT INTO public.listing_attribute_cleanup_backup (listing_id, attributes)
+  SELECT id, previous FROM changed
 )
 UPDATE public.listings l
-SET attributes = COALESCE(c.attributes, '{}'::jsonb)
-FROM corrected c
-WHERE l.id = c.id AND l.attributes IS DISTINCT FROM COALESCE(c.attributes, '{}'::jsonb);
+SET attributes = changed.next
+FROM changed
+WHERE l.id = changed.id;
+
+ALTER TABLE public.listings ENABLE TRIGGER listings_set_updated_at;
 
 -- 3) Søkevektoren følger kategoriens forelder ------------------------------
 --

@@ -299,6 +299,13 @@ export function effectiveFiltersForCategory(
   return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
 }
 
+/** Tallstreng i norsk skrivemåte → kanonisk form: mellomrom som
+ * tusenskille («150 000») fjernes og desimalkomma («12,5») blir punktum.
+ * Samme regel som tallryddingen i 20261013170000. */
+function canonicalNumericString(value: string): string {
+  return value.replace(/[\s\u00a0\u2009\u202f]/g, "").replace(/^(-?\d+),(\d+)$/, "$1.$2");
+}
+
 /** Eldre importdata kan ha tallstrenger. Bare kategoriens effektive
  * tallfelt konverteres; tekstvalg og ugyldige tall beholdes for validering. */
 export function normalizeNumericAttributes<T>(
@@ -310,13 +317,12 @@ export function normalizeNumericAttributes<T>(
   const normalized: Record<string, T | number> = { ...attributes };
   for (const filter of effectiveFiltersForCategory(categoryId, allFilters, categoriesById)) {
     const value = normalized[filter.key];
-    if (
-      (filter.type === "number" || filter.type === "range") &&
-      typeof value === "string" &&
-      /^-?[0-9]+(\.[0-9]+)?$/.test(value) &&
-      Number.isFinite(Number(value))
-    ) {
-      normalized[filter.key] = Number(value);
+    if ((filter.type !== "number" && filter.type !== "range") || typeof value !== "string") {
+      continue;
+    }
+    const canonical = canonicalNumericString(value);
+    if (/^-?[0-9]+(\.[0-9]+)?$/.test(canonical) && Number.isFinite(Number(canonical))) {
+      normalized[filter.key] = Number(canonical);
     }
   }
   return normalized;

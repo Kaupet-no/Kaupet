@@ -42,7 +42,7 @@ const match = (word: number, text: string, value: string) => ({
   categoryId: "bil",
 });
 
-function run(qDraft: string) {
+function run(qDraft: string, ignoredInterpretations?: Set<string>) {
   const handleAttrValueChange = vi.fn();
   const updateSearch = vi.fn();
   renderHook(() =>
@@ -55,6 +55,7 @@ function run(qDraft: string) {
       attrValues: {},
       handleAttrValueChange,
       categoryId: "bil",
+      ignoredInterpretations,
     }),
   );
   return { handleAttrValueChange, updateSearch };
@@ -116,4 +117,33 @@ it("bruker hoppede treff når teksten går tilbake, uten nytt oppslag", () => {
   expect(handleAttrValueChange).toHaveBeenCalledTimes(1);
   rerender({ qDraft: "kamera " });
   expect(handleAttrValueChange).toHaveBeenCalledTimes(1);
+});
+
+// Når en samlet brikke fjernes, gjenopprettes alle frasene som én tekst.
+it("beholder gjenopprettede utstyrsfraser som tekst gjennom neste tolkningsrunde", () => {
+  synonyms.debouncedQ = "kamera soltak";
+  synonyms.data = [match(0, "kamera", "camera"), match(1, "soltak", "roof")];
+  const { handleAttrValueChange, updateSearch } = run("kamera soltak", new Set(["kamera soltak"]));
+  expect(handleAttrValueChange).not.toHaveBeenCalled();
+  expect(updateSearch).not.toHaveBeenCalled();
+});
+
+it("ignorerer en hel gjenopprettet frase uten å ignorere deler av andre ord", () => {
+  synonyms.debouncedQ = "kamera soltak";
+  synonyms.data = [match(0, "kamera", "camera"), match(1, "soltak", "roof")];
+  const { handleAttrValueChange } = run("kamera soltak", new Set(["kamera panoramasoltak"]));
+  expect(handleAttrValueChange).toHaveBeenCalledWith("equipment", {
+    kind: "multiselect",
+    values: ["roof"],
+  });
+});
+
+it("beholder begge gjenopprettede prisgrenser som tekst", () => {
+  synonyms.debouncedQ = "over 1000 kr under 2000 kr";
+  const { handleAttrValueChange, updateSearch } = run(
+    synonyms.debouncedQ,
+    new Set([synonyms.debouncedQ]),
+  );
+  expect(handleAttrValueChange).not.toHaveBeenCalled();
+  expect(updateSearch).not.toHaveBeenCalled();
 });

@@ -9,6 +9,16 @@ import { negateSynonymMatches } from "@/lib/search-negation";
 import { stripFillerWords } from "@/lib/search-stopwords";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import type { InterpretedCriterion } from "./resolve-text-to-filters";
+// En samlet brikke gjenoppretter flere fraser; hvert helt ordtreff i teksten
+// må forbli fritekst, også når matcheren deler teksten opp igjen.
+function interpretationWasRemoved(matchedText: string, ignored?: Set<string>): boolean {
+  const phrase = ` ${matchedText.trim().toLocaleLowerCase().replace(/\s+/g, " ")} `;
+  for (const text of ignored ?? []) {
+    if (` ${text.trim().toLocaleLowerCase().replace(/\s+/g, " ")} `.includes(phrase)) return true;
+  }
+  return false;
+}
+
 /**
  * Single coordination point for every "recognize this typed word as a
  * structured filter" matcher (equipment/attribute synonyms, number+unit
@@ -97,21 +107,21 @@ export function useTextToFilterPipeline({
   const activeSynonymMatches = useMemo(
     () =>
       synonymMatches?.filter(
-        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+        (match) => !interpretationWasRemoved(match.matchedText, ignoredInterpretations),
       ),
     [ignoredInterpretations, synonymMatches],
   );
   const activeNumericMatches = useMemo(
     () =>
       numericMatches.filter(
-        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+        (match) => !interpretationWasRemoved(match.matchedText, ignoredInterpretations),
       ),
     [ignoredInterpretations, numericMatches],
   );
   const activePriceMatches = useMemo(
     () =>
       priceMatches.filter(
-        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+        (match) => !interpretationWasRemoved(match.matchedText, ignoredInterpretations),
       ),
     [ignoredInterpretations, priceMatches],
   );

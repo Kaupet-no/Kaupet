@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
   effectiveFiltersForCategory,
+  findNonNumericAttribute,
   getMissingRequiredFilters,
   normalizeFilter,
   isBoatCategory,
@@ -287,6 +288,16 @@ function validatePartFitment(
     throw new ClientError("Årsmodell fra kan ikke være høyere enn årsmodell til.", 400);
   }
 }
+function assertNumericAttributes(
+  categoryId: string | null,
+  filters: ReturnType<typeof normalizeFilter>[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+) {
+  const invalid = findNonNumericAttribute(categoryId, filters, categoriesById, attributes);
+  if (invalid) throw new ClientError(`${invalid.label_nb} må være et tall.`, 400);
+}
+
 async function validateExistingListingForPublish(
   supabaseAdmin: SupabaseClient,
   listing: ListingMutationRow,
@@ -353,6 +364,7 @@ async function validateExistingListingForPublish(
   const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
   if (!attributesResult.success) throw new ClientError("Annonsens attributter er ugyldige.", 400);
   const attributes = attributesResult.data;
+  assertNumericAttributes(listing.category_id, normalizedFilters, categoriesById, attributes);
 
   if (categoryBehavior.requiresCategoryFilterValues) {
     const missing = getMissingRequiredFilters(
@@ -661,6 +673,12 @@ export const createListing = createServerFn({ method: "POST" })
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
+    assertNumericAttributes(
+      data.category_id,
+      normalizedFilters,
+      categoriesById,
+      data.attributes ?? {},
+    );
     if (categoryBehavior.requiresCategoryFilterValues) {
       validatePartFitment(
         data.category_id,

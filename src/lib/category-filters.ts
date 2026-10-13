@@ -300,6 +300,26 @@ export function effectiveFiltersForCategory(
 }
 
 /**
+ * Første tallfelt (filtertype range/number) som har en verdi som ikke er et
+ * endelig tall. Søket og forsiden leser disse som tall; en lagret tekst som
+ * «oops» ble tidligere lest som feil for alle (KG-27-F02).
+ */
+export function findNonNumericAttribute(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+): CategoryFilter | null {
+  return (
+    effectiveFiltersForCategory(categoryId, allFilters, categoriesById).find((f) => {
+      if (f.type !== "range" && f.type !== "number") return false;
+      const v = attributes[f.key];
+      return v !== undefined && v !== null && (typeof v !== "number" || !Number.isFinite(v));
+    }) ?? null
+  );
+}
+
+/**
  * Returns the effective filters (excluding "range", which is search-only)
  * that don't yet have a value in `attributes`. Used to require filter values
  * to be filled in before a listing can be published/saved.

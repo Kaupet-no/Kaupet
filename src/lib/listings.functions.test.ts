@@ -10,6 +10,7 @@ const db = vi.hoisted(() => ({
   updateResult: undefined as Record<string, unknown> | null | undefined,
   inserts: [] as Array<{ table: string; value: unknown }>,
   tableErrors: {} as Record<string, unknown>,
+  tableData: {} as Record<string, unknown[]>,
 }));
 const assertUserNotRateLimited = vi.hoisted(() => vi.fn());
 
@@ -50,6 +51,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       let updating = false;
       const result = () => {
         if (db.tableErrors[table]) return { data: null, error: db.tableErrors[table] };
+        if (db.tableData[table]) return { data: db.tableData[table], error: null };
         if (updating && db.updateResult !== undefined)
           return { data: db.updateResult, error: null };
         if (table === "organization_members") return { data: db.membership, error: null };
@@ -151,6 +153,7 @@ beforeEach(() => {
   db.inserts = [];
   db.updates.mockReset();
   db.tableErrors = {};
+  db.tableData = {};
   assertUserNotRateLimited.mockReset().mockResolvedValue(undefined);
 });
 
@@ -629,4 +632,31 @@ describe("publiseringskontroller (B8)", () => {
       kaupet_code: null,
     });
   });
+});
+
+// KG-27-F02 (B16b): et ikke-numerisk tallfelt stoppet senere søk for alle.
+it("avviser et ikke-numerisk tallattributt før publisering", async () => {
+  setOrganization("superuser");
+  db.rpc.mockImplementation(async (name: string) => ({
+    data: name === "can_create_organization_listing" ? true : null,
+    error: null,
+  }));
+  db.tableData = {
+    category_filters: [
+      {
+        id: "f1",
+        category_id: categoryId,
+        key: "horsepower",
+        label_nb: "Hestekrefter",
+        type: "range",
+        sort_order: 0,
+      },
+    ],
+    categories: [{ id: categoryId, parent_id: null }],
+    category_flows: [],
+  };
+  await expect(
+    createListing({ data: { ...listingInput, attributes: { horsepower: "oops" } } }),
+  ).rejects.toMatchObject({ status: 400, message: "Hestekrefter må være et tall." });
+  expect(db.inserts).toEqual([]);
 });

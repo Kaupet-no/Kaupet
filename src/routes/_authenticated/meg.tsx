@@ -18,7 +18,7 @@ import {
   Building2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
@@ -65,7 +65,6 @@ function MegPage() {
   const { user } = useAuth();
   const { data: businessMembership } = useBusinessMembership();
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
   const adminEvents = useAdminOpenEventsCount();
   const { data: isDemo } = useIsDemo();
@@ -112,7 +111,6 @@ function MegPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    qc.clear();
     void navigate({ to: "/" });
   };
 

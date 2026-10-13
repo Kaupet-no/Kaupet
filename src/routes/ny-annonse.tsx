@@ -2,7 +2,7 @@ import { BusinessApprovalNotice } from "@/features/business-account/business-app
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { DRAFT_ACTOR_CHANGED_MESSAGE } from "@/features/listing-creation/use-draft-actor";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Link, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -341,7 +341,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     control,
     watch,
     trigger,
-    formState: { errors, touchedFields, isDirty },
+    formState: { errors, touchedFields },
   } = useForm<ListingForm>({
     resolver: zodResolver(listingSchema),
     mode: "onTouched",
@@ -931,7 +931,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
     discardDraft,
-    dismissDraftOffer,
+    releaseDraftOffer,
   } = useDraftAutosave({
     title,
     subtitle,
@@ -961,7 +961,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
   });
 
   function restoreDraft() {
-    setDraftDecisionPrompt(false);
     const savedStepKey = hasDraftData?.step_key;
     if (typeof savedStepKey === "string") pendingRestoreStepKeyRef.current = savedStepKey;
     void restoreDraftFields({
@@ -973,31 +972,40 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     });
   }
 
-  // Utkasttilbudet ("Du har et tidligere utkast: ... / Fortsett / Forkast") skal vises
-  // ÉN gang, ved start — ikke henge igjen på hvert steg. Så snart brukeren
-  // begynner å redigere (et felt blir "dirty") eller går videre til neste
-  // steg uten å ta et aktivt valg, forsvinner tilbudet for resten av
-  // økten. dismissDraftOffer lar det gamle utkastet ligge urørt (verken
-  // gjenopprettet eller slettet) — kun kobler fra den lagrede draftId-en,
-  // slik at autolagringen som fortsetter ikke overskriver det stille.
-  //
-  // Dette er kun trygt når det avviste utkastet allerede har en server-kopi
-  // (draftId) — da ligger dataene trygt hos Supabase uansett hva som skjer
-  // lokalt etterpå. Et utkast som KUN finnes i localStorage/IndexedDB ville
-  // blitt overskrevet stille av den nye annonsens autolagring (samme
-  // DRAFT_KEY/bildelager) hvis vi auto-avviste det samme veien — se
-  // draftDecisionRequired/goToNextPage, som i stedet tvinger et eksplisitt
-  // valg før brukeren kan forlate steg 1.
+  // Utkasttilbudet og meldingen om lagrede utkast blokkerer ikke. Går
+  // brukeren videre fra steg 1 uten å svare, forkastes det lokale utkastet,
+  // mens serverkopien blir liggende under Mine annonser (KG-18-F02). Gjelder
+  // alle veier videre (Neste, stegvelgeren), derfor effekt og ikke i
+  // goToNextPage.
+  const [leftFirstStep, setLeftFirstStep] = useState(false);
+  if (!isFirst && !leftFirstStep) setLeftFirstStep(true);
   useEffect(() => {
-    if (!hasDraftData || !draftId) return;
-    if (isDirty || step > 1) dismissDraftOffer();
-  }, [hasDraftData, draftId, isDirty, step, dismissDraftOffer]);
+    if (isFirst) return;
+    releaseDraftOffer();
+    // Bare ved overgangen: et utkast som står igjen etter en mislykket
+    // bildegjenoppretting på et senere steg skal ikke forkastes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirst]);
 
-  // Utkast som bare finnes lokalt: brukeren må aktivt velge Fortsett/Forkast
-  // før hen forlater steg 1 — se blokkeringen i goToNextPage.
-  const draftDecisionRequired = !!hasDraftData && !draftId;
-  const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
-  const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Serverutkast uten lokal kopie (f.eks. fra en annen enhet eller et
+  // tidligere forkastet lokalt utkast) nevnes, men tilbys ikke her.
+  const [savedDraftCount, setSavedDraftCount] = useState(0);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void supabase
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", userId)
+      .eq("status", "draft")
+      .then(({ count }) => {
+        if (!cancelled) setSavedDraftCount(count ?? 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (resume !== "auth-publish" || !user || !hasDraftData || authResumeHandledRef.current) {
@@ -1009,7 +1017,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, hasDraftData]);
   async function startNewListing() {
-    setDraftDecisionPrompt(false);
     setDraftDiscardConfirmOpen(false);
     await discardDraft();
   }
@@ -1084,16 +1091,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     setValidationError(null);
     setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
-
-    // Et lokalt-only utkast (ingen server-id) er ikke trygt å la autolagring
-    // skrive over stille — hold brukeren på steg 1 til hen har tatt et
-    // eksplisitt valg om det tilbudte utkastet, i stedet for å bare varsle
-    // med en toast.
-    if (isFirst && draftDecisionRequired) {
-      setDraftDecisionPrompt(true);
-      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
-      return "blocked";
-    }
 
     // Registrert kjøretøy: oppslaget kjøres normalt fra "Bekreft"-knappen ved
     // skiltet, men Neste gjør det samme hvis brukeren hoppet over den. Vi blir
@@ -1738,16 +1735,14 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
                       </>
                     )}
                   </p>
-                  {draftDecisionPrompt && (
-                    <p role="alert" aria-live="assertive" className="mt-1 text-destructive">
-                      Utkastet finnes bare på denne enheten. Velg «Fortsett utkastet» eller «Forkast
-                      utkastet» før du går videre, så det ikke går tapt.
-                    </p>
-                  )}
+                  <p className="mt-0.5 text-muted-foreground">
+                    {draftId
+                      ? "Går du videre, ligger det under Mine annonser."
+                      : "Går du videre, forkastes det."}
+                  </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button
-                    ref={continueDraftButtonRef}
                     type="button"
                     size="sm"
                     variant="secondary"
@@ -1767,6 +1762,16 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
                   </Button>
                 </div>
               </div>
+            ) : savedDraftCount > 0 && isFirst && !leftFirstStep ? (
+              <p className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs sm:text-sm">
+                Du har{" "}
+                {savedDraftCount === 1 ? "et lagret utkast" : `${savedDraftCount} lagrede utkast`}{" "}
+                under{" "}
+                <Link to="/mine-annonser" className="font-medium underline underline-offset-2">
+                  Mine annonser
+                </Link>
+                .
+              </p>
             ) : undefined
           }
           /* Stegantallet er ikke kjent før kategori er valgt (flyten er

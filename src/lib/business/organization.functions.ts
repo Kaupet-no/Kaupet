@@ -55,6 +55,8 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
   .validator((input: unknown) => businessListingStatsInput.parse(input))
   .handler(async ({ data, context }): Promise<BusinessListingStats> => {
     const { supabaseAdmin, organizationId, role } = await requireOrganizationMember(context.userId);
+    // Medlemmer ser bare det can_view_organization_listing gir: per lokasjon
+    // («all» eller egne annonser) og bare med aktiv Proff (KG-06-F04).
     let listingQuery = supabaseAdmin
       .from("listings")
       .select(
@@ -78,10 +80,20 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
         throw await toClientError("database", assignmentsError);
       }
       if (!assignments?.length) throw new Error(UNAUTHORIZED_MESSAGE);
-      const canViewAll = assignments.some((assignment) => assignment.listing_access === "all");
+      if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
+        throw new Error(PROFF_REQUIRED_MESSAGE);
+      }
+      const viewAllLocations = assignments
+        .filter((a) => a.listing_access === "all")
+        .map((a) => a.location_id as string);
       const locationIds = assignments.map((assignment) => assignment.location_id as string);
       listingQuery = listingQuery.in("organization_location_id", locationIds);
-      if (!canViewAll) listingQuery = listingQuery.eq("seller_id", context.userId);
+      // Tilgang må filtreres før PostgRESTs radgrense, ikke i det avkortede svaret.
+      listingQuery = viewAllLocations.length
+        ? listingQuery.or(
+            `organization_location_id.in.(${viewAllLocations.join(",")}),seller_id.eq.${context.userId}`,
+          )
+        : listingQuery.eq("seller_id", context.userId);
     }
 
     const { data: listings, error: listingsError } = await listingQuery;

@@ -1111,7 +1111,7 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
     expect(row.data?.name).toBe("RLS testnøkkel");
   });
 
-  it("viser private billing/fakturadata bare til superbruker og adresse offentlig når flagget er satt", async () => {
+  it("viser private billing/fakturadata bare til superbruker og stenger adressesnapshot for klienter", async () => {
     const owner = await signInWithRetry(emails.owner);
     const member = await signInWithRetry(emails.member);
     const outsider = await signInWithRetry(emails.outsider);
@@ -1148,6 +1148,10 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
       .from("listing_visiting_addresses")
       .select("listing_id")
       .eq("listing_id", listingId);
+    const memberAddress = await member
+      .from("listing_visiting_addresses")
+      .select("listing_id")
+      .eq("listing_id", listingId);
     expect(ownerBilling.error).toBeNull();
     expect(memberBilling.error).toBeNull();
     expect(ownerSubscription.error).toBeNull();
@@ -1155,7 +1159,10 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
     expect(ownerCharge.error).toBeNull();
     expect(memberCharge.error).toBeNull();
     expect(outsiderCategories.error).toBeNull();
-    expect(anonymousAddress.error).toBeNull();
+    // KG-14-F01: øyeblikksbildet fulgte ikke lokasjonens skjul-valg, så en
+    // skjult gateadresse kunne leses anonymt. Tabellen er stengt for klienter.
+    expect(anonymousAddress.error?.code).toBe("42501");
+    expect(memberAddress.error?.code).toBe("42501");
     expect(ownerBilling.data).toHaveLength(1);
     expect(memberBilling.data).toHaveLength(0);
     expect(ownerSubscription.data).toHaveLength(1);
@@ -1163,7 +1170,6 @@ describe.skipIf(!canRun)("RLS: organisasjonsdata følger medlems- og superbruker
     expect(ownerCharge.data).toHaveLength(1);
     expect(memberCharge.data).toHaveLength(0);
     expect(outsiderCategories.data).toHaveLength(0);
-    expect(anonymousAddress.data).toHaveLength(1);
   });
 
   it("viser egne medlemskategorier og importstatus til aktivt medlem, men blokkerer klient-skriving", async () => {

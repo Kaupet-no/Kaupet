@@ -37,6 +37,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from,
 vi.mock("@/lib/rate-limit.server", () => ({ assertUserNotRateLimited, assertNotRateLimited }));
 
 import {
+  wtbAttributesSchema,
   createWtbListing,
   listWtbListings,
   matchWtbListingsForListing,
@@ -206,5 +207,17 @@ describe("gjenåpning av kjøpsønske", () => {
     const update = chain.update.mock.calls[0][0];
     expect(update.status).toBe("active");
     expect(new Date(update.expires_at).getTime()).toBeGreaterThan(Date.now() + 89 * 864e5);
+  });
+});
+
+describe("kriterieformer for kjøpsønske", () => {
+  // KG-26-F01: formatet alene slapp gjennom datoer SQL-matcheren kaster på.
+  it("avviser minDate som ikke er en gyldig kalenderdato", () => {
+    for (const minDate of ["2026-99-99", "2026-02-30"]) {
+      expect(wtbAttributesSchema.safeParse({ next_eu_control: { minDate } }).success).toBe(false);
+    }
+    expect(
+      wtbAttributesSchema.safeParse({ next_eu_control: { minDate: "2028-02-29" } }).success,
+    ).toBe(true);
   });
 });

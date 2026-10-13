@@ -342,6 +342,25 @@ describe("syncListings", () => {
     });
   });
 
+  // KG-09-F01: «kun nye» med kjent referanse erstattet bildesettet til en
+  // annonse aktøren ikke nødvendigvis har endringsrett til.
+  it("legger IKKE bilder i kø for duplikat i create-modus", async () => {
+    const calls: string[] = [];
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (name) => {
+        calls.push(name);
+        return { data: { status: "duplicate", listing_id: "listing-b" }, error: null };
+      },
+    });
+    const results = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "known-ref", imageUrls: ["https://example.com/new.jpg"] })],
+      mode: "create",
+    });
+    expect(results[0]).toMatchObject({ status: "duplicate" });
+    expect(calls).toEqual(["upsert_listing_from_external"]);
+  });
+
   it("legger IKKE bilder i kø når raden ikke sender imageUrls (kolonne mangler/tom rører ikke bildene)", async () => {
     const calls: string[] = [];
     const supabaseAdmin = makeSupabaseAdmin({

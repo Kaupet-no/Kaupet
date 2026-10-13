@@ -16,6 +16,15 @@ describe("draft image store fallback", () => {
     await expect(clearDraftImages()).resolves.toBeUndefined();
     Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: original });
   });
+
+  // KG-18-F01: lagring av bilder uten IndexedDB ble meldt som vellykket.
+  it("avviser lagring av bilder når IndexedDB mangler", async () => {
+    const original = globalThis.indexedDB;
+    Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: undefined });
+    const image = { id: "i1", file: new File(["x"], "a.jpg"), thumbFile: new File(["x"], "t.jpg") };
+    await expect(saveDraftImages([image as never])).rejects.toThrow(/ikke tilgjengelig/);
+    Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: original });
+  });
 });
 
 afterEach(() => vi.unstubAllGlobals());

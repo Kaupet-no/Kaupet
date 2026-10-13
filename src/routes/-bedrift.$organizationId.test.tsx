@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ComponentType, ReactNode } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 const { range } = vi.hoisted(() => ({ range: vi.fn() }));
@@ -32,7 +32,7 @@ vi.mock("@/components/listing-detail/proff-listing-presentation", () => ({
 import { Route } from "./bedrift.$organizationId";
 const Page = (Route as unknown as { options: { component: ComponentType } }).options.component;
 afterEach(cleanup);
-it("KG-06-F02: offentlig bedriftsliste viser også annonse 1001", async () => {
+it("KG-06-F02: offentlig bedriftsliste henter én side om gangen og kan laste flere", async () => {
   const row = {
     id: "id",
     kaupet_code: "ABC",
@@ -47,7 +47,7 @@ it("KG-06-F02: offentlig bedriftsliste viser også annonse 1001", async () => {
   };
   range
     .mockResolvedValueOnce({
-      data: Array.from({ length: 1000 }, (_, i) => ({ ...row, id: String(i) })),
+      data: Array.from({ length: 24 }, (_, i) => ({ ...row, id: String(i) })),
       error: null,
     })
     .mockResolvedValueOnce({ data: [{ ...row, id: "last", title: "Siste annonse" }], error: null });
@@ -57,6 +57,9 @@ it("KG-06-F02: offentlig bedriftsliste viser også annonse 1001", async () => {
       <Page />
     </QueryClientProvider>,
   );
+  fireEvent.click(await screen.findByRole("button", { name: "Last inn flere annonser" }));
   expect(await screen.findByText("Siste annonse")).toBeTruthy();
-  expect(range).toHaveBeenNthCalledWith(2, 1000, 1999);
+  expect(range).toHaveBeenNthCalledWith(1, 0, 23);
+  expect(range).toHaveBeenNthCalledWith(2, 24, 47);
+  expect(screen.queryByRole("button", { name: "Last inn flere annonser" })).toBeNull();
 });

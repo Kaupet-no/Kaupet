@@ -159,6 +159,44 @@ describe("replaceListingImagesApi tilgang", () => {
     );
   });
 
+  it("sender aktøren til køen og avviser når RPC-en nekter (endret tilgang etter sjekken)", async () => {
+    mockListing({});
+    mockRpc(true, { data: null, error: { code: "42501", message: "listing_update_forbidden" } });
+
+    await expect(
+      replaceListingImagesApi({
+        auth: apiAuth,
+        externalRef: "sku-b",
+        body: { urls: ["https://example.com/a.jpg"] },
+      }),
+    ).rejects.toMatchObject({ status: 403, code: "forbidden" });
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
+      "enqueue_listing_image_jobs",
+      expect.objectContaining({ _user_id: "user-1" }),
+    );
+  });
+
+  it("faller tilbake til signaturen uten aktør før migrasjonen er anvendt", async () => {
+    mockListing({});
+    supabaseAdmin.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+      if (name === "can_update_organization_listing") return { data: true, error: null };
+      return "_user_id" in args
+        ? { data: null, error: { code: "PGRST202", message: "Could not find the function" } }
+        : { data: 1, error: null };
+    });
+
+    // Bildestatusen som leses etterpå er ikke mocket her; bare køkallene telles.
+    await replaceListingImagesApi({
+      auth: apiAuth,
+      externalRef: "sku-b",
+      body: { urls: ["https://example.com/a.jpg"] },
+    }).catch(() => undefined);
+    const enqueueCalls = supabaseAdmin.rpc.mock.calls.filter(
+      ([name]) => name === "enqueue_listing_image_jobs",
+    );
+    expect(enqueueCalls.map(([, args]) => "_user_id" in args)).toEqual([true, false]);
+  });
+
   it("avviser deaktiverte annonser selv med endringsrett", async () => {
     mockListing({ status: "disabled" });
     mockRpc(true, { data: 1, error: null });

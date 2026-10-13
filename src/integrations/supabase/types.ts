@@ -3552,6 +3552,7 @@ export type Database = {
           _organization_id: string
           _replace?: boolean
           _urls: string[]
+          _user_id?: string
         }
         Returns: number
       }

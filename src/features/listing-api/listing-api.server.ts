@@ -644,15 +644,41 @@ export async function replaceListingImagesApi(params: {
     );
   }
 
-  const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
+  // Sjekken over gir tydelige feilmeldinger; RPC-en gjentar den i samme
+  // transaksjon som køskrivingen, så endringer i mellomtiden fanges også.
+  const enqueueArgs = {
     _organization_id: auth.organizationId,
     _listing_id: listing.id,
     _urls: urls,
     _replace: true,
+  };
+  let { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
+    ...enqueueArgs,
+    _user_id: actor.userId,
   });
+  // ponytail: utrullingsbro til 20261012103000 er anvendt i alle miljøer.
+  // PGRST202 = signaturen med _user_id finnes ikke ennå. Fjern deretter.
+  if (enqueueError?.code === "PGRST202") {
+    ({ error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", enqueueArgs));
+  }
   if (enqueueError) {
     if (enqueueError.message.includes("organization_new_images_daily_quota_exceeded")) {
       throw new ListingApiError(422, "validation_error", newImagesPerDayLimitMessage(), "images");
+    }
+    if (enqueueError.message.includes("listing_update_forbidden")) {
+      throw new ListingApiError(
+        403,
+        "forbidden",
+        "Du har ikke tilgang til å endre denne annonsen.",
+      );
+    }
+    if (enqueueError.message.includes("listing_disabled")) {
+      throw new ListingApiError(
+        422,
+        "validation_error",
+        "Annonsen er deaktivert av moderator og kan ikke oppdateres.",
+        "images",
+      );
     }
     throw enqueueError;
   }

@@ -45,6 +45,10 @@ type Profile = {
 };
 
 const BUYER_IDS_CHUNK_SIZE = 100;
+const conversationDateFormatter = new Intl.DateTimeFormat("nb-NO", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 async function fetchBuyerProfiles(buyerIds: string[]): Promise<Profile[]> {
   const profiles: Profile[] = [];
@@ -215,10 +219,7 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
                       className="hidden shrink-0 text-xs text-muted-foreground sm:block"
                       dateTime={conversation.last_message_at}
                     >
-                      {new Intl.DateTimeFormat("nb-NO", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(conversation.last_message_at))}
+                      {conversationDateFormatter.format(new Date(conversation.last_message_at))}
                     </time>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
                   </Link>

@@ -142,18 +142,9 @@ export function usePushStatus(): PushStatus {
     }
     await refreshBrowser();
     if (kind) {
-      const next = {
-        web_push_messages: kind === "messages" ? true : effectivePrefs.web_push_messages,
-        web_push_saved_searches:
-          kind === "saved_searches" ? true : effectivePrefs.web_push_saved_searches,
-        web_push_price_drops: kind === "price_drops" ? true : effectivePrefs.web_push_price_drops,
-      };
-      if (
-        next.web_push_messages !== effectivePrefs.web_push_messages ||
-        next.web_push_saved_searches !== effectivePrefs.web_push_saved_searches ||
-        next.web_push_price_drops !== effectivePrefs.web_push_price_drops
-      ) {
-        await updatePrefs({ data: next });
+      const key = `web_push_${kind}` as const;
+      if (!effectivePrefs[key]) {
+        await updatePrefs({ data: { [key]: true } });
         await qc.invalidateQueries({ queryKey: ["notification-preferences"] });
       }
     }

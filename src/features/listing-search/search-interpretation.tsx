@@ -41,8 +41,9 @@ export function SearchInterpretation({
   filters: CategoryFilter[];
   onCategoryChange: (slug: string | undefined) => void;
   onAttributeChange: (key: string, value: AttributeFilterValue | undefined) => void;
-  /** Optional precise removal hook for multiselect/exclude criteria. */
-  onAttributeRemove?: (key: string, value?: string, matchedText?: string) => void;
+  /** Optional precise removal hook for multiselect/exclude criteria; gets
+   * every value the chip shows. */
+  onAttributeRemove?: (key: string, values?: string[], matchedText?: string) => void;
   onPriceRemove?: (matchedText?: string) => void;
 }) {
   return (
@@ -88,12 +89,13 @@ export function SearchInterpretation({
                 onPriceRemove?.(criterion.matchedText);
                 return;
               }
-              const option =
+              // Hele kriteriet brikken viser, ikke bare første verdi (KG-28-F03).
+              const options =
                 criterion.value.kind === "multiselect" || criterion.value.kind === "exclude"
-                  ? criterion.value.values[0]
+                  ? criterion.value.values
                   : undefined;
               if (onAttributeRemove)
-                onAttributeRemove(criterion.key, option, criterion.matchedText);
+                onAttributeRemove(criterion.key, options, criterion.matchedText);
               else onAttributeChange(criterion.key, undefined);
             }}
           />

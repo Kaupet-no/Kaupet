@@ -8,52 +8,64 @@ vi.mock("./use-search-synonym-matches", async (importOriginal) => {
   return {
     ...original,
     fetchSynonymMatches: vi.fn().mockImplementation((_categoryId: string | null, query: string) =>
-      query.includes("automat")
-        ? [
-            {
-              startWord: 0,
-              endWord: 0,
-              matchedText: "automat",
-              filterKey: "gearbox",
-              filterLabel: "Girkasse",
-              optionValue: "automatic",
-              optionLabel: "Automat",
-              isAmbiguous: false,
-              categoryId: "sofa",
-            },
-          ]
-        : query.toLowerCase().includes("rød")
+      query.includes("kamera soltak")
+        ? ["kamera", "soltak"].map((word, index) => ({
+            startWord: index,
+            endWord: index,
+            matchedText: word,
+            filterKey: "equipment",
+            filterLabel: "Utstyr",
+            optionValue: word === "kamera" ? "camera" : "roof",
+            optionLabel: word,
+            isAmbiguous: false,
+            categoryId: null,
+          }))
+        : query.includes("automat")
           ? [
               {
                 startWord: 0,
                 endWord: 0,
-                matchedText: "Rød",
-                filterKey: "color",
-                filterLabel: "Farge",
-                optionValue: "red",
-                optionLabel: "Rød",
+                matchedText: "automat",
+                filterKey: "gearbox",
+                filterLabel: "Girkasse",
+                optionValue: "automatic",
+                optionLabel: "Automat",
                 isAmbiguous: false,
-                categoryId: "bil",
+                categoryId: "sofa",
               },
             ]
-          : query.includes("hodetelefoner")
+          : query.toLowerCase().includes("rød")
             ? [
                 {
                   startWord: 0,
                   endWord: 0,
-                  matchedText: "hodetelefoner",
-                  // A filter key that exists in no category passed to
-                  // resolveTextToFilters — mirrors a globally-resolved synonym
-                  // whose owning category is not in scope for this search.
-                  filterKey: "accessory_type",
-                  filterLabel: "Type",
-                  optionValue: "hodetelefoner",
-                  optionLabel: "Hodetelefoner",
+                  matchedText: "Rød",
+                  filterKey: "color",
+                  filterLabel: "Farge",
+                  optionValue: "red",
+                  optionLabel: "Rød",
                   isAmbiguous: false,
-                  categoryId: "mobiltilbehor",
+                  categoryId: "bil",
                 },
               ]
-            : [],
+            : query.includes("hodetelefoner")
+              ? [
+                  {
+                    startWord: 0,
+                    endWord: 0,
+                    matchedText: "hodetelefoner",
+                    // A filter key that exists in no category passed to
+                    // resolveTextToFilters — mirrors a globally-resolved synonym
+                    // whose owning category is not in scope for this search.
+                    filterKey: "accessory_type",
+                    filterLabel: "Type",
+                    optionValue: "hodetelefoner",
+                    optionLabel: "Hodetelefoner",
+                    isAmbiguous: false,
+                    categoryId: "mobiltilbehor",
+                  },
+                ]
+              : [],
     ),
   };
 });
@@ -221,5 +233,34 @@ describe("resolveTextToFilters", () => {
     expect(resolved.attrPatch).toEqual({
       mileage_km: { kind: "range", max: 100000 },
     });
+  });
+
+  // KG-28-F03: bare første frase ble husket, så «soltak» forsvant ved fjerning.
+  it("husker alle frasene som ble tolket til samme kriterium", async () => {
+    const result = await resolveTextToFilters({
+      q: "kamera soltak",
+      categories: [],
+      vehicleBrands: [],
+      allFilters: [
+        {
+          id: "equipment",
+          category_id: "bil",
+          key: "equipment",
+          label_nb: "Utstyr",
+          type: "multiselect",
+          unit: null,
+          options: [],
+          sort_order: 0,
+          is_primary: false,
+          depends_on_key: null,
+          depends_on_value: null,
+          depends_on_not_value: null,
+          is_optional: false,
+        },
+      ],
+    });
+    expect(result.criteria).toEqual([
+      expect.objectContaining({ key: "equipment", matchedText: "kamera soltak" }),
+    ]);
   });
 });

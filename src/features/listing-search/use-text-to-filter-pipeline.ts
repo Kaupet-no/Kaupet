@@ -121,8 +121,17 @@ export function useTextToFilterPipeline({
     const hasNumeric = activeNumericMatches.length > 0;
     const hasPrice = activePriceMatches.length > 0;
     if (!hasSynonyms && !hasNumeric && !hasPrice) return;
+    // Treffene gjelder teksten de ble beregnet fra. Har brukeren skrevet
+    // videre, peker ordnumrene inn i en annen tekst: vent på et ferskt
+    // resultat i stedet for å fjerne feil ord (KG-28-F02).
+    if (matchedQ !== qDraft.trim()) return;
 
     const applied: Record<string, string> = {};
+    // Alle verdier i samme runde samles per nøkkel og lagres én gang, så to
+    // treff for samme filter ikke overskriver hverandre fra samme gamle
+    // øyeblikksbilde (KG-28-F01).
+    const patch: Record<string, AttributeFilterValue> = {};
+    const currentValue = (key: string) => (key in patch ? patch[key] : attrValues[key]);
     const criteria: InterpretedCriterion[] = [];
     const appliedSynonymMatches: NonNullable<typeof activeSynonymMatches> = [];
 
@@ -135,13 +144,10 @@ export function useTextToFilterPipeline({
         if (!filter) continue;
         if (m.negated) {
           if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
-            const current = attrValues[m.filterKey];
+            const current = currentValue(m.filterKey);
             const values = current?.kind === "exclude" ? current.values : [];
             if (!values.includes(m.optionValue)) {
-              handleAttrValueChange(m.filterKey, {
-                kind: "exclude",
-                values: [...values, m.optionValue],
-              });
+              patch[m.filterKey] = { kind: "exclude", values: [...values, m.optionValue] };
             }
             applied[`${m.filterKey}:!${m.optionValue}`] = m.matchedText;
             appliedSynonymMatches.push(m);
@@ -156,7 +162,7 @@ export function useTextToFilterPipeline({
           continue;
         }
         if (filter.type === "boolean") {
-          handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
+          patch[m.filterKey] = { kind: "boolean", value: true };
           applied[`${m.filterKey}:`] = m.matchedText;
           appliedSynonymMatches.push(m);
           criteria.push({
@@ -167,7 +173,7 @@ export function useTextToFilterPipeline({
             matchedText: m.matchedText,
           });
         } else if (filter.type === "select" && m.optionValue) {
-          handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
+          patch[m.filterKey] = { kind: "select", value: m.optionValue };
           applied[`${m.filterKey}:`] = m.matchedText;
           appliedSynonymMatches.push(m);
           criteria.push({
@@ -178,13 +184,10 @@ export function useTextToFilterPipeline({
             matchedText: m.matchedText,
           });
         } else if (filter.type === "multiselect" && m.optionValue) {
-          const current = attrValues[m.filterKey];
+          const current = currentValue(m.filterKey);
           const values = current?.kind === "multiselect" ? current.values : [];
           if (!values.includes(m.optionValue)) {
-            handleAttrValueChange(m.filterKey, {
-              kind: "multiselect",
-              values: [...values, m.optionValue],
-            });
+            patch[m.filterKey] = { kind: "multiselect", values: [...values, m.optionValue] };
           }
           applied[`${m.filterKey}:${m.optionValue}`] = m.matchedText;
           appliedSynonymMatches.push(m);
@@ -201,7 +204,7 @@ export function useTextToFilterPipeline({
 
     if (hasNumeric) {
       for (const m of activeNumericMatches) {
-        const current = attrValues[m.filterKey];
+        const current = currentValue(m.filterKey);
         const currentRange: { min?: number; max?: number } =
           current?.kind === "range" ? current : {};
         const value = {
@@ -209,7 +212,7 @@ export function useTextToFilterPipeline({
           min: m.min ?? currentRange.min,
           max: m.max ?? currentRange.max,
         };
-        handleAttrValueChange(m.filterKey, value);
+        patch[m.filterKey] = value;
         applied[`${m.filterKey}:`] = m.matchedText;
         criteria.push({
           kind: "attribute",
@@ -237,6 +240,8 @@ export function useTextToFilterPipeline({
     }
 
     if (appliedSynonymMatches.length === 0 && !hasNumeric && !hasPrice) return;
+
+    for (const [key, value] of Object.entries(patch)) handleAttrValueChange(key, value);
 
     onInterpreted?.(criteria);
     if (Object.keys(applied).length > 0) onApplied?.(applied);

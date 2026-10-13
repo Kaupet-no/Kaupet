@@ -1,7 +1,12 @@
 import type { HistoryState } from "@tanstack/react-router";
 import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
-import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
+import {
+  effectiveFiltersForCategory,
+  retainSearchAttributes,
+  type CategoryFilter,
+  type VehicleBrandGroup,
+} from "@/lib/category-filters";
 import { resolveTextToFilters, type InterpretedCriterion } from "./resolve-text-to-filters";
 import {
   writeAppliedSearchState,
@@ -46,21 +51,42 @@ export async function resolveAppliedSearch({
     criteria: [],
   }));
 
+  // Kategorien som brukes og den som vises i «Tolket som» må samsvare
+  // (KG-28-F04): et kategoriord som ikke allerede er valgt erstatter de
+  // valgte kategoriene, og attributter som ikke finnes der fjernes.
+  const selected = applied.value.categories;
+  const replacedCategory =
+    selected.length > 0 && resolved.categorySlug && !selected.includes(resolved.categorySlug)
+      ? categories.find((category) => category.slug === resolved.categorySlug)
+      : undefined;
+  const previousAttributes = replacedCategory
+    ? retainSearchAttributes(
+        applied.attributes,
+        effectiveFiltersForCategory(
+          replacedCategory.id,
+          allFilters,
+          new Map(categories.map((category) => [category.id, category])),
+        ),
+        { dropUnknown: true },
+      ).kept
+    : applied.attributes;
+
   return {
     applied: {
       value: {
         ...applied.value,
         terms: resolved.q.split(/\s+/).filter(Boolean),
-        categories:
-          applied.value.categories.length > 0
-            ? applied.value.categories
+        categories: replacedCategory
+          ? [replacedCategory.slug]
+          : selected.length > 0
+            ? selected
             : resolved.categorySlug
               ? [resolved.categorySlug]
               : [],
         min: resolved.minPrice ?? applied.value.min,
         max: resolved.maxPrice ?? applied.value.max,
       },
-      attributes: { ...applied.attributes, ...resolved.attrPatch },
+      attributes: { ...previousAttributes, ...resolved.attrPatch },
     },
     criteria: resolved.criteria,
   };

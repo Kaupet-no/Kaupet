@@ -59,4 +59,24 @@ describe("submitSearch", () => {
       max: 300000,
     });
   });
+
+  // KG-28-F04: «bil» ble fjernet fra teksten og vist som tolket, mens søket beholdt Sofa.
+  it("bruker kategorien som vises i tolkningen og fjerner attributter den ikke har", async () => {
+    let committed: Record<string, unknown> | undefined;
+    await submitSearch({
+      applied: {
+        value: { ...defaultAdvancedSearchValue(), categories: ["sofa"] },
+        attributes: { seats: { kind: "select", value: "3" } },
+      },
+      query: "bil",
+      categories: [
+        { id: "sofa", slug: "sofa", name_nb: "Sofa", parent_id: null },
+        { id: "bil", slug: "bil", name_nb: "Bil", parent_id: null },
+      ],
+      commit: (search) => {
+        committed = search;
+      },
+    });
+    expect(committed).toMatchObject({ q: "", categories: ["bil"], attrs: "" });
+  });
 });

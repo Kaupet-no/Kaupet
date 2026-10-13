@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "./fixtures";
 
 import {
@@ -18,22 +17,45 @@ import {
   startWantWithoutCategory,
 } from "./pages/want-listing-wizard";
 
-const { users } = JSON.parse(
-  readFileSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
-    "utf-8",
-  ),
-) as { users: Record<string, { email: string; password: string }> };
+// global-setup validerer nøklene; run-e2e gir en isolert lokal stack.
+const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const userIds: string[] = [];
+let credentials: { email: string; password: string };
+
+test.beforeEach(async () => {
+  // WebKit kan fullføre autolagring etter at neste test har startet. En egen
+  // konto per test (og retry) hindrer at slike utkast blokkerer neste flyt.
+  credentials = {
+    email: `e2e-want-${randomUUID()}@example.com`,
+    password: "e2e-test-password-12345",
+  };
+  const { data, error } = await admin.auth.admin.createUser({
+    ...credentials,
+    email_confirm: true,
+    user_metadata: { display_name: "E2E kjøpsønske" },
+  });
+  if (error) throw error;
+  const userId = data.user!.id;
+  userIds.push(userId);
+  const { error: roleError } = await admin
+    .from("user_roles")
+    .insert({ user_id: userId, role: "demo" });
+  if (roleError) throw roleError;
+});
+
+test.afterAll(async () => {
+  for (const userId of userIds) {
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) throw error;
+  }
+});
 
 // Samme skjulte testkategori som publish-listing.spec.ts, der global-setup.ts
 // har lagt tre faste annonser med «e2efilterfixture» i tittelen (gratis, 100
 // og 200 kr).
 const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
-test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, testInfo) => {
-  const credentials = users[testInfo.project.name];
-  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
-
+test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }) => {
   await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   await startWantWithoutCategory(page, "E2E ønsker å kjøpe barnestol");
@@ -64,10 +86,7 @@ test("oppretter, gjennomgår og publiserer et kjøpsønske", async ({ page }, te
   await publishWantAndExpectSuccess(page);
 });
 
-test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, testInfo) => {
-  const credentials = users[testInfo.project.name];
-  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
-
+test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }) => {
   await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   // Uten tittel stopper flyten på tittelsteget, med årsaken både ved feltet
@@ -80,10 +99,7 @@ test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, test
   await startWantWithoutCategory(page, "E2E ønsker å kjøpe barnestol");
 });
 
-test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, testInfo) => {
-  const credentials = users[testInfo.project.name];
-  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
-
+test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }) => {
   await login(page, credentials.email, credentials.password, "/ny-ok-annonse?forcenative=1");
   await goToNewWantListing(page, true);
 
@@ -98,10 +114,7 @@ test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, t
   await advanceWantStep(page, "review");
 });
 
-test("viser annonser som allerede matcher kjøpsønsket", async ({ page }, testInfo) => {
-  const credentials = users[testInfo.project.name];
-  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
-
+test("viser annonser som allerede matcher kjøpsønsket", async ({ page }) => {
   await login(page, credentials.email, credentials.password, "/ny-ok-annonse");
   await goToNewWantListing(page);
   await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker treffsjekk");

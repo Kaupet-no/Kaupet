@@ -221,6 +221,135 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     });
   });
 
+  // KG-09-F01: «kun nye» med en kjent referanse kunne endre status og fornye
+  // annonsen, også ved en lokasjon medlemmet ikke har endringsrett til.
+  it("create-modus lar en kjent annonse ved annen lokasjon stå urørt", async () => {
+    const { data: otherLocation, error: locationError } = await admin
+      .from("organization_locations")
+      .insert({ organization_id: organizationId, name: "Filial B", active: true })
+      .select("id")
+      .single();
+    if (locationError) throw locationError;
+    const { data: plainMember, error: userError } = await admin.auth.admin.createUser({
+      email: `listing-sync-plain-${suffix}@example.com`,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (userError) throw userError;
+    userIds.push(plainMember.user!.id);
+    const { error: memberError } = await admin.from("organization_members").insert({
+      organization_id: organizationId,
+      user_id: plainMember.user!.id,
+      role: "member",
+      status: "active",
+    });
+    if (memberError) throw memberError;
+
+    const ref = `sku-other-location-${suffix}`;
+    const listing = {
+      title: "Sykkel ved B",
+      description: "Står ved B",
+      category_id: categoryId,
+      price_nok: 1000,
+    };
+    const create = await admin.rpc("upsert_listing_from_external", {
+      _organization_id: organizationId,
+      _user_id: userIds[0],
+      _location_id: otherLocation.id,
+      _import_id: crypto.randomUUID(),
+      _source: "api",
+      _external_ref: ref,
+      _listing: listing,
+      _mode: "create",
+    });
+    expect(create.error).toBeNull();
+    expect(create.data).toMatchObject({ status: "created" });
+    const listingId = (create.data as { listing_id: string }).listing_id;
+    const before = await admin
+      .from("listings")
+      .select("status, expires_at")
+      .eq("id", listingId)
+      .single();
+
+    const duplicate = await admin.rpc("upsert_listing_from_external", {
+      _organization_id: organizationId,
+      _user_id: plainMember.user!.id,
+      _location_id: locationId,
+      _import_id: crypto.randomUUID(),
+      _source: "api",
+      _external_ref: ref,
+      _listing: { ...listing, status: "archived" },
+      _mode: "create",
+    });
+    expect(duplicate.error).toBeNull();
+    expect(duplicate.data).toMatchObject({ status: "duplicate", listing_id: listingId });
+    const after = await admin
+      .from("listings")
+      .select("status, expires_at")
+      .eq("id", listingId)
+      .single();
+    expect(after.data).toEqual(before.data);
+  });
+
+  // KG-08-F03 / B5: sjekken ligger i samme transaksjon som køskrivingen.
+  it("enqueue_listing_image_jobs håndhever aktørens endringsrett når _user_id er gitt", async () => {
+    const { data: outsider, error: userError } = await admin.auth.admin.createUser({
+      email: `listing-sync-outsider-${suffix}@example.com`,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (userError) throw userError;
+    userIds.push(outsider.user!.id);
+    const { error: memberError } = await admin.from("organization_members").insert({
+      organization_id: organizationId,
+      user_id: outsider.user!.id,
+      role: "member",
+      status: "active",
+    });
+    if (memberError) throw memberError;
+
+    const create = await admin.rpc("upsert_listing_from_external", {
+      _organization_id: organizationId,
+      _user_id: userIds[0],
+      _location_id: locationId,
+      _import_id: crypto.randomUUID(),
+      _source: "api",
+      _external_ref: `sku-enqueue-actor-${suffix}`,
+      _listing: { title: "Bilderett", description: "x", category_id: categoryId, price_nok: 100 },
+      _mode: "create",
+    });
+    expect(create.error).toBeNull();
+    const listingId = (create.data as { listing_id: string }).listing_id;
+    const enqueue = (userId: string | undefined) =>
+      admin.rpc("enqueue_listing_image_jobs", {
+        _organization_id: organizationId,
+        _listing_id: listingId,
+        _urls: [`https://example.com/actor-${suffix}.jpg`],
+        _replace: true,
+        ...(userId ? { _user_id: userId } : {}),
+      });
+
+    const forbidden = await enqueue(outsider.user!.id);
+    expect(forbidden.error?.message).toContain("listing_update_forbidden");
+    const { data: jobs } = await admin
+      .from("listing_image_jobs")
+      .select("id")
+      .eq("listing_id", listingId);
+    expect(jobs).toEqual([]);
+
+    expect((await enqueue(userIds[0])).error).toBeNull();
+    // Uten aktør (bulk-synken) er oppførselen uendret.
+    expect((await enqueue(undefined)).error).toBeNull();
+
+    const { error: disableError } = await admin
+      .from("listings")
+      .update({ status: "disabled" })
+      .eq("id", listingId);
+    expect(disableError).toBeNull();
+    const disabled = await enqueue(userIds[0]);
+    expect(disabled.error?.message).toContain("listing_disabled");
+  });
+
   it("dry_run skriver ingenting", async () => {
     const ref = `sku-dryrun-${suffix}`;
     const dryRun = await admin.rpc("upsert_listing_from_external", {

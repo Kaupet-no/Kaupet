@@ -4,35 +4,39 @@ Kaupet er en norsk markedsplass for brukte ting, uten sporende informasjonskapsl
 
 Dette repoet inneholder kode for Kaupet.no på web, Kaupet-appen på iOS og Android, og verktøy som gjør det enklere for bedrifter å administrere egne annonser.
 
-[Ta en titt på Kaupet](https://kaupet.no) · [Bli med og bygg](CONTRIBUTING.md) · [Integrasjoner](docs/PROFF-API.md)
+[kaupet.no](https://kaupet.no) · [Bidra](CONTRIBUTING.md) · [Integrasjoner](docs/PROFF-API.md)
 
 ## Funksjoner
 
-**Finn noe.** Bla gjennom annonser, bruk filtrene og lagre favoritter. Lagrede søk gjør det enklere å følge med på det du leter etter.
+**Søk og finn.** Bla gjennom annonser, bruk filtrene og lagre favoritter. Lagrede søk gjør det enklere å følge med på det du leter etter. Søkemotoren identifiserer filter basert på ren tekst, slik at eksempelvis søket "under 3000kr" identifiseres som et prisfilter. Det kan også kombineres flere filter i samme søkestreng. Søket "Stasjonsvogn med automat ikke el", oppretter filtre på karrosseritype, girkasse og filtrerer bort biler med drivstoff el.
 
-**Selg noe.** Legg til bilder, skriv litt om det du selger, og fyll inn opplysningene som passer. Blir du avbrutt, kan du fortsette fra et utkast senere.
+**Annonser.** Last opp bilder, skriv litt om det du selger, og fyll inn opplysningene som passer. Blir du avbrutt, kan du fortsette fra et utkast senere. Om ønskelig, kan Kaupet foreslå kategori, tittel og annonseinnhold basert på bildene som lastes opp.
 
-**Spørr etter noe.** Finner du ikke det du trenger? Legg ut et kjøpsønske, så kan de som har det, finne deg.
+**Kjøp.** Finner du ikke det du trenger? Legg ut et kjøpsønske, så kan de som har det, finne deg. Dersom noen publiserer en annonse som treffer kriteriene, varsles de med en gang. Selgeren ser allerede mens annonsen lages hvor mange som ønsker å kjøpe noe lignende.
 
-**Snakk sammen.** Send en melding, still spørsmål og avtal videre med kjøper eller selger.
+**Chat.** Send en melding, still spørsmål og avtal videre med kjøper eller selger. Meldinger sorteres etter annonse, slik at det er enkelt å få oversikt over hvilke meldinger som hører til hvilke annonser.
 
-Bedrifter kan bruke Kaupet Proff til å samarbeide om annonser. Har du allerede varene i et regneark eller et annet system, finnes det Excel-import, REST-API og MCP.
+Bedrifter kan integrere Kaupet med eksisterende lager- og ERP-systemer gjennom Kaupet Proff. Integrasjoner finnes gjennom Excel-import, REST-API og MCP for agentisk behandling av bedriftens egne annonser.
 
-## Under panseret
+## Teknologi
 
-Nettstedet og mobilappene deler brukerflyter og logikk. Capacitor kobler den felles applikasjonen til mobilfunksjoner på iOS og Android.
+Nettstedet og mobilappene deler brukerflyter og logikk. Kaupet benytter Capacitor for å knytte web-applikasjonen til mobilfunksjoner på iOS og Android.
 
-| Hva                             | Hva vi bruker                       |
-| ------------------------------- | ----------------------------------- |
-| Applikasjon                     | React, TypeScript og TanStack Start |
-| Server                          | Cloudflare Workers                  |
-| Database, innlogging og sanntid | Supabase                            |
-| Bilder og opplastede filer      | Cloudflare R2                       |
-| Mobilapp (iOS og Android)       | Capacitor                           |
+| Funksjon                           | Løsning                             |
+| ---------------------------------- | ----------------------------------- |
+| Applikasjon                        | React, TypeScript og TanStack Start |
+| Server                             | Cloudflare Workers                  |
+| Database, autentisering og sanntid | Supabase                            |
+| Bilder og brukeropplastede filer   | Cloudflare R2                       |
+| Mobilgrensesnitt (iOS og Android)  | Capacitor                           |
+| Push-varsler på mobil              | Firebase Cloud Messaging            |
+| Epost-varsler                      | Resend                              |
+| Bot-beskyttelse                    | Cloudflare Turnstile                |
+| KI-funksjoner                      | Mistral AI                          |
 
-Vil du vite hvordan delene henger sammen, les [arkitekturguiden](docs/ARCHITECTURE.md). [UI-guiden](docs/UI-GUIDE.md) beskriver hvordan grensesnittet skal fungere på store og små skjermer.
+Se [infrastrukturdokumentasjonen](docs/INFRASTRUKTUR.md) for mer detaljer.
 
-## Kjør din egen kopi
+## Kjør din egen kopi av Kaupet
 
 Du trenger Bun, Node.js og Docker. Bun-versjonen står i `package.json`.
 
@@ -57,7 +61,7 @@ En liten rettelse er også et bidrag. Det samme er en god feilrapport eller et f
 
 Skal du endre kode, start med det som allerede finnes, og hold endringen til én ting om gangen. Les [bidragsveiledningen](CONTRIBUTING.md) før du åpner en pull request. Alle kodeagenter du benytter skal i tillegg lese [AGENTS.md](AGENTS.md).
 
-Disse kontrollene er et vanlig sted å begynne:
+Disse kontrollene kan være et lurt sted å begynne:
 
 ```bash
 bun run lint
@@ -79,16 +83,16 @@ Pull requests går til `staging`. Alle endringer valideres i Staging før de sli
 
 ## Hvor finner jeg resten?
 
-| Skal du …                             | Se her                                 |
-| ------------------------------------- | -------------------------------------- |
-| Forstå hvordan systemet henger sammen | [Arkitektur](docs/ARCHITECTURE.md)     |
-| Jobbe med utseende og mobiltilpasning | [UI-guide](docs/UI-GUIDE.md)           |
-| Endre sider og navigasjon             | [Routing](src/routes/README.md)        |
-| Jobbe med tjenester, miljøer og drift | [Infrastruktur](docs/INFRASTRUKTUR.md) |
-| Teste på staging                      | [Staging](docs/STAGING.md)             |
-| Bygge mobilappene                     | [Capacitor](README-CAPACITOR.md)       |
-| Koble Kaupet til et annet system      | [Proff-API og MCP](docs/PROFF-API.md)  |
-| Jobbe med e-post og innlogging        | [E-post](docs/EPOST.md)                |
+| Skal du …                                | Se her                                 |
+| ---------------------------------------- | -------------------------------------- |
+| Forstå hvordan komponenter henger sammen | [Arkitektur](docs/ARCHITECTURE.md)     |
+| Jobbe med utseende og mobiltilpasning    | [UI-guide](docs/UI-GUIDE.md)           |
+| Endre sider og navigasjon                | [Routing](src/routes/README.md)        |
+| Jobbe med tjenester, miljøer og drift    | [Infrastruktur](docs/INFRASTRUKTUR.md) |
+| Teste på staging                         | [Staging](docs/STAGING.md)             |
+| Bygge mobilappene                        | [Capacitor](README-CAPACITOR.md)       |
+| Koble Kaupet til et annet system         | [Proff-API og MCP](docs/PROFF-API.md)  |
+| Jobbe med e-post-varsler og innlogging   | [E-post](docs/EPOST.md)                |
 
 ## Lisens og det formelle
 

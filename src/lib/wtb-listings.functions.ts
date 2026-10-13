@@ -33,9 +33,10 @@ const wtbAttributeValueSchema = z.union([
       max: z.number().optional(),
     })
     .strict(),
-  z.object({ minDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
+  // Gyldig kalenderdato, ikke bare formatet: matcheren kaster på 2026-99-99 (KG-26-F01).
+  z.object({ minDate: z.string().date() }).strict(),
 ]);
-const wtbAttributesSchema = z.record(z.string(), wtbAttributeValueSchema);
+export const wtbAttributesSchema = z.record(z.string(), wtbAttributeValueSchema);
 
 export type WtbListing = {
   id: string;

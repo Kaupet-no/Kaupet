@@ -488,10 +488,13 @@ export async function syncListings(
         // lagrede bildesettet ("kolonne mangler/tom" = ikke rør bilder;
         // "liste med URL-er" = erstatt settet, håndhevet av
         // `enqueue_listing_image_jobs(_replace=true)`). Ingen dry-run
-        // (skriver ingenting), og kun for rader som faktisk lyktes.
+        // (skriver ingenting), og kun for rader som faktisk lyktes. Et
+        // duplikat i «kun nye»-modus er ikke endringsautorisert og skal stå
+        // urørt (KG-09-F01).
         if (
           !dryRun &&
           result.status !== "failed" &&
+          result.status !== "duplicate" &&
           result.listingId &&
           normalized.imageUrls.length > 0
         ) {

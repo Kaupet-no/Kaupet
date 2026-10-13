@@ -69,7 +69,12 @@ export async function saveDraftImages(images: PendingImage[], actorKey = "guest"
     caption: image.caption,
     sortOrder,
   }));
-  await runTransaction("readwrite", (store) => store.put(stored, actorKey));
+  const result = await runTransaction("readwrite", (store) => store.put(stored, actorKey));
+  // Uten IndexedDB er en tom lagring fortsatt en no-op, men bilder må ikke
+  // meldes som lagret når de ikke er det (KG-18-F01).
+  if (result === null && stored.length > 0) {
+    throw new Error("Bildelagringen er ikke tilgjengelig. Bildene ble ikke lagret.");
+  }
 }
 
 export async function loadDraftImages(actorKey = "guest"): Promise<PendingImage[]> {

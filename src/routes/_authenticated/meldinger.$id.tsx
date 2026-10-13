@@ -505,7 +505,7 @@ function ConversationPage() {
     sendAttemptRef.current = attempt;
     sendMutation.mutate({
       text: body,
-      file: personalSellerControlsDisabled ? null : attachment,
+      file: attachment,
       attempt,
       conversationId: id,
     });
@@ -864,7 +864,7 @@ function ConversationPage() {
           )}
         </div>
 
-        {attachmentPreview && !personalSellerControlsDisabled && (
+        {attachmentPreview && (
           <div className="relative mt-2 w-fit">
             <img
               src={attachmentPreview}
@@ -889,37 +889,29 @@ function ConversationPage() {
           className="mt-3 flex items-stretch gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (
-              !sendMutation.isPending &&
-              !disabled &&
-              (body.trim() || (!personalSellerControlsDisabled && attachment))
-            )
+            if (!sendMutation.isPending && !disabled && (body.trim() || attachment))
               sendCurrentMessage();
           }}
         >
-          {!personalSellerControlsDisabled && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={IMAGE_ACCEPT}
-                className="hidden"
-                onChange={handleAttachmentChange}
-                disabled={disabled}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label="Legg ved bilde"
-                disabled={disabled || !!attachment}
-                onClick={() => fileInputRef.current?.click()}
-                className="shrink-0 self-end"
-              >
-                <Paperclip className="size-4" />
-              </Button>
-            </>
-          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={IMAGE_ACCEPT}
+            className="hidden"
+            onChange={handleAttachmentChange}
+            disabled={disabled}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Legg ved bilde"
+            disabled={disabled || !!attachment}
+            onClick={() => fileInputRef.current?.click()}
+            className="shrink-0 self-end"
+          >
+            <Paperclip className="size-4" />
+          </Button>
           <Textarea
             value={body}
             onChange={(e) => {
@@ -936,11 +928,7 @@ function ConversationPage() {
               if (native) return;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (
-                  !sendMutation.isPending &&
-                  !disabled &&
-                  (body.trim() || (!personalSellerControlsDisabled && attachment))
-                ) {
+                if (!sendMutation.isPending && !disabled && (body.trim() || attachment)) {
                   sendCurrentMessage();
                 }
               }
@@ -953,11 +941,7 @@ function ConversationPage() {
           />
           <Button
             type="submit"
-            disabled={
-              sendMutation.isPending ||
-              (!body.trim() && (personalSellerControlsDisabled || !attachment)) ||
-              disabled
-            }
+            disabled={sendMutation.isPending || (!body.trim() && !attachment) || disabled}
             className="h-auto gap-2 self-stretch"
           >
             <Send className="size-4" /> Send

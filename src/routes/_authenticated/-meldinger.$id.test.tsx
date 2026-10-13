@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   handlers: [] as { event: string; table: string; cb: (payload: { new: unknown }) => void }[],
   setQueryData: vi.fn(),
   setQueriesData: vi.fn(),
+  mutate: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -47,7 +48,7 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false, isError: false, error: null };
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useMutation: () => ({ mutate: mocks.mutate, isPending: false }),
   useQueryClient: () => ({
     invalidateQueries: vi.fn(),
     setQueryData: mocks.setQueryData,
@@ -135,6 +136,7 @@ beforeEach(() => {
   mocks.handlers = [];
   mocks.setQueryData.mockReset();
   mocks.setQueriesData.mockReset();
+  mocks.mutate.mockReset();
 });
 
 afterEach(() => {
@@ -323,4 +325,42 @@ describe("meldinger.$id — kjøpsønsker, realtime og komposer (KG-24)", () => 
     rerender(<ConversationPage />);
     expect(container.querySelector("textarea")!.value).toBe("");
   });
+});
+
+it("lar bedriftssuperbrukeren sende et bilde i en ansatts samtale", () => {
+  mocks.queryData = {
+    conversation: baseConv({
+      buyer_id: "buyer-1",
+      seller_id: "employee-1",
+      isBusinessSeller: true,
+      listing_id: "listing-1",
+      listing: { id: "listing-1", title: "Bedriftens annonse", listing_images: [] },
+    }),
+    "my-blocks": [],
+    "blocks-against-me": [],
+  };
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = vi.fn(() => "blob:attachment");
+      static revokeObjectURL = vi.fn();
+    },
+  );
+  try {
+    const { container, getByRole } = render(<ConversationPage />);
+    expect(getByRole("button", { name: "Legg ved bilde" })).toBeDefined();
+    const file = new File(["image"], "bilde.jpg", { type: "image/jpeg" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [file] },
+    });
+    const send = getByRole("button", { name: "Send" });
+    expect(send.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(send);
+    expect(mocks.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-1", file }),
+    );
+    expect(container.textContent).not.toContain("Salgspanel");
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

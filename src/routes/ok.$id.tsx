@@ -286,14 +286,18 @@ function WtbListingPage() {
               onSelect={(catId) => {
                 setCategoryPickerOpen(false);
                 // Kriterier den nye kategorien ikke har, fjernes i samme
-                // lagring (KG-23-F02).
+                // lagring (KG-23-F02). Uten lastede filtre og kategorier vet
+                // vi ikke hvilke det er, og da beholdes alle.
                 saveField({
                   group: "category",
                   category_id: catId,
-                  attributes: pruneWtbCriteria(
-                    attributes,
-                    effectiveFiltersForCategory(catId, allFilters ?? [], categoriesById),
-                  ),
+                  attributes:
+                    allFilters && allCategories?.length
+                      ? pruneWtbCriteria(
+                          attributes,
+                          effectiveFiltersForCategory(catId, allFilters, categoriesById),
+                        )
+                      : undefined,
                 });
               }}
             />

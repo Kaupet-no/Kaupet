@@ -569,10 +569,12 @@ function NewWtbPage() {
    * gamle, skjulte krav ikke stopper treff (KG-23-F02). */
   function setCategory(id: string | null) {
     setValue("category_id", id, { shouldValidate: true });
-    if (id === categoryId) return;
+    // Uten lastede filtre og kategorier vet vi ikke hvilke kriterier den nye
+    // kategorien har; da beholdes alle i stedet for å tømmes.
+    if (id === categoryId || !allFilters || allCategories.length === 0) return;
     const next = pruneWtbCriteria(
       attributes,
-      effectiveFiltersForCategory(id, allFilters ?? [], categoriesById),
+      effectiveFiltersForCategory(id, allFilters, categoriesById),
     );
     setAttributes(next);
     setCheckedKeys((keys) => keys.filter((key) => key in next || !(key in attributes)));

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useSearchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import {
   parseNumericFilters,
@@ -116,15 +116,22 @@ export function useTextToFilterPipeline({
     [ignoredInterpretations, priceMatches],
   );
 
+  const handledMatchSetRef = useRef<unknown[] | null>(null);
   useEffect(() => {
     const hasSynonyms = !!activeSynonymMatches && activeSynonymMatches.length > 0;
     const hasNumeric = activeNumericMatches.length > 0;
     const hasPrice = activePriceMatches.length > 0;
     if (!hasSynonyms && !hasNumeric && !hasPrice) return;
+    // Hvert treffsett brukes én gang, selv om effekten også kjører når
+    // qDraft endres.
+    const matchSet = [activeSynonymMatches, activeNumericMatches, activePriceMatches];
+    if (handledMatchSetRef.current?.every((matches, i) => matches === matchSet[i])) return;
     // Treffene gjelder teksten de ble beregnet fra. Har brukeren skrevet
-    // videre, peker ordnumrene inn i en annen tekst: vent på et ferskt
-    // resultat i stedet for å fjerne feil ord (KG-28-F02).
+    // videre, peker ordnumrene inn i en annen tekst: vent til teksten igjen
+    // er den treffene ble beregnet fra, eller på et ferskt resultat, i stedet
+    // for å fjerne feil ord (KG-28-F02).
     if (matchedQ !== qDraft.trim()) return;
+    handledMatchSetRef.current = matchSet;
 
     const applied: Record<string, string> = {};
     // Alle verdier i samme runde samles per nøkkel og lagres én gang, så to
@@ -263,8 +270,9 @@ export function useTextToFilterPipeline({
         ...(hasPrice ? { min: nextMin, max: nextMax } : {}),
       });
     }
-    // Runs once per resolved match set; re-triggers naturally once qDraft
-    // changes again as a result of applying it.
+    // Runs once per resolved match set (handledMatchSetRef). qDraft is a
+    // dependency so a set skipped because the text had moved on is applied
+    // when the text matches again, even if the debounced text never changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSynonymMatches, activeNumericMatches, activePriceMatches]);
+  }, [activeSynonymMatches, activeNumericMatches, activePriceMatches, matchedQ, qDraft]);
 }

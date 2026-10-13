@@ -85,3 +85,35 @@ it("bruker ikke et svar som ble beregnet for en eldre søketekst", () => {
   expect(handleAttrValueChange).not.toHaveBeenCalled();
   expect(updateSearch).not.toHaveBeenCalled();
 });
+
+// KG-28-F02 (oppfølging): et treffsett som ble hoppet over fordi teksten
+// hadde endret seg, brukes når teksten igjen er den treffene gjelder — og
+// bare én gang.
+it("bruker hoppede treff når teksten går tilbake, uten nytt oppslag", () => {
+  synonyms.debouncedQ = "kamera";
+  synonyms.data = [match(0, "kamera", "camera")];
+  const handleAttrValueChange = vi.fn();
+  // Stabile referanser, som i komponenten: nye lister ville vært et nytt treffsett.
+  const filters = [equipment];
+  const attrValues = {};
+  const noop = vi.fn();
+  const { rerender } = renderHook(
+    ({ qDraft }) =>
+      useTextToFilterPipeline({
+        qDraft,
+        setQDraft: noop,
+        updateSearch: noop,
+        attrFilters: filters,
+        allFilters: filters,
+        attrValues,
+        handleAttrValueChange,
+        categoryId: "bil",
+      }),
+    { initialProps: { qDraft: "kamera x" } },
+  );
+  expect(handleAttrValueChange).not.toHaveBeenCalled();
+  rerender({ qDraft: "kamera" });
+  expect(handleAttrValueChange).toHaveBeenCalledTimes(1);
+  rerender({ qDraft: "kamera " });
+  expect(handleAttrValueChange).toHaveBeenCalledTimes(1);
+});

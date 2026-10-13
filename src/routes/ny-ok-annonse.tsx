@@ -521,8 +521,9 @@ function NewWtbPage() {
   function goToStep(index: number) {
     // Fremover-hopp mens utkasttilbudet står ubesvart har samme risiko som
     // Fortsett-knappen — krev eksplisitt valg først (se attemptNext).
-    if (restorableDraft && index > stepIndex) {
+    if (draftDecisionRequired && index > stepIndex) {
       setDraftDecisionPrompt(true);
+      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
       return;
     }
     setValidationError(null);

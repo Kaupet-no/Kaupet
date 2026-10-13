@@ -235,7 +235,9 @@ describe.skipIf(!canRun)("RLS: sync_draft_listing_images", () => {
         ["lock_listing_draft_for_user", { _listing_id: listingId, _user_id: sellerId }],
       ] as const) {
         const { error } = await client.rpc(name as never, args as never);
-        expect(error, name).not.toBeNull();
+        // REVOKE stopper kallet før auth.role()-sjekken (som også gir 42501).
+        expect(error?.code, name).toBe("42501");
+        expect(error?.message, name).toContain(`permission denied for function ${name}`);
       }
     }
   });

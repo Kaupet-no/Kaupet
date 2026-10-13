@@ -24,6 +24,7 @@ import { TermGroupEditor } from "@/features/listing-search/filters/term-group-ed
 import { type Category } from "@/lib/categories";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
+import { useRetainCategoryAttributes } from "@/features/listing-search/use-retain-category-attributes";
 import {
   buildAdvancedSearchCriteria,
   mergeAdvancedSearchGroups,
@@ -72,6 +73,7 @@ export function AdvancedSearchSheet({
 }: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
+  const retainForCategories = useRetainCategoryAttributes(categories);
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
@@ -207,7 +209,15 @@ export function AdvancedSearchSheet({
             <CategorySlugPicker
               categories={categories}
               selected={v.categories}
-              onChange={(slugs) => setV({ ...v, categories: slugs, catMode: "any" })}
+              // Attributter de nye kategoriene ikke har, fjernes (KG-29-F01).
+              onChange={(slugs) =>
+                setV({
+                  ...v,
+                  categories: slugs,
+                  catMode: "any",
+                  attributes: retainForCategories(v.attributes ?? {}, slugs),
+                })
+              }
             />
 
             {/* Pris */}

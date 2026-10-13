@@ -32,6 +32,9 @@ function filterMatchesValue(
   value: AttributeFilterValue | undefined,
 ): boolean {
   if (!value) return false;
+  // Merke og modell har ingen statisk opsjonsliste; verdiene kommer fra egne
+  // referansetabeller og skal ikke valideres mot `options` (KG-30-F02).
+  if (filter.type === "brand_select" || filter.type === "model_select") return true;
   if (value.kind === "select") return !!filter.options?.some((o) => o.value === value.value);
   if (value.kind === "multiselect" || value.kind === "exclude") {
     return value.values.every((v) => filter.options?.some((o) => o.value === v));

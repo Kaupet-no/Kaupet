@@ -142,7 +142,9 @@ export function useCategoryDrilldown(params: {
     }
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
-      goToCategory(cat);
+      // Ny rotkategori: filtre og pris fra forrige kategori gjelder ikke her,
+      // samme nullstilling som hub-grenen under (KG-35-F02).
+      navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
       return;
     }
     setSelectedPath([cat]);

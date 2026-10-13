@@ -8,6 +8,9 @@ import { useFormFactor } from "@/hooks/use-form-factor";
 import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { SearchPanel } from "./search-panel";
 
+vi.mock("@/features/listing-search/use-retain-category-attributes", () => ({
+  useRetainCategoryAttributes: () => (attributes: unknown) => attributes,
+}));
 vi.mock("vaul", () => ({
   Drawer: {
     Root: ({ children }: { children: ReactNode }) => <>{children}</>,

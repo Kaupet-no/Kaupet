@@ -210,7 +210,7 @@ Foreslått testnivå for regresjonsvern: unit|component|rls|e2e
 ```
 
 **Dekningsratchet.** Terskelen i `vitest.config.ts` står i dag på
-statements 40 / branches 34 / functions 33 / lines 41. Den er et _gulv_, ikke et
+statements 49 / branches 42 / functions 40 / lines 50. Den er et _gulv_, ikke et
 mål. Ratchet-regel: når en modul får ny testdekning, hev terskelen til
 nærmeste hele prosent under målt verdi i samme PR. Terskelen skal aldri
 senkes; en senking krever eksplisitt godkjenning fra testleder i PR-teksten.
@@ -875,7 +875,7 @@ gjennomføringsrekkefølge for agenter.
 | 3   | Ingen automatisert IDOR-/hemmelighetssonde                                                                          | SEC-02, SEC-08               | M       |
 | 4   | Ingen målte Web Vitals; kun bundle-budsjett                                                                         | PERF-02, PERF-03             | M       |
 | 5   | Semantikk, søk og composer har automatiserte a11y-assertions; skjermleser og reflow må testes manuelt               | A11Y-02, A11Y-03, A11Y-04    | M       |
-| 6   | Tersklene er 40/34/33/41 %; ratchet og risikobasert dekning videreføres                                             | § 9 ratchet                  | L       |
+| 6   | Tersklene er 49/42/40/50 %; ratchet og risikobasert dekning videreføres                                             | § 9 ratchet                  | L       |
 | 7   | Varselutsending og dedupe har tester i `api/public/push/-dispatch.test.ts`; hosted levering gjenstår                | NOTIF-03, NOTIF-06, NOTIF-07 | M       |
 | 8   | Polish-sjekklisten er knyttet til PR-malen; manuell vurdering kreves                                                | § 11.17                      | S       |
 

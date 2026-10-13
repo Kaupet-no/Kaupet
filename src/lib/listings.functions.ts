@@ -880,9 +880,14 @@ export const republishListing = createServerFn({ method: "POST" })
       .eq("status", listing.status)
       .eq("updated_at", listing.updated_at)
       .select("id, status, published_at, expires_at")
-      .single();
+      .maybeSingle();
     if (error) {
       throw await toClientError("republishListing.update", error, { listing_id: data.id });
+    }
+    // Ingen rad: annonsen ble endret (eller fikk ny status) etter at den ble
+    // validert, så publiseringen hadde vært basert på utdaterte data.
+    if (!updated) {
+      throw new ClientError("Annonsen ble endret samtidig. Last siden på nytt og prøv igjen.", 409);
     }
 
     return updated;

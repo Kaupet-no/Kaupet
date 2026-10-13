@@ -290,6 +290,32 @@ describe("organization listing creation authorization (SEC-07)", () => {
     },
   );
 
+  it("melder konflikt når annonsen endres mellom kontroll og republisering", async () => {
+    db.listing = {
+      id: "00000000-0000-0000-0000-000000000014",
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "archived",
+      title: "Gyldig annonsetittel",
+      description: "Dette er en gyldig annonsebeskrivelse.",
+      condition: "good",
+      can_ship: false,
+      postal_code: "0123",
+      city: "Oslo",
+      is_free: true,
+      price_nok: null,
+      category_id: categoryId,
+      attributes: {},
+      updated_at: "2026-01-01T00:00:00Z",
+    };
+    db.updateResult = null;
+
+    await expect(republishListing({ data: { id: db.listing.id as string } })).rejects.toMatchObject(
+      { status: 409 },
+    );
+  });
+
   it("fails closed when the authoritative permission RPC errors", async () => {
     setOrganization("superuser");
     db.rpc.mockImplementation(async (name: string) =>

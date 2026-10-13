@@ -63,4 +63,11 @@ describe("Price", () => {
     );
     expect(screen.getByText("Lignende til salgs for 1 200–2 000 kr")).toBeTruthy();
   });
+
+  // KG-19-F02: feltet godtok priser som utkastlagring og publisering avviser.
+  it("holder prisen innenfor serverens grense på 10 000 000 kr", () => {
+    const setValue = vi.fn();
+    render(<Price {...baseProps({ setValue, priceNok: 10_000_001 })} />);
+    expect(setValue).toHaveBeenCalledWith("price_nok", 10_000_000, expect.anything());
+  });
 });

@@ -17,15 +17,14 @@ import { displayPriceNok, formatNok, formatNokNumber, priceRange } from "@/lib/f
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
+import { MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 import { RequiredMark } from "../required-mark";
 import { SimilarListings } from "../similar-listings";
 import { OmregistreringsavgiftBox } from "./omregistreringsavgift-box";
 
-/** Highest price a listing can have (matches the `price_nok` Zod schema's
- * `.max()` in ny-annonse.tsx) — enforced here too so the input itself can
- * never produce a value the schema would reject, instead of letting the user
- * type past it and only finding out from a validation error afterwards. */
-const MAX_PRICE_NOK = 999_999_999;
+/** Enforced on the input too, so it can never produce a value the client
+ * schema, draft save or publish would reject. */
+const MAX_PRICE_NOK = MAX_LISTING_PRICE_NOK;
 
 /**
  * Pris (price) + "gis bort gratis" + WTB-treff-hint. The WTB hint used to be

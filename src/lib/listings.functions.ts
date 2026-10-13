@@ -31,6 +31,7 @@ import {
   type OrganizationListingLocation,
 } from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 
 const LISTING_CREATE_LIMIT_MESSAGE =
   "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.";
@@ -307,7 +308,7 @@ async function validateExistingListingForPublish(
     (listing.price_nok == null ||
       !Number.isInteger(listing.price_nok) ||
       listing.price_nok < 0 ||
-      listing.price_nok > 10_000_000)
+      listing.price_nok > MAX_LISTING_PRICE_NOK)
   ) {
     throw new ClientError("Oppgi en gyldig pris før annonsen publiseres.", 400);
   }
@@ -398,7 +399,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           .nullable()
           .optional(),
         is_free: z.boolean().optional(),
-        price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+        price_nok: z.number().int().min(0).max(MAX_LISTING_PRICE_NOK).nullable().optional(),
         postal_code: z
           .string()
           .regex(/^\d{4}$/)
@@ -582,7 +583,7 @@ export const createListing = createServerFn({ method: "POST" })
         category_id: z.string().uuid(),
         condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable(),
         is_free: z.boolean(),
-        price_nok: z.number().int().min(0).max(10_000_000).nullable(),
+        price_nok: z.number().int().min(0).max(MAX_LISTING_PRICE_NOK).nullable(),
         postal_code: z
           .string()
           .regex(/^\d{4}$/)
@@ -623,7 +624,11 @@ export const createListing = createServerFn({ method: "POST" })
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
 
-    const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
+    const [
+      { data: filterRows, error: filterError },
+      { data: categoryRows, error: categoryError },
+      flowsResult,
+    ] = await Promise.all([
       supabaseAdmin
         .from("category_filters")
         .select(
@@ -632,6 +637,10 @@ export const createListing = createServerFn({ method: "POST" })
       supabaseAdmin.from("categories").select("id, parent_id"),
       supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
     ]);
+    // Uten reglene kan vi ikke vite hva som er påkrevd: avbryt i stedet for å
+    // validere mot tomme regler og publisere en ufullstendig annonse (KG-16-F02).
+    const rulesError = filterError ?? categoryError ?? flowsResult.error;
+    if (rulesError) throw await toClientError("database", rulesError);
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
     );
@@ -661,7 +670,6 @@ export const createListing = createServerFn({ method: "POST" })
       );
     }
 
-    // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
     const { fieldGroups } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
     const fieldGroupError = validateRequiredFieldGroups(
@@ -827,6 +835,16 @@ export const republishListing = createServerFn({ method: "POST" })
     await validateExistingListingForPublish(supabaseAdmin, listing);
     if (listing.status !== "draft") {
       await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
+    } else if (listing.organization_id) {
+      // Endringsrett (can_update) er ikke opprettingsrett: et bedriftsutkast
+      // publiseres med samme kontroll som createListing (KG-16-F01).
+      const ownership = await resolveListingOwnership(
+        supabaseAdmin,
+        userId,
+        listing.category_id,
+        listing.organization_location_id,
+      );
+      assertDraftOrganization(listing.organization_id, ownership.organization_id);
     }
 
     const now = new Date().toISOString();
@@ -890,14 +908,24 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
     // must not use service-role to reveal a draft/disabled listing's code —
     // same visibility RLS gives everyone else. See
     // the internal security review, L-13.
+    // Synligheten er listing_is_public (aktiv, eller solgt de siste 30
+    // dagene), samme kontrakt som RLS og /$kaupetCode (KG-16-F03).
     const { data: row, error } = await supabaseAdmin
       .from("listings")
-      .select("kaupet_code")
+      .select("kaupet_code, status, sold_at")
       .eq("id", data.listing_id)
-      .eq("status", "active")
+      .in("status", ["active", "sold"])
       .maybeSingle();
     if (error) {
       throw await toClientError("database", error);
     }
-    return { kaupet_code: row?.kaupet_code ?? null };
+    if (!row) return { kaupet_code: null };
+    const { data: isPublic, error: publicError } = await supabaseAdmin.rpc("listing_is_public", {
+      _status: row.status,
+      _sold_at: row.sold_at,
+    });
+    if (publicError) {
+      throw await toClientError("database", publicError);
+    }
+    return { kaupet_code: isPublic === true ? row.kaupet_code : null };
   });

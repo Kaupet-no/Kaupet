@@ -80,7 +80,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CONDITIONS } from "@/lib/constants";
+import { CONDITIONS, MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
@@ -141,7 +141,7 @@ const listingSchema = z.object({
         .number()
         .int("Prisen må være et helt tall")
         .min(0, "Prisen kan ikke være negativ")
-        .max(999_999_999, "Prisen er for høy"),
+        .max(MAX_LISTING_PRICE_NOK, "Prisen kan ikke være over 10 000 000 kr"),
       z.literal(""),
     ])
     .optional(),

@@ -177,6 +177,22 @@ describe("usePublishListing", () => {
     expect(upsertImages).not.toHaveBeenCalled();
   });
 
+  it("bruker bilder som autolagringen allerede har lastet opp til utkastet", async () => {
+    const [synced, fresh] = pendingImages("a", "b");
+    synced.remote = { id: "row-a", path: "draft-1/a.webp", uploadedAt: 0, synced: true };
+    createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
+    const { result } = setup([synced, fresh]);
+    act(() => result.current.publishOnce(values));
+    await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+    expect(uploadImage.mock.calls.map(([arg]) => arg.file.name)).toEqual(["b.jpg"]);
+    expect(uploadThumb).toHaveBeenCalledOnce();
+    expect(createListing.mock.calls[0][0].data.images[0]).toMatchObject({
+      id: "row-a",
+      storage_path: "draft-1/a.webp",
+      sort_order: 0,
+    });
+  });
+
   it.each([
     { elapsed: 23 * 60 * 60 * 1000 - 1, reupload: false },
     { elapsed: 23 * 60 * 60 * 1000, reupload: true },

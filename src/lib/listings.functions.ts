@@ -400,6 +400,42 @@ async function validateExistingListingForPublish(
   return attributes;
 }
 
+const listingImageRefsSchema = z
+  .array(
+    z.object({
+      id: z.string().uuid(),
+      storage_path: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
+      sort_order: z.number().int().min(0).max(99),
+      caption: z.string().trim().max(140).nullable(),
+    }),
+  )
+  .max(100);
+
+/** Knytter allerede opplastede bilder til et serverutkast, med samme
+ * avstemming som publiseringen (sync_listing_images). */
+export const syncDraftListingImages = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        expected_user_id: z.string().uuid().optional(),
+        draftId: z.string().uuid(),
+        images: listingImageRefsSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: result, error } = await supabaseAdmin.rpc("sync_draft_listing_images", {
+      _listing_id: data.draftId,
+      _user_id: context.userId,
+      _images: data.images,
+    });
+    if (error) throw await toClientError("database", error);
+    return z.object({ already_published: z.boolean() }).parse(result);
+  });
+
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
@@ -582,19 +618,7 @@ export const createListing = createServerFn({ method: "POST" })
       .object({
         expected_user_id: z.string().uuid().optional(),
         expected_organization_id: z.string().uuid().nullable().optional(),
-        images: z
-          .array(
-            z.object({
-              id: z.string().uuid(),
-              storage_path: z
-                .string()
-                .regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
-              sort_order: z.number().int().min(0).max(99),
-              caption: z.string().trim().max(140).nullable(),
-            }),
-          )
-          .max(100)
-          .optional(),
+        images: listingImageRefsSchema.optional(),
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
         subtitle: z.string().trim().max(80).nullable().optional(),

@@ -4096,6 +4096,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      sync_draft_listing_images: {
+        Args: { _images: Json; _listing_id: string; _user_id: string }
+        Returns: Json
+      }
+      sync_listing_images: {
+        Args: { _images: Json; _listing_id: string }
+        Returns: undefined
+      }
       sync_organization_entitlements: {
         Args: { _organization_id: string }
         Returns: undefined

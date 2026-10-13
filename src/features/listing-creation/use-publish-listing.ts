@@ -16,6 +16,7 @@ import type { CategoryBehavior } from "@/lib/category-behavior";
 
 import type { ListingFormShape } from "./field-groups/types";
 import type { useDraftAutosave } from "./use-draft-autosave";
+import { reusableRemote, UPLOAD_REUSE_TTL_MS } from "./draft-image-sync";
 
 /**
  * Publiseringstilstanden til annonseveiviseren. Delt fra
@@ -56,9 +57,6 @@ export function usePublishState() {
 }
 
 type PublishState = ReturnType<typeof usePublishState>;
-
-// Unreferenced uploads can be deleted after 24 hours; leave one hour of margin.
-const UPLOAD_CACHE_TTL_MS = 23 * 60 * 60 * 1000;
 
 export function usePublishListing({
   state,
@@ -160,9 +158,11 @@ export function usePublishListing({
         const uploads = await Promise.allSettled(
           images.map(async (img, i) => {
             const imageKey = `${ensuredDraftId}:${img.id}`;
-            let uploaded = uploadedImages.current.get(imageKey);
+            // Allerede lastet opp av autolagringen til dette utkastet.
+            const remote = reusableRemote(img, ensuredDraftId);
+            let uploaded = remote ?? uploadedImages.current.get(imageKey);
             const uploadedAt = Date.now();
-            if (!uploaded || uploadedAt - uploaded.uploadedAt >= UPLOAD_CACHE_TTL_MS) {
+            if (!uploaded || (!remote && uploadedAt - uploaded.uploadedAt >= UPLOAD_REUSE_TTL_MS)) {
               const path = await uploadListingImage({ listingId: ensuredDraftId, file: img.file });
               uploaded = { id: crypto.randomUUID(), path, uploadedAt };
               uploadedImages.current.set(imageKey, uploaded);
@@ -171,12 +171,13 @@ export function usePublishListing({
             // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
             // hvis thumbnailen mangler, så en feil her skal ikke stoppe
             // publiseringen — men samles opp og vises til brukeren etterpå.
-            thumbPromises.push(
-              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
-                console.warn("Kunne ikke laste opp kort-thumbnail", err);
-                thumbFailures.push(img.file.name);
-              }),
-            );
+            if (!remote)
+              thumbPromises.push(
+                uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
+                  console.warn("Kunne ikke laste opp kort-thumbnail", err);
+                  thumbFailures.push(img.file.name);
+                }),
+              );
             done += 1;
             setUploadProgress({ done, total: images.length });
             return { id, storage_path: path, sort_order: i, caption: img.caption?.trim() || null };

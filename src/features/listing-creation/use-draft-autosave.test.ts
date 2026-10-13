@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PendingImage } from "@/components/image-uploader";
 import { useDraftAutosave } from "./use-draft-autosave";
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -16,9 +17,17 @@ vi.mock("@/lib/toast", () => ({
 
 const saveDraftListingMock = vi.fn();
 const discardDraftListingMock = vi.fn();
+const syncDraftListingImagesMock = vi.fn();
 vi.mock("@/lib/listings.functions", () => ({
   saveDraftListing: (...args: unknown[]) => saveDraftListingMock(...args),
   discardDraftListing: (...args: unknown[]) => discardDraftListingMock(...args),
+  syncDraftListingImages: (...args: unknown[]) => syncDraftListingImagesMock(...args),
+}));
+
+const uploadListingImageMock = vi.fn();
+vi.mock("@/lib/storage", () => ({
+  uploadListingImage: (...args: unknown[]) => uploadListingImageMock(...args),
+  uploadListingImageThumb: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/vehicle/vehicle-title", () => ({
@@ -68,6 +77,10 @@ beforeEach(() => {
   localStorage.clear();
   saveDraftListingMock.mockReset();
   discardDraftListingMock.mockReset();
+  syncDraftListingImagesMock.mockReset().mockResolvedValue({ already_published: false });
+  uploadListingImageMock
+    .mockReset()
+    .mockImplementation(async ({ listingId }: { listingId: string }) => `${listingId}/bilde.webp`);
   loadDraftImagesMock.mockReset().mockResolvedValue([]);
   saveDraftImagesMock.mockReset().mockResolvedValue(undefined);
   transferDraftImagesMock.mockReset().mockResolvedValue(undefined);
@@ -276,6 +289,69 @@ describe("useDraftAutosave", () => {
       expect.objectContaining({ title: "Sykkel til salgs" }),
     );
     expect(result.current.draftId).toBe("draft-123");
+  });
+
+  it("laster opp bilder til serverutkastet én gang og gjenbruker dem ved neste lagring", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+    const file = new File(["x"], "a.webp", { type: "image/webp" });
+    const { result } = renderHook(() => {
+      const [images, setImages] = useState<PendingImage[]>([
+        { id: "img-1", file, thumbFile: file, previewUrl: "blob:a", caption: " Front " },
+      ]);
+      return useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages });
+    });
+    await waitFor(() => expect(result.current.draftChecked).toBe(true));
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBe("draft-1");
+    });
+    expect(uploadListingImageMock).toHaveBeenCalledOnce();
+    expect(syncDraftListingImagesMock).toHaveBeenCalledWith({
+      data: {
+        expected_user_id: "user-1",
+        draftId: "draft-1",
+        images: [
+          {
+            id: expect.any(String),
+            storage_path: "draft-1/bilde.webp",
+            sort_order: 0,
+            caption: "Front",
+          },
+        ],
+      },
+    });
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBe("draft-1");
+    });
+    expect(uploadListingImageMock).toHaveBeenCalledOnce();
+    expect(syncDraftListingImagesMock).toHaveBeenCalledOnce();
+  });
+
+  it("beholder bildene lokalt og melder feil når bildesynken feiler", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+    syncDraftListingImagesMock.mockRejectedValue(new Error("nede"));
+    const file = new File(["x"], "a.webp", { type: "image/webp" });
+    const { result } = renderHook(() => {
+      const [images, setImages] = useState<PendingImage[]>([
+        { id: "img-1", file, thumbFile: file, previewUrl: "blob:a" },
+      ]);
+      return {
+        images,
+        draft: useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages }),
+      };
+    });
+    await waitFor(() => expect(result.current.draft.draftChecked).toBe(true));
+
+    await act(async () => {
+      expect(await result.current.draft.saveDraftWithImages()).toBeNull();
+    });
+    expect(result.current.draft.draftSaveError).toBe(true);
+    // Opplastingen er husket, så neste forsøk laster ikke opp på nytt.
+    expect(result.current.images[0].remote).toMatchObject({
+      path: "draft-1/bilde.webp",
+      synced: false,
+    });
   });
 
   it("KG-18-F02: går videre uten svar forkaster lokalt utkast, men ikke serverutkastet", async () => {

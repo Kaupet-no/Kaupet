@@ -19,6 +19,7 @@ import {
   validateImages,
 } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
+import type { RemoteImage } from "@/features/listing-creation/draft-image-sync";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhotos } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
@@ -29,6 +30,8 @@ export type PendingImage = {
   thumbFile: File;
   previewUrl: string;
   caption?: string;
+  /** Satt når bildet er lastet opp til et serverutkast (se draft-image-sync.ts). */
+  remote?: RemoteImage;
 };
 
 function SortableImageItem({

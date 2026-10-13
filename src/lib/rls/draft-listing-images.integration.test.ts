@@ -22,11 +22,20 @@ describe.skipIf(!canRun)("RLS: sync_draft_listing_images", () => {
   const userIds: string[] = [];
   let sellerId: string;
   let otherId: string;
+  let organizationId: string;
+  let locationId: string;
 
-  const createDraft = async () => {
+  const createDraft = async (organization = false) => {
     const { data, error } = await admin
       .from("listings")
-      .insert({ seller_id: sellerId, title: "RLS utkast med bilder", status: "draft" })
+      .insert({
+        seller_id: organization ? otherId : sellerId,
+        title: "RLS utkast med bilder",
+        status: "draft",
+        ...(organization
+          ? { organization_id: organizationId, organization_location_id: locationId }
+          : {}),
+      })
       .select("id")
       .single();
     if (error) throw error;
@@ -57,10 +66,51 @@ describe.skipIf(!canRun)("RLS: sync_draft_listing_images", () => {
   beforeAll(async () => {
     sellerId = await createRlsUser(admin, emails.seller, userIds);
     otherId = await createRlsUser(admin, emails.other, userIds);
+
+    // Verifisert bedrift der bare `other` er superbruker.
+    const now = Date.now();
+    const { data: organization, error: organizationError } = await admin
+      .from("organizations")
+      .insert({
+        organization_number: String(900_000_000 + (suffix % 99_999_999)),
+        legal_name: `RLS Utkastbilder ${suffix}`,
+        display_name: `RLS Utkastbilder ${suffix}`,
+        selected_plan: "proff",
+        proff_trial_started_at: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+        proff_trial_ends_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        proff_access_until: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        verification_status: "verified",
+      })
+      .select("id")
+      .single();
+    if (organizationError) throw organizationError;
+    organizationId = organization.id;
+    const { data: location, error: locationError } = await admin
+      .from("organization_locations")
+      .insert({
+        organization_id: organizationId,
+        name: "Hovedlokasjon",
+        address_line: "Storgata 1",
+        postal_code: "0001",
+        city: "Oslo",
+        is_default: true,
+      })
+      .select("id")
+      .single();
+    if (locationError) throw locationError;
+    locationId = location.id;
+    const { error: memberError } = await admin.from("organization_members").insert({
+      organization_id: organizationId,
+      user_id: otherId,
+      role: "superuser",
+      status: "active",
+    });
+    if (memberError) throw memberError;
   });
 
   afterAll(async () => {
     await admin.from("listings").delete().in("seller_id", userIds);
+    if (organizationId) await admin.from("organizations").delete().eq("id", organizationId);
     for (const id of userIds) await admin.auth.admin.deleteUser(id);
   });
 
@@ -125,6 +175,54 @@ describe.skipIf(!canRun)("RLS: sync_draft_listing_images", () => {
     expect(late.error).toBeNull();
     expect(late.data).toEqual({ already_published: true });
     expect(await rows(listingId)).toEqual(images);
+  });
+
+  it("lar bedriftens superbruker synke og nekter brukere utenfor bedriften", async () => {
+    const listingId = await createDraft(true);
+    const kept = image(listingId, 0);
+    expect((await sync(listingId, otherId, [kept])).error).toBeNull();
+
+    const { error } = await sync(listingId, sellerId, []);
+    expect(error?.code).toBe("42501");
+    expect((await rows(listingId)).map((row) => row.id)).toEqual([kept.id]);
+  });
+
+  it("er en no-op når annonsen er solgt eller arkivert etter publisering", async () => {
+    const listingId = await createDraft();
+    const kept = image(listingId, 0);
+    expect((await sync(listingId, sellerId, [kept])).error).toBeNull();
+
+    for (const status of ["sold", "archived"] as const) {
+      const { error: statusError } = await admin
+        .from("listings")
+        .update({ status })
+        .eq("id", listingId);
+      if (statusError) throw statusError;
+      const late = await sync(listingId, sellerId, []);
+      expect(late.error).toBeNull();
+      expect(late.data).toEqual({ already_published: true });
+      expect((await rows(listingId)).map((row) => row.id)).toEqual([kept.id]);
+    }
+  });
+
+  it("avviser ugyldige bildelister uten å endre utkastet", async () => {
+    const listingId = await createDraft();
+    const kept = image(listingId, 0);
+    expect((await sync(listingId, sellerId, [kept])).error).toBeNull();
+
+    const fresh = image(listingId, 1);
+    const invalid: unknown[] = [
+      null,
+      { not: "an array" },
+      [kept, { ...kept, sort_order: 1 }], // duplisert id
+      [{ ...fresh, sort_order: 100 }],
+      [{ ...fresh, storage_path: null }],
+    ];
+    for (const images of invalid) {
+      const { error } = await sync(listingId, sellerId, images as SyncImage[]);
+      expect(error?.message, JSON.stringify(images)).toContain("Ugyldig bildeliste");
+    }
+    expect((await rows(listingId)).map((row) => row.id)).toEqual([kept.id]);
   });
 
   it("nekter klienter å kalle funksjonene", async () => {

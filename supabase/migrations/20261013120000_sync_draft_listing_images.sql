@@ -47,6 +47,8 @@ BEGIN
   -- Unreferenced files remain in standard_upload_objects for the guarded cleanup job.
 END;
 $$;
+COMMENT ON FUNCTION public.sync_listing_images(uuid, jsonb) IS
+  'Intern hjelper: forutsetter at kalleren har låst annonsen med lock_listing_draft_for_user og sjekket status. Kall sync_draft_listing_images eller publish_listing_draft i stedet.';
 REVOKE ALL ON FUNCTION public.sync_listing_images(uuid, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.sync_listing_images(uuid, jsonb) TO service_role;
 
@@ -85,11 +87,11 @@ DECLARE
   _current public.listings%ROWTYPE;
 BEGIN
   _current := public.lock_listing_draft_for_user(_listing_id, _user_id);
-  -- Publisert i mellomtiden: publiseringen eier bildene nå.
-  IF _current.status = 'active' THEN
+  -- Publisert i mellomtiden (og ev. solgt, arkivert osv. etterpå): publiseringen
+  -- eier bildene nå, så en sen autolagring er en stille no-op.
+  IF _current.status <> 'draft' THEN
     RETURN jsonb_build_object('already_published', true);
   END IF;
-  IF _current.status <> 'draft' THEN RAISE EXCEPTION 'Utkastet kan ikke endres i denne tilstanden'; END IF;
   PERFORM public.sync_listing_images(_listing_id, _images);
   RETURN jsonb_build_object('already_published', false);
 END;

@@ -80,6 +80,9 @@ export function useWtbDraftAutosave(
   const [isSaving, setIsSaving] = useState(false);
   const saveInProgress = useRef<Promise<string | null> | null>(null);
   const savingStopped = useRef(false);
+  // Øker ved forkasting: en lagring som var underveis skal ikke skrive
+  // utkast-ID-en tilbake etterpå (KG-23-F01).
+  const discardGeneration = useRef(0);
   const restorableDraftRef = useRef<WtbDraftData | null>(null);
   const draftOfferDismissed = useRef(false);
   const fieldsRef = useRef(fields);
@@ -242,6 +245,7 @@ export function useWtbDraftAutosave(
         : null;
     setIsSaving(true);
     publishedId.current = null;
+    const generation = discardGeneration.current;
     const promise = (async () => {
       try {
         const result = await saveWtbDraft({
@@ -265,6 +269,9 @@ export function useWtbDraftAutosave(
           },
         });
         if (!isCurrent()) return null;
+        // Forkastet mens lagringen pågikk: gi ID-en til discardDraft, som
+        // sletter den, i stedet for å huske den.
+        if (generation !== discardGeneration.current) return result.id;
         if ("published" in result && result.published) {
           // A lost publish response: the want listing is live, so these edits were not saved.
           publishedId.current = result.id;
@@ -362,15 +369,24 @@ export function useWtbDraftAutosave(
     },
     discardDraft: async () => {
       if (!isCurrent()) return;
-      const id = draftIdRef.current;
+      discardGeneration.current += 1;
+      const pending = saveInProgress.current;
+      const ids = new Set<string>();
+      if (draftIdRef.current) ids.add(draftIdRef.current);
       clearStorage();
       setRestorableDraft(null);
       rememberDraftId(null);
-      if (!id || !authenticated) return;
-      try {
-        await discardWtbDraft({ data: { id } });
-      } catch {
-        setDraftSaveError(true);
+      // En første lagring som fortsatt pågår oppretter et serverutkast etter
+      // forkastingen; vent på den og slett også det (KG-23-F01).
+      const savedId = pending ? await pending : null;
+      if (savedId) ids.add(savedId);
+      if (!authenticated) return;
+      for (const id of ids) {
+        try {
+          await discardWtbDraft({ data: { id } });
+        } catch {
+          setDraftSaveError(true);
+        }
       }
     },
     clearAfterPublish: () => {

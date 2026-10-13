@@ -2,9 +2,10 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { saveWtbDraftMock, getLatestWtbDraftMock } = vi.hoisted(() => ({
+const { saveWtbDraftMock, getLatestWtbDraftMock, discardWtbDraftMock } = vi.hoisted(() => ({
   saveWtbDraftMock: vi.fn(),
   getLatestWtbDraftMock: vi.fn(),
+  discardWtbDraftMock: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -16,7 +17,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/lib/wtb-listings.functions", () => ({
   saveWtbDraft: saveWtbDraftMock,
   getLatestWtbDraft: getLatestWtbDraftMock,
-  discardWtbDraft: vi.fn().mockResolvedValue(undefined),
+  discardWtbDraft: discardWtbDraftMock,
 }));
 
 import { useWtbDraftAutosave } from "./use-wtb-draft-autosave";
@@ -37,6 +38,7 @@ describe("useWtbDraftAutosave", () => {
     vi.useFakeTimers();
     saveWtbDraftMock.mockReset();
     getLatestWtbDraftMock.mockReset().mockResolvedValue(null);
+    discardWtbDraftMock.mockReset().mockResolvedValue(undefined);
     saveWtbDraftMock.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000001",
     });
@@ -73,6 +75,34 @@ describe("useWtbDraftAutosave", () => {
       });
     });
     expect(saveWtbDraftMock).toHaveBeenCalledTimes(1);
+  });
+
+  // KG-23-F01: et sent svar fra første lagring skrev ID-en tilbake etter forkasting.
+  it("forkasting venter på pågående lagring og sletter også det nye utkastet", async () => {
+    const id = "00000000-0000-4000-8000-000000000009";
+    let resolveSave!: (value: { id: string }) => void;
+    saveWtbDraftMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useWtbDraftAutosave(fields, true, "user-1"));
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    let discarded!: Promise<void>;
+    await act(async () => {
+      void result.current.saveToServer();
+      discarded = result.current.discardDraft();
+    });
+    unmount();
+    await act(async () => {
+      resolveSave({ id });
+      await discarded;
+    });
+    expect(discardWtbDraftMock).toHaveBeenCalledWith({ data: { id } });
+    expect(localStorage.getItem("kaupet_draft_want_listing_id:user-1:private")).toBeNull();
   });
 
   it("melder fra når utkastet allerede er publisert etter tapt svar", async () => {

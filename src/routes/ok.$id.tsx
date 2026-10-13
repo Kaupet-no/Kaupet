@@ -28,7 +28,11 @@ import {
   effectiveFiltersForCategory,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { wtbCriteriaSummary, wtbLocationLabel } from "@/features/wtb/wtb-criteria-presentation";
+import {
+  pruneWtbCriteria,
+  wtbCriteriaSummary,
+  wtbLocationLabel,
+} from "@/features/wtb/wtb-criteria-presentation";
 import { EditableField } from "@/features/listing-edit/editable-field";
 import { EditableRegion } from "@/features/listing-edit/editable-region";
 import { Button } from "@/components/ui/button";
@@ -281,7 +285,16 @@ function WtbListingPage() {
               selectedId={listing.category_id ?? ""}
               onSelect={(catId) => {
                 setCategoryPickerOpen(false);
-                saveField({ group: "category", category_id: catId });
+                // Kriterier den nye kategorien ikke har, fjernes i samme
+                // lagring (KG-23-F02).
+                saveField({
+                  group: "category",
+                  category_id: catId,
+                  attributes: pruneWtbCriteria(
+                    attributes,
+                    effectiveFiltersForCategory(catId, allFilters ?? [], categoriesById),
+                  ),
+                });
               }}
             />
           </section>

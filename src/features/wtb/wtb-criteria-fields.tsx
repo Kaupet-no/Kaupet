@@ -29,7 +29,7 @@ import {
   type WtbAttributeMap,
   type WtbAttributeValue,
 } from "./wtb-criteria-types";
-import { criterionSummary, orderWtbCriteria } from "./wtb-criteria-presentation";
+import { criterionSummary, orderWtbCriteria, pruneWtbCriteria } from "./wtb-criteria-presentation";
 
 /**
  * Renders the search-criteria form for an Ønskes kjøpt listing: one row per
@@ -69,12 +69,16 @@ export function WtbCriteriaFields({
     return m;
   }, [categories]);
 
+  const categoryFilters = useMemo(
+    () => effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
+  );
   const filters = useMemo(
     () =>
-      effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById).filter((f) =>
+      categoryFilters.filter((f) =>
         filterDependencyMet(f, value as Record<string, AttributeValue>),
       ),
-    [categoryId, allFilters, categoriesById, value],
+    [categoryFilters, value],
   );
 
   if (!categoryId || filters.length === 0) return null;
@@ -85,14 +89,22 @@ export function WtbCriteriaFields({
       v === "" ||
       (Array.isArray(v) && v.length === 0) ||
       (isWtbRangeValue(v) && v.min == null && v.max == null);
-    const next = { ...value };
+    let next: WtbAttributeMap = { ...value };
     if (empty) delete next[key];
     else next[key] = v;
+    // Modellen hører til merket: et nytt merke gjør den gamle modellen
+    // ugyldig. Avhengige filtre uten forutsetning fjernes også (KG-23-F02).
+    if (categoryFilters.find((f) => f.key === key)?.type === "brand_select" && v !== value[key]) {
+      for (const f of categoryFilters) if (f.type === "model_select") delete next[f.key];
+    }
+    next = pruneWtbCriteria(next, categoryFilters);
     onChange(next);
+    const removed = new Set(Object.keys(value).filter((k) => !(k in next)));
     onCheckedKeysChange(
-      empty
+      (empty
         ? checkedKeys.filter((checkedKey) => checkedKey !== key)
-        : [...new Set([...checkedKeys, key])],
+        : [...new Set([...checkedKeys, key])]
+      ).filter((checkedKey) => !removed.has(checkedKey)),
     );
   };
 

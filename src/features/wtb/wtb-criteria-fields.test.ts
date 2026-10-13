@@ -4,6 +4,7 @@ import { normalizeFilter } from "@/lib/category-filters";
 import {
   criterionSummary,
   orderWtbCriteria,
+  pruneWtbCriteria,
   wtbCriteriaSummary,
 } from "./wtb-criteria-presentation";
 
@@ -66,5 +67,31 @@ describe("WTB-kriterieoversikt", () => {
         brand: "Trek",
       }),
     ).toBe("Type: Terrengsykkel · Rammestørrelse (cm): 40–70 · Merke: Trek");
+  });
+});
+
+// KG-23-F02: skjulte kriterier fra forrige kategori ble matchet mot nye annonser.
+describe("pruneWtbCriteria", () => {
+  it("fjerner kriterier den nye kategorien ikke har, men beholder fritekst", () => {
+    expect(
+      pruneWtbCriteria({ type: ["mountain"], fuel_type: ["diesel"], __freetext: "ABS" }, filters),
+    ).toEqual({ type: ["mountain"], __freetext: "ABS" });
+  });
+
+  it("fjerner avhengige kriterier når forutsetningen er borte", () => {
+    const dependent = normalizeFilter({
+      id: "motor",
+      category_id: "category",
+      key: "motor",
+      label_nb: "Motor",
+      type: "select",
+      options: null,
+      unit: null,
+      sort_order: 3,
+      is_primary: false,
+      depends_on_key: "type",
+      depends_on_value: "electric",
+    });
+    expect(pruneWtbCriteria({ motor: ["mid"] }, [...filters, dependent])).toEqual({});
   });
 });

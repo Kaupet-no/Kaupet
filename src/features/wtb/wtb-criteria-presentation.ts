@@ -1,4 +1,8 @@
-import type { CategoryFilter } from "@/lib/category-filters";
+import {
+  filterDependencyMet,
+  type AttributeValue,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 import {
   isWtbDateMinValue,
   isWtbRangeValue,
@@ -6,6 +10,29 @@ import {
   type WtbAttributeMap,
   type WtbAttributeValue,
 } from "./wtb-criteria-types";
+
+/** Beholder bare kriterier som kategoriens filtre fortsatt viser (også
+ * avhengige filtre hvis forutsetning er borte), pluss fritekst. Brukes ved
+ * kategori- og merkebytte, så gamle, usynlige krav ikke stopper treff
+ * (KG-23-F02). `filters` er kategoriens effektive filtre. */
+export function pruneWtbCriteria(
+  value: WtbAttributeMap,
+  filters: CategoryFilter[],
+): WtbAttributeMap {
+  let next = value;
+  for (;;) {
+    const visible = new Set(
+      filters
+        .filter((f) => filterDependencyMet(f, next as Record<string, AttributeValue>))
+        .map((f) => f.key),
+    );
+    const pruned = Object.fromEntries(
+      Object.entries(next).filter(([key]) => key === WTB_FREETEXT_KEY || visible.has(key)),
+    );
+    if (Object.keys(pruned).length === Object.keys(next).length) return pruned;
+    next = pruned;
+  }
+}
 
 export function orderWtbCriteria(filters: CategoryFilter[], value: WtbAttributeMap) {
   return [...filters].sort((a, b) => Number(b.key in value) - Number(a.key in value));

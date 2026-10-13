@@ -8,11 +8,11 @@ Dette repoet inneholder kode for Kaupet.no på web, Kaupet-appen på iOS og Andr
 
 ## Funksjoner
 
-**Søk og finn** Bla gjennom annonser, bruk filtrene og lagre favoritter. Lagrede søk gjør det enklere å følge med på det du leter etter. Søkemotoren identifiserer filter basert på ren tekst, slik at eksempelvis søket "under 3000kr" identifiseres som et prisfilter. Det kan også kombinseres flere filter i samme søkestreng. Søket "Stasjonsvogn med automat ikke el", oppretter filtre på karrosseritype, girkasse og filtrerer bort biler med drivstoff el.
+**Søk og finn.** Bla gjennom annonser, bruk filtrene og lagre favoritter. Lagrede søk gjør det enklere å følge med på det du leter etter. Søkemotoren identifiserer filter basert på ren tekst, slik at eksempelvis søket "under 3000kr" identifiseres som et prisfilter. Det kan også kombineres flere filter i samme søkestreng. Søket "Stasjonsvogn med automat ikke el", oppretter filtre på karrosseritype, girkasse og filtrerer bort biler med drivstoff el.
 
-**Annonser** Last opp bilder, skriv litt om det du selger, og fyll inn opplysningene som passer. Blir du avbrutt, kan du fortsette fra et utkast senere. Om ønskelig, kan Kaupet foreslå kategori, tittel og annonseinnhold basert på bildene som lastes opp.
+**Annonser.** Last opp bilder, skriv litt om det du selger, og fyll inn opplysningene som passer. Blir du avbrutt, kan du fortsette fra et utkast senere. Om ønskelig, kan Kaupet foreslå kategori, tittel og annonseinnhold basert på bildene som lastes opp.
 
-**Kjøp** Finner du ikke det du trenger? Legg ut et kjøpsønske, så kan de som har det, finne deg. Dersom noen oppretter en annonse som treffer kriteriene, varsles dem med en gang, før annonsen publiseres.
+**Kjøp.** Finner du ikke det du trenger? Legg ut et kjøpsønske, så kan de som har det, finne deg. Dersom noen oppretter en annonse som treffer kriteriene, varsles de med en gang, før annonsen publiseres.
 
 **Snakk sammen.** Send en melding, still spørsmål og avtal videre med kjøper eller selger. Meldinger sorteres etter annonse, slik at det er enkelt å få oversikt over hvilke meldinger som hører til hvilke annonser.
 

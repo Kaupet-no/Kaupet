@@ -621,6 +621,64 @@ describe("uploadMessageAttachment", () => {
     expect(putObjectMock).not.toHaveBeenCalled();
   });
 
+  // KG-10-F02: bedriftssuperbrukeren kan sende tekst i samtalen, men ble nektet vedlegg.
+  it("tillater vedlegg for bedriftsbruker med chattilgang uten å være selger", async () => {
+    mockConversationsTable({
+      maybeSingle: {
+        data: {
+          id: CONVERSATION_ID,
+          buyer_id: "kjoper",
+          seller_id: "ansatt",
+          listing: {
+            organization_id: "org-1",
+            organization_location_id: "loc-1",
+            seller_id: "ansatt",
+          },
+        },
+        error: null,
+      },
+    });
+    rpcMock.mockImplementation(async (name: string) => ({
+      data: name === "can_access_organization_chat",
+      error: null,
+    }));
+    const result = await uploadMessageAttachment({
+      data: formData({ conversationId: CONVERSATION_ID, file: makeFile(1024) }),
+    });
+    expect(rpcMock).toHaveBeenCalledWith("can_access_organization_chat", {
+      _organization_id: "org-1",
+      _location_id: "loc-1",
+      _seller_id: "ansatt",
+      _user_id: USER_ID,
+    });
+    expect(result.path).toMatch(new RegExp(`^${CONVERSATION_ID}/`));
+  });
+
+  it("avviser bedriftsbruker uten chattilgang til lokasjonen", async () => {
+    mockConversationsTable({
+      maybeSingle: {
+        data: {
+          id: CONVERSATION_ID,
+          buyer_id: "kjoper",
+          seller_id: "ansatt",
+          listing: {
+            organization_id: "org-1",
+            organization_location_id: "loc-1",
+            seller_id: "ansatt",
+          },
+        },
+        error: null,
+      },
+    });
+    rpcMock.mockResolvedValue({ data: false, error: null });
+    await expect(
+      uploadMessageAttachment({
+        data: formData({ conversationId: CONVERSATION_ID, file: makeFile(1024) }),
+      }),
+    ).rejects.toThrow("Du er ikke deltaker");
+    expect(putObjectMock).not.toHaveBeenCalled();
+  });
+
   it("laster opp til VEDLEGG med nøkkelen {conversationId}/{uuid}.{ext} for en deltaker", async () => {
     mockConversationsTable({
       maybeSingle: {
@@ -662,6 +720,29 @@ describe("signMessageAttachmentUrls", () => {
     expect(Object.keys(result)).toEqual([path]);
     expect(presignGetUrlMock).toHaveBeenCalledTimes(1);
     expect(presignGetUrlMock).toHaveBeenCalledWith("VEDLEGG", path, 60 * 60);
+  });
+
+  it("signerer vedlegg for bedriftsbruker med chattilgang", async () => {
+    mockConversationsTable({
+      list: {
+        data: [
+          {
+            id: OTHER_CONVERSATION_ID,
+            buyer_id: "kjoper",
+            seller_id: "ansatt",
+            listing: {
+              organization_id: "org-1",
+              organization_location_id: "loc-1",
+              seller_id: "ansatt",
+            },
+          },
+        ],
+        error: null,
+      },
+    });
+    rpcMock.mockResolvedValue({ data: true, error: null });
+    const result = await signMessageAttachmentUrls({ data: { paths: [otherPath] } });
+    expect(Object.keys(result)).toEqual([otherPath]);
   });
 
   it("returnerer ingenting og gjør ingen oppslag for en tom liste", async () => {

@@ -299,6 +299,29 @@ export function effectiveFiltersForCategory(
   return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
 }
 
+/** Eldre importdata kan ha tallstrenger. Bare kategoriens effektive
+ * tallfelt konverteres; tekstvalg og ugyldige tall beholdes for validering. */
+export function normalizeNumericAttributes<T>(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, T>,
+): Record<string, T | number> {
+  const normalized: Record<string, T | number> = { ...attributes };
+  for (const filter of effectiveFiltersForCategory(categoryId, allFilters, categoriesById)) {
+    const value = normalized[filter.key];
+    if (
+      (filter.type === "number" || filter.type === "range") &&
+      typeof value === "string" &&
+      /^-?[0-9]+(\.[0-9]+)?$/.test(value) &&
+      Number.isFinite(Number(value))
+    ) {
+      normalized[filter.key] = Number(value);
+    }
+  }
+  return normalized;
+}
+
 /**
  * Første tallfelt (filtertype range/number) som har en verdi som ikke er et
  * endelig tall. Søket og forsiden leser disse som tall; en lagret tekst som

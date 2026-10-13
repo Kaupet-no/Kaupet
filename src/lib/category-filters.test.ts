@@ -6,6 +6,8 @@ import {
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
+  normalizeNumericAttributes,
+  findNonNumericAttribute,
   retainSearchAttributes,
   NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
@@ -319,5 +321,47 @@ describe("retainSearchAttributes", () => {
       { dropUnknown: true },
     );
     expect(Object.keys(kept)).toEqual(["color"]);
+  });
+});
+
+describe("normalisering av tallattributter (ekvivalensklasser)", () => {
+  const filters = [f({ category_id: "main", key: "year", type: "number" })];
+
+  it.each([
+    ["2020", 2020],
+    ["0", 0],
+    ["-12.5", -12.5],
+    [2020, 2020],
+  ])("normaliserer gyldig tall %j til %j", (year, expected) => {
+    const attributes = { year, brand: "2020" };
+    const normalized = normalizeNumericAttributes("sub", filters, byId, attributes);
+    expect(normalized).toEqual({ year: expected, brand: "2020" });
+    expect(attributes.year).toBe(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)).toBeNull();
+  });
+
+  it.each(["", "oops", "æøå😀", "0x10", "Infinity", "9".repeat(400), true, ["2020"]])(
+    "lar ugyldig tall %j bli avvist av valideringen",
+    (year) => {
+      const normalized = normalizeNumericAttributes("sub", filters, byId, { year });
+      expect(normalized.year).toEqual(year);
+      expect(findNonNumericAttribute("sub", filters, byId, normalized)?.key).toBe("year");
+    },
+  );
+
+  it.each([null, undefined])("beholder et usatt valgfritt felt %j", (year) => {
+    const normalized = normalizeNumericAttributes("sub", filters, byId, { year });
+    expect(normalized.year).toBe(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)).toBeNull();
+  });
+
+  it("respekterer barnets filtertype og ignorerer andre kategorier", () => {
+    const overridden = [...filters, f({ category_id: "sub", key: "year", type: "select" })];
+    expect(normalizeNumericAttributes("sub", overridden, byId, { year: "2020" })).toEqual({
+      year: "2020",
+    });
+    expect(normalizeNumericAttributes("other", filters, byId, { year: "2020" })).toEqual({
+      year: "2020",
+    });
   });
 });

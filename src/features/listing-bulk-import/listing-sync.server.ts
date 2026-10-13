@@ -5,6 +5,8 @@ import {
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
+  normalizeNumericAttributes,
+  findNonNumericAttribute,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -294,6 +296,8 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
   }
 
   const attributes = row.attributes;
+  const invalid = findNonNumericAttribute(category.id, ctx.filters, ctx.categoriesById, attributes);
+  if (invalid) return `${invalid.label_nb} må være et tall.`;
   const behavior = getCategoryBehavior(
     vehicleCategoryGroupFor(category.id, ctx.filters, ctx.categoriesById),
     isBoatCategory(category.id, ctx.filters, ctx.categoriesById),
@@ -337,6 +341,13 @@ export function validateSyncRow(
   }
   const normalized = normalizeBulkImportRow(schemaResult.data, row.rowNumber);
   if (isDraft) (normalized as { status?: string }).status = "draft";
+  const category = resolveCategory(normalized.category, ctx.categories);
+  normalized.attributes = normalizeNumericAttributes(
+    category?.id ?? null,
+    ctx.filters,
+    ctx.categoriesById,
+    normalized.attributes,
+  );
   const validationError = validateRowFields(normalized, ctx);
   if (validationError) return { ok: false, error: safeRowError(validationError) };
   return { ok: true, row: normalized };

@@ -9,6 +9,7 @@ import {
   attributesSchema,
   effectiveFiltersForCategory,
   findNonNumericAttribute,
+  normalizeNumericAttributes,
   getMissingRequiredFilters,
   normalizeFilter,
   isBoatCategory,
@@ -363,7 +364,12 @@ async function validateExistingListingForPublish(
   );
   const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
   if (!attributesResult.success) throw new ClientError("Annonsens attributter er ugyldige.", 400);
-  const attributes = attributesResult.data;
+  const attributes = normalizeNumericAttributes(
+    listing.category_id,
+    normalizedFilters,
+    categoriesById,
+    attributesResult.data,
+  );
   assertNumericAttributes(listing.category_id, normalizedFilters, categoriesById, attributes);
 
   if (categoryBehavior.requiresCategoryFilterValues) {
@@ -391,6 +397,7 @@ async function validateExistingListingForPublish(
     categoryBehavior,
   );
   if (fieldGroupError) throw new Error(fieldGroupError);
+  return attributes;
 }
 
 export const saveDraftListing = createServerFn({ method: "POST" })
@@ -657,35 +664,28 @@ export const createListing = createServerFn({ method: "POST" })
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
     );
     const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
-    const categoryBehavior = getCategoryBehavior(
-      vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
-      isBoatCategory(data.category_id, normalizedFilters, categoriesById),
-    );
-    const missing = categoryBehavior.requiresCategoryFilterValues
-      ? getMissingRequiredFilters(
-          data.category_id,
-          normalizedFilters,
-          categoriesById,
-          data.attributes ?? {},
-          [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
-        )
-      : [];
-    if (missing.length > 0) {
-      throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
-    }
-    assertNumericAttributes(
+    const attributes = normalizeNumericAttributes(
       data.category_id,
       normalizedFilters,
       categoriesById,
       data.attributes ?? {},
     );
+    const categoryBehavior = getCategoryBehavior(
+      vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
+      isBoatCategory(data.category_id, normalizedFilters, categoriesById),
+    );
+    const missing = categoryBehavior.requiresCategoryFilterValues
+      ? getMissingRequiredFilters(data.category_id, normalizedFilters, categoriesById, attributes, [
+          ...VEHICLE_EQUIPMENT_FILTER_KEYS,
+          ...categoryBehavior.requiredFilterExclusions,
+        ])
+      : [];
+    if (missing.length > 0) {
+      throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
+    }
+    assertNumericAttributes(data.category_id, normalizedFilters, categoriesById, attributes);
     if (categoryBehavior.requiresCategoryFilterValues) {
-      validatePartFitment(
-        data.category_id,
-        normalizedFilters,
-        categoriesById,
-        data.attributes ?? {},
-      );
+      validatePartFitment(data.category_id, normalizedFilters, categoriesById, attributes);
     }
 
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
@@ -716,7 +716,7 @@ export const createListing = createServerFn({ method: "POST" })
       known_issues: data.known_issues ?? null,
       no_known_issues: !!data.no_known_issues,
       maintenance_history: data.maintenance_history ?? null,
-      ...(data.attributes !== undefined && { attributes: data.attributes }),
+      ...(data.attributes !== undefined && { attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
     };
@@ -850,7 +850,7 @@ export const republishListing = createServerFn({ method: "POST" })
     if (!["draft", "archived", "sold", "expired"].includes(listing.status)) {
       throw new ClientError("Annonsen kan ikke publiseres på nytt fra denne statusen.", 409);
     }
-    await validateExistingListingForPublish(supabaseAdmin, listing);
+    const attributes = await validateExistingListingForPublish(supabaseAdmin, listing);
     if (listing.status !== "draft") {
       await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
     } else if (listing.organization_id) {
@@ -871,12 +871,14 @@ export const republishListing = createServerFn({ method: "POST" })
     const { data: updated, error } = await supabaseAdmin
       .from("listings")
       .update({
+        attributes,
         status: "active",
         published_at: now,
         expires_at: expiresAt,
       })
       .eq("id", data.id)
       .eq("status", listing.status)
+      .eq("updated_at", listing.updated_at)
       .select("id, status, published_at, expires_at")
       .single();
     if (error) {

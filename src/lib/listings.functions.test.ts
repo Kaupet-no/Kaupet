@@ -660,3 +660,54 @@ it("avviser et ikke-numerisk tallattributt før publisering", async () => {
   ).rejects.toMatchObject({ status: 400, message: "Hestekrefter må være et tall." });
   expect(db.inserts).toEqual([]);
 });
+
+it.each(["create", "republish"])(
+  "%s normaliserer eldre tallstrenger før validering og lagring",
+  async (operation) => {
+    setOrganization("superuser");
+    db.rpc.mockImplementation(async (name: string) => ({
+      data: [
+        "can_create_organization_listing",
+        "can_update_organization_listing",
+        "organization_has_proff_access",
+      ].includes(name)
+        ? true
+        : null,
+      error: null,
+    }));
+    db.tableData = {
+      category_filters: [
+        {
+          id: "f1",
+          category_id: categoryId,
+          key: "width_cm",
+          label_nb: "Bredde",
+          type: "number",
+          sort_order: 0,
+        },
+      ],
+      categories: [{ id: categoryId, parent_id: null }],
+      category_flows: [],
+    };
+    const attributes = { width_cm: "40", brand: "2020" };
+    if (operation === "create") {
+      await createListing({ data: { ...listingInput, attributes } });
+      expect(db.inserts.find((row) => row.table === "listings")?.value).toMatchObject({
+        attributes: { width_cm: 40, brand: "2020" },
+      });
+    } else {
+      db.listing = {
+        ...listingInput,
+        id: categoryId,
+        seller_id: "user-id",
+        organization_id: organizationId,
+        status: "draft",
+        attributes,
+      };
+      await republishListing({ data: { id: categoryId } });
+      expect(db.updates).toHaveBeenCalledWith(
+        expect.objectContaining({ attributes: { width_cm: 40, brand: "2020" }, status: "active" }),
+      );
+    }
+  },
+);

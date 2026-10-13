@@ -478,3 +478,29 @@ describe("syncListings — utkast via MCP", () => {
     expect(supabaseAdmin.rpc).not.toHaveBeenCalled();
   });
 });
+
+it.each(["40", "oops"])("synk validerer og normaliserer tallfeltet %j før RPC", async (width) => {
+  const ctx = makeContext();
+  ctx.filters = [
+    {
+      id: "f1",
+      category_id: categoryId,
+      key: "width_cm",
+      label_nb: "Bredde",
+      type: "number",
+      sort_order: 0,
+    } as SyncContext["filters"][number],
+  ];
+  const admin = makeSupabaseAdmin({
+    rpcImpl: (_name, args) => {
+      expect(args._listing).toMatchObject({ attributes: { width_cm: 40, brand: "2020" } });
+      return { data: { status: "created", listing_id: "listing-1" }, error: null };
+    },
+  });
+  const result = await syncListings(admin, ctx, {
+    importId,
+    mode: "create",
+    rows: [makeRow({ attributes: { width_cm: width, brand: "2020" } })],
+  });
+  expect(result[0].status).toBe(width === "40" ? "created" : "failed");
+});

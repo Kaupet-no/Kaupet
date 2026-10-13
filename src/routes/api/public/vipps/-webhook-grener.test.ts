@@ -18,6 +18,7 @@ const s = vi.hoisted(() => ({
   live: [] as { id: string }[],
   logServerError: vi.fn(),
   updateError: {} as Record<string, unknown>,
+  lookupError: {} as Record<string, unknown>,
   calls: [] as Call[],
   getVippsPayment: vi.fn(),
   captureVippsPayment: vi.fn(),
@@ -45,8 +46,12 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         eq: () => ({
           in: () => ({ neq: () => ({ limit: async () => ({ data: s.live, error: null }) }) }),
           maybeSingle: async () => ({
-            data: table === "vipps_webhook_events" ? s.existingEvent : s.promo,
-            error: null,
+            data: s.lookupError[table]
+              ? null
+              : table === "vipps_webhook_events"
+                ? s.existingEvent
+                : s.promo,
+            error: s.lookupError[table] ?? null,
           }),
         }),
       }),
@@ -112,6 +117,7 @@ beforeEach(() => {
   s.existingEvent = null;
   s.promo = { ...pendingPromo };
   s.updateError = {};
+  s.lookupError = {};
   s.live = [];
   s.logServerError.mockReset().mockResolvedValue(undefined);
   s.releaseSupersededPromotionPayment.mockReset().mockResolvedValue(undefined);
@@ -484,5 +490,48 @@ describe("Vipps-webhook: statusoverganger", () => {
     expect((await post()).status).toBe(503);
     expect(promoUpdates()).toEqual([]);
     expect(processed()).toBe(false);
+  });
+});
+
+// KG-05-F02: en databasefeil må aldri kvittere hendelsen som behandlet.
+describe("Vipps-webhook: databasefeil er retrybare", () => {
+  it("svarer 503 uten å markere behandlet når fremhevingsoppslaget feiler", async () => {
+    s.lookupError = { listing_promotions: { message: "timeout" } };
+    const res = await post();
+    expect(res.status).toBe(503);
+    expect(processed()).toBe(false);
+    expect(s.getVippsPayment).not.toHaveBeenCalled();
+  });
+
+  it("aktiverer betalingen når Vipps prøver igjen etter feilen", async () => {
+    s.lookupError = { listing_promotions: { message: "timeout" } };
+    expect((await post()).status).toBe(503);
+    s.lookupError = {};
+    s.existingEvent = { id: "evt", processed_at: null };
+    s.getVippsPayment.mockResolvedValue({
+      state: "AUTHORIZED",
+      aggregate: { authorizedAmount: nok(1000), capturedAmount: nok(0) },
+    });
+    expect((await post()).status).toBe(200);
+    expect(promoUpdates().some((c) => c.values.status === "active")).toBe(true);
+    expect(processed()).toBe(true);
+  });
+
+  it("svarer 503 når hendelsesoppslaget feiler", async () => {
+    s.lookupError = { vipps_webhook_events: { message: "timeout" } };
+    expect((await post()).status).toBe(503);
+    expect(s.calls).toEqual([]);
+  });
+
+  it("svarer 503 når hendelsen ikke kan markeres behandlet", async () => {
+    s.promo = null;
+    s.updateError = { "vipps_webhook_events:": { message: "timeout" } };
+    expect((await post()).status).toBe(503);
+  });
+
+  it("kvitterer fortsatt ukjent referanse når oppslaget lykkes", async () => {
+    s.promo = null;
+    expect((await post()).status).toBe(200);
+    expect(processed()).toBe(true);
   });
 });

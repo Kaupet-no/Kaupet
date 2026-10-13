@@ -81,12 +81,27 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
 
         const supabaseAdmin = await getSupabaseAdmin();
 
+        // Databasefeil gir 503 så Vipps prøver igjen; hendelsen markeres
+        // behandlet bare etter at oppslaget faktisk har lykkes.
+        const retryLater = (scope: string, error: unknown) => {
+          console.error(`[vipps webhook] ${scope} failed`, describeSafeError(error));
+          return new Response("Retry later", { status: 503 });
+        };
+        const markProcessed = async () => {
+          const { error } = await supabaseAdmin
+            .from("vipps_webhook_events")
+            .update({ processed_at: new Date().toISOString() })
+            .eq("event_id", eventId);
+          return error ? retryLater("mark processed", error) : new Response("ok", { status: 200 });
+        };
+
         // Idempotency
-        const { data: existing } = await supabaseAdmin
+        const { data: existing, error: existingError } = await supabaseAdmin
           .from("vipps_webhook_events")
           .select("id, processed_at")
           .eq("event_id", eventId)
           .maybeSingle();
+        if (existingError) return retryLater("event lookup", existingError);
         if (existing?.processed_at) {
           return new Response("ok", { status: 200 });
         }
@@ -98,36 +113,30 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Stale webhook", { status: 401 });
         }
         if (!existing) {
-          await supabaseAdmin.from("vipps_webhook_events").insert({
+          const { error: insertError } = await supabaseAdmin.from("vipps_webhook_events").insert({
             event_id: eventId,
             reference: reference ?? null,
             event_name: eventName ?? null,
             payload: payload as never,
           });
+          // 23505: en samtidig levering av samme hendelse rakk å lagre den.
+          if (insertError && insertError.code !== "23505") {
+            return retryLater("event insert", insertError);
+          }
         }
 
-        if (!reference) {
-          await supabaseAdmin
-            .from("vipps_webhook_events")
-            .update({ processed_at: new Date().toISOString() })
-            .eq("event_id", eventId);
-          return new Response("ok");
-        }
+        if (!reference) return markProcessed();
 
         // Look up promotion
-        const { data: promo } = await supabaseAdmin
+        const { data: promo, error: promoError } = await supabaseAdmin
           .from("listing_promotions")
           .select("id, listing_id, status, duration_days, price_nok, vipps_mode")
           .eq("vipps_reference", reference)
           .maybeSingle();
+        if (promoError) return retryLater("promotion lookup", promoError);
 
-        if (!promo) {
-          await supabaseAdmin
-            .from("vipps_webhook_events")
-            .update({ processed_at: new Date().toISOString() })
-            .eq("event_id", eventId);
-          return new Response("ok");
-        }
+        // Ukjent referanse (f.eks. en annen tjenestes betaling) kvitteres.
+        if (!promo) return markProcessed();
 
         // Re-fetch authoritative state from Vipps, using the environment the
         // transaction was created in — not the request's host.
@@ -262,12 +271,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Retry later", { status: 503 });
         }
 
-        await supabaseAdmin
-          .from("vipps_webhook_events")
-          .update({ processed_at: new Date().toISOString() })
-          .eq("event_id", eventId);
-
-        return new Response("ok", { status: 200 });
+        return markProcessed();
       },
     },
   },

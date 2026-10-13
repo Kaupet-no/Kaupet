@@ -325,12 +325,18 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
 export function validateSyncRow(
   row: BulkImportRow,
   ctx: SyncContext,
+  allowDraftStatus = false,
 ): { ok: true; row: BulkImportRow } | { ok: false; error: string } {
-  const schemaResult = bulkImportRowSchema.safeParse(row);
+  // Excel-/REST-kontrakten godtar bare active/sold/archived. MCP kan i tillegg
+  // opprette en ny annonse som utkast (KG-08-F01); `syncListings` avviser
+  // utkast for eksisterende referanser.
+  const isDraft = allowDraftStatus && (row.status as string) === "draft";
+  const schemaResult = bulkImportRowSchema.safeParse(isDraft ? { ...row, status: undefined } : row);
   if (!schemaResult.success) {
     return { ok: false, error: schemaResult.error.issues.map((issue) => issue.message).join(" ") };
   }
   const normalized = normalizeBulkImportRow(schemaResult.data, row.rowNumber);
+  if (isDraft) (normalized as { status?: string }).status = "draft";
   const validationError = validateRowFields(normalized, ctx);
   if (validationError) return { ok: false, error: safeRowError(validationError) };
   return { ok: true, row: normalized };
@@ -421,9 +427,11 @@ export async function syncListings(
     rows: BulkImportRow[];
     mode: "create" | "upsert";
     dryRun?: boolean;
+    /** Bare MCP: tillat `status: "draft"` ved opprettelse av ny annonse. */
+    allowDraftStatus?: boolean;
   },
 ): Promise<ListingSyncResult[]> {
-  const { importId, rows, mode, dryRun = false } = params;
+  const { importId, rows, mode, dryRun = false, allowDraftStatus = false } = params;
 
   const externalIds = Array.from(
     new Set(rows.map((row) => String(row.externalId ?? "").trim()).filter(Boolean)),
@@ -450,12 +458,20 @@ export async function syncListings(
       batch.map(async (row): Promise<ListingSyncResult> => {
         const rowNumber = row.rowNumber;
         const externalId = String(row.externalId ?? "");
-        const validated = validateSyncRow(row, ctx);
+        const validated = validateSyncRow(row, ctx, allowDraftStatus);
         if (!validated.ok) {
           return { rowNumber, externalId, status: "failed", error: validated.error };
         }
         const normalized = validated.row;
         const wouldCreate = !existingRefs.has(normalized.externalId);
+        if (!wouldCreate && (normalized.status as string) === "draft") {
+          return {
+            rowNumber,
+            externalId: normalized.externalId,
+            status: "failed",
+            error: "Bare nye annonser kan lagres som utkast.",
+          };
+        }
         if (wouldCreate && (normalized.status === "sold" || normalized.status === "archived")) {
           return {
             rowNumber,

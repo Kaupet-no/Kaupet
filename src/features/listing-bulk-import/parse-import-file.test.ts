@@ -102,6 +102,61 @@ describe("bulk import parser", () => {
     expect(parsed.rows[0]?.externalId).toBe("xlsx-1");
   });
 
+  // KG-09-F02: SheetJS sin sheetRows kuttet rad 501 bort uten feil.
+  it("avviser 501 XLSX-annonser i stedet for å avkorte dem stille", async () => {
+    const XLSX = await import("@e965/xlsx");
+    const header = ["external_id", "category", "title", "description", "price"];
+    const rows = Array.from({ length: 501 }, (_, i) => [
+      `sku-${i}`,
+      "sykler",
+      "En sykkel",
+      "Dette er en god beskrivelse av varen.",
+      "4500",
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([["Ledetekst"], header, [], ...rows]),
+      "Annonser",
+    );
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    await expect(parseImportFile(new File([bytes], "annonser.xlsx"))).rejects.toThrow(
+      /maksimalt 500/,
+    );
+  });
+
+  it("leser alle 500 XLSX-annonser selv med mange tomme rader imellom", async () => {
+    const XLSX = await import("@e965/xlsx");
+    const header = ["external_id", "category", "title", "description", "price"];
+    const rows = Array.from({ length: 500 }, (_, i) => [
+      [`sku-${i}`, "sykler", "En sykkel", "Dette er en god beskrivelse av varen.", "4500"],
+      [],
+    ]).flat();
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([header, ...rows]), "Annonser");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const parsed = await parseImportFile(new File([bytes], "annonser.xlsx"));
+    expect(parsed.rows).toHaveLength(500);
+  });
+
+  it("avviser data utenfor den fysiske radgrensen i stedet for å kutte den", async () => {
+    const XLSX = await import("@e965/xlsx");
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["external_id", "category", "title", "description", "price"],
+    ]);
+    XLSX.utils.sheet_add_aoa(
+      sheet,
+      [["sku-sent", "sykler", "En sykkel", "Dette er en god beskrivelse av varen.", "4500"]],
+      { origin: "A6000" },
+    );
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Annonser");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    await expect(parseImportFile(new File([bytes], "annonser.xlsx"))).rejects.toThrow(
+      /Fjern tomme rader/,
+    );
+  });
+
   it("avviser fil- og radgrenser før oppretting", async () => {
     const tooLarge = new File([new Uint8Array(MAX_IMPORT_FILE_BYTES + 1)], "annonser.csv");
     await expect(parseImportFile(tooLarge)).rejects.toThrow("5 MB");

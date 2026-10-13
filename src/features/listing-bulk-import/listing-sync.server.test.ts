@@ -437,3 +437,44 @@ describe("syncListings", () => {
     });
   });
 });
+
+// KG-08-F01: MCP-standarden «nytt utkast» ble avvist av den delte synkvalideringen.
+describe("syncListings — utkast via MCP", () => {
+  const draftRow = () => makeRow({ status: "draft" as BulkImportRow["status"] });
+
+  it("oppretter ny annonse som utkast når allowDraftStatus er satt", async () => {
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: () => ({ data: { status: "created", listing_id: "listing-1" }, error: null }),
+    });
+    const [result] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+      allowDraftStatus: true,
+    });
+    expect(result.status).toBe("created");
+    const rpcArgs = (supabaseAdmin.rpc as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(rpcArgs._listing.status).toBe("draft");
+  });
+
+  it("avviser fortsatt utkast for REST/Excel og for eksisterende referanser", async () => {
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["external-1"],
+      rpcImpl: () => ({ data: { status: "updated", listing_id: "listing-1" }, error: null }),
+    });
+    const [rest] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+    });
+    const [existing] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+      allowDraftStatus: true,
+    });
+    expect(rest.status).toBe("failed");
+    expect(existing.status).toBe("failed");
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalled();
+  });
+});

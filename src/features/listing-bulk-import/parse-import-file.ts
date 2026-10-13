@@ -326,18 +326,24 @@ function mapRows(
   return { fileName, rows: parsedRows, errors };
 }
 
+/** Ressursgrense for fysiske rader som leses. Romslig over malens to
+ * overskriftsrader + maks antall annonser, så tomme rader i midten ikke kutter
+ * data; alt over grensen avvises i stedet for å avkortes stille (KG-09-F02). */
+const XLSX_PHYSICAL_ROW_LIMIT = MAX_IMPORT_ROWS * 10;
+
 async function parseXlsx(file: File): Promise<unknown[][]> {
   try {
     const XLSX = await import("@e965/xlsx/dist/xlsx.mini.min");
     const workbook = XLSX.read(await file.arrayBuffer(), {
       type: "array",
-      sheetRows: MAX_IMPORT_ROWS + 3,
+      sheetRows: XLSX_PHYSICAL_ROW_LIMIT,
     });
     if (workbook.SheetNames.length === 0) {
       throw new ImportFileError("Excel-filen mangler et regneark.");
     }
     for (const sheetName of workbook.SheetNames) {
-      const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",
         raw: false,
@@ -346,7 +352,20 @@ async function parseXlsx(file: File): Promise<unknown[][]> {
         const headers = new Set(row.map((cell) => String(cell).trim().toLocaleLowerCase("nb-NO")));
         return [...requiredColumns].every((column) => headers.has(column));
       });
-      if (hasImportHeader) return rows;
+      if (!hasImportHeader) continue;
+      // `sheetRows` kutter arket; `!fullref` beholder det opprinnelige området.
+      const fullRef = sheet["!fullref"];
+      const readRef = sheet["!ref"];
+      if (
+        fullRef &&
+        readRef &&
+        XLSX.utils.decode_range(fullRef).e.r > XLSX.utils.decode_range(readRef).e.r
+      ) {
+        throw new ImportFileError(
+          `Regnearket har over ${XLSX_PHYSICAL_ROW_LIMIT} rader. Fjern tomme rader nederst eller del opp filen (maks ${MAX_IMPORT_ROWS} annonser).`,
+        );
+      }
+      return rows;
     }
     throw new ImportFileError("Excel-filen mangler et ark med importkolonnene.");
   } catch (error) {

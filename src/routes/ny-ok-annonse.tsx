@@ -262,7 +262,7 @@ function NewWtbPage() {
     trigger,
     control,
     setValue,
-    formState: { errors, touchedFields, dirtyFields, isSubmitted, isDirty },
+    formState: { errors, touchedFields, dirtyFields, isSubmitted },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
@@ -351,6 +351,7 @@ function NewWtbPage() {
   );
   const {
     restorableDraft,
+    draftId,
     lastSaved,
     draftSaveError,
     isSaving,
@@ -660,9 +661,12 @@ function NewWtbPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, restorableDraft]);
 
+  // Samme regel som salgsflyten (ny-annonse.tsx): går brukeren videre uten å
+  // svare på tilbudet, forkastes det lokale utkastet, mens serverutkastet
+  // blir liggende under Mine annonser.
   useEffect(() => {
-    if (restorableDraft && (isDirty || stepIndex > 0)) dismissDraftOffer();
-  }, [restorableDraft, isDirty, stepIndex, dismissDraftOffer]);
+    if (stepIndex > 0) dismissDraftOffer();
+  }, [stepIndex, dismissDraftOffer]);
 
   if (actorChanged)
     return (
@@ -914,6 +918,11 @@ function NewWtbPage() {
                 {restorableDraft.title.trim()
                   ? `Utkast for annonse "${restorableDraft.title}" er lagret. Vil du fortsette der du slapp?`
                   : "Du har et lagret utkast. Vil du fortsette der du slapp?"}
+                <span className="mt-0.5 block text-muted-foreground">
+                  {draftId
+                    ? "Går du videre, ligger det under Mine annonser."
+                    : "Går du videre, forkastes det."}
+                </span>
               </span>
               <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
                 <Button

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -35,7 +35,6 @@ const passwordFormSchema = z
 type PasswordForm = z.infer<typeof passwordFormSchema>;
 
 export function AccountSection() {
-  const qc = useQueryClient();
   const navigate = useNavigate();
   const {
     data: userData,
@@ -184,7 +183,6 @@ export function AccountSection() {
             onClick={async () => {
               setSigningOut(true);
               await supabase.auth.signOut();
-              qc.clear();
               void navigate({ to: "/" });
             }}
           >

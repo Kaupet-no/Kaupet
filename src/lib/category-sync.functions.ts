@@ -27,36 +27,61 @@ function assertProductionEnvironment() {
   }
 }
 
+const SYNC_PAGE_SIZE = 500;
+
+/** Offset-paging kan hoppe over rader når staging redigeres under henting.
+ * Bruk siste ID som markør og avvis endret antall før synken kan slette noe. */
+async function fetchAllRows<T extends { id: string }>(
+  client: SupabaseClient<Database>,
+  table: "categories" | "category_filters" | "category_flows" | "filter_synonyms",
+): Promise<T[]> {
+  const rows: T[] = [];
+  const readCount = async () => {
+    const { count, error } = await client.from(table).select("id", { count: "exact", head: true });
+    if (error) throw await toClientError("database", error);
+    return count ?? -1;
+  };
+  const total = await readCount();
+  let hasMore: boolean;
+  do {
+    let query = client
+      .from(table)
+      .select("*")
+      .order("id")
+      .range(0, SYNC_PAGE_SIZE - 1);
+    const lastId = rows.at(-1)?.id;
+    if (lastId) query = query.gt("id", lastId);
+    const { data, error } = await query;
+    if (error) throw await toClientError("database", error);
+    rows.push(...((data ?? []) as unknown as T[]));
+    hasMore = data?.length === SYNC_PAGE_SIZE;
+  } while (hasMore && rows.length <= total);
+  if (rows.length !== total || (await readCount()) !== total) {
+    throw new Error(
+      `Kunne ikke hente hele ${table} (${rows.length} av ${total} rader). Synken er avbrutt.`,
+    );
+  }
+  return rows;
+}
+
 async function fetchCategorySyncTables(client: SupabaseClient<Database>) {
   const [categories, categoryFilters, categoryFlows, filterSynonyms, siteSettings] =
     await Promise.all([
-      client.from("categories").select("*"),
-      client.from("category_filters").select("*"),
-      client.from("category_flows").select("*"),
-      client.from("filter_synonyms").select("*"),
+      fetchAllRows<CategoryRow>(client, "categories"),
+      fetchAllRows<CategoryFilterRow>(client, "category_filters"),
+      fetchAllRows<CategoryFlowRow>(client, "category_flows"),
+      fetchAllRows<FilterSynonymRow>(client, "filter_synonyms"),
       client.from("site_settings").select("default_search_examples").eq("id", true).single(),
     ]);
-  if (categories.error) {
-    throw await toClientError("database", categories.error);
-  }
-  if (categoryFilters.error) {
-    throw await toClientError("database", categoryFilters.error);
-  }
-  if (categoryFlows.error) {
-    throw await toClientError("database", categoryFlows.error);
-  }
-  if (filterSynonyms.error) {
-    throw await toClientError("database", filterSynonyms.error);
-  }
   if (siteSettings.error) {
     throw await toClientError("database", siteSettings.error);
   }
 
   return {
-    categories: categories.data as CategoryRow[],
-    categoryFilters: categoryFilters.data as CategoryFilterRow[],
-    categoryFlows: categoryFlows.data as CategoryFlowRow[],
-    filterSynonyms: filterSynonyms.data as FilterSynonymRow[],
+    categories,
+    categoryFilters,
+    categoryFlows,
+    filterSynonyms,
     defaultSearchExamples: siteSettings.data.default_search_examples,
   };
 }

@@ -7,23 +7,22 @@ async function waitForHydration(page: Page) {
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
-test("innlogget Proff-toppfelt har tilgjengelige kontroller uten horisontal scrolling", async ({
-  page,
-}) => {
-  const { users } = JSON.parse(readFileSync(new URL(".auth/user.json", import.meta.url), "utf8"));
-  // Proff-logoen er bredere enn privatlogoen og utløste DEF-A11Y-03.
-  await login(
+// Egen kontekst per bredde: en hard navigasjon rett etter /meldinger kan
+// avbryte auth-prefetch og gi en falsk CORS-pageerror i WebKit på Linux.
+for (const width of [320, 375, 1280]) {
+  test(`innlogget Proff-toppfelt har tilgjengelige kontroller uten horisontal scrolling ved ${width}px`, async ({
     page,
-    users["desktop-web"].email,
-    users["desktop-web"].password,
-    "/bedriftsinvitasjon",
-  );
-
-  for (const width of [320, 375, 1280]) {
+  }) => {
     await page.setViewportSize({ width, height: 812 });
-    if (new URL(page.url()).pathname !== "/bedriftsinvitasjon") {
-      await page.goto("/bedriftsinvitasjon");
-    }
+    const { users } = JSON.parse(readFileSync(new URL(".auth/user.json", import.meta.url), "utf8"));
+    // Proff-logoen er bredere enn privatlogoen og utløste DEF-A11Y-03.
+    await login(
+      page,
+      users["desktop-web"].email,
+      users["desktop-web"].password,
+      "/bedriftsinvitasjon",
+    );
+
     await waitForHydration(page);
     const nav = page.getByRole("navigation", { name: "Hovednavigasjon" });
     await expect(nav.getByText("Proff", { exact: true })).toBeVisible();
@@ -77,8 +76,8 @@ test("innlogget Proff-toppfelt har tilgjengelige kontroller uten horisontal scro
     await nav.getByRole("link", { name: /^Meldinger/ }).click();
     await expect(page).toHaveURL(/\/meldinger/);
     await expect(page.getByRole("heading", { level: 1, name: "Meldinger" })).toBeVisible();
-  }
-});
+  });
+}
 
 // Safari on macOS uses Option-Tab for all controls with the default keyboard
 // preference. Use real keyboard navigation without changing the user's OS:

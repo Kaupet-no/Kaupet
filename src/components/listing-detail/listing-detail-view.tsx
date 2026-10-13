@@ -289,7 +289,12 @@ export function ListingDetailView({
   const closeMapOverlay = useCallback(() => setMapOverlayOpen(false), []);
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
-  const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
+  // Ett objekt i stedet for has360 + løse rammer: 360-visning kan da ikke
+  // aktiveres uten at rammene faktisk følger med (KG-31-F01).
+  const vehicle360 =
+    vehicle360Frames && vehicle360Frames.length > 0
+      ? { frames: vehicle360Frames, imgUrls: vehicle360ImgUrls ?? {} }
+      : undefined;
   // Persistent kontakthandling er kjøperreisens primære konvertering — skal
   // ikke avhenge av at brukeren scroller forbi bilder/spesifikasjoner for å
   // finne selgerkortet. Vist på mobilweb; desktop web har allerede
@@ -481,7 +486,7 @@ export function ListingDetailView({
       attributes={attributes}
       canShip={canShip ?? null}
       relatedListingsSlot={relatedListingsSlot}
-      vehicle360ImgUrls={vehicle360ImgUrls}
+      vehicle360={vehicle360}
       actionsMenuSlot={actionsMenuSlot}
       ownerStatsSlot={ownerStatsSlot}
       requiresDeliveryMethod={requiresDeliveryMethod}
@@ -499,7 +504,6 @@ export function ListingDetailView({
       closeLightbox={closeLightbox}
       closeMapOverlay={closeMapOverlay}
       sortedImages={sortedImages}
-      has360={has360}
       showStickyContact={showStickyContact}
       priceLabel={priceLabel}
       priceBlock={priceBlock}
@@ -571,8 +575,7 @@ function ListingDetailViewBody({
   attributes,
   requiresDeliveryMethod,
   canShip,
-  vehicle360Frames,
-  vehicle360ImgUrls,
+  vehicle360,
   actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
@@ -590,7 +593,6 @@ function ListingDetailViewBody({
   closeLightbox,
   closeMapOverlay,
   sortedImages,
-  has360,
   showStickyContact,
   priceLabel,
   priceBlock,
@@ -631,8 +633,7 @@ function ListingDetailViewBody({
   attributes: Record<string, unknown>;
   requiresDeliveryMethod: boolean;
   canShip: boolean | null;
-  vehicle360Frames?: Vehicle360Frame[];
-  vehicle360ImgUrls?: Record<string, string>;
+  vehicle360?: { frames: Vehicle360Frame[]; imgUrls: Record<string, string> };
   actionsMenuSlot?: ReactNode;
   ownerStatsSlot?: ReactNode;
   sellerContactSlot?: ReactNode;
@@ -650,7 +651,6 @@ function ListingDetailViewBody({
   closeLightbox: () => void;
   closeMapOverlay: () => void;
   sortedImages: { storage_path: string; sort_order: number; caption?: string | null }[];
-  has360: boolean;
   showStickyContact: boolean;
   priceLabel: string;
   priceBlock: ReactNode;
@@ -677,7 +677,7 @@ function ListingDetailViewBody({
   // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
   // brukes) dersom slug mangler eller ikke finnes i tabellen.
   const vehicleLeafSlug = isVehicleListing ? (category?.slug as VehicleLeafSlug) : null;
-  const hasGalleryContent = has360 || sortedImages.length > 0;
+  const hasGalleryContent = !!vehicle360 || sortedImages.length > 0;
   const [wideGallery, setWideGallery] = useWideGallery();
   // Bredde-valget gjelder bare der siden faktisk har to kolonner. Under md
   // ville "én kolonne" bare flyttet prisen opp foran bildet uten å gjøre
@@ -697,9 +697,7 @@ function ListingDetailViewBody({
       title={title}
       onImageClick={setLightboxIndex}
       thumbnailsOverlay={!galleryInColumn}
-      vehicle360={
-        has360 ? { frames: vehicle360Frames!, imgUrls: vehicle360ImgUrls ?? {} } : undefined
-      }
+      vehicle360={vehicle360}
     />
   ) : null;
 
@@ -1413,9 +1411,7 @@ function ListingDetailViewBody({
             initialIndex={lightboxIndex}
             title={title}
             onClose={closeLightbox}
-            vehicle360={
-              has360 ? { frames: vehicle360Frames!, imgUrls: vehicle360ImgUrls ?? {} } : undefined
-            }
+            vehicle360={vehicle360}
           />
         </Suspense>
       )}

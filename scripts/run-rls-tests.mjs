@@ -57,6 +57,7 @@ const result = spawnSync(
     "src/lib/listing-search-semantics.integration.test.ts",
     "src/lib/listing-search-attributes.integration.test.ts",
     "src/features/listing-bulk-import/listing-bulk-import.integration.test.ts",
+    "src/features/listing-bulk-import/listing-sync.integration.test.ts",
   ],
   { stdio: "inherit", env: { ...process.env, ...localEnv } },
 );

@@ -91,7 +91,11 @@ export function VehiclePlateEditDialog({
 
       await saveListingField(
         listingId,
-        { group: "attributes", attributes: nextAttributes },
+        {
+          group: "attributes",
+          attributes: nextAttributes,
+          removedKeys: Object.keys(attributes).filter((key) => !(key in nextAttributes)),
+        },
         { behavior: getCategoryBehavior(vehicleGroup) },
       );
       await queryClient.invalidateQueries({ queryKey: ["listing", kaupetCode] });

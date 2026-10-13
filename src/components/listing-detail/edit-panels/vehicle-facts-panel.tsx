@@ -40,9 +40,12 @@ export function VehicleFactsPanel({
     setSaving(true);
     try {
       const attrs: Record<string, unknown> = { eu_control_exempt: exempt };
+      const removedKeys: string[] = [];
       if (km.trim() !== "") attrs.mileage_km = Number(km);
+      else removedKeys.push("mileage_km");
       if (drive.trim() !== "") attrs.drive_type = drive.trim();
-      await editCtx?.saveField({ group: "attributes", attributes: attrs });
+      else removedKeys.push("drive_type");
+      await editCtx?.saveField({ group: "attributes", attributes: attrs, removedKeys });
       onClose();
     } finally {
       setSaving(false);

@@ -200,6 +200,23 @@ function AuthPage() {
 
   const webOrigin = () => (isNative() ? "https://kaupet.no" : window.location.origin);
 
+  // Bot-sjekken kjører i bakgrunnen fra siden lastes, og er nesten alltid
+  // ferdig før noen rekker å fylle ut skjemaet. Vi venter på token her i
+  // stedet for å låse knappen, slik at ventingen (om den skjer) foregår
+  // etter klikk med vanlig lastetilstand. Bare ett skjema er montert om
+  // gangen, så alle deler samme widget-ref.
+  const getCaptchaToken = async () =>
+    turnstileEnabled
+      ? ((await turnstileRef.current?.getResponsePromise()) ?? undefined)
+      : undefined;
+  const turnstileWidget = turnstileEnabled && (
+    <Turnstile
+      ref={turnstileRef}
+      siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+      options={{ appearance: "interaction-only", action: "kaupet" }}
+    />
+  );
+
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!(await trigger("email"))) return;
@@ -207,6 +224,7 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(getValues("email"), {
         redirectTo: `${webOrigin()}/tilbakestill-passord`,
+        captchaToken: await getCaptchaToken(),
       });
       if (error) throw error;
       showSuccessToast(
@@ -215,6 +233,8 @@ function AuthPage() {
     } catch (err: unknown) {
       showErrorToast(formatErrorMessage(err, "Kunne ikke sende e-post. Prøv igjen."));
     } finally {
+      // Tokenet er engangsbruk — hent et nytt før neste forsøk.
+      turnstileRef.current?.reset();
       setLoading(false);
     }
   };
@@ -228,7 +248,10 @@ function AuthPage() {
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: getValues("email"),
-        options: { emailRedirectTo: authConfirmationRedirect(returnTo, webOrigin()) },
+        options: {
+          emailRedirectTo: authConfirmationRedirect(returnTo, webOrigin()),
+          captchaToken: await getCaptchaToken(),
+        },
       });
       if (error) throw error;
       resendCooldown.startCooldown();
@@ -236,6 +259,7 @@ function AuthPage() {
     } catch (err: unknown) {
       showErrorToast(formatErrorMessage(err, "Kunne ikke sende e-post. Prøv igjen."));
     } finally {
+      turnstileRef.current?.reset();
       setResendLoading(false);
     }
   };
@@ -243,20 +267,14 @@ function AuthPage() {
   const onSubmit = async (values: AuthForm) => {
     setLoading(true);
     try {
-      // Bot-sjekken kjører i bakgrunnen fra siden lastes, og er nesten alltid
-      // ferdig før noen rekker å fylle ut skjemaet. Vi venter på token her i
-      // stedet for å låse knappen, slik at ventingen (om den skjer) foregår
-      // etter klikk med vanlig lastetilstand.
-      const turnstileToken = turnstileEnabled
-        ? await turnstileRef.current?.getResponsePromise()
-        : undefined;
+      const turnstileToken = await getCaptchaToken();
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
           email: values.email,
           password: values.password,
           options: {
             emailRedirectTo: authConfirmationRedirect(returnTo, webOrigin()),
-            captchaToken: turnstileToken ?? undefined,
+            captchaToken: turnstileToken,
             data: {
               display_name: values.displayName || values.email.split("@")[0],
               terms_accepted_version: TERMS_VERSION,
@@ -274,7 +292,7 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
-          options: { captchaToken: turnstileToken ?? undefined },
+          options: { captchaToken: turnstileToken },
         });
         if (error) throw error;
         showSuccessToast("Velkommen tilbake!");
@@ -386,6 +404,7 @@ function AuthPage() {
                   </p>
                 )}
               </div>
+              {turnstileWidget}
               <Button type="submit" className="w-full gap-2" disabled={loading}>
                 {loading && <Loader2 className="size-4 animate-spin" />}
                 Send lenke
@@ -429,6 +448,7 @@ function AuthPage() {
                   </p>
                 )}
               </div>
+              {turnstileWidget}
               <Button
                 type="submit"
                 className="w-full gap-2"
@@ -618,13 +638,7 @@ function AuthPage() {
                   )}
                 </div>
               )}
-              {turnstileEnabled && (
-                <Turnstile
-                  ref={turnstileRef}
-                  siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                  options={{ appearance: "interaction-only", action: "kaupet" }}
-                />
-              )}
+              {turnstileWidget}
               <Button
                 type="submit"
                 className="w-full gap-2"

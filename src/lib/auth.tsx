@@ -24,18 +24,11 @@ export function AuthProvider({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, s) => {
-      // supabase-js invokes this callback synchronously with the current
-      // session right as we subscribe, tagged as the INITIAL_SESSION event
-      // (e.g. when a session is already persisted) — that lands inside this
-      // effect's own call stack, before React fully considers the component
-      // mounted, and previously logged "Can't perform a React state update
-      // on a component that hasn't mounted yet." getSession() below already
-      // covers the initial session (its result only ever arrives via a
-      // microtask, guaranteed after mount), so skipping INITIAL_SESSION here
-      // removes the race at its source instead of just narrowing the timing
-      // window (an earlier queueMicrotask-based fix didn't fully eliminate
-      // it — this warning still surfaced once, later, per
-      // E2E-ROBUSTNESS-PLAN-STATUS-3.md).
+      // getSession() below seeds the initial user and clears `loading`.
+      // INITIAL_SESSION carries that same session (supabase-js emits it
+      // after its own initialization), so it is skipped to avoid setting the
+      // user twice. Later events (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED,
+      // USER_UPDATED) keep the context current.
       if (event === "INITIAL_SESSION") return;
       setUser(s?.user ?? null);
     });

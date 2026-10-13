@@ -29,7 +29,16 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/lib/native", () => ({ isNative: () => false }));
 vi.mock("@/lib/toast", () => ({ showSuccessToast: vi.fn() }));
-vi.mock("@marsidev/react-turnstile", () => ({ Turnstile: () => null }));
+const captchaMock = vi.hoisted(() => ({ getResponsePromise: vi.fn(), reset: vi.fn() }));
+vi.mock("@marsidev/react-turnstile", async () => {
+  const { forwardRef, useImperativeHandle } = await import("react");
+  return {
+    Turnstile: forwardRef(function Turnstile(_props, ref) {
+      useImperativeHandle(ref, () => captchaMock);
+      return null;
+    }),
+  };
+});
 
 import { BusinessSignupFlow } from "./business-signup-flow";
 
@@ -57,7 +66,10 @@ async function reachProfile() {
   await screen.findByRole("heading", { name: "Opprett profilen din" });
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 beforeEach(() => {
   localStorage.clear();
@@ -189,6 +201,24 @@ describe("BusinessSignupFlow", () => {
     fireEvent.click(resendButton);
     expect(resendMock).toHaveBeenCalledTimes(1);
   });
+  // KG-02-F02: med CAPTCHA påkrevd avvises resend uten token.
+  it("sender nytt CAPTCHA-token når bekreftelses-e-posten sendes på nytt", async () => {
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "site-key");
+    captchaMock.getResponsePromise.mockReset().mockResolvedValue("captcha-1");
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
+    await reachProfile();
+    fireEvent.change(screen.getByLabelText("Navn"), { target: { value: "Kari Nordmann" } });
+    fireEvent.change(screen.getByLabelText("E-post"), { target: { value: "kari@example.com" } });
+    fireEvent.change(screen.getByLabelText("Passord"), { target: { value: "hemmelig123" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /vilkårene for bedrifter/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Opprett bedriftskonto" }));
+    await screen.findByRole("heading", { name: "Sjekk e-posten din" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send bekreftelses-e-post på nytt" }));
+    await waitFor(() => expect(resendMock).toHaveBeenCalled());
+    expect(resendMock.mock.calls[0][0].options).toMatchObject({ captchaToken: "captcha-1" });
+  });
+
   it("går videre når signup returnerer en aktiv sesjon", async () => {
     signUpMock.mockResolvedValueOnce({
       data: { user: { id: "user-1" }, session: { access_token: "token" } },

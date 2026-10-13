@@ -3418,6 +3418,16 @@ export type Database = {
           updated_at: string
         }[]
       }
+      complete_listing_image_job: {
+        Args: {
+          _attempt: number
+          _content_hash: string
+          _job_id: string
+          _storage_path: string
+          _transformations: number
+        }
+        Returns: string
+      }
       compute_wtb_matches: {
         Args: {
           _attributes: Json

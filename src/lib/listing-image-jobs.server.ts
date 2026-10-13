@@ -305,41 +305,21 @@ export type ProcessJobOutcome =
   | { outcome: "internal_failed"; jobId: string; message: string }
   | { outcome: "stale"; jobId: string };
 
-/** Claimet ble mistet etter at bilderaden ble lagt inn. Raden fjernes bare
- * når jobben er borte (en ny synk erstattet den, og bildet skal ikke komme
- * tilbake) eller når et nyere claim har sin egen rad. Ellers kan det nye
- * claimet ha sett raden vår og hoppet over sin egen innsetting: da er det
- * vår rad som er bildet. */
-async function shouldRemoveStaleImage(
-  job: ListingImageJobRow,
-  insertedImageId: string,
-  deps: ProcessJobDeps,
-): Promise<boolean> {
-  const { data: currentJob, error: jobError } = await deps.supabaseAdmin
-    .from("listing_image_jobs")
-    .select("id")
-    .eq("id", job.id)
-    .maybeSingle();
-  if (jobError) throw new Error(`Kunne ikke sjekke jobben: ${jobError.message}`);
-  if (!currentJob) return true;
-  const { data: otherImage, error: otherError } = await deps.supabaseAdmin
-    .from("listing_images")
-    .select("id")
-    .eq("listing_id", job.listing_id)
-    .eq("source_url", job.source_url)
-    .neq("id", insertedImageId)
-    .limit(1)
-    .maybeSingle();
-  if (otherError) throw new Error(`Kunne ikke sjekke bilderad: ${otherError.message}`);
-  return !!otherImage;
-}
-
 export async function processListingImageJob(
   job: ListingImageJobRow,
   deps: ProcessJobDeps,
 ): Promise<ProcessJobOutcome> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const now = deps.now ?? (() => new Date());
+  // Feilstatus skrives bare mens dette claimet eier jobben (samme token som
+  // complete_listing_image_job), så en utløpt worker ikke overstyrer en ny.
+  const updateOwnedJob = (values: Database["public"]["Tables"]["listing_image_jobs"]["Update"]) =>
+    deps.supabaseAdmin
+      .from("listing_image_jobs")
+      .update(values)
+      .eq("id", job.id)
+      .eq("status", "processing")
+      .eq("attempts", job.attempts);
 
   try {
     const { bytes, contentType } = await fetchSourceImage(job.source_url, fetchImpl);
@@ -377,84 +357,31 @@ export async function processListingImageJob(
     await putObject("BILDER", key, compressed.main.bytes, compressed.main.contentType);
     await putObject("BILDER", thumbKey, compressed.thumb.bytes, compressed.thumb.contentType);
 
-    // Et utløpt lån kan claimes på nytt mens den første workeren fortsatt
-    // kjører. Claimet (attempts) er tokenet: en worker som har mistet jobben,
-    // skriver verken bilderad eller status. Samme regel som
-    // complete_listing_image_job: én bilderad per kilde-URL i annonsen (URL-en
-    // er unik per annonse i listing_image_jobs).
-    // ponytail: sjekk-så-skriv, ikke atomisk; se opprydding etter tapt claim
-    // under. Erstattes av RPC-en i B5b.
-    const { data: ownedJob, error: ownedError } = await deps.supabaseAdmin
-      .from("listing_image_jobs")
-      .select("id")
-      .eq("id", job.id)
-      .eq("status", "processing")
-      .eq("attempts", job.attempts)
-      .maybeSingle();
-    if (ownedError) throw new Error(`Kunne ikke sjekke jobbens claim: ${ownedError.message}`);
-    if (!ownedJob) return { outcome: "stale", jobId: job.id };
-
-    const { data: existingImage, error: existingError } = await deps.supabaseAdmin
-      .from("listing_images")
-      .select("id")
-      .eq("listing_id", job.listing_id)
-      .eq("source_url", job.source_url)
-      .limit(1)
-      .maybeSingle();
-    if (existingError) throw new Error(`Kunne ikke sjekke bilderad: ${existingError.message}`);
-    let insertedImageId: string | null = null;
-    if (!existingImage) {
-      const { data: inserted, error: insertError } = await deps.supabaseAdmin
-        .from("listing_images")
-        .insert({
-          listing_id: job.listing_id,
-          storage_path: key,
-          sort_order: job.sort_order,
-          source_url: job.source_url,
-        })
-        .select("id")
-        .single();
-      if (insertError) throw new Error(`Kunne ikke lagre bilderad: ${insertError.message}`);
-      insertedImageId = inserted.id;
-    }
-
-    const { data: completed, error: updateError } = await deps.supabaseAdmin
-      .from("listing_image_jobs")
-      .update({
-        status: "done",
-        storage_path: key,
-        content_hash: hash,
-        transformations: compressed.transformations,
-        customer_error: null,
-        internal_error: null,
-      })
-      .eq("id", job.id)
-      .eq("status", "processing")
-      .eq("attempts", job.attempts)
-      .select("id");
-    if (updateError) throw new Error(`Kunne ikke oppdatere jobbstatus: ${updateError.message}`);
-    if (!completed?.length) {
-      if (insertedImageId && (await shouldRemoveStaleImage(job, insertedImageId, deps))) {
-        const { error: deleteError } = await deps.supabaseAdmin
-          .from("listing_images")
-          .delete()
-          .eq("id", insertedImageId);
-        if (deleteError) {
-          throw new Error(`Kunne ikke fjerne foreldet bilderad: ${deleteError.message}`);
-        }
-      }
-      return { outcome: "stale", jobId: job.id };
-    }
+    // Bilderad og «done» skrives atomisk, og bare så lenge dette claimet
+    // fortsatt eier jobben (KG-10-F01). «stale» betyr at jobben er erstattet
+    // av en ny synk eller tatt over etter utløpt lån; de opplastede objektene
+    // ryddes da av R2-registeret.
+    const { data: completion, error: completeError } = await deps.supabaseAdmin.rpc(
+      "complete_listing_image_job",
+      {
+        _job_id: job.id,
+        _attempt: job.attempts,
+        _storage_path: key,
+        _content_hash: hash,
+        _transformations: compressed.transformations,
+      },
+    );
+    if (completeError) throw new Error(`Kunne ikke fullføre bildejobb: ${completeError.message}`);
+    if (completion === "stale") return { outcome: "stale", jobId: job.id };
 
     return { outcome: "done", jobId: job.id, storagePath: key };
   } catch (cause) {
     if (cause instanceof CustomerImageError) {
-      await deps.supabaseAdmin
-        .from("listing_image_jobs")
-        .update({ status: "failed", customer_error: cause.message, internal_error: null })
-        .eq("id", job.id)
-        .eq("status", "processing")
-        .eq("attempts", job.attempts);
+      await updateOwnedJob({
+        status: "failed",
+        customer_error: cause.message,
+        internal_error: null,
+      });
       return { outcome: "customer_failed", jobId: job.id, message: cause.message };
     }
 
@@ -474,12 +401,11 @@ export async function processListingImageJob(
         listingId: job.listing_id,
         internalError: message,
       });
-      await deps.supabaseAdmin
-        .from("listing_image_jobs")
-        .update({ status: "failed", customer_error: finalMessage, internal_error: message })
-        .eq("id", job.id)
-        .eq("status", "processing")
-        .eq("attempts", job.attempts);
+      await updateOwnedJob({
+        status: "failed",
+        customer_error: finalMessage,
+        internal_error: message,
+      });
       return { outcome: "internal_failed", jobId: job.id, message: finalMessage };
     }
 
@@ -491,12 +417,11 @@ export async function processListingImageJob(
       internalError: message,
       nextAttemptAt,
     });
-    await deps.supabaseAdmin
-      .from("listing_image_jobs")
-      .update({ status: "pending", next_attempt_at: nextAttemptAt, internal_error: message })
-      .eq("id", job.id)
-      .eq("status", "processing")
-      .eq("attempts", job.attempts);
+    await updateOwnedJob({
+      status: "pending",
+      next_attempt_at: nextAttemptAt,
+      internal_error: message,
+    });
     return { outcome: "retry_pending", jobId: job.id, nextAttemptAt };
   }
 }

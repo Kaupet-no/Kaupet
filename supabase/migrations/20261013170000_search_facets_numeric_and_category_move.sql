@@ -113,23 +113,44 @@ AS $$
   OFFSET GREATEST(0, COALESCE(_offset, 0));
 $$;
 
--- Opprydding: en verdi for et intervallfilter som ikke er et tall kan aldri
--- treffe et intervall, og ble bare lest som feil. Nøkkelen fjernes
--- (manglende verdi er filtrets egen semantikk). Ekte JSON-tall og tallstrenger
--- beholdes.
+-- Normaliser og rydd bare tallfelt i annonsens effektive kategori. Barnets
+-- filtertype overstyrer forelderen; samme nøkkel i andre kategorier er irrelevant.
+WITH RECURSIVE ancestors AS (
+  SELECT id AS category_id, id AS ancestor_id, parent_id, 0 AS depth
+  FROM public.categories
+  UNION ALL
+  SELECT a.category_id, c.id, c.parent_id, a.depth + 1
+  FROM ancestors a JOIN public.categories c ON c.id = a.parent_id
+), effective_filters AS (
+  SELECT DISTINCT ON (a.category_id, cf.key) a.category_id, cf.key, cf.type
+  FROM ancestors a JOIN public.category_filters cf ON cf.category_id = a.ancestor_id
+  ORDER BY a.category_id, cf.key, a.depth
+), corrected AS (
+  SELECT l.id, jsonb_object_agg(attr.key,
+    CASE WHEN f.type IN ('number', 'range')
+      AND jsonb_typeof(attr.value) = 'string'
+      AND attr.value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$'
+      AND pg_input_is_valid(attr.value #>> '{}', 'double precision')
+      AND pg_input_is_valid(attr.value #>> '{}', 'numeric')
+      THEN to_jsonb((attr.value #>> '{}')::numeric)
+      ELSE attr.value
+    END
+  ) FILTER (WHERE NOT (
+    COALESCE(f.type = 'range', false)
+    AND jsonb_typeof(attr.value) <> 'number'
+    AND NOT (jsonb_typeof(attr.value) = 'string'
+      AND attr.value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$')
+  )) AS attributes
+  FROM public.listings l
+  CROSS JOIN LATERAL jsonb_each(l.attributes) attr
+  LEFT JOIN effective_filters f ON f.category_id = l.category_id AND f.key = attr.key
+  WHERE jsonb_typeof(l.attributes) = 'object'
+  GROUP BY l.id
+)
 UPDATE public.listings l
-SET attributes = l.attributes - bad.keys
-FROM (
-  SELECT l2.id, array_agg(a.key) AS keys
-  FROM public.listings l2
-  CROSS JOIN LATERAL jsonb_each(l2.attributes) a
-  WHERE jsonb_typeof(l2.attributes) = 'object'
-    AND a.key IN (SELECT DISTINCT cf.key FROM public.category_filters cf WHERE cf.type = 'range')
-    AND jsonb_typeof(a.value) <> 'number'
-    AND NOT (jsonb_typeof(a.value) = 'string' AND a.value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$')
-  GROUP BY l2.id
-) bad
-WHERE l.id = bad.id;
+SET attributes = COALESCE(c.attributes, '{}'::jsonb)
+FROM corrected c
+WHERE l.id = c.id AND l.attributes IS DISTINCT FROM COALESCE(c.attributes, '{}'::jsonb);
 
 -- 3) Søkevektoren følger kategoriens forelder ------------------------------
 --

@@ -1,0 +1,42 @@
+-- Regresjon: kjør den faktiske migrasjonen mot eldre data og rull alt tilbake.
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
+SET search_path = public, extensions;
+SELECT plan(6);
+
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-4000-8000-00000000f001', 'numeric-cleanup-pgtap@example.com');
+INSERT INTO public.categories (id, slug, name_nb, parent_id) VALUES
+  ('00000000-0000-4000-8000-00000000f101', 'numeric-cleanup-parent', 'Tall', NULL),
+  ('00000000-0000-4000-8000-00000000f102', 'numeric-cleanup-other', 'Tekst', NULL),
+  ('00000000-0000-4000-8000-00000000f103', 'numeric-cleanup-child', 'Overstyring', '00000000-0000-4000-8000-00000000f101'),
+  ('00000000-0000-4000-8000-00000000f104', 'numeric-cleanup-inherits', 'Arv', '00000000-0000-4000-8000-00000000f101');
+INSERT INTO public.category_filters (category_id, key, label_nb, type) VALUES
+  ('00000000-0000-4000-8000-00000000f101', 'cleanup_size', 'Størrelse', 'range'),
+  ('00000000-0000-4000-8000-00000000f101', 'cleanup_width', 'Bredde', 'number'),
+  ('00000000-0000-4000-8000-00000000f102', 'cleanup_size', 'Størrelse', 'select'),
+  ('00000000-0000-4000-8000-00000000f103', 'cleanup_size', 'Størrelse', 'select');
+INSERT INTO public.listings (id, seller_id, category_id, title, status, attributes) VALUES
+  ('00000000-0000-4000-8000-00000000f201', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f102', 'Gyldig tekstvalg', 'draft', '{"cleanup_size":"XL","untouched":"40"}'),
+  ('00000000-0000-4000-8000-00000000f202', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f103', 'Overstyrt filtertype', 'draft', '{"cleanup_size":"XL"}'),
+  ('00000000-0000-4000-8000-00000000f203', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f104', 'Arvede tallstrenger', 'draft', '{"cleanup_size":"42","cleanup_width":"40","untouched":"40"}'),
+  ('00000000-0000-4000-8000-00000000f204', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f104', 'Ugyldig tallområde', 'draft', '{"cleanup_size":"oops","untouched":"40"}'),
+  ('00000000-0000-4000-8000-00000000f205', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Eksisterende JSON-tall', 'draft', '{"cleanup_size":0,"cleanup_width":-12.5}');
+
+INSERT INTO public.listings (id, seller_id, category_id, title, status, attributes)
+VALUES ('00000000-0000-4000-8000-00000000f206', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Ekstrem tallstreng', 'draft', jsonb_build_object('cleanup_size', repeat('9', 400)));
+
+-- Migrasjonen er allerede anvendt i teststacken. Triggeren opprettes på nytt
+-- nedenfor; transaksjonens rollback gjenoppretter originalen.
+DROP TRIGGER categories_refresh_listing_search_after_move ON public.categories;
+DROP FUNCTION public.refresh_listing_search_vector_after_category_move();
+-- APPLY_NUMERIC_ATTRIBUTE_MIGRATION
+
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f201'), '{"cleanup_size":"XL","untouched":"40"}'::jsonb, 'Beholder gyldig tekstvalg i en annen kategori');
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f202'), '{"cleanup_size":"XL"}'::jsonb, 'Barnets tekstfilter overstyrer arvet tallområde');
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f203'), '{"cleanup_size":42,"cleanup_width":40,"untouched":"40"}'::jsonb, 'Normaliserer arvede tallfelt og beholder annen tekst');
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f204'), '{"untouched":"40"}'::jsonb, 'Fjerner bare det ugyldige tallområdet i annonsens kategori');
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f205'), '{"cleanup_size":0,"cleanup_width":-12.5}'::jsonb, 'Beholder eksisterende JSON-tall');
+SELECT is((SELECT attributes->>'cleanup_size' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f206'), repeat('9', 400), 'En tallstreng utenfor endelig tallområde stopper ikke migrasjonen');
+SELECT * FROM finish();
+ROLLBACK;

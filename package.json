@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:db-migration": "bun scripts/test-numeric-attribute-migration.mjs",
     "test:rls": "node scripts/run-rls-tests.mjs",
     "test:e2e": "node scripts/run-e2e.mjs",
     "test:e2e:playwright": "playwright test",

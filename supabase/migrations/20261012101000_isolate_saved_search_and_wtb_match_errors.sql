@@ -4,8 +4,10 @@
 --
 -- Kropper kopiert fra 20260928120000 (wtb_criteria_match_listing) og
 -- 20261002120000 (match_listing_to_saved_searches); eneste endring er
--- feilisoleringen. Unntaksblokkene omslutter bare lesende evaluering, så
--- delttransaksjonene får ingen xid.
+-- feilisoleringen. I match_listing_to_saved_searches omslutter unntaksblokken
+-- bare lesende evaluering per søk. wtb_criteria_match_listing kalles per rad i
+-- søk og matching, så der vaktes hver cast eksplisitt i stedet for en
+-- unntaksblokk (som ville gitt én deltransaksjon per kall).
 
 CREATE OR REPLACE FUNCTION public.wtb_criteria_match_listing(
     _w_max_price_nok integer,
@@ -87,14 +89,32 @@ BEGIN
       IF attr_val ? 'minDate' THEN
         -- {minDate} — kun next_eu_control: annonsens dato må være på
         -- eller etter kjøperens tidligste akseptable dato.
-        IF listing_text_val IS NULL
-           OR listing_text_val !~ '^\d{4}-\d{2}-\d{2}$'
-           OR listing_text_val::date < (attr_val->>'minDate')::date
-        THEN
+        -- Hver cast vaktes i egen IF: OR kortslutter ikke garantert i SQL.
+        -- Et ugyldig kriterium gir «ikke treff» for dette kjøpsønsket og en
+        -- advarsel i loggen, ikke en feil som ruller tilbake publiseringen.
+        IF NOT pg_input_is_valid(attr_val->>'minDate', 'date') THEN
+          RAISE WARNING 'wtb_criteria_match_listing: ugyldig minDate % for %',
+            attr_val->>'minDate', attr_key;
+          RETURN false;
+        END IF;
+        IF listing_text_val IS NULL OR listing_text_val !~ '^\d{4}-\d{2}-\d{2}$' THEN
+          RETURN false;
+        END IF;
+        -- Formatet slipper gjennom 2026-99-99 også på annonsesiden.
+        IF NOT pg_input_is_valid(listing_text_val, 'date') THEN
+          RETURN false;
+        END IF;
+        IF listing_text_val::date < (attr_val->>'minDate')::date THEN
           RETURN false;
         END IF;
       ELSE
         -- {min,max} — tallområde. Ubundet side = ingen grense den veien.
+        IF NOT COALESCE(pg_input_is_valid(attr_val->>'min', 'numeric'), true)
+           OR NOT COALESCE(pg_input_is_valid(attr_val->>'max', 'numeric'), true)
+        THEN
+          RAISE WARNING 'wtb_criteria_match_listing: ugyldig min/max % for %', attr_val, attr_key;
+          RETURN false;
+        END IF;
         IF listing_text_val IS NULL OR listing_text_val !~ '^-?\d+(\.\d+)?$' THEN
           RETURN false;
         END IF;
@@ -145,10 +165,6 @@ BEGIN
   END LOOP;
 
   RETURN true;
-EXCEPTION WHEN OTHERS THEN
-  -- Ugyldige lagrede verdier (f.eks. minDate 2026-99-99) skal gi «ikke treff»
-  -- for dette kjøpsønsket, ikke avbryte spørringen for alle andre.
-  RETURN false;
 END;
 $$;
 

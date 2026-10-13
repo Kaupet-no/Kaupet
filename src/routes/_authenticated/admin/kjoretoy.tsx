@@ -4,10 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { invalidateSharedVehicleQueries } from "@/lib/reference-query-invalidation";
+import { useAllVehicleModelClasses } from "@/lib/vehicle/vehicle-brands";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,18 +134,9 @@ function VehicleBrandsCrud() {
 
   // Klassene hentes for seg: admin-RPC-en finner dem bare via modellene, så
   // en ny klasse uten modeller kunne aldri velges til sin første modell
-  // (KG-11-F02). Nøkkelen ligger under samme prefiks som invalideres under.
-  const { data: approvedClasses } = useQuery({
-    queryKey: ["admin-vehicle-brands-with-models", "classes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vehicle_model_classes")
-        .select("id, brand_id, name")
-        .eq("status", "approved");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  // (KG-11-F02). Delt, paginert spørring som invalidateSharedVehicleQueries
+  // oppdaterer.
+  const { data: approvedClasses } = useAllVehicleModelClasses();
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin-vehicle-brands-with-models"] });

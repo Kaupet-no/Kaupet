@@ -46,8 +46,11 @@ vi.mock("@/integrations/supabase/client", () => ({
       const query: Record<string, unknown> = {};
       query.select = () => query;
       query.eq = () => query;
-      query.then = (resolve: (value: unknown) => unknown) =>
-        resolve({ data: [{ id: "c1", brand_id: "b1", name: "Sedan" }], error: null });
+      query.order = () => query;
+      query.range = async () => ({
+        data: [{ id: "c1", brand_id: "b1", name: "Sedan" }],
+        error: null,
+      });
       return query;
     },
   },

@@ -22,7 +22,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF auth.role() <> 'service_role' THEN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'Server access required';
   END IF;
 

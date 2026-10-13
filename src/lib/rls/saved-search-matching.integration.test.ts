@@ -170,6 +170,54 @@ describe.skipIf(!canRun)("Saved-search matching: internal access and new matches
     },
   );
 
+  // KG-26-F02: extraGroups ble aldri evaluert, så ekskluderte ord varslet likevel.
+  it.each([
+    {
+      name: "ekskludert ord skjuler annonsen",
+      groups: [{ id: "x", mode: "any", exclude: true, terms: ["ødelagt"] }],
+      hit: "TOKEN hel",
+      miss: "TOKEN ødelagt",
+    },
+    {
+      name: "inkluderingsgruppe med alle ord",
+      groups: [{ id: "a", mode: "all", exclude: false, terms: ["rød", "ramme"] }],
+      hit: "TOKEN rød ramme",
+      miss: "TOKEN rød",
+    },
+    {
+      name: "inkluderingsgruppe med minst ett ord",
+      groups: [{ id: "b", mode: "any", exclude: false, terms: ["rød", "blå"] }],
+      hit: "TOKEN blå",
+      miss: "TOKEN grønn",
+    },
+    {
+      name: "tom gruppe begrenser ikke",
+      groups: [{ id: "e", mode: "any", exclude: false, terms: [] }],
+      hit: "TOKEN",
+      miss: null,
+    },
+    { name: "gammelt søk uten grupper", groups: undefined, hit: "TOKEN", miss: null },
+  ])("ekstra søkegrupper: $name", async ({ name, groups, hit, miss }) => {
+    const token = `groups-${name.replaceAll(" ", "-")}-${suffix}`;
+    const searchId = await search({ q: token, ...(groups && { extraGroups: groups }) });
+    const hitId = await listing({ title: hit.replace("TOKEN", token) });
+    expect(await notificationCount(searchId, hitId)).toBe(1);
+    if (miss) {
+      const missId = await listing({ title: miss.replace("TOKEN", token) });
+      expect(await notificationCount(searchId, missId)).toBe(0);
+    }
+  });
+
+  it("avviser lagrede søk med ugyldig extraGroups-form", async () => {
+    const { error } = await admin.from("saved_searches").insert({
+      user_id: readerId,
+      name: "Ugyldig gruppe",
+      criteria: { q: "x", extraGroups: [{ mode: "kanskje", exclude: false, terms: [] }] },
+      notify: true,
+    });
+    expect(error?.code).toBe("23514");
+  });
+
   it("notifies on text-only changes and on prices entering the interval", async () => {
     const token = `text-only-${suffix}`;
     const id = await listing();

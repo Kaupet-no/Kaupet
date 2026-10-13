@@ -1,3 +1,4 @@
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Building2 } from "lucide-react";
@@ -57,14 +58,18 @@ function OrganizationListingsPage() {
   const listingsQuery = useQuery({
     queryKey: ["organization-listings-page", organization.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("listings")
-        .select(
-          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
-        )
-        .eq("organization_id", organization.id)
-        .eq("status", "active")
-        .order("created_at", { ascending: false });
+      const { data, error } = await fetchAllPages((from, to) =>
+        supabase
+          .from("listings")
+          .select(
+            "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
+          )
+          .eq("organization_id", organization.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      );
       if (error) throw error;
       return (data ?? []).map((row) =>
         toListingCardData(row as Parameters<typeof toListingCardData>[0]),

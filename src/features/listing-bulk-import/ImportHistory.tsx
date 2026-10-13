@@ -1,3 +1,4 @@
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { formatDateTime } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Clock, History } from "lucide-react";
@@ -127,10 +128,14 @@ async function fetchImageStatusByListingId(
   >();
   for (let offset = 0; offset < listingIds.length; offset += LISTING_IDS_CHUNK_SIZE) {
     const chunk = listingIds.slice(offset, offset + LISTING_IDS_CHUNK_SIZE);
-    const { data, error } = await supabase
-      .from("listing_image_jobs")
-      .select("listing_id, status, customer_error")
-      .in("listing_id", chunk);
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase
+        .from("listing_image_jobs")
+        .select("listing_id, status, customer_error")
+        .in("listing_id", chunk)
+        .order("id")
+        .range(from, to),
+    );
     if (error) throw error;
     for (const job of data ?? []) {
       const entry = result.get(job.listing_id) ?? { processing: 0, failed: 0, failedMessages: [] };
@@ -151,12 +156,17 @@ async function fetchImageStatusByListingId(
 async function fetchImportHistory(
   organizationId: string,
 ): Promise<(ImportRun & { imageStatus: ImportRunImageStatus })[]> {
-  const { data, error } = await supabase
-    .from("organization_listing_imports")
-    .select("import_id, source, status, created_at, listing_id")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false })
-    .limit(HISTORY_ROW_WINDOW);
+  const { data, error } = await fetchAllPages((from, to) =>
+    from >= HISTORY_ROW_WINDOW
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+          .from("organization_listing_imports")
+          .select("import_id, source, status, created_at, listing_id")
+          .eq("organization_id", organizationId)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, Math.min(to, HISTORY_ROW_WINDOW - 1)),
+  );
   if (error) throw error;
   const runs = groupIntoRuns((data ?? []) as ImportHistoryRow[]);
 

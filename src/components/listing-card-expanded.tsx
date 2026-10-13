@@ -132,6 +132,7 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
               {isVehicleListing && (
                 <VehicleInfoGrid
                   vehicleLookup={vehicleLookup}
+                  attributes={attributes}
                   mileageKm={typeof listing.mileage_km === "number" ? listing.mileage_km : null}
                   euControlExempt={euControlExempt}
                   driveType={driveType}

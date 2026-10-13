@@ -37,6 +37,7 @@ export function useCategoryDrilldown(params: {
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
   const [priceMin, setPriceMin] = useState<number | undefined>(undefined);
   const [priceMax, setPriceMax] = useState<number | undefined>(undefined);
+  const [includeFree, setIncludeFree] = useState(true);
   const subcatRef = useRef<HTMLDivElement>(null);
 
   const activeFilters = useMemo(() => {
@@ -99,6 +100,7 @@ export function useCategoryDrilldown(params: {
         ...(Object.keys(filterValues).length > 0 && { attrs: encodeAttrFilters(filterValues) }),
         ...(priceMin !== undefined && { min: priceMin }),
         ...(priceMax !== undefined && { max: priceMax }),
+        ...(!includeFree && { includeFree: false }),
       },
     });
   }
@@ -125,6 +127,7 @@ export function useCategoryDrilldown(params: {
         ...(Object.keys(filterValues).length > 0 && { attrs: encodeAttrFilters(filterValues) }),
         ...(priceMin !== undefined && { min: priceMin }),
         ...(priceMax !== undefined && { max: priceMax }),
+        ...(!includeFree && { includeFree: false }),
       },
     });
   };
@@ -137,6 +140,7 @@ export function useCategoryDrilldown(params: {
       setFilterValues({});
       setPriceMin(undefined);
       setPriceMax(undefined);
+      setIncludeFree(true);
       setCategoriesOpen(false);
       return;
     }
@@ -151,6 +155,7 @@ export function useCategoryDrilldown(params: {
     setFilterValues({});
     setPriceMin(undefined);
     setPriceMax(undefined);
+    setIncludeFree(true);
     setCategoriesOpen(true);
     setNavDirection("forward");
     // Scroll so the newly revealed subcategories are visible after the slide-down.
@@ -170,6 +175,7 @@ export function useCategoryDrilldown(params: {
     setFilterValues({});
     setPriceMin(undefined);
     setPriceMax(undefined);
+    setIncludeFree(true);
     setNavDirection("forward");
     requestAnimationFrame(() => {
       setTimeout(
@@ -189,6 +195,7 @@ export function useCategoryDrilldown(params: {
     setFilterValues({});
     setPriceMin(undefined);
     setPriceMax(undefined);
+    setIncludeFree(true);
     setNavDirection("back");
   };
 
@@ -197,6 +204,7 @@ export function useCategoryDrilldown(params: {
     setFilterValues({});
     setPriceMin(undefined);
     setPriceMax(undefined);
+    setIncludeFree(true);
     setNavDirection("back");
   };
 
@@ -214,6 +222,8 @@ export function useCategoryDrilldown(params: {
     setPriceMin,
     priceMax,
     setPriceMax,
+    includeFree,
+    setIncludeFree,
     subcatRef,
     activeFilters,
     primaryFilters,

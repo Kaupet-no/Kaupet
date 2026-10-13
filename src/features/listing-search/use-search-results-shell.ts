@@ -1,3 +1,4 @@
+import { displayPriceNok } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import type { ListingCardData } from "@/lib/listing-card-data";
@@ -231,6 +232,8 @@ export function useSearchResultsShell({
     cover_path: l.cover_path,
     category_slug: l.category_slug,
     attributes: l.attributes,
+    mileage_km: l.mileage_km,
+    engine_hours: l.engine_hours,
     sold_at: l.sold_at,
   }));
 
@@ -240,7 +243,7 @@ export function useSearchResultsShell({
       id: l.id,
       kaupet_code: l.kaupet_code,
       title: l.title,
-      price_nok: l.price_nok,
+      price_nok: displayPriceNok(l),
       is_free: l.is_free,
       lat: l.lat,
       lng: l.lng,

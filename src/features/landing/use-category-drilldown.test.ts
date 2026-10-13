@@ -184,3 +184,16 @@ it("KG-35-F02: leafroot får ingen gamle filtre eller pris; Vis treff bevarer sa
   act(() => result.current.handlePickCategory(annet));
   expect(navigate.mock.calls[1][0].search).toEqual({ q: "", category: "annet", sort: "new" });
 });
+
+it("KG-35-F01: gratisvalget følger begge Vis treff-inngangene og nullstilles ved kategoribytte", () => {
+  const { result, navigate } = setup();
+  act(() => result.current.handlePickCategory(elektronikk));
+  act(() => result.current.setIncludeFree(false));
+  act(() => {
+    result.current.goToCategory(elektronikk);
+    result.current.goToCategoryPage([elektronikk]);
+  });
+  for (const [navigation] of navigate.mock.calls) expect(navigation.search.includeFree).toBe(false);
+  act(() => result.current.drillIntoSub(tvOgLyd));
+  expect(result.current.includeFree).toBe(true);
+});

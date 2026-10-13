@@ -148,7 +148,7 @@ it("avviser utkasttilbudet uten å blokkere når brukeren går videre", async ()
     await screen.findByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }),
   ).toBeTruthy();
   // Lokalt utkast avvises; serverutkastet slettes ikke.
-  expect(mocks.dismissDraftOffer).toHaveBeenCalled();
+  await waitFor(() => expect(mocks.dismissDraftOffer).toHaveBeenCalled());
   expect(mocks.discardDraft).not.toHaveBeenCalled();
 });
 

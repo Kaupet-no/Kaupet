@@ -67,7 +67,7 @@ it.each([123, 0, null, "123", NaN, Infinity])(
         total_views: 0,
         views_last_week: 0,
         cover_path: null,
-      } as PopularListingRow),
+      } as unknown as PopularListingRow),
     ).toMatchObject({ engine_hours: expected });
   },
 );

@@ -351,12 +351,14 @@ function NewWtbPage() {
   );
   const {
     restorableDraft,
+    draftId,
     lastSaved,
     draftSaveError,
     isSaving,
     saveToServer,
     flushLocalDraft,
     dismissRestore,
+    dismissDraftOffer,
     discardDraft,
     clearAfterPublish,
     actorChanged,
@@ -366,14 +368,6 @@ function NewWtbPage() {
     resumeAutosave,
     draftSaveMessage,
   } = useWtbDraftAutosave(draftFields, !!user, user?.id ?? null, resume === "auth-publish");
-
-  // Utkasttilbudet krever et eksplisitt Gjenopprett/Forkast før brukeren går
-  // videre — også for lokale utkast uten server-ID, som autolagringen ellers
-  // kunne overskrive stille (samme klasse som KG-18-F02 i salgsflyten). Se
-  // blokkeringen i attemptNext/goToStep.
-  const draftDecisionRequired = !!restorableDraft;
-  const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
-  const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const vehicleGroup = useMemo(
     () => vehicleCategoryGroupFor(categoryId ?? null, allFilters ?? [], categoriesById),
@@ -519,13 +513,6 @@ function NewWtbPage() {
   });
 
   function goToStep(index: number) {
-    // Fremover-hopp mens utkasttilbudet står ubesvart har samme risiko som
-    // Fortsett-knappen — krev eksplisitt valg først (se attemptNext).
-    if (draftDecisionRequired && index > stepIndex) {
-      setDraftDecisionPrompt(true);
-      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
-      return;
-    }
     setValidationError(null);
     setStepIndex(index);
     window.scrollTo({ top: 0 });
@@ -552,15 +539,6 @@ function NewWtbPage() {
   ];
 
   async function attemptNext(): Promise<ComposerNavigationResult> {
-    // Samme regel som salgsflyten (ny-annonse.tsx): et tilbudt utkast er
-    // ikke trygt å la autolagring skrive over stille — hold brukeren her til
-    // hen har tatt et eksplisitt valg om det, også for lokale utkast uten
-    // server-ID (samme klasse som KG-18-F02).
-    if (draftDecisionRequired) {
-      setDraftDecisionPrompt(true);
-      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
-      return "blocked";
-    }
     if (step === "review") return "busy";
     if (forwardBusyRef.current) return "busy";
     forwardBusyRef.current = true;
@@ -649,7 +627,6 @@ function NewWtbPage() {
   }
 
   function restoreDraft() {
-    setDraftDecisionPrompt(false);
     if (!isCurrent() || !restorableDraft) return;
     setValue("title", restorableDraft.title);
     setValue("description", restorableDraft.description);
@@ -683,6 +660,13 @@ function NewWtbPage() {
     requestAnimationFrame(() => setStepIndex(steps.length - 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, restorableDraft]);
+
+  // Samme regel som salgsflyten (ny-annonse.tsx): går brukeren videre uten å
+  // svare på tilbudet, forkastes det lokale utkastet, mens serverutkastet
+  // blir liggende under Mine annonser.
+  useEffect(() => {
+    if (stepIndex > 0) dismissDraftOffer();
+  }, [stepIndex, dismissDraftOffer]);
 
   if (actorChanged)
     return (
@@ -934,15 +918,14 @@ function NewWtbPage() {
                 {restorableDraft.title.trim()
                   ? `Utkast for annonse "${restorableDraft.title}" er lagret. Vil du fortsette der du slapp?`
                   : "Du har et lagret utkast. Vil du fortsette der du slapp?"}
-                {draftDecisionPrompt && (
-                  <p role="alert" aria-live="assertive" className="mt-1 text-destructive">
-                    Velg «Gjenopprett» eller «Forkast» før du går videre, så utkastet ikke går tapt.
-                  </p>
-                )}
+                <span className="mt-0.5 block text-muted-foreground">
+                  {draftId
+                    ? "Går du videre, ligger det under Mine annonser."
+                    : "Går du videre, forkastes det."}
+                </span>
               </span>
               <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
                 <Button
-                  ref={continueDraftButtonRef}
                   type="button"
                   size="sm"
                   variant="secondary"
@@ -956,10 +939,7 @@ function NewWtbPage() {
                   size="sm"
                   variant="ghost"
                   className="native-touch-target"
-                  onClick={() => {
-                    setDraftDecisionPrompt(false);
-                    void discardDraft();
-                  }}
+                  onClick={discardDraft}
                 >
                   Forkast
                 </Button>

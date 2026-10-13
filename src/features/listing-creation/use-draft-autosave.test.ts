@@ -278,6 +278,24 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftId).toBe("draft-123");
   });
 
+  it("KG-18-F02: går videre uten svar forkaster lokalt utkast, men ikke serverutkastet", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Sykkel til salgs", saved_at: Date.now() }),
+    );
+    localStorage.setItem(DRAFT_ID_KEY, "draft-123");
+    const { result } = renderHook(() => useDraftAutosave(baseFields));
+
+    act(() => result.current.releaseDraftOffer());
+
+    expect(result.current.hasDraftData).toBeNull();
+    expect(result.current.draftId).toBeNull();
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+    expect(clearDraftImagesMock).toHaveBeenCalledWith(DRAFT_KEY);
+    expect(discardDraftListingMock).not.toHaveBeenCalled();
+  });
+
   it("DEF-DRAFT-01: overtar ikke eldre globale utkast uten kjent eier, men rydder dem bort", () => {
     localStorage.setItem(
       "kaupet_draft_ny_annonse",

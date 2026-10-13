@@ -27,6 +27,9 @@ const mocks = vi.hoisted(() => ({
   discardDraft: vi.fn(() => {
     mocks.restorableDraft = null;
   }),
+  dismissDraftOffer: vi.fn(() => {
+    mocks.restorableDraft = null;
+  }),
   restorableDraft: null as null | MockDraft,
   actorChanged: false,
   useBlocker: vi.fn(
@@ -78,6 +81,7 @@ vi.mock("@/features/wtb/use-wtb-draft-autosave", () => ({
     restorableDraft: mocks.restorableDraft,
     dismissRestore: mocks.dismissRestore,
     discardDraft: mocks.discardDraft,
+    dismissDraftOffer: mocks.dismissDraftOffer,
     actorChanged: mocks.actorChanged,
   }),
 }));
@@ -130,7 +134,7 @@ it("omgår avslutningsvernet når brukeren starter på nytt etter kontobytte", (
   expect(options.shouldBlockFn()).toBe(false);
 });
 
-it("blokkerer videre navigasjon mens utkasttilbudet står ubesvart", async () => {
+it("avviser utkasttilbudet uten å blokkere når brukeren går videre", async () => {
   setMockDraft();
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -138,15 +142,14 @@ it("blokkerer videre navigasjon mens utkasttilbudet står ubesvart", async () =>
     </QueryClientProvider>,
   );
   expect(screen.getByRole("button", { name: "Gjenopprett" })).toBeTruthy();
+  expect(mocks.dismissDraftOffer).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: /^Neste:/ }));
-  // Blokkert med hint — tilbudet avvises ikke automatisk (samme regel som
-  // salgsflyten, KG-18-F02), og vi blir på første steg.
-  const alert = await screen.findByRole("alert");
-  expect(alert.textContent).toContain("Velg «Gjenopprett» eller «Forkast»");
-  expect(screen.getByText("Steg 1 av 4")).toBeTruthy();
   expect(
-    screen.queryByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }),
-  ).toBeNull();
+    await screen.findByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }),
+  ).toBeTruthy();
+  // Lokalt utkast avvises; serverutkastet slettes ikke.
+  expect(mocks.dismissDraftOffer).toHaveBeenCalled();
+  expect(mocks.discardDraft).not.toHaveBeenCalled();
 });
 
 it("gjenoppretter utkastet ved eksplisitt valg og lar brukeren gå videre", async () => {

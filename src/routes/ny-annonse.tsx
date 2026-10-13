@@ -2,7 +2,7 @@ import { BusinessApprovalNotice } from "@/features/business-account/business-app
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { DRAFT_ACTOR_CHANGED_MESSAGE } from "@/features/listing-creation/use-draft-actor";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Link, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -931,6 +931,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
     discardDraft,
+    releaseDraftOffer,
   } = useDraftAutosave({
     title,
     subtitle,
@@ -960,7 +961,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
   });
 
   function restoreDraft() {
-    setDraftDecisionPrompt(false);
     const savedStepKey = hasDraftData?.step_key;
     if (typeof savedStepKey === "string") pendingRestoreStepKeyRef.current = savedStepKey;
     void restoreDraftFields({
@@ -972,14 +972,40 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     });
   }
 
-  // Utkasttilbudet krever et eksplisitt Fortsett/Forkast før brukeren forlater
-  // steg 1 — også når utkastet har server-ID. Serverkopien har ikke bildene
-  // (de lastes først opp ved publisering) og kan være eldre enn den lokale,
-  // så automatisk avvisning lot den nye annonsen overskrive gamle bilder og
-  // lokal tilstand på samme nøkkel (KG-18-F02). Se blokkeringen i goToNextPage.
-  const draftDecisionRequired = !!hasDraftData;
-  const [draftDecisionPrompt, setDraftDecisionPrompt] = useState(false);
-  const continueDraftButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Utkasttilbudet og meldingen om lagrede utkast blokkerer ikke. Går
+  // brukeren videre fra steg 1 uten å svare, forkastes det lokale utkastet,
+  // mens serverkopien blir liggende under Mine annonser (KG-18-F02). Gjelder
+  // alle veier videre (Neste, stegvelgeren), derfor effekt og ikke i
+  // goToNextPage.
+  const [leftFirstStep, setLeftFirstStep] = useState(false);
+  if (!isFirst && !leftFirstStep) setLeftFirstStep(true);
+  useEffect(() => {
+    if (isFirst) return;
+    releaseDraftOffer();
+    // Bare ved overgangen: et utkast som står igjen etter en mislykket
+    // bildegjenoppretting på et senere steg skal ikke forkastes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirst]);
+
+  // Serverutkast uten lokal kopie (f.eks. fra en annen enhet eller et
+  // tidligere forkastet lokalt utkast) nevnes, men tilbys ikke her.
+  const [savedDraftCount, setSavedDraftCount] = useState(0);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void supabase
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", userId)
+      .eq("status", "draft")
+      .then(({ count }) => {
+        if (!cancelled) setSavedDraftCount(count ?? 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (resume !== "auth-publish" || !user || !hasDraftData || authResumeHandledRef.current) {
@@ -991,7 +1017,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user?.id, hasDraftData]);
   async function startNewListing() {
-    setDraftDecisionPrompt(false);
     setDraftDiscardConfirmOpen(false);
     await discardDraft();
   }
@@ -1066,15 +1091,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     setValidationError(null);
     setBlockingValidator(null);
     const groups = currentPage?.groups ?? [];
-
-    // Et tilbudt utkast er ikke trygt å la autolagring skrive over stille —
-    // hold brukeren på steg 1 til hen har tatt et eksplisitt valg om det, i
-    // stedet for å bare varsle med en toast.
-    if (isFirst && draftDecisionRequired) {
-      setDraftDecisionPrompt(true);
-      requestAnimationFrame(() => continueDraftButtonRef.current?.focus());
-      return "blocked";
-    }
 
     // Registrert kjøretøy: oppslaget kjøres normalt fra "Bekreft"-knappen ved
     // skiltet, men Neste gjør det samme hvis brukeren hoppet over den. Vi blir
@@ -1719,16 +1735,14 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
                       </>
                     )}
                   </p>
-                  {draftDecisionPrompt && (
-                    <p role="alert" aria-live="assertive" className="mt-1 text-destructive">
-                      Utkastet finnes bare på denne enheten. Velg «Fortsett utkastet» eller «Forkast
-                      utkastet» før du går videre, så det ikke går tapt.
-                    </p>
-                  )}
+                  <p className="mt-0.5 text-muted-foreground">
+                    {draftId
+                      ? "Går du videre, ligger det under Mine annonser."
+                      : "Går du videre, forkastes det."}
+                  </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button
-                    ref={continueDraftButtonRef}
                     type="button"
                     size="sm"
                     variant="secondary"
@@ -1748,6 +1762,16 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
                   </Button>
                 </div>
               </div>
+            ) : savedDraftCount > 0 && isFirst && !leftFirstStep ? (
+              <p className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs sm:text-sm">
+                Du har{" "}
+                {savedDraftCount === 1 ? "et lagret utkast" : `${savedDraftCount} lagrede utkast`}{" "}
+                under{" "}
+                <Link to="/mine-annonser" className="font-medium underline underline-offset-2">
+                  Mine annonser
+                </Link>
+                .
+              </p>
             ) : undefined
           }
           /* Stegantallet er ikke kjent før kategori er valgt (flyten er

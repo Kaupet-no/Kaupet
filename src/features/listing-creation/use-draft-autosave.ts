@@ -133,6 +133,7 @@ export function useDraftAutosave(fields: DraftFields) {
   const draftUpdatedAtRef = useRef<string | null>(null);
   const draftConflictRef = useRef(false);
   const draftRestorePending = useRef(false);
+  const restoringDraft = useRef(false);
   // Set by clearDraftStorage({ stopAutosave: true }) on publish: the wizard
   // stays mounted (the success dialog renders on top of it) with the form
   // still populated, so the 30s interval and the visibilitychange handler
@@ -546,6 +547,7 @@ export function useDraftAutosave(fields: DraftFields) {
 
   async function restoreDraft(target: RestoreTarget) {
     if (!isCurrent() || !hasDraftData) return;
+    restoringDraft.current = true;
     const { setValue, setSelectedParentId, setLocationMethod, setAttributes, setCoords } = target;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
     if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
@@ -632,6 +634,15 @@ export function useDraftAutosave(fields: DraftFields) {
     void clearDraftImages(DRAFT_KEY);
   }
 
+  /** Brukeren gikk videre uten å svare på utkasttilbudet: den lokale kopien
+   * (felt og bilder) forkastes, mens serverkopien blir liggende urørt under
+   * Mine annonser. Autolagringen starter deretter et nytt utkast. */
+  function releaseDraftOffer() {
+    // Gjenopprettingen kan hoppe til lagret steg før bildene er lest inn.
+    if (restoringDraft.current || !hasDraftData) return;
+    clearDraftStorage();
+  }
+
   async function discardDraft() {
     if (!isCurrent()) return;
     const id = draftIdRef.current ?? readItem(DRAFT_ID_KEY);
@@ -687,5 +698,6 @@ export function useDraftAutosave(fields: DraftFields) {
     restoreDraft,
     clearDraftStorage,
     discardDraft,
+    releaseDraftOffer,
   };
 }

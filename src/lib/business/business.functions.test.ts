@@ -119,7 +119,18 @@ function buildAdmin(
   const calls = { updates: [] as Record<string, unknown>[] };
   const makeChain = (table: string) => {
     const chain: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "is", "gt", "lt", "in", "gte", "order", "limit"]) {
+    for (const method of [
+      "select",
+      "eq",
+      "is",
+      "gt",
+      "lt",
+      "in",
+      "gte",
+      "order",
+      "limit",
+      "range",
+    ]) {
       chain[method] = vi.fn(() => chain);
     }
     chain.maybeSingle = vi.fn(async () => ({

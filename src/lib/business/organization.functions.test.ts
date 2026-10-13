@@ -49,6 +49,11 @@ function table(rows: Record<string, unknown>[], filterListings = false) {
   const query: Record<string, unknown> = {};
   for (const method of ["select", "eq", "in", "gte", "order"]) query[method] = () => query;
   const filters: Array<(row: Record<string, unknown>) => boolean> = [];
+  let range = [0, 999];
+  query.range = (from: number, to: number) => {
+    range = [from, to];
+    return query;
+  };
   if (filterListings) {
     query.eq = (column: string, value: unknown) => {
       filters.push((row) => row[column] === value);
@@ -73,7 +78,10 @@ function table(rows: Record<string, unknown>[], filterListings = false) {
   }
   query.then = (resolve: (value: unknown) => unknown) =>
     resolve({
-      data: rows.filter((row) => filters.every((filter) => filter(row))).slice(0, 1000),
+      // PostgREST kapper hvert svar ved max-rows = 1000.
+      data: rows
+        .filter((row) => filters.every((filter) => filter(row)))
+        .slice(range[0], Math.min(range[1] + 1, range[0] + 1000)),
       error: null,
     });
   return query;
@@ -153,5 +161,16 @@ describe("getBusinessListingStats innsyn per lokasjon", () => {
     });
     const stats = (await call()) as { current: Array<{ id: string }> };
     expect(stats.current.map((row) => row.id)).toEqual(["b-own-after-limit"]);
+  });
+
+  // KG-06-F02: statistikken må omfatte alle annonser, også over radgrensen.
+  it("henter alle sider når bedriften har over 1000 annonser (grenseverdi)", async () => {
+    membership.role = "superuser";
+    const rows = Array.from({ length: 1001 }, (_, i) => listing(`l-${i}`, "loc-a", "u"));
+    supabaseAdmin.from.mockImplementation((name: string) =>
+      name === "listings" ? table(rows, true) : table([]),
+    );
+    const stats = (await call()) as { current: Array<{ id: string }> };
+    expect(stats.current).toHaveLength(1001);
   });
 });

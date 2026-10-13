@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
 
 import {
@@ -34,32 +34,41 @@ export function CategoryAttributes({
   requestPhotoAttributeSuggestions,
 }: WizardSharedProps) {
   const { data: allFilters } = useAllCategoryFilters();
-  // Bare nøklene: feltene var tomme før forslaget (se filteret under), så
-  // "Angre" kan trygt bare fjerne dem igjen i stedet for å måtte huske en
-  // tidligere verdi.
-  const [appliedAttributeSuggestionKeys, setAppliedAttributeSuggestionKeys] = useState<
-    string[] | null
-  >(null);
+  // Verdiene som ble foreslått. «Angre» fjerner bare felt som fortsatt har
+  // den foreslåtte verdien, så senere manuelle endringer beholdes (KG-19-F01).
+  const [appliedAttributeSuggestions, setAppliedAttributeSuggestions] =
+    useState<AttributeMap | null>(null);
+  // Forslaget kommer etter en await: det må bygge på verdiene brukeren har
+  // nå, ikke øyeblikksbildet fra da knappen ble trykket.
+  const latestAttributes = useRef(attributes);
+  useEffect(() => {
+    latestAttributes.current = attributes;
+  }, [attributes]);
 
   async function suggestAttributesFromPhotos() {
     if (!categorySlug) return;
     const suggestions = await requestPhotoAttributeSuggestions(categorySlug);
+    const current = latestAttributes.current;
     const emptySuggestions = suggestions.filter(
-      (s) => attributes[s.key] === undefined || attributes[s.key] === "",
+      (s) => current[s.key] === undefined || current[s.key] === "",
     );
     if (emptySuggestions.length === 0) return;
-    const next: AttributeMap = { ...attributes };
+    const next: AttributeMap = { ...current };
     for (const s of emptySuggestions) next[s.key] = s.value;
     onAttributesChange(next);
-    setAppliedAttributeSuggestionKeys(emptySuggestions.map((s) => s.key));
+    setAppliedAttributeSuggestions(
+      Object.fromEntries(emptySuggestions.map((s) => [s.key, s.value])),
+    );
   }
 
   function undoAttributeSuggestions() {
-    if (!appliedAttributeSuggestionKeys) return;
+    if (!appliedAttributeSuggestions) return;
     const next: AttributeMap = { ...attributes };
-    for (const key of appliedAttributeSuggestionKeys) delete next[key];
+    for (const [key, value] of Object.entries(appliedAttributeSuggestions)) {
+      if (next[key] === value) delete next[key];
+    }
     onAttributesChange(next);
-    setAppliedAttributeSuggestionKeys(null);
+    setAppliedAttributeSuggestions(null);
   }
 
   const filterLabelsByKey = useMemo(
@@ -130,11 +139,11 @@ export function CategoryAttributes({
             <Sparkles className="size-4 shrink-0" aria-hidden />
             {photoAttributeSuggestionLoading ? "Henter forslag …" : "Foreslå detaljer fra bildene"}
           </Button>
-          {appliedAttributeSuggestionKeys && (
+          {appliedAttributeSuggestions && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-sm">
               <span className="text-brand-text">
                 Kaupet fylte ut{" "}
-                {appliedAttributeSuggestionKeys
+                {Object.keys(appliedAttributeSuggestions)
                   .map((key) => filterLabelsByKey.get(key) ?? key)
                   .join(" og ")}{" "}
                 fra bildene. Sjekk at det stemmer.

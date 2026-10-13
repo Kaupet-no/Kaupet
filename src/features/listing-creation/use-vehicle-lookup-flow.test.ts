@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
+import { applyVehicleLookup, useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 
 vi.mock("@tanstack/react-start", () => ({
@@ -354,5 +354,33 @@ describe("useVehicleLookupFlow", () => {
     // never reaches confirmVehicleData's caller (swallowed inside
     // proposeUnknownVehicle's own try/catch), so it can never block this.
     expect(goNext).toHaveBeenCalled();
+  });
+});
+
+// KG-20-F01: et nytt kjennemerke beholdt A sine tekniske data der B manglet verdi.
+describe("applyVehicleLookup", () => {
+  const lookupA = {
+    registrationNumber: "AB12345",
+    brand: "Volvo",
+    model: "V70",
+    next_eu_control: "2027-01-01",
+    drive_type: "awd",
+    power_hk: 200,
+  } as never;
+  const lookupB = { registrationNumber: "CD54321", brand: "Audi", model: "A4" } as never;
+
+  it("fjerner forrige kjøretøys oppslagsdata ved nytt kjennemerke", () => {
+    const afterA = applyVehicleLookup({ title_hint: "beholdes" }, lookupA);
+    const afterB = applyVehicleLookup(afterA, lookupB);
+    expect(afterB).toMatchObject({ registration_number: "CD54321", brand: "Audi", model: "A4" });
+    expect(afterB).not.toHaveProperty("next_eu_control");
+    expect(afterB).not.toHaveProperty("drive_type");
+    expect(afterB).not.toHaveProperty("power_hk");
+    expect(afterB.title_hint).toBe("beholdes");
+  });
+
+  it("beholder manuelle verdier når samme kjennemerke bekreftes igjen", () => {
+    const afterA = { ...applyVehicleLookup({}, lookupA), seats: 5 };
+    expect(applyVehicleLookup(afterA, lookupA).seats).toBe(5);
   });
 });

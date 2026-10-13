@@ -17,6 +17,95 @@ import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 import type { AttributeMap } from "@/components/attribute-fields";
 
+/** Attributtene et kjøretøyoppslag fyller. Ved et nytt kjennemerke fjernes
+ * de før det nye oppslaget legges inn, så kjøretøy B ikke arver A sine data
+ * der B mangler en verdi (KG-20-F01). Andre felt beholdes. */
+const VEHICLE_LOOKUP_KEYS = [
+  "brand",
+  "model",
+  "year",
+  "fuel_type",
+  "weight_kg",
+  "transmission",
+  "color",
+  "body_type",
+  "next_eu_control",
+  "power_hk",
+  "drive_type",
+  "tow_hitch",
+  "max_tow_weight_kg",
+  "max_total_weight_kg",
+  "length_m",
+  "seats",
+  "imported_used",
+  "first_registration_date",
+  "first_registration_year",
+  "cylinders",
+  "engine_displacement_cc",
+  "engine_code",
+  "sleeping_places",
+  "avgiftskode_gruppe",
+] as const;
+
+/** Legger rå SVV-data inn i attributes. Merke/modell fra SVV vinner over
+ * tittelforslaget når oppslaget har begge; mangler ett av dem, fyller
+ * brukeren dem inn selv. Delt av veiviseren og skiltdialogen. */
+export function applyVehicleLookup(
+  attributes: AttributeMap,
+  lookup: VehicleLookupResult,
+): AttributeMap {
+  const next: AttributeMap = { ...attributes };
+  const previousPlate = attributes.registration_number;
+  if (attributes.vehicle_lookup && previousPlate !== lookup.registrationNumber) {
+    for (const key of VEHICLE_LOOKUP_KEYS) delete next[key];
+  }
+  next.is_registered = true;
+  next.registration_number = lookup.registrationNumber;
+  next.vehicle_lookup = JSON.stringify(lookup);
+  if (lookup.brand && lookup.model) {
+    next.brand = lookup.brand;
+    next.model = lookup.model;
+  }
+  if (lookup.year) next.year = lookup.year;
+  if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
+  if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
+  if (lookup.transmission) next.transmission = lookup.transmission;
+  const color = guessColorOption(lookup.color);
+  if (color) next.color = color;
+  if (lookup.body_type) next.body_type = lookup.body_type;
+  if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
+  if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
+  if (lookup.drive_type) next.drive_type = lookup.drive_type;
+  if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
+  if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
+  if (lookup.max_total_weight_kg != null) next.max_total_weight_kg = lookup.max_total_weight_kg;
+  if (lookup.length_m != null) next.length_m = lookup.length_m;
+  if (lookup.seats != null) next.seats = lookup.seats;
+  if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
+  if (lookup.first_registration_date) {
+    next.first_registration_date = lookup.first_registration_date;
+    // Den eksakte datoen vises på annonsesiden, men søkes på som år — så
+    // året lagres avledet ved siden av (se
+    // 20260729130000_first_registration_year_numeric.sql).
+    const year = firstRegistrationYear(lookup.first_registration_date);
+    if (year != null) next.first_registration_year = year;
+  }
+  if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
+  if (lookup.engine_displacement_cc != null)
+    next.engine_displacement_cc = lookup.engine_displacement_cc;
+  if (lookup.engine_code) next.engine_code = lookup.engine_code;
+  if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
+  // Personbil/Varebil-gruppen, utledet automatisk fra avgiftsklassekoden —
+  // uten denne kan ikke omregistreringsavgiften beregnes (se bug-rapport
+  // for DR50500, en Audi A3 e-tron med fullstendige data der denne manglet).
+  const avgiftskodeGruppe = avgiftskodeGruppeFromCode(
+    lookup.avgiftsklasse_code,
+    lookup.classification_code,
+  );
+  if (avgiftskodeGruppe) next.avgiftskode_gruppe = avgiftskodeGruppe;
+  return next;
+}
+
 type CategoriesById = Map<string, CategoryNode & { name_nb: string; slug?: string }>;
 
 /** SVV returns color as free text (e.g. "SORT", "SØLV METALLIC") — best-effort
@@ -165,63 +254,15 @@ export function useVehicleLookupFlow(params: {
     }
   }
 
-  /** Skriver rå SVV-data til attributes når brukeren går videre fra
-   * vehicle-registration. Merke/modell fra SVV vinner over tittelforslaget
-   * når oppslaget har begge; mangler ett av dem, fyller brukeren dem inn på
-   * siden, og de verdiene beholdes.
+  /** Skriver rå SVV-data til attributes (applyVehicleLookup) når brukeren
+   * går videre fra vehicle-registration.
    * `categoryGroup` avgjør hvilken merke-/modelltabell et ukjent merke/modell
    * (fra SVV) foreslås inn i — se proposeUnknownVehicle over. */
   function confirmVehicleData(leafCategoryId: string, categoryGroup: VehicleBrandGroup) {
     const lookup = vehicleLookupResult;
     if (!lookup) return;
 
-    const next: AttributeMap = {
-      ...attributes,
-      is_registered: true,
-      registration_number: lookup.registrationNumber,
-      vehicle_lookup: JSON.stringify(lookup),
-    };
-    if (lookup.brand && lookup.model) {
-      next.brand = lookup.brand;
-      next.model = lookup.model;
-    }
-    if (lookup.year) next.year = lookup.year;
-    if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
-    if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
-    if (lookup.transmission) next.transmission = lookup.transmission;
-    const color = guessColorOption(lookup.color);
-    if (color) next.color = color;
-    if (lookup.body_type) next.body_type = lookup.body_type;
-    if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
-    if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
-    if (lookup.drive_type) next.drive_type = lookup.drive_type;
-    if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
-    if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
-    if (lookup.max_total_weight_kg != null) next.max_total_weight_kg = lookup.max_total_weight_kg;
-    if (lookup.length_m != null) next.length_m = lookup.length_m;
-    if (lookup.seats != null) next.seats = lookup.seats;
-    if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
-    if (lookup.first_registration_date) {
-      next.first_registration_date = lookup.first_registration_date;
-      // Den eksakte datoen vises på annonsesiden, men søkes på som år — så
-      // året lagres avledet ved siden av (se
-      // 20260729130000_first_registration_year_numeric.sql).
-      const year = firstRegistrationYear(lookup.first_registration_date);
-      if (year != null) next.first_registration_year = year;
-    }
-    if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
-    if (lookup.engine_displacement_cc != null)
-      next.engine_displacement_cc = lookup.engine_displacement_cc;
-    if (lookup.engine_code) next.engine_code = lookup.engine_code;
-    if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
-    // Personbil/Varebil-gruppen, utledet automatisk fra avgiftsklassekoden —
-    // uten denne kan ikke omregistreringsavgiften beregnes (se bug-rapport
-    // for DR50500, en Audi A3 e-tron med fullstendige data der denne manglet).
-    const avgiftskodeGruppe = avgiftskodeGruppeFromCode(
-      lookup.avgiftsklasse_code,
-      lookup.classification_code,
-    );
-    if (avgiftskodeGruppe) next.avgiftskode_gruppe = avgiftskodeGruppe;
+    const next = applyVehicleLookup(attributes, lookup);
     if (typeof next.brand === "string" && next.brand.trim()) {
       void proposeUnknownVehicle(
         categoryGroup,

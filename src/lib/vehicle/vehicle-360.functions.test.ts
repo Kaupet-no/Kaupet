@@ -201,3 +201,32 @@ describe("vehicle 360 upload validation", () => {
     expect(putObjectMock).not.toHaveBeenCalled();
   });
 });
+
+describe("KG-34-F01: samlet sekvens og ledige ordre", () => {
+  it.each(
+    [[], [0], [0, 2, 35], Array.from({ length: 36 }, (_, i) => i)].map((orders) => ({ orders })),
+  )("returnerer antall og bare ledige plasser for %j", async ({ orders }) => {
+    const session = {
+      select: () => session,
+      eq: () => session,
+      is: () => session,
+      gt: () => session,
+      maybeSingle: async () => ({
+        data: { listing_id: LISTING_ID, listings: { title: "Bil" } },
+        error: null,
+      }),
+    };
+    const frames = {
+      select: () => frames,
+      eq: () => frames,
+      order: async () => ({ data: orders.map((frame_order) => ({ frame_order })), error: null }),
+    };
+    fromMock.mockImplementation((table) => (table === "listing_360_frames" ? frames : session));
+    const { getVehicle360CaptureSession } = await import("./vehicle-360.functions");
+    const result = await getVehicle360CaptureSession({ data: { token: TOKEN } });
+    expect(result.existingFrameCount).toBe(orders.length);
+    expect(result.availableFrameOrders).toEqual(
+      Array.from({ length: 36 }, (_, i) => i).filter((i) => !orders.includes(i)),
+    );
+  });
+});

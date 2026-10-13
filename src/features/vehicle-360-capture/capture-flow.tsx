@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Camera as CameraIcon, Check, Loader2, RotateCw, Square } from "lucide-react";
 
@@ -8,7 +8,6 @@ import { compressImage } from "@/lib/image-compression";
 import {
   MIN_360_FRAMES,
   TARGET_360_FRAMES,
-  MAX_360_FRAMES,
   completeVehicle360CaptureSession,
   uploadVehicle360Frame,
 } from "@/lib/vehicle/vehicle-360.functions";
@@ -119,12 +118,14 @@ function videoFrameToRawFile(video: HTMLVideoElement): Promise<File | null> {
 export function Vehicle360CaptureFlow({
   token,
   listingTitle,
-  startFrameOrder,
+  existingFrameCount,
+  availableFrameOrders,
   onDone,
 }: {
   token: string;
   listingTitle: string;
-  startFrameOrder: number;
+  existingFrameCount: number;
+  availableFrameOrders: number[];
   /** Set when the capture happens on the same device as the listing (in-wizard
    * or "add to existing listing" entry points) instead of via QR handoff from
    * desktop — swaps the completion copy/button accordingly and lets the
@@ -138,7 +139,9 @@ export function Vehicle360CaptureFlow({
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<number | null>(null);
   const capturingRef = useRef(false);
-  const nextOrderRef = useRef(startFrameOrder);
+  const nextSlotRef = useRef(0);
+  const startupGenerationRef = useRef(0);
+  const startingRef = useRef(false);
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastSignatureRef = useRef<Uint8ClampedArray | null>(null);
   const processingRef = useRef(false);
@@ -148,6 +151,11 @@ export function Vehicle360CaptureFlow({
   const orientationSupportedRef = useRef(true);
 
   const [frames, setFrames] = useState<Frame[]>([]);
+  const framesRef = useRef<Frame[]>([]);
+  useEffect(() => {
+    framesRef.current = frames;
+  }, [frames]);
+  const [starting, setStarting] = useState(false);
   const [recording, setRecording] = useState(false);
   const [waitingForMovement, setWaitingForMovement] = useState(false);
   const [waitingForLevel, setWaitingForLevel] = useState(false);
@@ -156,8 +164,8 @@ export function Vehicle360CaptureFlow({
   const [finishing, setFinishing] = useState(false);
   const [done, setDone] = useState(false);
 
-  const doneCount = frames.filter((f) => f.status === "done").length;
-  const totalCount = frames.length;
+  const doneCount = existingFrameCount + frames.filter((f) => f.status === "done").length;
+  const totalCount = existingFrameCount + frames.length;
   const hasEnough = doneCount >= MIN_360_FRAMES;
   const processedCount = frames.filter((f) => f.status === "done" || f.status === "error").length;
 
@@ -167,6 +175,9 @@ export function Vehicle360CaptureFlow({
   }, []);
 
   const stopStream = useCallback(() => {
+    startupGenerationRef.current += 1;
+    startingRef.current = false;
+    setStarting(false);
     if (intervalRef.current != null) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -188,14 +199,9 @@ export function Vehicle360CaptureFlow({
     processingRef.current = true;
     setProcessing(true);
     try {
-      // Les gjeldende liste via functional update-triks: vi itererer over en
-      // snapshot tatt før løkken starter, siden `frames` i closure kan være
-      // stale mellom await-punktene.
-      let pending: Frame[] = [];
-      setFrames((prev) => {
-        pending = prev.filter((f) => f.status === "captured");
-        return prev;
-      });
+      const pending = framesRef.current.filter(
+        (frame) => frame.status === "captured" || frame.status === "error",
+      );
       for (const entry of pending) {
         setFrames((prev) =>
           prev.map((f) => (f.order === entry.order ? { ...f, status: "processing" } : f)),
@@ -228,6 +234,16 @@ export function Vehicle360CaptureFlow({
   }, [token, uploadFrame]);
 
   const startRecording = useCallback(async () => {
+    if (
+      startingRef.current ||
+      streamRef.current ||
+      nextSlotRef.current >= availableFrameOrders.length
+    )
+      return;
+    startingRef.current = true;
+    setStarting(true);
+    const generation = ++startupGenerationRef.current;
+    const cancelled = () => generation !== startupGenerationRef.current;
     setCameraError(null);
     try {
       // iOS 13+ krever eksplisitt tillatelse til orientasjonssensoren, som må
@@ -246,15 +262,23 @@ export function Vehicle360CaptureFlow({
         orientationSupportedRef.current = typeof DeviceOrientationEvent !== "undefined";
       }
 
+      if (cancelled()) return;
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 960 } },
         audio: false,
       });
+      if (cancelled()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      if (cancelled()) return;
+      startingRef.current = false;
+      setStarting(false);
       if (!signatureCanvasRef.current) {
         const c = document.createElement("canvas");
         c.width = SIGNATURE_WIDTH;
@@ -274,7 +298,7 @@ export function Vehicle360CaptureFlow({
       setRecording(true);
       intervalRef.current = window.setInterval(async () => {
         if (capturingRef.current || !videoRef.current || !signatureCanvasRef.current) return;
-        if (nextOrderRef.current - startFrameOrder >= MAX_360_FRAMES) {
+        if (nextSlotRef.current >= availableFrameOrders.length) {
           stopStream();
           setRecording(false);
           void processPendingFrames();
@@ -321,20 +345,22 @@ export function Vehicle360CaptureFlow({
         if (signature) lastSignatureRef.current = signature;
         const file = await videoFrameToRawFile(videoRef.current);
         capturingRef.current = false;
-        if (file) {
-          const order = nextOrderRef.current;
-          nextOrderRef.current += 1;
+        if (file && !cancelled()) {
+          const order = availableFrameOrders[nextSlotRef.current];
+          nextSlotRef.current += 1;
           const previewUrl = URL.createObjectURL(file);
           setFrames((p) => [...p, { order, file, previewUrl, status: "captured" }]);
         }
       }, CAPTURE_INTERVAL_MS);
     } catch (e) {
+      if (cancelled()) return;
+      stopStream();
       console.error("[vehicle-360] kamera-tilgang feilet", e);
       setCameraError(
         "Fikk ikke tilgang til kameraet. Sjekk at appen/nettleseren har kameratillatelse.",
       );
     }
-  }, [startFrameOrder, stopStream, processPendingFrames, handleOrientation]);
+  }, [availableFrameOrders, stopStream, processPendingFrames, handleOrientation]);
 
   function stopRecording() {
     stopStream();
@@ -393,7 +419,7 @@ export function Vehicle360CaptureFlow({
           muted
           playsInline
           className="size-full object-cover"
-          style={{ display: recording || totalCount > 0 ? "block" : "none" }}
+          style={{ display: starting || recording || totalCount > 0 ? "block" : "none" }}
         />
         {!recording && totalCount === 0 && (
           <div className="flex size-full flex-col items-center justify-center gap-2 text-white/70">
@@ -437,13 +463,13 @@ export function Vehicle360CaptureFlow({
         <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
           <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-primary">
             <Loader2 className="size-4 animate-spin" /> Laster opp bilder ({processedCount}/
-            {totalCount})…
+            {frames.length})…
           </p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
               style={{
-                width: `${totalCount > 0 ? (processedCount / totalCount) * 100 : 0}%`,
+                width: `${frames.length > 0 ? (processedCount / frames.length) * 100 : 0}%`,
               }}
             />
           </div>
@@ -478,18 +504,32 @@ export function Vehicle360CaptureFlow({
               className="w-full gap-2"
               size="xl"
               onClick={startRecording}
-              disabled={processing}
+              disabled={starting || processing || frames.length >= availableFrameOrders.length}
             >
               <CameraIcon className="size-6" />{" "}
-              {totalCount === 0 ? "Start opptak" : "Fortsett opptak"}
+              {starting
+                ? "Starter kamera …"
+                : totalCount === 0
+                  ? "Start opptak"
+                  : "Fortsett opptak"}
             </Button>
+            {frames.some((frame) => frame.status === "error") && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={processPendingFrames}
+              >
+                Prøv mislykkede opplastinger igjen
+              </Button>
+            )}
             {totalCount > 0 && (
               <Button
                 type="button"
                 variant="outline"
                 className="w-full"
                 onClick={finish}
-                disabled={!hasEnough || finishing || processing}
+                disabled={starting || !hasEnough || finishing || processing}
               >
                 {finishing && <Loader2 className="mr-2 size-4 animate-spin" />}
                 {hasEnough

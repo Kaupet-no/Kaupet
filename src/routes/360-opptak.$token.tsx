@@ -20,12 +20,13 @@ export const Route = createFileRoute("/360-opptak/$token")({
 
 function CapturePage() {
   const { token } = Route.useParams();
-  const { listingTitle, nextFrameOrder } = Route.useLoaderData();
+  const { listingTitle, existingFrameCount, availableFrameOrders } = Route.useLoaderData();
   return (
     <Vehicle360CaptureFlow
       token={token}
       listingTitle={listingTitle}
-      startFrameOrder={nextFrameOrder}
+      existingFrameCount={existingFrameCount}
+      availableFrameOrders={availableFrameOrders}
     />
   );
 }

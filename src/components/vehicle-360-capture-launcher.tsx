@@ -10,6 +10,7 @@ import { Vehicle360CaptureFlow } from "@/features/vehicle-360-capture/capture-fl
 import {
   createVehicle360CaptureSession,
   getVehicle360Frames,
+  getVehicle360CaptureSession,
 } from "@/lib/vehicle/vehicle-360.functions";
 
 /**
@@ -37,8 +38,13 @@ export function Vehicle360CaptureLauncher({
   size?: "default" | "sm" | "icon";
 }) {
   const createSession = useServerFn(createVehicle360CaptureSession);
+  const fetchSession = useServerFn(getVehicle360CaptureSession);
   const fetchFrames = useServerFn(getVehicle360Frames);
-  const [session, setSession] = useState<{ token: string; startFrameOrder: number } | null>(null);
+  const [session, setSession] = useState<{
+    token: string;
+    existingFrameCount: number;
+    availableFrameOrders: number[];
+  } | null>(null);
   const [starting, setStarting] = useState(false);
 
   const framesQuery = useQuery({
@@ -57,7 +63,8 @@ export function Vehicle360CaptureLauncher({
         return;
       }
       const { token } = await createSession({ data: { listingId: id } });
-      setSession({ token, startFrameOrder: frameCount });
+      const capture = await fetchSession({ data: { token } });
+      setSession({ token, ...capture });
     } catch (e) {
       console.error("[vehicle-360] kunne ikke starte opptaksøkt", e);
       showErrorToast("Kunne ikke starte opptaket");
@@ -93,7 +100,8 @@ export function Vehicle360CaptureLauncher({
           <Vehicle360CaptureFlow
             token={session.token}
             listingTitle={listingTitle}
-            startFrameOrder={session.startFrameOrder}
+            existingFrameCount={session.existingFrameCount}
+            availableFrameOrders={session.availableFrameOrders}
             onDone={close}
           />
         </FullscreenOverlayContent>

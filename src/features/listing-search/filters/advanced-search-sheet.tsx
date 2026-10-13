@@ -232,10 +232,22 @@ export function AdvancedSearchSheet({
               onUpdate={() => {}}
               attrFilters={allFilters ?? []}
               attrValues={v.attributes}
-              onRemoveAttr={(key) => {
-                const attributes = { ...v.attributes };
-                delete attributes[key];
-                setV({ ...v, attributes });
+              onRemoveAttr={(key, value) => {
+                setV((previous) => {
+                  const attributes = { ...previous.attributes };
+                  const current = attributes[key];
+                  if (
+                    value !== undefined &&
+                    (current?.kind === "multiselect" || current?.kind === "exclude")
+                  ) {
+                    const values = current.values.filter((item) => item !== value);
+                    if (values.length) attributes[key] = { ...current, values };
+                    else delete attributes[key];
+                  } else {
+                    delete attributes[key];
+                  }
+                  return { ...previous, attributes };
+                });
               }}
             />
 

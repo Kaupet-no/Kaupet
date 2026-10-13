@@ -16,3 +16,28 @@ export async function fetchAllPages<T>(
     if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
   }
 }
+
+/** Hvor mange ID-er ett `.in(...)`-filter får: tusenvis av UUID-er i
+ * query-strengen gir en URL som avvises (414). */
+export const ID_CHUNK_SIZE = 100;
+
+/** `fetchAllPages` for et `.in(...)`-filter over mange ID-er: ID-ene deles i
+ * biter, og hver bit pagineres for seg. Rader for samme ID havner i samme bit,
+ * så sorteringen per ID beholdes. */
+export async function fetchAllPagesByIds<T>(
+  ids: string[],
+  page: (
+    chunk: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<{ data: T[]; error: null } | { data: null; error: unknown }> {
+  const rows: T[] = [];
+  for (let start = 0; start < ids.length; start += ID_CHUNK_SIZE) {
+    const chunk = ids.slice(start, start + ID_CHUNK_SIZE);
+    const result = await fetchAllPages<T>((from, to) => page(chunk, from, to));
+    if (result.data === null) return result;
+    rows.push(...result.data);
+  }
+  return { data: rows, error: null };
+}

@@ -12,7 +12,7 @@ import {
   requireSuperuserOrganization,
 } from "@/lib/business/organization-access";
 import { uuid } from "@/lib/business/schemas";
-import { fetchAllPages } from "@/lib/fetch-all-pages";
+import { fetchAllPages, fetchAllPagesByIds } from "@/lib/fetch-all-pages";
 import { toClientError } from "@/lib/to-client-error";
 import { welcomeEmail } from "@/lib/business-email-templates";
 import { sendBusinessReceipt } from "@/lib/business/business-emails.server";
@@ -125,29 +125,29 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
       { data: viewEvents, error: viewEventsError },
     ] = listingIds.length
       ? await Promise.all([
-          fetchAllPages((from, to) =>
+          fetchAllPagesByIds(listingIds, (chunk, from, to) =>
             supabaseAdmin
               .from("listing_status_history")
               .select("listing_id, status, changed_at")
-              .in("listing_id", listingIds)
+              .in("listing_id", chunk)
               .order("changed_at")
               .order("id")
               .range(from, to),
           ),
-          fetchAllPages((from, to) =>
+          fetchAllPagesByIds(listingIds, (chunk, from, to) =>
             supabaseAdmin
               .from("listing_sales")
               .select("listing_id, confirmed_at")
-              .in("listing_id", listingIds)
+              .in("listing_id", chunk)
               .gte("confirmed_at", salesStart.toISOString())
               .order("listing_id")
               .range(from, to),
           ),
-          fetchAllPages((from, to) =>
+          fetchAllPagesByIds(listingIds, (chunk, from, to) =>
             supabaseAdmin
               .from("listing_view_events")
               .select("listing_id, created_at")
-              .in("listing_id", listingIds)
+              .in("listing_id", chunk)
               .gte("created_at", historyStart.toISOString())
               .order("id")
               .range(from, to),

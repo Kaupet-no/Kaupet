@@ -49,6 +49,39 @@ it("nedre grense: en tom samtaleliste trenger ingen spørring", async () => {
   expect(await lastConversationMessages([])).toEqual(new Map());
 });
 
+it("grenseverdi: beholder siste melding for alle 1001 samtaler med korte forespørsler", async () => {
+  const ids = Array.from({ length: 1001 }, () => crypto.randomUUID());
+  const client = createClient<Database>("https://test.invalid", "test-key", {
+    auth: { persistSession: false },
+    global: {
+      fetch: async (input) => {
+        const url = new URL(String(input));
+        // Simuler PostgRESTs radgrense og avvis for lange URL-er.
+        if (url.href.length > 8000)
+          return Response.json({ message: "URI too long" }, { status: 414 });
+        const selected = url.searchParams.get("id")!.slice(4, -1).split(",");
+        return Response.json(
+          selected.slice(0, 1000).map((id) => ({
+            id,
+            messages: [
+              {
+                body: `Hei ${id}`,
+                sender_id: "buyer",
+                created_at: "2026-10-02T12:00:00Z",
+                deleted_at: null,
+                attachment_path: null,
+              },
+            ],
+          })),
+        );
+      },
+    },
+  });
+  const messages = await lastConversationMessages(ids, client);
+  expect([...messages.keys()]).toEqual(ids);
+  expect(messages.get(ids.at(-1)!)?.body).toBe(`Hei ${ids.at(-1)}`);
+});
+
 describe("messagePreview", () => {
   it("viser bilde for vedlegg uten tekst og skjuler slettede meldinger", () => {
     expect(messagePreview({ body: "", deleted_at: null, attachment_path: "a/b.jpg" })).toBe(

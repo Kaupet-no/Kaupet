@@ -44,6 +44,21 @@ type Profile = {
   deleted_at: string | null;
 };
 
+const BUYER_IDS_CHUNK_SIZE = 100;
+
+async function fetchBuyerProfiles(buyerIds: string[]): Promise<Profile[]> {
+  const profiles: Profile[] = [];
+  for (let from = 0; from < buyerIds.length; from += BUYER_IDS_CHUNK_SIZE) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, deleted_at")
+      .in("id", buyerIds.slice(from, from + BUYER_IDS_CHUNK_SIZE));
+    if (error) throw error;
+    profiles.push(...(data ?? []));
+  }
+  return profiles;
+}
+
 export function BusinessMessagesPanel({ organization, locationId }: Props) {
   const conversationsQuery = useQuery({
     queryKey: ["business-messages", organization.id, locationId],
@@ -64,26 +79,16 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
       if (error) throw error;
       const conversations = data as unknown as Conversation[];
       const ids = conversations.map((conversation) => conversation.id);
-      const userIds = Array.from(
-        new Set(
-          conversations.flatMap((conversation) => [conversation.buyer_id, conversation.seller_id]),
-        ),
+      const buyerIds = Array.from(
+        new Set(conversations.map((conversation) => conversation.buyer_id)),
       );
       // Én siste melding per samtale (KG-06-F02): en lang tråd må ikke bruke
       // opp radgrensen og få andre samtaler til å se tomme ut.
-      const [latestByConversation, { data: profiles, error: profilesError }] = await Promise.all([
+      const [latestByConversation, profiles] = await Promise.all([
         lastConversationMessages(ids),
-        userIds.length
-          ? supabase
-              .from("profiles")
-              .select("id, display_name, avatar_url, deleted_at")
-              .in("id", userIds)
-          : Promise.resolve({ data: [], error: null }),
+        fetchBuyerProfiles(buyerIds),
       ]);
-      if (profilesError) throw profilesError;
-      const profileById = new Map(
-        (profiles ?? []).map((profile) => [profile.id, profile as Profile]),
-      );
+      const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
       return conversations.map((conversation) => ({
         ...conversation,
         listing: Array.isArray(conversation.listing)

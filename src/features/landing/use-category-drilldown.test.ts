@@ -167,3 +167,20 @@ describe("useCategoryDrilldown", () => {
     });
   });
 });
+
+it("KG-35-F02: leafroot får ingen gamle filtre eller pris; Vis treff bevarer samme kategori", () => {
+  const { result, navigate } = setup();
+  act(() => result.current.handlePickCategory(elektronikk));
+  act(() => {
+    result.current.setFilterValues({ fuel_type: { kind: "select", value: "diesel" } });
+    result.current.setPriceMin(100);
+    result.current.setPriceMax(500);
+  });
+  act(() => result.current.goToCategory(elektronikk));
+  expect(navigate.mock.calls[0][0].search).toMatchObject({
+    min: 100,
+    max: 500,
+  });
+  act(() => result.current.handlePickCategory(annet));
+  expect(navigate.mock.calls[1][0].search).toEqual({ q: "", category: "annet", sort: "new" });
+});

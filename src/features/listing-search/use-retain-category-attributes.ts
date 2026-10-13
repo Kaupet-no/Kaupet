@@ -16,11 +16,8 @@ export function useRetainCategoryAttributes(categories: Category[]) {
   const { data: allFilters } = useAllCategoryFilters();
   const tree = useMemo(() => buildTree(categories), [categories]);
   return useCallback(
-    (
-      attributes: Record<string, AttributeFilterValue>,
-      slugs: string[],
-    ): Record<string, AttributeFilterValue> =>
-      allFilters
+    (attributes: Record<string, AttributeFilterValue>, slugs: string[]) => {
+      const result = allFilters
         ? retainSearchAttributes(
             attributes,
             effectiveFiltersForCategories(
@@ -29,8 +26,19 @@ export function useRetainCategoryAttributes(categories: Category[]) {
               tree.byId,
             ),
             { dropUnknown: true },
-          ).kept
-        : {},
+          )
+        : { kept: {}, dropped: Object.keys(attributes) };
+      return {
+        ...result,
+        droppedLabels: [
+          ...new Set(
+            result.dropped.map(
+              (key) => allFilters?.find((filter) => filter.key === key)?.label_nb ?? key,
+            ),
+          ),
+        ],
+      };
+    },
     [allFilters, tree],
   );
 }

@@ -52,16 +52,16 @@ export function SearchFilterSidebar({
   // Samme regler som SearchPanel: ved kategoribytte beholdes verdier den
   // nye kategorien også har, og avhengige filtre fjernes sammen med
   // forutsetningen (KG-30-F01).
+  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
   const retainForCategories = useRetainCategoryAttributes(categories);
   const setValue = (next: React.SetStateAction<AdvancedSearchValue>) => {
     const value = typeof next === "function" ? next(applied.value) : next;
-    onApply({
-      value,
-      attributes:
-        value.categories.join("\0") === applied.value.categories.join("\0")
-          ? applied.attributes
-          : retainForCategories(applied.attributes, value.categories),
-    });
+    const changedCategory = value.categories.join("\0") !== applied.value.categories.join("\0");
+    const retained = changedCategory
+      ? retainForCategories(applied.attributes, value.categories)
+      : null;
+    if (retained) setCategoryNotice(retained.droppedLabels);
+    onApply({ value, attributes: retained?.kept ?? applied.attributes });
   };
 
   const onAttributeChange = (key: string, value: AttributeFilterValue | undefined) => {
@@ -138,11 +138,7 @@ export function SearchFilterSidebar({
       label: categoryLabel,
       onRemove: results.categoryLocked
         ? undefined
-        : () =>
-            onApply({
-              value: { ...applied.value, categories: [], catMode: "any" },
-              attributes: {},
-            }),
+        : () => setValue({ ...applied.value, categories: [], catMode: "any" }),
     });
   }
   if (applied.value.location.lat != null) {
@@ -356,6 +352,7 @@ export function SearchFilterSidebar({
             )}
           >
             <SearchFilterSections
+              categoryNotice={categoryNotice}
               layout="expanded"
               desktopGroup={inline ? undefined : group}
               value={applied.value}

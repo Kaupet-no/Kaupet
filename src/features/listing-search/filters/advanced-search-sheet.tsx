@@ -1,3 +1,5 @@
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { ActiveFilters } from "./active-filters";
 import { useMemo, useState } from "react";
 import { ChevronDown, X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
@@ -73,6 +75,8 @@ export function AdvancedSearchSheet({
 }: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
+  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
+  const { data: allFilters } = useAllCategoryFilters();
   const retainForCategories = useRetainCategoryAttributes(categories);
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
@@ -210,14 +214,29 @@ export function AdvancedSearchSheet({
               categories={categories}
               selected={v.categories}
               // Attributter de nye kategoriene ikke har, fjernes (KG-29-F01).
-              onChange={(slugs) =>
-                setV({
-                  ...v,
-                  categories: slugs,
-                  catMode: "any",
-                  attributes: retainForCategories(v.attributes ?? {}, slugs),
-                })
-              }
+              onChange={(slugs) => {
+                const retained = retainForCategories(v.attributes ?? {}, slugs);
+                setCategoryNotice(retained.droppedLabels);
+                setV({ ...v, categories: slugs, catMode: "any", attributes: retained.kept });
+              }}
+            />
+
+            {categoryNotice.length > 0 && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {categoryNotice.join(", ")} ble fjernet ved kategoribyttet.
+              </p>
+            )}
+            <ActiveFilters
+              search={{ q: "", qMode: v.qMode, extraGroups: [] }}
+              terms={[]}
+              onUpdate={() => {}}
+              attrFilters={allFilters ?? []}
+              attrValues={v.attributes}
+              onRemoveAttr={(key) => {
+                const attributes = { ...v.attributes };
+                delete attributes[key];
+                setV({ ...v, attributes });
+              }}
             />
 
             {/* Pris */}

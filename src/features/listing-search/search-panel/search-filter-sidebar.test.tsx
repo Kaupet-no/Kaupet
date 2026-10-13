@@ -64,6 +64,7 @@ describe("SearchFilterSidebar", () => {
 
     expect(onApply.mock.calls[0][0].value.categories).toEqual([]);
     expect(onApply.mock.calls[0][0].attributes).toEqual({});
+    expect(getByRole("status").textContent).toContain("make");
   });
 
   it("lar brukeren fjerne et aktivt prisfilter fra oppsummeringen", () => {

@@ -42,5 +42,8 @@ it("beholder verdier den nye kategorien har og fjerner resten", () => {
       },
       ["mc"],
     ),
-  ).toEqual({ color: { kind: "select", value: "red" } });
+  ).toMatchObject({
+    kept: { color: { kind: "select", value: "red" } },
+    droppedLabels: ["fuel_type"],
+  });
 });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -86,12 +86,16 @@ function renderPanel() {
 }
 
 it("viser kjøper og siste melding også for samtale 1001", async () => {
-  const { findByText, queryByText } = renderPanel();
+  const { container, findByText } = renderPanel();
   const last = fixture.conversations.at(-1)!;
-  expect(await findByText(`Kjøper ${last.buyer_id}`)).toBeTruthy();
-  expect(await findByText(`Melding ${last.id}`)).toBeTruthy();
-  expect(queryByText("Ukjent kjøper")).toBeNull();
-  expect(queryByText("Ingen meldinger enda")).toBeNull();
+  await findByText("1001 samtaler", { selector: "p" });
+  const rows = container.querySelectorAll("li");
+  expect(rows).toHaveLength(1001);
+  const lastRow = within(rows[rows.length - 1]);
+  expect(lastRow.getByText(`Kjøper ${last.buyer_id}`)).toBeTruthy();
+  expect(lastRow.getByText(`Melding ${last.id}`)).toBeTruthy();
+  expect(container.textContent).not.toContain("Ukjent kjøper");
+  expect(container.textContent).not.toContain("Ingen meldinger enda");
 });
 
 it("viser feil hvis en senere gruppe kjøperprofiler ikke kan hentes", async () => {

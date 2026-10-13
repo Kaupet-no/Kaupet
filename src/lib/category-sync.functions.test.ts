@@ -28,7 +28,7 @@ vi.mock("@/lib/admin-auth.server", () => ({ requireAdminRole: vi.fn() }));
 vi.mock("@/integrations/supabase/admin", () => ({ getSupabaseAdmin: async () => prod }));
 vi.mock("@/integrations/supabase/staging-client.server", () => ({ stagingAdmin: staging }));
 
-import { syncCategoriesFromStaging } from "./category-sync.functions";
+import { getCategorySyncDiff, syncCategoriesFromStaging } from "./category-sync.functions";
 
 const MAX_ROWS = 1000;
 
@@ -125,4 +125,81 @@ describe("syncCategoriesFromStaging", () => {
       expect(prod.rpc).not.toHaveBeenCalled();
     },
   );
+});
+
+/** Enkel tabelldobbel: alle rader på én side. */
+function serveTables(
+  client: { from: ReturnType<typeof vi.fn> },
+  tables: Record<string, unknown[]>,
+) {
+  client.from.mockImplementation((table: string) => {
+    if (table === "site_settings") {
+      const single = { data: { default_search_examples: [] }, error: null };
+      return { select: () => ({ eq: () => ({ single: async () => single }) }) };
+    }
+    let head = false;
+    let afterId = "";
+    const query = {
+      select: (_columns: string, options?: { head?: boolean }) => {
+        head = !!options?.head;
+        return query;
+      },
+      order: () => query,
+      gt: (_column: string, id: string) => {
+        afterId = id;
+        return query;
+      },
+      range: () => query,
+      then: (resolve: (value: unknown) => unknown) => {
+        const rows = (tables[table] ?? []) as Array<{ id: string }>;
+        return head
+          ? resolve({ data: null, error: null, count: rows.length })
+          : resolve({ data: afterId ? [] : rows, error: null });
+      },
+    };
+    return query;
+  });
+}
+
+// KG-21-F02: parent_id ble fjernet fra sammenligningen, så en flytting alene
+// ga ingen diff og kunne ikke synkes.
+describe("getCategorySyncDiff", () => {
+  const category = (id: string, slug: string, parent_id: string | null) => ({
+    id,
+    slug,
+    parent_id,
+    name_nb: slug,
+    created_at: "x",
+    updated_at: "x",
+  });
+
+  it("viser en kategori som bare har byttet forelder som endret", async () => {
+    serveTables(prod, {
+      categories: [
+        category("p-a", "a", null),
+        category("p-b", "b", null),
+        category("p-child", "barn", "p-a"),
+      ],
+    });
+    serveTables(staging, {
+      categories: [
+        category("s-a", "a", null),
+        category("s-b", "b", null),
+        category("s-child", "barn", "s-b"),
+      ],
+    });
+    const diff = await getCategorySyncDiff({ context: { userId: "admin-1" } } as never);
+    expect(diff.categories.updated.map((u) => u.after.slug)).toEqual(["barn"]);
+  });
+
+  it("ser bort fra ulike UUID-er når forelderen er den samme", async () => {
+    serveTables(prod, {
+      categories: [category("p-a", "a", null), category("p-child", "barn", "p-a")],
+    });
+    serveTables(staging, {
+      categories: [category("s-a", "a", null), category("s-child", "barn", "s-a")],
+    });
+    const diff = await getCategorySyncDiff({ context: { userId: "admin-1" } } as never);
+    expect(diff.categories.updated).toEqual([]);
+  });
 });

@@ -5,7 +5,7 @@
 // glob (src/**/*.test.tsx) treffer fila fortsatt.
 
 import type { ComponentType, ReactNode } from "react";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Regresjonstest for F16: realtime-kanalen for den åpne samtalen svarte 500 i
@@ -23,6 +23,9 @@ const mocks = vi.hoisted(() => ({
   // brukes av blokkerings-testene under til å sette opp conv/myBlocks/
   // blocksAgainstMe uten å måtte kjøre de ekte queryFn-ene mot Supabase.
   queryData: {} as Record<string, unknown>,
+  handlers: [] as { event: string; table: string; cb: (payload: { new: unknown }) => void }[],
+  setQueryData: vi.fn(),
+  setQueriesData: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -47,7 +50,8 @@ vi.mock("@tanstack/react-query", () => ({
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useQueryClient: () => ({
     invalidateQueries: vi.fn(),
-    setQueryData: vi.fn(),
+    setQueryData: mocks.setQueryData,
+    setQueriesData: mocks.setQueriesData,
     getQueryData: vi.fn(),
   }),
 }));
@@ -56,7 +60,14 @@ vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 
 vi.mock("@/integrations/supabase/client", () => {
   const channel = {
-    on: () => channel,
+    on: (
+      _type: string,
+      filter: { event: string; table: string },
+      cb: (payload: { new: unknown }) => void,
+    ) => {
+      mocks.handlers.push({ event: filter.event, table: filter.table, cb });
+      return channel;
+    },
     subscribe: (cb: (status: string) => void) => {
       mocks.statusCallback = cb;
       mocks.statusCallbacks.push(cb);
@@ -103,7 +114,7 @@ vi.mock("@/components/native-page-header", () => ({ NativePageHeader: () => null
 vi.mock("@/components/meldinger/message-list", () => ({
   renderWithDayDividers: () => null,
 }));
-vi.mock("@/components/meldinger/sale-panel", () => ({ SalePanel: () => null }));
+vi.mock("@/components/meldinger/sale-panel", () => ({ SalePanel: () => <p>Salgspanel</p> }));
 vi.mock("@/components/trade-safety-advice", () => ({ TradeSafetyAdvice: () => null }));
 
 import { Route, MESSAGES_POLL_INTERVAL_MS } from "./meldinger.$id";
@@ -121,6 +132,9 @@ beforeEach(() => {
   mocks.queryCalls = [];
   mocks.routeId = "conv-1";
   mocks.queryData = {};
+  mocks.handlers = [];
+  mocks.setQueryData.mockReset();
+  mocks.setQueriesData.mockReset();
 });
 
 afterEach(() => {
@@ -254,5 +268,59 @@ describe("meldinger.$id — blokkeringstilstand", () => {
 
     const textarea = container.querySelector("textarea");
     expect(textarea?.disabled).toBe(false);
+  });
+});
+
+describe("meldinger.$id — kjøpsønsker, realtime og komposer (KG-24)", () => {
+  const handler = (table: string, event: string) =>
+    mocks.handlers.find((h) => h.table === table && h.event === event)?.cb;
+
+  // KG-24-F01
+  it("viser kjøpsønsket og skjuler salgspanelet i en samtale om et kjøpsønske", () => {
+    mocks.queryData = {
+      conversation: baseConv({
+        wtb_listing_id: "wtb-1",
+        wtbListing: { id: "wtb-1", title: "Ønsker sykkel", max_price_nok: null },
+      }),
+      "my-blocks": [],
+      "blocks-against-me": [],
+    };
+    const { container } = render(<ConversationPage />);
+    expect(container.textContent).toContain("Ønsker sykkel");
+    expect(container.textContent).not.toContain("Annonsen er ikke lenger tilgjengelig");
+    expect(container.textContent).not.toContain("Salgspanel");
+  });
+
+  // KG-24-F02
+  it("oppdaterer lesekvitteringen i den aktive samtalespørringen", () => {
+    render(<ConversationPage />);
+    act(() => handler("conversations", "UPDATE")?.({ new: { buyer_last_read_at: "t" } }));
+    expect(mocks.setQueriesData).toHaveBeenCalledWith(
+      { queryKey: ["conversation", "conv-1"] },
+      expect.any(Function),
+    );
+  });
+
+  // KG-24-F03
+  it("skjuler en melding motparten sletter mens samtalen er åpen", () => {
+    render(<ConversationPage />);
+    const deleted = { id: "m1", body: "", deleted_at: "2026-10-13T10:00:00Z" };
+    act(() => handler("messages", "UPDATE")?.({ new: deleted }));
+    const call = mocks.setQueryData.mock.calls.find(([key]) => key[0] === "messages");
+    expect(call?.[0]).toEqual(["messages", "conv-1"]);
+    expect(call?.[1]([{ id: "m1", body: "hei", deleted_at: null }])).toEqual([
+      { id: "m1", body: "", deleted_at: "2026-10-13T10:00:00Z" },
+    ]);
+  });
+
+  // KG-24-F04
+  it("tar ikke med uferdig tekst til neste samtale", () => {
+    mocks.queryData = { conversation: baseConv(), "my-blocks": [], "blocks-against-me": [] };
+    const { container, rerender } = render(<ConversationPage />);
+    const textarea = container.querySelector("textarea")!;
+    fireEvent.change(textarea, { target: { value: "Til samtale A" } });
+    mocks.routeId = "conv-2";
+    rerender(<ConversationPage />);
+    expect(container.querySelector("textarea")!.value).toBe("");
   });
 });

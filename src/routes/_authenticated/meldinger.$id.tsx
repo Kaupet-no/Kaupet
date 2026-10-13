@@ -27,7 +27,9 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
-import { displayPriceNok, formatNokNumber } from "@/lib/format";
+import { displayPriceNok, formatNokNumber, formatWtbMaxPrice } from "@/lib/format";
+
+type WtbListingRef = { id: string; title: string; max_price_nok: number | null };
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { InboxPage } from "@/components/inbox-page";
@@ -97,6 +99,19 @@ function ConversationPage() {
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendAttemptRef = useRef<{ clientId: string; attachmentPath: string | null } | null>(null);
+  // Uferdig tekst, vedlegg og sendeforsøk hører til samtalen de ble laget i;
+  // ruten gjenbrukes ved bytte, så de nullstilles når id endres (KG-24-F04).
+  const [composerConversationId, setComposerConversationId] = useState(id);
+  if (composerConversationId !== id) {
+    setComposerConversationId(id);
+    setBody("");
+    setAttachment(null);
+    setAttachmentPreview(null);
+  }
+  useEffect(() => {
+    sendAttemptRef.current = null;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [id]);
   // true når realtime-kanalen for samtalen ikke er SUBSCRIBED — se
   // MESSAGES_POLL_INTERVAL_MS.
   const [realtimeDown, setRealtimeDown] = useState(false);
@@ -127,8 +142,9 @@ function ConversationPage() {
       const { data, error } = await supabase
         .from("conversations")
         .select(
-          `id, buyer_id, seller_id, listing_id, buyer_last_read_at, seller_last_read_at,
-           listing:listings(id, organization_id, kaupet_code, title, price_nok, is_free, attributes, listing_images(storage_path, sort_order), categories(slug))`,
+          `id, buyer_id, seller_id, listing_id, wtb_listing_id, buyer_last_read_at, seller_last_read_at,
+           listing:listings(id, organization_id, kaupet_code, title, price_nok, is_free, attributes, listing_images(storage_path, sort_order), categories(slug)),
+           wtb_listing:wtb_listings(id, title, max_price_nok)`,
         )
         .eq("id", id)
         .maybeSingle();
@@ -136,6 +152,10 @@ function ConversationPage() {
       if (!data) throw new Error("Samtalen finnes ikke");
       const rawListing = data.listing;
       const listing = Array.isArray(rawListing) ? rawListing[0] : rawListing;
+      // Samtaler om kjøpsønsker har wtb_listing_id i stedet for listing_id (KG-24-F01).
+      const rawWtb = (data as unknown as { wtb_listing: WtbListingRef | WtbListingRef[] | null })
+        .wtb_listing;
+      const wtbListing = (Array.isArray(rawWtb) ? rawWtb[0] : rawWtb) ?? null;
       const listingOrganizationId =
         listing &&
         typeof listing === "object" &&
@@ -176,6 +196,7 @@ function ConversationPage() {
       return {
         ...data,
         listing,
+        wtbListing,
         isBusinessSeller,
         other: profile,
         otherOrganizationName,
@@ -307,6 +328,23 @@ function ConversationPage() {
         {
           event: "UPDATE",
           schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${id}`,
+        },
+        (payload) => {
+          // Sletting er en UPDATE (deleted_at): motparten må se den uten
+          // refresh (KG-24-F03).
+          const m = payload.new as Message;
+          queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
+            prev?.map((x) => (x.id === m.id ? { ...x, ...m } : x)),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
           table: "conversations",
           filter: `id=eq.${id}`,
         },
@@ -315,7 +353,8 @@ function ConversationPage() {
             buyer_last_read_at: string | null;
             seller_last_read_at: string | null;
           };
-          queryClient.setQueryData<typeof conv>(["conversation", id], (prev) =>
+          // Prefiks: den aktive nøkkelen inneholder også isBusinessSuperuser (KG-24-F02).
+          queryClient.setQueriesData<typeof conv>({ queryKey: ["conversation", id] }, (prev) =>
             prev
               ? {
                   ...prev,
@@ -376,10 +415,13 @@ function ConversationPage() {
       text,
       file,
       attempt,
+      conversationId,
     }: {
       text: string;
       file: File | null;
       attempt: { clientId: string; attachmentPath: string | null };
+      // Samtalen meldingen ble skrevet i; ruten kan ha byttet før svaret kommer.
+      conversationId: string;
     }) => {
       const trimmed = text.trim();
       if (!trimmed && !file) throw new Error("Tom melding");
@@ -387,13 +429,13 @@ function ConversationPage() {
       if (file && !attempt.attachmentPath) {
         const compressed = await compressImage(file, "listing");
         attempt.attachmentPath = await uploadMessageAttachment({
-          conversationId: id,
+          conversationId,
           file: compressed,
         });
       }
       const data = await sendMessageFn({
         data: {
-          conversationId: id,
+          conversationId,
           body: trimmed,
           attachmentPath: attempt.attachmentPath,
           clientId: attempt.clientId,
@@ -405,13 +447,13 @@ function ConversationPage() {
     // databasetrigger (messages_bump_conversation_last_message_at_trg)
     // for å unngå at feltet kan drifte fra faktisk siste melding.
     // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.
-    onMutate: ({ text, file }) => {
+    onMutate: ({ text, file, conversationId }) => {
       const trimmed = text.trim();
       if ((!trimmed && !file) || trimmed.length > 4000) return {};
       const previewUrl = file ? URL.createObjectURL(file) : undefined;
       const optimistic: Message = {
         id: `optimistic-${crypto.randomUUID()}`,
-        conversation_id: id,
+        conversation_id: conversationId,
         sender_id: user!.id,
         body: trimmed,
         created_at: new Date().toISOString(),
@@ -419,7 +461,7 @@ function ConversationPage() {
         pending: true,
         attachmentPreviewUrl: previewUrl,
       };
-      queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
+      queryClient.setQueryData<Message[]>(["messages", conversationId], (prev) =>
         prev ? [...prev, optimistic] : [optimistic],
       );
       setBody("");
@@ -427,7 +469,7 @@ function ConversationPage() {
       return { optimisticId: optimistic.id, previousBody: text, previewUrl };
     },
     onSuccess: (m, vars, context) => {
-      queryClient.setQueryData<Message[]>(["messages", id], (prev) => {
+      queryClient.setQueryData<Message[]>(["messages", vars.conversationId], (prev) => {
         const withoutOptimistic = (prev ?? []).filter((x) => x.id !== context?.optimisticId);
         if (withoutOptimistic.some((x) => x.id === m.id)) return withoutOptimistic;
         return [...withoutOptimistic, m];
@@ -439,7 +481,7 @@ function ConversationPage() {
     },
     onError: (e: Error, vars, context) => {
       if (context?.optimisticId) {
-        queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
+        queryClient.setQueryData<Message[]>(["messages", vars.conversationId], (prev) =>
           prev?.filter((x) => x.id !== context.optimisticId),
         );
         if (sendAttemptRef.current === vars.attempt) {
@@ -465,6 +507,7 @@ function ConversationPage() {
       text: body,
       file: personalSellerControlsDisabled ? null : attachment,
       attempt,
+      conversationId: id,
     });
   }
 
@@ -521,11 +564,16 @@ function ConversationPage() {
         attributes: (conv.listing.attributes ?? null) as Record<string, unknown> | null,
       })
     : null;
-  const priceLabel = conv?.listing?.is_free
-    ? "Gis bort"
-    : conversationPriceKr != null
-      ? `${formatNokNumber(conversationPriceKr)} kr`
-      : "Pris ved henvendelse";
+  const priceLabel =
+    !conv?.listing && conv?.wtbListing
+      ? conv.wtbListing.max_price_nok != null
+        ? formatWtbMaxPrice(conv.wtbListing.max_price_nok, "Ønskes kjøpt · maks ")
+        : "Ønskes kjøpt"
+      : conv?.listing?.is_free
+        ? "Gis bort"
+        : conversationPriceKr != null
+          ? `${formatNokNumber(conversationPriceKr)} kr`
+          : "Pris ved henvendelse";
   const isBusinessSeller = !!conv?.isBusinessSeller;
   const otherId = conv
     ? conv.seller_id === user?.id || isBusinessSeller
@@ -624,7 +672,7 @@ function ConversationPage() {
       }}
     >
       <NativePageHeader
-        title={conv?.listing?.title ?? "Samtale"}
+        title={conv?.listing?.title ?? conv?.wtbListing?.title ?? "Samtale"}
         backTo={source === "business" ? "/bedrift" : "/meldinger"}
         hideBack={isTablet}
       />
@@ -668,6 +716,14 @@ function ConversationPage() {
                   className="block truncate font-medium hover:underline"
                 >
                   {conv.listing.title}
+                </Link>
+              ) : conv.wtbListing ? (
+                <Link
+                  to="/ok/$id"
+                  params={{ id: conv.wtbListing.id }}
+                  className="block truncate font-medium hover:underline"
+                >
+                  {conv.wtbListing.title}
                 </Link>
               ) : (
                 <p className="block truncate font-medium italic text-muted-foreground">
@@ -725,7 +781,8 @@ function ConversationPage() {
           </div>
         )}
 
-        {conv && !(native && keyboardVisible) && !personalSellerControlsDisabled && (
+        {/* Salg og vurdering finnes bare for salgsannonser, ikke kjøpsønsker. */}
+        {conv?.listing_id && !(native && keyboardVisible) && !personalSellerControlsDisabled && (
           <SalePanel
             isSeller={isSeller}
             hasMessages={(messages ?? []).length > 0}

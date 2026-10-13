@@ -152,3 +152,28 @@ it("feilgjetting: viser feil i stedet for tom innboks når meldingene ikke kan h
   expect(getByRole("button", { name: "Prøv igjen" })).toBeTruthy();
   expect(queryByText("Ingen samtaler enda")).toBeNull();
 });
+
+// KG-24-F01: samtaler om ulike kjøpsønsker havnet i én «Slettet annonse»-gruppe.
+it("grupperer samtaler per kjøpsønske med riktig tittel", async () => {
+  const wtbConversation = (id: string, wtbId: string, title: string) => ({
+    ...vehicleConversation,
+    id,
+    listing_id: null,
+    listing: null,
+    wtb_listing_id: wtbId,
+    wtb_listing: { id: wtbId, title, max_price_nok: null },
+  });
+  conversationsData = [
+    wtbConversation("conv-a", "wtb-a", "Ønsker sykkel"),
+    wtbConversation("conv-b", "wtb-b", "Ønsker sofa"),
+  ];
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { findByText, getByText, queryByText } = render(
+    <QueryClientProvider client={qc}>
+      <InboxPage />
+    </QueryClientProvider>,
+  );
+  await findByText("Ønsker sykkel");
+  expect(getByText("Ønsker sofa")).toBeTruthy();
+  expect(queryByText("Slettet annonse")).toBeNull();
+});

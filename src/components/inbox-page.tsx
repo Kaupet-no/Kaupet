@@ -21,7 +21,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
-import { displayPriceNok, formatPrice } from "@/lib/format";
+import { displayPriceNok, formatPrice, formatWtbMaxPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -31,11 +31,15 @@ import { isUnread } from "@/lib/unread";
 import { lastConversationMessages, messagePreview } from "@/lib/conversation-messages";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
+type WtbListingRef = { id: string; title: string; max_price_nok: number | null };
+
 type ConversationRow = {
   id: string;
   buyer_id: string;
   seller_id: string;
-  listing_id: string;
+  listing_id: string | null;
+  wtb_listing_id: string | null;
+  wtb_listing: WtbListingRef | null;
   last_message_at: string;
   buyer_last_read_at: string | null;
   seller_last_read_at: string | null;
@@ -88,7 +92,9 @@ type RawConv = {
   id: string;
   buyer_id: string;
   seller_id: string;
-  listing_id: string;
+  listing_id: string | null;
+  wtb_listing_id: string | null;
+  wtb_listing: WtbListingRef | WtbListingRef[] | null;
   last_message_at: string;
   buyer_last_read_at: string | null;
   seller_last_read_at: string | null;
@@ -131,8 +137,9 @@ export function InboxPage() {
       const { data, error } = await supabase
         .from("conversations")
         .select(
-          `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
+          `id, buyer_id, seller_id, listing_id, wtb_listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
            listing:listings(id, title, price_nok, is_free, status, attributes, categories(slug), listing_images(storage_path, sort_order)),
+           wtb_listing:wtb_listings(id, title, max_price_nok),
            buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url, deleted_at),
            seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url, deleted_at)`,
         )
@@ -142,8 +149,9 @@ export function InboxPage() {
         const { data: convs, error: e2 } = await supabase
           .from("conversations")
           .select(
-            `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
-             listing:listings(id, title, price_nok, is_free, status, attributes, categories(slug), listing_images(storage_path, sort_order))`,
+            `id, buyer_id, seller_id, listing_id, wtb_listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
+             listing:listings(id, title, price_nok, is_free, status, attributes, categories(slug), listing_images(storage_path, sort_order)),
+             wtb_listing:wtb_listings(id, title, max_price_nok)`,
           )
           .or(visibility)
           .order("last_message_at", { ascending: false });
@@ -158,6 +166,7 @@ export function InboxPage() {
         const enriched = rawConvs.map((c) => ({
           ...c,
           listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
+          wtb_listing: (Array.isArray(c.wtb_listing) ? c.wtb_listing[0] : c.wtb_listing) ?? null,
           buyer: pmap.get(c.buyer_id) ?? null,
           seller: pmap.get(c.seller_id) ?? null,
         }));
@@ -166,6 +175,7 @@ export function InboxPage() {
       const normalised = ((data ?? []) as unknown as RawConv[]).map((c) => ({
         ...c,
         listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
+        wtb_listing: (Array.isArray(c.wtb_listing) ? c.wtb_listing[0] : c.wtb_listing) ?? null,
         buyer: (Array.isArray(c.buyer) ? c.buyer[0] : c.buyer) ?? null,
         seller: (Array.isArray(c.seller) ? c.seller[0] : c.seller) ?? null,
       }));
@@ -225,13 +235,20 @@ export function InboxPage() {
       string,
       {
         listing: ConversationRow["listing"];
+        wtbListing: WtbListingRef | null;
         conversations: ConversationRow[];
         lastActivity: string;
         unreadCount: number;
       }
     >();
     for (const c of conversations ?? []) {
-      const key = c.listing_id;
+      // Grupper per annonsetype og ID: kjøpsønsker har ikke listing_id og
+      // havnet ellers i én felles «slettet annonse»-gruppe (KG-24-F01).
+      const key = c.listing_id
+        ? `listing:${c.listing_id}`
+        : c.wtb_listing_id
+          ? `wtb:${c.wtb_listing_id}`
+          : `conversation:${c.id}`;
       const u = unreadByConv.get(c.id) ? 1 : 0;
       const g = map.get(key);
       if (g) {
@@ -241,6 +258,7 @@ export function InboxPage() {
       } else {
         map.set(key, {
           listing: c.listing,
+          wtbListing: c.wtb_listing,
           conversations: [c],
           lastActivity: c.last_message_at,
           unreadCount: u,
@@ -335,7 +353,11 @@ export function InboxPage() {
                       }),
                       is_free: g.listing.is_free,
                     })
-                  : "Pris ved henvendelse";
+                  : g.wtbListing
+                    ? g.wtbListing.max_price_nok != null
+                      ? formatWtbMaxPrice(g.wtbListing.max_price_nok, "Ønskes kjøpt · maks ")
+                      : "Ønskes kjøpt"
+                    : "Pris ved henvendelse";
                 return (
                   <div
                     key={g.listingId}
@@ -353,7 +375,7 @@ export function InboxPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">
-                          {g.listing?.title ?? "Slettet annonse"}
+                          {g.listing?.title ?? g.wtbListing?.title ?? "Slettet annonse"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {priceLabel} · {g.conversations.length}{" "}

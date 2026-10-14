@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 
+import { sanitizeFeedbackPageUrl } from "@/lib/feedback-page-url";
 import { hashRequestIp, sha256Hex } from "@/lib/request-ip.server";
 
 const feedbackSchema = z.object({
@@ -27,7 +28,7 @@ async function rateLimitedInsert(args: {
     _type: args.type,
     _message: args.message,
     _user_id: args.userId,
-    _page_url: args.pageUrl ?? null,
+    _page_url: sanitizeFeedbackPageUrl(args.pageUrl) ?? null,
     _category_name: args.categoryName ?? null,
     _category_description: args.categoryDescription ?? null,
   });

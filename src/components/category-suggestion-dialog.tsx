@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Textarea } from "@/components/ui/textarea";
 import { formatErrorMessage } from "@/lib/errors";
+import { sanitizeFeedbackPageUrl } from "@/lib/feedback-page-url";
 import { submitCategorySuggestion } from "@/lib/feedback.functions";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
@@ -37,7 +38,10 @@ export function CategorySuggestionDialog() {
         data: {
           categoryName: categoryName.trim(),
           description: description.trim() || undefined,
-          pageUrl: typeof window !== "undefined" ? window.location.href : undefined,
+          pageUrl:
+            typeof window !== "undefined"
+              ? sanitizeFeedbackPageUrl(window.location.href)
+              : undefined,
         },
       });
       showSuccessToast("Kategoriforslaget er sendt. Takk!");

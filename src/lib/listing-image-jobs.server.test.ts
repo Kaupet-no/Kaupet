@@ -58,9 +58,15 @@ function fakeTransformer(bytes = new Uint8Array(100)): ImageTransformer {
 }
 
 function buildAdmin(
-  options: { registrationError?: Error; insertError?: Error; existingImage?: { id: string } } = {},
+  options: {
+    registrationError?: Error;
+    insertError?: Error;
+    existingImage?: { id: string };
+    /** Jobben er claimet på nytt av en annen worker. */
+    lostClaim?: boolean;
+  } = {},
 ) {
-  const updates: Array<{ table: string; payload: unknown }> = [];
+  const updates: Array<{ table: string; payload: unknown; filters: unknown[][] }> = [];
   const registered: string[] = [];
   const admin = {
     rpc: (name: string, args: { _key: string }) => {
@@ -71,28 +77,45 @@ function buildAdmin(
       }
       throw new Error(`unexpected RPC: ${name}`);
     },
-    from: (table: string) => ({
-      select: () => ({
-        eq: () => ({
-          eq: () => ({
-            limit: () => ({
-              maybeSingle: () =>
-                Promise.resolve({ data: options.existingImage ?? null, error: null }),
-            }),
-          }),
-        }),
-      }),
-      insert: (payload: unknown) => {
-        uploadEvents.push("insert");
-        return Promise.resolve({ data: null, error: options.insertError ?? null, payload, table });
-      },
-      update: (payload: unknown) => ({
-        eq: () => {
-          updates.push({ table, payload });
-          return Promise.resolve({ data: null, error: null });
+    from: (table: string) => {
+      const data =
+        table === "listing_images"
+          ? (options.existingImage ?? null)
+          : options.lostClaim
+            ? null
+            : { id: "job-1" };
+      const query = {
+        eq: () => query,
+        limit: () => query,
+        maybeSingle: () => Promise.resolve({ data, error: null }),
+      };
+      return {
+        select: () => query,
+        insert: (payload: unknown) => {
+          uploadEvents.push("insert");
+          return Promise.resolve({
+            data: null,
+            error: options.insertError ?? null,
+            payload,
+            table,
+          });
         },
-      }),
-    }),
+        update: (payload: unknown) => {
+          const filters: unknown[][] = [];
+          const chain = {
+            eq: (...args: unknown[]) => {
+              filters.push(args);
+              return chain;
+            },
+            then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
+              updates.push({ table, payload, filters });
+              return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+            },
+          };
+          return chain;
+        },
+      };
+    },
   };
   return { admin, updates, registered };
 }
@@ -145,6 +168,33 @@ describe("processListingImageJob", () => {
     expect(updates.find((u) => u.table === "listing_image_jobs")?.payload).toMatchObject({
       status: "done",
     });
+  });
+
+  it("skriver status bare for eget claim (status og attempts)", async () => {
+    const { admin, updates } = buildAdmin();
+    await processListingImageJob(job({ attempts: 3 }), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(updates.find((u) => u.table === "listing_image_jobs")?.filters).toEqual(
+      expect.arrayContaining([
+        ["status", "processing"],
+        ["attempts", 3],
+      ]),
+    );
+  });
+
+  it("en worker som har mistet claimet skriver verken bilderad eller status", async () => {
+    const { admin, updates } = buildAdmin({ lostClaim: true });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(uploadEvents).not.toContain("insert");
+    expect(updates).toHaveLength(0);
   });
 
   it("registreringsfeil gir retry uten å skrive noen objekter", async () => {

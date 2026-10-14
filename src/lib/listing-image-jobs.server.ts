@@ -302,7 +302,8 @@ export type ProcessJobOutcome =
   | { outcome: "done"; jobId: string; storagePath: string }
   | { outcome: "customer_failed"; jobId: string; message: string }
   | { outcome: "retry_pending"; jobId: string; nextAttemptAt: string }
-  | { outcome: "internal_failed"; jobId: string; message: string };
+  | { outcome: "internal_failed"; jobId: string; message: string }
+  | { outcome: "stale"; jobId: string };
 
 export async function processListingImageJob(
   job: ListingImageJobRow,
@@ -348,8 +349,21 @@ export async function processListingImageJob(
     await putObject("BILDER", thumbKey, compressed.thumb.bytes, compressed.thumb.contentType);
 
     // Et utløpt lån kan claimes på nytt mens den første workeren fortsatt
-    // kjører; samme regel som complete_listing_image_job: én bilderad per
-    // kilde-URL i annonsen. Fjernes når workeren går over til RPC-en (B5b).
+    // kjører. Claimet (attempts) er tokenet: en worker som har mistet jobben,
+    // skriver verken bilderad eller status. Samme regel som
+    // complete_listing_image_job: én bilderad per kilde-URL i annonsen.
+    // ponytail: sjekk-så-skriv, ikke atomisk; to workere innenfor samme
+    // millisekunder kan fortsatt begge skrive. Erstattes av RPC-en i B5b.
+    const { data: ownedJob, error: ownedError } = await deps.supabaseAdmin
+      .from("listing_image_jobs")
+      .select("id")
+      .eq("id", job.id)
+      .eq("status", "processing")
+      .eq("attempts", job.attempts)
+      .maybeSingle();
+    if (ownedError) throw new Error(`Kunne ikke sjekke jobbens claim: ${ownedError.message}`);
+    if (!ownedJob) return { outcome: "stale", jobId: job.id };
+
     const { data: existingImage, error: existingError } = await deps.supabaseAdmin
       .from("listing_images")
       .select("id")
@@ -378,7 +392,9 @@ export async function processListingImageJob(
         customer_error: null,
         internal_error: null,
       })
-      .eq("id", job.id);
+      .eq("id", job.id)
+      .eq("status", "processing")
+      .eq("attempts", job.attempts);
     if (updateError) throw new Error(`Kunne ikke oppdatere jobbstatus: ${updateError.message}`);
 
     return { outcome: "done", jobId: job.id, storagePath: key };
@@ -387,7 +403,9 @@ export async function processListingImageJob(
       await deps.supabaseAdmin
         .from("listing_image_jobs")
         .update({ status: "failed", customer_error: cause.message, internal_error: null })
-        .eq("id", job.id);
+        .eq("id", job.id)
+        .eq("status", "processing")
+        .eq("attempts", job.attempts);
       return { outcome: "customer_failed", jobId: job.id, message: cause.message };
     }
 
@@ -410,7 +428,9 @@ export async function processListingImageJob(
       await deps.supabaseAdmin
         .from("listing_image_jobs")
         .update({ status: "failed", customer_error: finalMessage, internal_error: message })
-        .eq("id", job.id);
+        .eq("id", job.id)
+        .eq("status", "processing")
+        .eq("attempts", job.attempts);
       return { outcome: "internal_failed", jobId: job.id, message: finalMessage };
     }
 
@@ -425,7 +445,9 @@ export async function processListingImageJob(
     await deps.supabaseAdmin
       .from("listing_image_jobs")
       .update({ status: "pending", next_attempt_at: nextAttemptAt, internal_error: message })
-      .eq("id", job.id);
+      .eq("id", job.id)
+      .eq("status", "processing")
+      .eq("attempts", job.attempts);
     return { outcome: "retry_pending", jobId: job.id, nextAttemptAt };
   }
 }

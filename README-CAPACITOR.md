@@ -89,13 +89,21 @@ med USB-debugging.
 
 ### Bygg signert debug-APK for sideload
 
+Appen har to flavors med hver sin pakke: `staging` (`no.kaupet.app.staging`,
+«Kaupet Staging») og `production` (`no.kaupet.app`). Velg miljø før du bygger
+— testere skal normalt ha staging.
+
 ```
 cd android
-gradlew.bat assembleDebug
+gradlew.bat assembleStagingDebug
 ```
 
-APK-en havner i `android/app/build/outputs/apk/debug/app-debug.apk` og
-kan installeres med `adb install` eller deles til testere.
+APK-en havner i
+`android/app/build/outputs/apk/staging/debug/app-staging-debug.apk`. For
+produksjon: `gradlew.bat assembleProductionDebug` og
+`android/app/build/outputs/apk/production/debug/app-production-debug.apk`.
+Installer med `adb install` eller del filen med testere. De to pakkene kan
+ligge side om side på samme enhet.
 
 ---
 

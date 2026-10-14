@@ -745,6 +745,27 @@ describe("signMessageAttachmentUrls", () => {
     expect(Object.keys(result)).toEqual([otherPath]);
   });
 
+  it("sjekker chattilgang én gang per bedrift/lokasjon/selger, ikke per samtale", async () => {
+    const listing = {
+      organization_id: "org-1",
+      organization_location_id: "loc-1",
+      seller_id: "ansatt",
+    };
+    mockConversationsTable({
+      list: {
+        data: [
+          { id: CONVERSATION_ID, buyer_id: "kjoper-1", seller_id: "ansatt", listing },
+          { id: OTHER_CONVERSATION_ID, buyer_id: "kjoper-2", seller_id: "ansatt", listing },
+        ],
+        error: null,
+      },
+    });
+    rpcMock.mockResolvedValue({ data: true, error: null });
+    const result = await signMessageAttachmentUrls({ data: { paths: [path, otherPath] } });
+    expect(Object.keys(result).sort()).toEqual([path, otherPath].sort());
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+  });
+
   it("returnerer ingenting og gjør ingen oppslag for en tom liste", async () => {
     const result = await signMessageAttachmentUrls({ data: { paths: [] } });
     expect(result).toEqual({});

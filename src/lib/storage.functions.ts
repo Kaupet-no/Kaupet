@@ -415,10 +415,22 @@ export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
     if (error) throw new Error("Kunne ikke sjekke tilgang til samtalene");
     const convs = (data ?? []) as unknown as AttachmentConversation[];
 
+    // Samme bedrift/lokasjon/selger gir samme svar: ett RPC-kall per
+    // kombinasjon, ikke per samtale (Worker-grensen for underforespørsler).
+    const accessByListing = new Map<string, Promise<boolean>>();
     const access = await Promise.all(
-      convs.map(async (c) =>
-        (await canUseConversationAttachments(context.supabase, context.userId, c)) ? c.id : null,
-      ),
+      convs.map(async (c) => {
+        const cacheKey =
+          c.buyer_id === context.userId || c.seller_id === context.userId || !c.listing
+            ? null
+            : `${c.listing.organization_id}/${c.listing.organization_location_id}/${c.listing.seller_id}`;
+        let allowed = cacheKey ? accessByListing.get(cacheKey) : undefined;
+        if (!allowed) {
+          allowed = canUseConversationAttachments(context.supabase, context.userId, c);
+          if (cacheKey) accessByListing.set(cacheKey, allowed);
+        }
+        return (await allowed) ? c.id : null;
+      }),
     );
     const allowedConversationIds = new Set(access.filter((id): id is string => id !== null));
 

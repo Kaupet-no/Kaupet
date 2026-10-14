@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 // Verifiserer at R2-oppsettet faktisk virker: tester begge buckets
 // (R2_BILDER_BUCKET og R2_VEDLEGG_BUCKET) med put → get → offentlig-fetch →
-// delete. Bilde-bucketen skal være offentlig (200), vedlegg-bucketen skal
-// være privat (404 fra offentlig URL). Krever ekte credentials i miljøet
-// (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
-// R2_BILDER_BUCKET, R2_VEDLEGG_BUCKET, R2_PUBLIC_BASE_URL) — se .env.example.
+// delete. Bilde-bucketen skal være offentlig (200 fra R2_PUBLIC_BASE_URL).
+// Vedlegg-bucketen skal være privat: det kontrolleres ved å lese Public
+// Access (r2.dev og egne domener) fra Cloudflare-API-et, ikke ved å kalle
+// bildedomenet. Krever ekte credentials i miljøet (R2_ACCOUNT_ID,
+// R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BILDER_BUCKET, R2_VEDLEGG_BUCKET,
+// R2_PUBLIC_BASE_URL) — se .env.example — og CLOUDFLARE_API_TOKEN med
+// R2-lesetilgang. Sistnevnte er et management-token og hører ikke i .env;
+// sett det bare i skallet for kjøringen.
 // Ikke en del av CI; kjør manuelt etter å ha satt opp/endret R2-secrets.
 
 import { AwsClient } from "aws4fetch";
+
+import { publicBucketDomains } from "./r2-bucket-access.mjs";
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -24,6 +30,7 @@ const secretAccessKey = requireEnv("R2_SECRET_ACCESS_KEY");
 const bildeBucket = requireEnv("R2_BILDER_BUCKET");
 const vedleggBucket = requireEnv("R2_VEDLEGG_BUCKET");
 const publicBaseUrl = requireEnv("R2_PUBLIC_BASE_URL");
+const apiToken = requireEnv("CLOUDFLARE_API_TOKEN");
 
 const client = new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region: "auto" });
 const timestamp = Date.now();
@@ -43,7 +50,7 @@ async function runTests() {
   for (const { bucket, key, isPublic } of testObjects) {
     const content = bucket === bildeBucket ? imageContent : attachmentContent;
     const r2Url = `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${key}`;
-    const publicUrl = `${publicBaseUrl}/${key}`;
+    const publicUrl = `${publicBaseUrl}/${key}`; // bare for bilde-bucketen
 
     console.log(`\nTester ${bucket}:`);
 
@@ -71,9 +78,8 @@ async function runTests() {
       }
       console.log("✓ GET med credentials OK");
 
-      // GET fra offentlig URL
-      const publicResponse = await fetch(publicUrl);
       if (isPublic) {
+        const publicResponse = await fetch(publicUrl);
         if (!publicResponse.ok) {
           throw new Error(`Offentlig URL feilet: ${publicResponse.status} (forventet 200)`);
         }
@@ -85,13 +91,11 @@ async function runTests() {
         }
         console.log("✓ Offentlig URL OK (200)");
       } else {
-        if (publicResponse.ok) {
-          throw new Error(`Offentlig URL skulle gi 404, fikk ${publicResponse.status}`);
+        const domains = await publicBucketDomains({ accountId, bucket, apiToken });
+        if (domains.length > 0) {
+          throw new Error(`Bucketen er offentlig via ${domains.join(", ")} (forventet privat)`);
         }
-        if (publicResponse.status !== 404) {
-          throw new Error(`Offentlig URL feilet: ${publicResponse.status} (forventet 404)`);
-        }
-        console.log("✓ Offentlig URL blokkert (404)");
+        console.log("✓ Ingen offentlige domener på bucketen");
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

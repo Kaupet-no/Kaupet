@@ -56,7 +56,7 @@ jobs:
         run: bun run test:coverage
 
       - name: Local staging configuration
-        run: node --test scripts/staging-env.test.mjs
+        run: node --test scripts/staging-env.test.mjs scripts/r2-bucket-access.test.mjs
 
       - name: Doppler distribution (offline)
         run: |

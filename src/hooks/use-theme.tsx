@@ -28,7 +28,12 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === "undefined") return "system";
-    const stored = localStorage.getItem(STORAGE_KEY);
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      // Blokkert lagring (SecurityError): start med systemtema.
+    }
     return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
   });
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
@@ -49,7 +54,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   function setTheme(next: Theme) {
     setThemeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Valget gjelder denne økten selv om det ikke kan huskes.
+    }
   }
 
   return (

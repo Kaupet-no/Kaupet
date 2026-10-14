@@ -9,7 +9,7 @@ const filter = (key: string, category: string) => ({
   label_nb: key,
   type: "select",
   unit: null,
-  options: null,
+  options: [{ value: "red", label_nb: "Rød" }],
   sort_order: 0,
   is_primary: true,
   depends_on_key: null,
@@ -19,7 +19,12 @@ const filter = (key: string, category: string) => ({
 });
 vi.mock("@/components/attribute-fields", () => ({
   useAllCategoryFilters: () => ({
-    data: [filter("color", "bil"), filter("fuel_type", "bil"), filter("color", "mc")],
+    data: [
+      filter("color", "bil"),
+      filter("fuel_type", "bil"),
+      filter("color", "mc"),
+      { ...filter("fuel_type", "grill"), options: [{ value: "gass", label_nb: "Gass" }] },
+    ],
   }),
 }));
 
@@ -46,4 +51,15 @@ it("beholder verdier den nye kategorien har og fjerner resten", () => {
     kept: { color: { kind: "select", value: "red" } },
     droppedLabels: ["fuel_type"],
   });
+});
+
+it("kategoribytte fjerner diesel fra Grill og forklarer fjerningen", () => {
+  const { result } = renderHook(() =>
+    useRetainCategoryAttributes([
+      { id: "grill", slug: "grill", name_nb: "Grill", parent_id: null },
+    ]),
+  );
+  expect(
+    result.current.retain({ fuel_type: { kind: "select", value: "diesel" } }, ["grill"]),
+  ).toMatchObject({ kept: {}, droppedLabels: ["fuel_type"] });
 });

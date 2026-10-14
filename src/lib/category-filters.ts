@@ -209,9 +209,29 @@ export function searchFilterDependencyMet(
   return filterDependencyMet(filter, raw === undefined ? {} : { [filter.depends_on_key]: raw });
 }
 
+/** Whether `filter`'s own options actually contain the value(s) held in
+ * `value` — used to disambiguate a shared attribute key (e.g. "fuel_type")
+ * between categories that define completely different vocabularies for it.
+ * Kinds without an option list (boolean/text/range) have nothing to
+ * validate against, so they're treated as a match by default. */
+export function searchFilterMatchesValue(
+  filter: CategoryFilter,
+  value: AttributeFilterValue | undefined,
+): boolean {
+  if (!value) return false;
+  // Merke og modell har ingen statisk opsjonsliste; verdiene kommer fra egne
+  // referansetabeller og skal ikke valideres mot `options` (KG-30-F02).
+  if (filter.type === "brand_select" || filter.type === "model_select") return true;
+  if (value.kind === "select") return !!filter.options?.some((o) => o.value === value.value);
+  if (value.kind === "multiselect" || value.kind === "exclude") {
+    return value.values.every((v) => filter.options?.some((o) => o.value === v));
+  }
+  return true;
+}
+
 /**
  * Keeps the search filter values that still apply under `filters`. Values
- * whose dependency no longer holds are dropped until stable, so clearing Merke
+ * with invalid options or dependencies are dropped until stable, so clearing Merke
  * also clears Modell. With `dropUnknown`, keys `filters` doesn't define are
  * dropped too — used when the category changes, so Farge survives a switch
  * between two categories that both have it while Rammestørrelse does not.
@@ -224,7 +244,10 @@ export function retainSearchAttributes(
   const byKey = new Map(filters.map((filter) => [filter.key, filter]));
   return pruneUntilStable(values, (key, kept) => {
     const filter = byKey.get(key);
-    return filter ? searchFilterDependencyMet(filter, kept, filters) : !dropUnknown;
+    return filter
+      ? searchFilterMatchesValue(filter, kept[key]) &&
+          searchFilterDependencyMet(filter, kept, filters)
+      : !dropUnknown;
   });
 }
 

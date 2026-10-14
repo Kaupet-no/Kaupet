@@ -36,11 +36,11 @@ import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import type { SellerIdentity } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
+import { ListingLoadError } from "@/components/listing-detail/listing-load-error";
 import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
 import { ProffRelatedListings } from "@/components/listing-detail/proff-listing-presentation";
 import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { formatErrorMessage } from "@/lib/errors";
 import {
   genericBrandFilterFor,
   isBoatCategory,
@@ -316,21 +316,13 @@ function ListingErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   console.error("[listing route] error", describeSafeError(error));
   return (
-    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-      <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {formatErrorMessage(error, "Prøv på nytt eller gå tilbake til forsiden.")}
-      </p>
-      <Button
-        className="mt-6"
-        onClick={() => {
-          router.invalidate();
-          reset();
-        }}
-      >
-        Prøv på nytt
-      </Button>
-    </div>
+    <ListingLoadError
+      error={error}
+      onRetry={() => {
+        router.invalidate();
+        reset();
+      }}
+    />
   );
 }
 
@@ -416,7 +408,7 @@ function ListingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.promotion, search.promo_id]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["listing", kaupetCode],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -715,7 +707,10 @@ function ListingDetailPage() {
       </div>
     );
   }
-  if (!data) return null;
+  // Feil ved senere refetch beholder cachet annonse; bare uten data vises feilen.
+  if (!data) {
+    return error ? <ListingLoadError error={error} onRetry={() => void refetch()} /> : null;
+  }
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
   const attributes = (data.attributes ?? {}) as Record<string, unknown>;

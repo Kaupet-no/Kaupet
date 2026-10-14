@@ -27,7 +27,7 @@ describe("ComboboxMultiContent – skjermlesertilstand (KG-36-F01)", () => {
       />,
     );
 
-    expect(getByRole("listbox").getAttribute("aria-multiselectable")).toBe("true");
+    expect(getByRole("listbox").hasAttribute("aria-multiselectable")).toBe(false);
     const [alpha, beta] = getAllByRole("option");
     expect(alpha.getAttribute("aria-checked")).toBe("false");
     expect(beta.getAttribute("aria-checked")).toBe("true");

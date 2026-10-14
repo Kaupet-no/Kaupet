@@ -217,6 +217,9 @@ export function SearchResultsPage({
     removeAttrWithRestore,
     activeFilterCount,
     isLoading,
+    loadError,
+    nextPageError,
+    retryListings,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -933,6 +936,9 @@ export function SearchResultsPage({
                 cards={cards}
                 totalCount={totalCount}
                 isLoading={isLoading}
+                loadError={loadError}
+                nextPageError={nextPageError}
+                onRetry={retryListings}
                 hasNextPage={!!hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
                 fetchNextPage={() => void fetchNextPage()}

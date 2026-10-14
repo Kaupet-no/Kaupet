@@ -5,7 +5,11 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdminRole as requireAdmin } from "@/lib/admin-auth.server";
-import { PROFF_TERMS, type ProffTerm } from "@/features/business-account/plans";
+import {
+  addMonthsClampedUtc,
+  PROFF_TERMS,
+  type ProffTerm,
+} from "@/features/business-account/plans";
 import { proffEndedByKaupetEmail, proffPaidEmail } from "@/lib/business-email-templates";
 import { sendBusinessReceipt } from "@/lib/business/business-emails.server";
 
@@ -419,9 +423,10 @@ export const adminListLocationCharges = createServerFn({ method: "GET" })
       (profiles ?? []).map((profile) => [profile.organization_id, profile.billing_email]),
     );
     return rows.map((row) => {
-      const periodStart = new Date(row.next_period_start);
-      const periodEnd = new Date(periodStart);
-      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + row.billing_interval_months);
+      const periodEnd = addMonthsClampedUtc(
+        new Date(row.next_period_start),
+        row.billing_interval_months,
+      );
       const organization = row.organization_locations.organizations;
       return {
         subscription_id: row.id,

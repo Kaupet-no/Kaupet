@@ -110,6 +110,14 @@ function ConversationPage() {
     sendAttemptRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [id]);
+  // Forhåndsvisningen frigis når den byttes ut, fjernes (også ved
+  // samtalebytte over) eller siden forlates.
+  useEffect(
+    () => () => {
+      if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
+    },
+    [attachmentPreview],
+  );
   // true når realtime-kanalen for samtalen ikke er SUBSCRIBED — se
   // MESSAGES_POLL_INTERVAL_MS.
   const [realtimeDown, setRealtimeDown] = useState(false);
@@ -511,10 +519,7 @@ function ConversationPage() {
 
   function clearAttachment() {
     setAttachment(null);
-    setAttachmentPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
+    setAttachmentPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 

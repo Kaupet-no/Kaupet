@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { render, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useOverlayHistory } from "./use-overlay-history";
 
@@ -84,6 +84,27 @@ describe("useOverlayHistory", () => {
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(closeParent).toHaveBeenCalledTimes(1);
     parent.unmount();
+    await tick();
+  });
+
+  it("forelder og barn som åpnes i samme render: tilbake lukker barnet", async () => {
+    mockBack();
+    const closeParent = vi.fn();
+    const closeChild = vi.fn();
+    function Child() {
+      useOverlayHistory(true, closeChild);
+      return null;
+    }
+    function Parent() {
+      useOverlayHistory(true, closeParent);
+      return <Child />;
+    }
+    const { unmount } = render(<Parent />);
+
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(closeChild).toHaveBeenCalledTimes(1);
+    expect(closeParent).not.toHaveBeenCalled();
+    unmount();
     await tick();
   });
 

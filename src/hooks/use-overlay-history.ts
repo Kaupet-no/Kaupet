@@ -50,21 +50,37 @@ function insert(entry: Entry) {
   stack.splice(index, 0, entry);
   batch.push(entry);
 }
-// history.back() fra egen opprydding gir også popstate; den skal ikke lukke
-// nivået under.
-let ignoredPops = 0;
+// Hver oppføring bærer sitt nivå (`overlayLevel`). popstate lukker nivåene
+// over det nivået man landet på, så egen opprydding (som lander på
+// `stack.length`) lukker ingenting, og en traversering som aldri fullføres
+// (avbrutt av en ruteendring) etterlater ingen teller som sluker neste trykk.
 let listening = false;
+let syncTimer: ReturnType<typeof setTimeout> | undefined;
 
-function onPop() {
-  if (ignoredPops > 0) {
-    ignoredPops--;
-    return;
+function levelOf(state: unknown): number {
+  const level = (state as { overlayLevel?: unknown } | null)?.overlayLevel;
+  return typeof level === "number" ? level : 0;
+}
+
+function onPop(event: PopStateEvent) {
+  const level = levelOf(event.state);
+  while (stack.length > level) {
+    const top = stack.pop()!;
+    clearTimeout(top.releaseTimer);
+    top.popped = true;
+    top.close();
   }
-  const top = stack.pop();
-  if (!top) return;
-  clearTimeout(top.releaseTimer);
-  top.popped = true;
-  top.close();
+}
+
+/** Gå tilbake forbi oppføringer for nivåer som er ryddet. Samles til ett
+ * kall per tick, så flere nivåer som lukkes samtidig gir én traversering. */
+function scheduleSync() {
+  if (syncTimer !== undefined) return;
+  syncTimer = setTimeout(() => {
+    syncTimer = undefined;
+    const excess = levelOf(history.state) - stack.length;
+    if (excess > 0) history.go(-excess);
+  }, 0);
 }
 
 export function useOverlayHistory(enabled: boolean, onClose: () => void) {
@@ -98,17 +114,14 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
       if (current.popped) return;
       // Lukket på annen måte (X, Escape, klikk utenfor): rydd opp oppføringen.
       // Utsatt én tick slik at en umiddelbar remontering overtar den i stedet.
-      // Guarden hindrer at vi navigerer feil vei når overlayet i stedet ble
-      // avmontert av en ruteendring — da er toppen av stacken ruterens
-      // tilstand, ikke vår.
+      // scheduleSync går bare tilbake over egne nivåer: ble overlayet
+      // avmontert av en ruteendring, er toppen av stacken ruterens tilstand
+      // (nivå 0), ikke vår.
       current.releaseTimer = setTimeout(() => {
         current.releaseTimer = undefined;
         const index = stack.indexOf(current);
         if (index >= 0) stack.splice(index, 1);
-        if ((history.state as { overlay?: unknown } | null)?.overlay) {
-          ignoredPops++;
-          history.back();
-        }
+        scheduleSync();
       }, 0);
     };
   }, [enabled, order]);

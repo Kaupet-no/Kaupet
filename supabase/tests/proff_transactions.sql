@@ -1,7 +1,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(55);
+SELECT plan(56);
 
 INSERT INTO public.organizations (id, organization_number, legal_name, display_name,
   selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_access_until,
@@ -254,6 +254,13 @@ SELECT is((SELECT period_end FROM month_end), '2027-02-28T12:00:00Z'::timestampt
   'Perioden slutter ved klampet månedsslutt');
 SELECT is((SELECT proff_access_until FROM organizations WHERE id = '00000000-0000-4000-8000-000000000108'),
   (SELECT period_end FROM month_end), 'Tilgangen følger periodeslutt');
+
+-- KG-11-F03: addMonthsClampedUtc speiler denne aritmetikken i UTC.
+SELECT ok(
+  (SELECT 'TimeZone=UTC' = ANY(proconfig) FROM pg_proc
+   WHERE oid = 'public.mark_organization_location_charge_invoiced(uuid, timestamptz, text)'::regprocedure),
+  'fakturaperiodens månedsaritmetikk er festet til UTC'
+);
 
 SELECT * FROM finish();
 ROLLBACK;

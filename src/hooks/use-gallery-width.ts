@@ -13,11 +13,15 @@ function subscribe(onChange: () => void) {
   };
 }
 
+// Valg som ikke kunne lagres (privat modus / blokkerte cookies) gjelder
+// likevel i denne økten.
+let unsavedWide: boolean | undefined;
+
 function readWide() {
+  if (unsavedWide !== undefined) return unsavedWide;
   try {
     return window.localStorage.getItem(KEY) !== "narrow";
   } catch {
-    // Privat modus / blokkerte cookies: behold standarden.
     return true;
   }
 }
@@ -35,8 +39,10 @@ export function useWideGallery(): [boolean, (wide: boolean) => void] {
   const setWide = useCallback((next: boolean) => {
     try {
       window.localStorage.setItem(KEY, next ? "wide" : "narrow");
+      unsavedWide = undefined;
     } catch {
       // Preferansen huskes ikke, men visningen skal fortsatt bytte.
+      unsavedWide = next;
     }
     window.dispatchEvent(new Event(CHANGE_EVENT));
   }, []);

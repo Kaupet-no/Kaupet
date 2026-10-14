@@ -271,7 +271,8 @@ export function useSearchResultsShell({
     },
     attributeFilters: attrFilters,
     attributeCounts: facetCounts,
-    resultCount: totalCount ?? cards.length,
+    // Ukjent ved søkefeil: panelet skal ikke tilby «Vis 0 annonser».
+    resultCount: loadError ? undefined : (totalCount ?? cards.length),
     availablePriceMax,
     /* Samme fakta som `canRemoveCategoryInZeroResultExpansion`: en
        kategorilandingsside har kategorien sin fra URL-en, og `effectiveSearch`

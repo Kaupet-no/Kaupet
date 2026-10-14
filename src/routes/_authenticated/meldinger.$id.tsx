@@ -28,11 +28,9 @@ import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.fun
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { displayPriceNok, formatNokNumber, formatWtbMaxPrice } from "@/lib/format";
-
-type WtbListingRef = { id: string; title: string; max_price_nok: number | null };
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
-import { InboxPage } from "@/components/inbox-page";
+import { InboxPage, type WtbListingRef } from "@/components/inbox-page";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { ConversationErrorBoundary } from "@/components/meldinger/conversation-error-boundary";

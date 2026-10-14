@@ -31,7 +31,9 @@ import { isUnread } from "@/lib/unread";
 import { lastConversationMessages, messagePreview } from "@/lib/conversation-messages";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
-type WtbListingRef = { id: string; title: string; max_price_nok: number | null };
+
+/** Kjøpsønsket en samtale gjelder (wtb_listings-joinen). */
+export type WtbListingRef = { id: string; title: string; max_price_nok: number | null };
 
 type ConversationRow = {
   id: string;

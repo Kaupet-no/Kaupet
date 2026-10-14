@@ -56,17 +56,17 @@ symptomet i den ene ruten der det ble observert (se `AGENTS.md`, ARCHITECTURE
 
 ISTQB-nivåene mappet konkret til dette repoet:
 
-| Nivå                     | Verktøy                                                     | Filmønster                           | Kommando                                                             | Kjøres                   |
-| ------------------------ | ----------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- | ------------------------ |
-| Komponenttest (unit)     | Vitest                                                      | `src/**/*.test.ts`                   | `bun run test`                                                       | Hver CI-kjøring          |
-| Komponentintegrasjon     | Vitest + Testing Library                                    | `src/**/*.test.tsx`                  | `bun run test`                                                       | Hver CI-kjøring          |
-| Systemintegrasjon (data) | Vitest mot lokal Supabase                                   | `src/**/*.integration.test.ts`       | `bun run test:rls`                                                   | CI-jobb `rls`            |
-| Systemtest (E2E)         | Playwright                                                  | `e2e/*.spec.ts`                      | `bun run test:e2e`                                                   | PR mot `main` + dispatch |
-| Visuell regresjon        | Playwright screenshots                                      | `e2e/*.visual.spec.ts`               | samme                                                                | samme                    |
-| Statisk test             | ESLint, tsc, prettier, boundary-script, `bun audit`, CodeQL | —                                    | `bun run lint`, `bunx tsc --noEmit`, `bun run check:server-boundary` | Hver CI-kjøring + hooks  |
-| Byggverifikasjon         | Vite + bundle-budsjett                                      | —                                    | `bun run build && bun run check:bundle`                              | Hver CI-kjøring          |
-| Native enhetstest        | Gradle                                                      | `android/**`                         | `./gradlew test<Flavor>DebugUnitTest`                                | CI-jobb `native-android` |
-| Akseptansetest (manuell) | Sjekklister                                                 | Intern QA-sjekkliste (Notion) + § 12 | —                                                                    | Før release              |
+| Nivå                     | Verktøy                                                     | Filmønster                           | Kommando                                                             | Kjøres                              |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- | ----------------------------------- |
+| Komponenttest (unit)     | Vitest                                                      | `src/**/*.test.ts`                   | `bun run test`                                                       | Hver CI-kjøring                     |
+| Komponentintegrasjon     | Vitest + Testing Library                                    | `src/**/*.test.tsx`                  | `bun run test`                                                       | Hver CI-kjøring                     |
+| Systemintegrasjon (data) | Vitest mot lokal Supabase                                   | `src/**/*.integration.test.ts`       | `bun run test:rls`                                                   | CI-jobb `rls`                       |
+| Systemtest (E2E)         | Playwright                                                  | `e2e/*.spec.ts`                      | `bun run test:e2e`                                                   | PR/push `main`/`staging` + dispatch |
+| Visuell regresjon        | Playwright screenshots                                      | `e2e/*.visual.spec.ts`               | samme                                                                | samme                               |
+| Statisk test             | ESLint, tsc, prettier, boundary-script, `bun audit`, CodeQL | —                                    | `bun run lint`, `bunx tsc --noEmit`, `bun run check:server-boundary` | Hver CI-kjøring + hooks             |
+| Byggverifikasjon         | Vite + bundle-budsjett                                      | —                                    | `bun run build`                                                      | Hver CI-kjøring                     |
+| Native byggkontroll      | Gradle                                                      | `android/**`                         | `./gradlew assemble<Flavor>Debug`                                    | CI-jobb `native-android`            |
+| Akseptansetest (manuell) | Sjekklister                                                 | Intern QA-sjekkliste (Notion) + § 12 | —                                                                    | Før release                         |
 
 **Nivåvalgstabell.** Slå opp raden som passer og bruk nivået den gir. Ikke
 vurder — slå opp. Passer flere rader, velg den øverste.
@@ -361,7 +361,7 @@ Obligatoriske feilgjettings-angrep i hvert charter:
 ### PB-6 — Ytelsestest
 
 ```
-1. Statisk budsjett: bun run build && bun run check:bundle
+1. Statisk budsjett: bun run build
    (grenser: 450 KiB JS, 180 KiB CSS per fil — scripts/check-bundle-budget.mjs)
 2. Web Vitals: mål LCP, INP, CLS på ruter i § 11.14 mot staging, mobil-profil
    med nettverksstrupning (Fast 3G) og 4x CPU-throttling.
@@ -674,7 +674,7 @@ eller mot mock.
 | NAT-08 | M    | P0  | Kamera- og geoposisjonstillatelser avslått                                | Flyten fortsetter med manuell inntasting og forklarende tekst                                                   |
 | NAT-09 | M    | P1  | Tastatur skjuler ikke aktivt felt                                         | På iOS og Android scrolles feltet i synlig område                                                               |
 | NAT-10 | M    | P1  | App i bakgrunnen i lang tid                                               | Ved retur er sesjon og data konsistente; ingen tom skjerm                                                       |
-| NAT-11 | CI   | P1  | Android-enhetstester og APK-bygg                                          | `./gradlew test<Flavor>DebugUnitTest` grønn for både staging- og produksjonsflavor                              |
+| NAT-11 | CI   | P1  | Android APK-bygg                                                          | `./gradlew assemble<Flavor>Debug` grønn for både staging- og produksjonsflavor                                  |
 | NAT-12 | M    | P1  | Deep link / universal link til annonse                                    | Åpner riktig skjerm i appen, med fungerende tilbake til app-rot                                                 |
 
 ### 11.12 Data, migrasjoner og RLS — R1

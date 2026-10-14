@@ -47,6 +47,7 @@ public class MainActivity extends BridgeActivity {
         }
         registerPlugin(ShellThemePlugin.class);
         registerPlugin(AuthCookiesPlugin.class);
+        registerPlugin(TextScalePlugin.class);
 
         // Staging's "Velg server" screen (capacitor-shell/index.html) and
         // the in-app DevServerSwitch persist their choice via
@@ -94,9 +95,8 @@ public class MainActivity extends BridgeActivity {
         // etiketter og navigasjonen dekket sideinnhold. Vi låser textZoom til
         // 100 og styrer i stedet lesbarhet selv via appens egne
         // Tailwind-typografitokens (se src/lib/text-scale.ts og
-        // src/styles.css), som iOS allerede bruker. En tilsvarende Android-bro
-        // til Configuration.fontScale finnes ikke ennå — det er en egen,
-        // fremtidig utvidelse, ikke del av denne endringen.
+        // src/styles.css), som iOS allerede bruker. Skalaen leses fra
+        // Configuration.fontScale via TextScalePlugin.
         getBridge().getWebView().getSettings().setTextZoom(100);
 
         // capacitor-shell/offline.html and index.html are served from this

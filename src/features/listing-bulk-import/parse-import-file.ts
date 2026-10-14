@@ -262,7 +262,10 @@ function mapRows(
           errors.push({
             rowNumber,
             field: `${ATTRIBUTE_PREFIX}${key}`,
-            message: "Verdien kunne ikke tolkes. Velg fra nedtrekkslisten i malen.",
+            message:
+              attributeMeta[key]?.type === "number"
+                ? "Verdien må være et tall uten tvetydig skilletegn, f.eks. 150000 eller 12,5."
+                : "Verdien kunne ikke tolkes. Velg fra nedtrekkslisten i malen.",
           });
         }
         continue;

@@ -23,7 +23,8 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
 import { TermGroupEditor } from "@/features/listing-search/filters/term-group-editor";
-import { type Category } from "@/lib/categories";
+import { buildTree, type Category } from "@/lib/categories";
+import { effectiveFiltersForCategories, retainSearchAttributes } from "@/lib/category-filters";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
 import { useRetainCategoryAttributes } from "@/features/listing-search/use-retain-category-attributes";
@@ -77,6 +78,15 @@ export function AdvancedSearchSheet({
   const [v, setV] = useAdvancedSearchValue(open, initial);
   const { data: allFilters } = useAllCategoryFilters();
   const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
+  const attributeFilters = useMemo(() => {
+    if (!v.categories.length) return allFilters ?? [];
+    const tree = buildTree(categories);
+    return effectiveFiltersForCategories(
+      v.categories.map((slug) => tree.bySlug.get(slug)?.id).filter((id): id is string => !!id),
+      allFilters ?? [],
+      tree.byId,
+    );
+  }, [allFilters, categories, v.categories]);
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
@@ -232,7 +242,7 @@ export function AdvancedSearchSheet({
               search={{ q: "", qMode: v.qMode, extraGroups: [] }}
               terms={[]}
               onUpdate={() => {}}
-              attrFilters={allFilters ?? []}
+              attrFilters={attributeFilters}
               attrValues={v.attributes}
               onRemoveAttr={(key, value) => {
                 setV((previous) => {
@@ -248,7 +258,12 @@ export function AdvancedSearchSheet({
                   } else {
                     delete attributes[key];
                   }
-                  return { ...previous, attributes };
+                  return {
+                    ...previous,
+                    attributes: allFilters
+                      ? retainSearchAttributes(attributes, attributeFilters).kept
+                      : attributes,
+                  };
                 });
               }}
             />

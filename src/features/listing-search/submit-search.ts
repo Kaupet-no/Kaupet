@@ -54,7 +54,7 @@ export async function resolveAppliedSearch({
   // Kategorien som brukes og den som vises i «Tolket som» må samsvare
   // (KG-28-F04): et kategoriord som ikke allerede er valgt erstatter de
   // valgte kategoriene, og attributter som ikke finnes der fjernes. Er
-  // ordet en overkategori av et valg («bil» med «Elbil» valgt), er valget
+  // ordet en overkategori av alle valg («bil» med «Elbil» valgt), er valget
   // allerede smalere: det beholdes, og kategoritolkningen utelates.
   const selected = applied.value.categories;
   const byId = new Map(categories.map((category) => [category.id, category]));
@@ -62,7 +62,8 @@ export async function resolveAppliedSearch({
   const textCategory = resolved.categorySlug ? bySlug.get(resolved.categorySlug) : undefined;
   const coversSelection =
     !!textCategory &&
-    selected.some((slug) => {
+    selected.length > 0 &&
+    selected.every((slug) => {
       for (let c = bySlug.get(slug); c; c = c.parent_id ? byId.get(c.parent_id) : undefined) {
         if (c.id === textCategory.id) return true;
       }

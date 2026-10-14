@@ -102,4 +102,35 @@ describe("submitSearch", () => {
     expect(String(committed?.attrs)).toContain("battery_kwh");
     expect(committedCriteria?.some((c) => (c as { kind: string }).kind === "category")).toBe(false);
   });
+
+  it.each([
+    { selected: [], expected: ["bil"], interpreted: true },
+    { selected: ["elbil", "sofa"], expected: ["bil"], interpreted: true },
+    { selected: ["elbil", "varebil"], expected: ["elbil", "varebil"], interpreted: false },
+  ])(
+    "avgrenser bil fra $selected (beslutningstabell)",
+    async ({ selected, expected, interpreted }) => {
+      const commit = vi.fn();
+      await submitSearch({
+        applied: {
+          value: { ...defaultAdvancedSearchValue(), categories: selected, catMode: "any" },
+          attributes: {},
+        },
+        query: "bil",
+        categories: [
+          { id: "bil", slug: "bil", name_nb: "Bil", parent_id: null },
+          { id: "elbil", slug: "elbil", name_nb: "Elbil", parent_id: "bil" },
+          { id: "varebil", slug: "varebil", name_nb: "Varebil", parent_id: "bil" },
+          { id: "sofa", slug: "sofa", name_nb: "Sofa", parent_id: null },
+        ],
+        commit,
+      });
+      expect(commit.mock.calls[0][0]).toMatchObject({ q: "", categories: expected });
+      expect(
+        commit.mock.calls[0][1].some(
+          (criterion: { kind: string }) => criterion.kind === "category",
+        ),
+      ).toBe(interpreted);
+    },
+  );
 });

@@ -19,7 +19,9 @@ vi.mock("@/components/attribute-fields", () => ({
         ],
       },
       { key: "color", label_nb: "Farge", options: [{ value: "red", label_nb: "Rød" }] },
-    ],
+      { key: "brand", label_nb: "Merke", type: "brand_select" },
+      { key: "model", label_nb: "Modell", type: "model_select" },
+    ].map((filter) => ({ ...filter, category_id: "bil", sort_order: 0 })),
   }),
 }));
 vi.mock("@/features/listing-search/use-retain-category-attributes", () => ({
@@ -101,4 +103,30 @@ it("nullstiller alle egenskaper i samme handling", () => {
   fireEvent.click(getByRole("button", { name: "Nullstill alle" }));
   fireEvent.click(getByRole("button", { name: "Bruk søk" }));
   expect(onApply.mock.calls[0][0].attributes).toEqual({});
+});
+
+it("fjerner avhengig modell sammen med merket og beholder andre filtre", () => {
+  const onApply = vi.fn();
+  const { getByRole, queryByRole } = render(
+    <AdvancedSearchSheet
+      open
+      onOpenChange={vi.fn()}
+      categories={[{ id: "bil", slug: "bil", name_nb: "Bil", parent_id: null }]}
+      onApply={onApply}
+      initial={{
+        ...defaultAdvancedSearchValue(),
+        categories: ["bil"],
+        attributes: {
+          brand: { kind: "select", value: "Volvo" },
+          model: { kind: "select", value: "XC60" },
+          color: { kind: "select", value: "red" },
+        },
+      }}
+    />,
+  );
+  fireEvent.click(getByRole("button", { name: "Fjern Merke: Volvo" }));
+  expect(queryByRole("button", { name: "Fjern Modell: XC60" })).toBeNull();
+  expect(getByRole("button", { name: "Fjern Farge: Rød" })).toBeTruthy();
+  fireEvent.click(getByRole("button", { name: "Bruk søk" }));
+  expect(onApply.mock.calls[0][0].attributes).toEqual({ color: { kind: "select", value: "red" } });
 });

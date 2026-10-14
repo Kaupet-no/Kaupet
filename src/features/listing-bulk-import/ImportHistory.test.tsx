@@ -58,7 +58,10 @@ beforeEach(() => {
   imageJobsInMock.mockReset();
   imageJobsSelectMock.mockReset();
   imageJobsSelectMock.mockImplementation(() => ({ in: imageJobsInMock }));
-  imageJobsInMock.mockReturnValue({ order: () => ({ range: imageRangeMock }) });
+  imageJobsInMock.mockImplementation(() => ({
+    in: imageJobsInMock,
+    order: () => ({ range: imageRangeMock }),
+  }));
   mockImageJobs([]);
   fromMock.mockImplementation((table: string) =>
     table === "listing_image_jobs" ? { select: imageJobsSelectMock } : { select: selectMock },
@@ -121,6 +124,7 @@ describe("ImportHistory", () => {
     expect(await screen.findByText(/Bilder behandles: 2/)).toBeTruthy();
     expect(screen.getByText(/Bilder feilet: 1/)).toBeTruthy();
     expect(screen.getByText("Bildet finnes ikke på adressen (HTTP 404).")).toBeTruthy();
+    expect(imageJobsInMock).toHaveBeenCalledWith("status", ["pending", "processing", "failed"]);
   });
 });
 

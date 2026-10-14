@@ -127,6 +127,8 @@ async function fetchImageStatusByListingId(
       .from("listing_image_jobs")
       .select("listing_id, status, customer_error")
       .in("listing_id", chunk)
+      // Ferdige jobber (de aller fleste) vises ikke; ikke hent dem.
+      .in("status", ["pending", "processing", "failed"])
       .order("id")
       .range(from, to),
   );

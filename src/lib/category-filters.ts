@@ -301,9 +301,12 @@ export function effectiveFiltersForCategory(
 
 /** Tallstreng i norsk skrivemåte → kanonisk form: mellomrom som
  * tusenskille («150 000») fjernes og desimalkomma («12,5») blir punktum.
- * Samme regel som tallryddingen i 20261013170000. */
+ * «12,500» kan være både 12,5 og 12 500 og blir stående, så valideringen
+ * avviser den. Samme regel som tallryddingen i 20261013170000. */
 function canonicalNumericString(value: string): string {
-  return value.replace(/[\s\u00a0\u2009\u202f]/g, "").replace(/^(-?\d+),(\d+)$/, "$1.$2");
+  const stripped = value.replace(/[\s\u00a0\u2009\u202f]/g, "");
+  if (/^-?\d{1,3},\d{3}$/.test(stripped)) return stripped;
+  return stripped.replace(/^(-?\d+),(\d+)$/, "$1.$2");
 }
 
 /** Eldre importdata kan ha tallstrenger. Bare kategoriens effektive

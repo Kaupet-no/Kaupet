@@ -116,7 +116,8 @@ $$;
 -- Normaliser og rydd bare tallfelt i annonsens effektive kategori. Barnets
 -- filtertype overstyrer forelderen; samme nøkkel i andre kategorier er irrelevant.
 -- Tallstrenger med mellomrom som tusenskille («150 000») og desimalkomma
--- («12,5») normaliseres i stedet for å fjernes, samme regel som
+-- («12,5») normaliseres i stedet for å fjernes; tvetydige («12,500»)
+-- beholdes urørt. Samme regel som
 -- normalizeNumericAttributes. Bare tallområder som fortsatt ikke er tall
 -- fjernes. Opprinnelige attributter for hver endret annonse lagres i
 -- listing_attribute_cleanup_backup, og updated_at beholdes: dette er en
@@ -131,7 +132,12 @@ REVOKE ALL ON public.listing_attribute_cleanup_backup FROM PUBLIC, anon, authent
 COMMENT ON TABLE public.listing_attribute_cleanup_backup IS
   'Engangskopi av annonseattributter før tallryddingen i 20261013170000 (B16). Kun service role. Kan slettes når ryddingen er verifisert i produksjon.';
 
+-- Kjøpsønske-matchingen (UPDATE OF attributes) slås også av: en
+-- normalisert verdi kan gi nye treff for gamle annonser, og ryddingen skal
+-- ikke sende varsler. DISABLE TRIGGER tar SHARE ROW EXCLUSIVE, som blokkerer
+-- skriving (ikke lesing) mens ryddingen pågår.
 ALTER TABLE public.listings DISABLE TRIGGER listings_set_updated_at;
+ALTER TABLE public.listings DISABLE TRIGGER listings_match_wtb_listings;
 
 WITH RECURSIVE ancestors AS (
   SELECT id AS category_id, id AS ancestor_id, parent_id, 0 AS depth
@@ -146,14 +152,21 @@ WITH RECURSIVE ancestors AS (
 ), attrs AS (
   SELECT l.id, attr.key, attr.value, f.type,
     CASE WHEN f.type IN ('number', 'range') AND jsonb_typeof(attr.value) = 'string'
-      THEN regexp_replace(
-        regexp_replace(attr.value #>> '{}', '[[:space:]   ]', '', 'g'),
-        '^(-?[0-9]+),([0-9]+)$', '\1.\2')
-    END AS cleaned
+      THEN regexp_replace(attr.value #>> '{}', '[[:space:]   ]', '', 'g')
+    END AS stripped
   FROM public.listings l
   CROSS JOIN LATERAL jsonb_each(l.attributes) attr
   LEFT JOIN effective_filters f ON f.category_id = l.category_id AND f.key = attr.key
   WHERE jsonb_typeof(l.attributes) = 'object'
+), cleaned_attrs AS (
+  -- «12,500» kan være både 12,5 og 12 500: tvetydige verdier røres ikke,
+  -- verken normaliseres eller fjernes, og må rettes av eieren.
+  SELECT id, key, value, type,
+    COALESCE(stripped ~ '^-?[0-9]{1,3},[0-9]{3}$', false) AS ambiguous,
+    CASE WHEN stripped !~ '^-?[0-9]{1,3},[0-9]{3}$'
+      THEN regexp_replace(stripped, '^(-?[0-9]+),([0-9]+)$', '\1.\2')
+    END AS cleaned
+  FROM attrs
 ), corrected AS (
   SELECT id, jsonb_object_agg(key,
     CASE WHEN cleaned ~ '^-?[0-9]+(\.[0-9]+)?$'
@@ -165,9 +178,10 @@ WITH RECURSIVE ancestors AS (
   ) FILTER (WHERE NOT (
     COALESCE(type = 'range', false)
     AND jsonb_typeof(value) <> 'number'
+    AND NOT ambiguous
     AND NOT COALESCE(cleaned ~ '^-?[0-9]+(\.[0-9]+)?$', false)
   )) AS attributes
-  FROM attrs
+  FROM cleaned_attrs
   GROUP BY id
 ), changed AS (
   SELECT l.id, l.attributes AS previous, COALESCE(c.attributes, '{}'::jsonb) AS next
@@ -184,6 +198,7 @@ FROM changed
 WHERE l.id = changed.id;
 
 ALTER TABLE public.listings ENABLE TRIGGER listings_set_updated_at;
+ALTER TABLE public.listings ENABLE TRIGGER listings_match_wtb_listings;
 
 -- 3) Søkevektoren følger kategoriens forelder ------------------------------
 --

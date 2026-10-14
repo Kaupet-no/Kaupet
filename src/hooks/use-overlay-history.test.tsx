@@ -6,10 +6,16 @@ import { useOverlayHistory } from "./use-overlay-history";
 /** Opprydningen er utsatt én tick, jf. hookens kommentar. */
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
-/** jsdoms history traverserer asynkront og fyrer popstate med tilstanden. */
+/** jsdom traverserer via flere køede oppgaver; vent på hendelsen, ikke en
+ * fast tid (5 ms holdt ikke i CI under coverage). */
+const nextPop = () =>
+  new Promise<void>((resolve) =>
+    window.addEventListener("popstate", () => resolve(), { once: true }),
+  );
 const pressBack = async () => {
+  const popped = nextPop();
   history.back();
-  await tick();
+  await popped;
 };
 const spyGo = () => vi.spyOn(history, "go");
 const level = () => (history.state as { overlayLevel?: number } | null)?.overlayLevel ?? 0;
@@ -37,10 +43,10 @@ describe("useOverlayHistory", () => {
     const go = spyGo();
     const { unmount } = renderHook(() => useOverlayHistory(true, () => {}));
 
+    const popped = nextPop();
     unmount();
-    await tick();
+    await popped;
     expect(go).toHaveBeenCalledExactlyOnceWith(-1);
-    await tick();
     expect(level()).toBe(0);
   });
 
@@ -56,10 +62,10 @@ describe("useOverlayHistory", () => {
     expect(push).toHaveBeenCalledTimes(1);
     expect(go).not.toHaveBeenCalled();
 
+    const popped = nextPop();
     second.unmount();
-    await tick();
+    await popped;
     expect(go).toHaveBeenCalledExactlyOnceWith(-1);
-    await tick();
   });
 
   it("gjør ingenting når den er deaktivert", async () => {
@@ -108,8 +114,9 @@ describe("useOverlayHistory", () => {
     await pressBack();
     expect(closeChild).toHaveBeenCalledTimes(1);
     expect(closeParent).not.toHaveBeenCalled();
+    const popped = nextPop();
     unmount();
-    await tick();
+    await popped;
   });
 
   it("opprydding av et lukket barn lukker ikke forelderen", async () => {
@@ -118,9 +125,9 @@ describe("useOverlayHistory", () => {
     const parent = renderHook(() => useOverlayHistory(true, closeParent));
     const child = renderHook(() => useOverlayHistory(true, () => {}));
 
+    const popped = nextPop();
     child.unmount();
-    await tick();
-    await tick();
+    await popped;
     expect(go).toHaveBeenCalledExactlyOnceWith(-1);
     expect(closeParent).not.toHaveBeenCalled();
     expect(level()).toBe(1);
@@ -145,9 +152,9 @@ describe("useOverlayHistory", () => {
     const { unmount } = render(<Parent />);
     expect(level()).toBe(2);
 
+    const popped = nextPop();
     unmount();
-    await tick();
-    await tick();
+    await popped;
     expect(go).toHaveBeenCalledExactlyOnceWith(-2);
     expect(level()).toBe(0);
     expect(closeParent).not.toHaveBeenCalled();

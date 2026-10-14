@@ -3329,6 +3329,16 @@ export type Database = {
           value: string
         }[]
       }
+      business_listing_stats_inputs: {
+        Args: {
+          _location_id: string | null
+          _organization_id: string
+          _sales_since: string
+          _user_id: string | null
+          _views_since: string
+        }
+        Returns: Json
+      }
       can_access_organization_chat: {
         Args: {
           _location_id: string

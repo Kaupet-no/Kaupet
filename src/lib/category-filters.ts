@@ -222,15 +222,26 @@ export function retainSearchAttributes(
   { dropUnknown = false }: { dropUnknown?: boolean } = {},
 ): { kept: Record<string, AttributeFilterValue>; dropped: string[] } {
   const byKey = new Map(filters.map((filter) => [filter.key, filter]));
+  return pruneUntilStable(values, (key, kept) => {
+    const filter = byKey.get(key);
+    return filter ? searchFilterDependencyMet(filter, kept, filters) : !dropUnknown;
+  });
+}
+
+/** Fjerner verdier `keep` avviser, gjentatt til resultatet er stabilt: en
+ * fjernet forutsetning kan gjøre et avhengig filter ugyldig. Felles for søk
+ * (retainSearchAttributes) og kjøpsønsker (pruneWtbCriteria). */
+export function pruneUntilStable<V>(
+  values: Record<string, V>,
+  keep: (key: string, kept: Record<string, V>) => boolean,
+): { kept: Record<string, V>; dropped: string[] } {
   const kept = { ...values };
   const dropped: string[] = [];
   let changed = true;
   while (changed) {
     changed = false;
     for (const key of Object.keys(kept)) {
-      const filter = byKey.get(key);
-      const keep = filter ? searchFilterDependencyMet(filter, kept, filters) : !dropUnknown;
-      if (keep) continue;
+      if (keep(key, kept)) continue;
       delete kept[key];
       dropped.push(key);
       changed = true;

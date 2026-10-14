@@ -1,5 +1,6 @@
 import {
   filterDependencyMet,
+  pruneUntilStable,
   type AttributeValue,
   type CategoryFilter,
 } from "@/lib/category-filters";
@@ -19,19 +20,12 @@ export function pruneWtbCriteria(
   value: WtbAttributeMap,
   filters: CategoryFilter[],
 ): WtbAttributeMap {
-  let next = value;
-  for (;;) {
-    const visible = new Set(
-      filters
-        .filter((f) => filterDependencyMet(f, next as Record<string, AttributeValue>))
-        .map((f) => f.key),
-    );
-    const pruned = Object.fromEntries(
-      Object.entries(next).filter(([key]) => key === WTB_FREETEXT_KEY || visible.has(key)),
-    );
-    if (Object.keys(pruned).length === Object.keys(next).length) return pruned;
-    next = pruned;
-  }
+  const byKey = new Map(filters.map((filter) => [filter.key, filter]));
+  return pruneUntilStable(value, (key, kept) => {
+    if (key === WTB_FREETEXT_KEY) return true;
+    const filter = byKey.get(key);
+    return !!filter && filterDependencyMet(filter, kept as Record<string, AttributeValue>);
+  }).kept;
 }
 
 export function orderWtbCriteria(filters: CategoryFilter[], value: WtbAttributeMap) {

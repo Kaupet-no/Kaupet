@@ -22,14 +22,27 @@
 //   Vi måler den på et skjult element og bruker forholdstallet.
 //   `-webkit-text-size-adjust` ble vurdert først (jf. planens rekkefølge), men
 //   styrer WebKits egen autosizing av smale tekstkolonner — ikke Dynamic Type.
-// - **Android (WebView):** systemets fontskala (`Configuration.fontScale`)
-//   styres i stedet på native side — se MainActivity.java, som låser
-//   WebView-ens `textZoom` til 100 slik at layout aldri vokser ukontrollert
-//   fra OS-innstillingen. Denne modulen forblir derfor no-op på Android; en
-//   fremtidig egen skalering der krever en native bro til
-//   `Configuration.fontScale` (ingen slik bro finnes i dag).
+// - **Android (WebView):** MainActivity.java låser WebView-ens `textZoom` til
+//   100 slik at layout aldri vokser ukontrollert fra OS-innstillingen, og
+//   TextScalePlugin eksponerer `Configuration.fontScale`. En endring av
+//   fontskalaen gjenskaper aktiviteten (fontScale står ikke i configChanges),
+//   så siden laster på nytt og leser verdien igjen.
+
+import { registerPlugin } from "@capacitor/core";
 
 import { isNative, nativePlatform } from "./native";
+
+const TextScale = registerPlugin<{ get(): Promise<{ fontScale: number }> }>("TextScale");
+
+/** Androids fontskala via TextScalePlugin; null når broen mangler (eldre app). */
+export async function readAndroidFontScale(): Promise<number | null> {
+  try {
+    const { fontScale } = await TextScale.get();
+    return Number.isFinite(fontScale) && fontScale > 0 ? clampScale(fontScale) : null;
+  } catch {
+    return null;
+  }
+}
 
 /** `-apple-system-body` ved standard Dynamic Type. */
 const BASE_BODY_PX = 17;
@@ -63,8 +76,7 @@ export function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 }
 
-function apply(): void {
-  const scale = measureTextScale();
+function apply(scale: number | null = measureTextScale()): void {
   const root = document.documentElement;
   if (scale == null) {
     root.style.removeProperty(SCALE_PROPERTY);
@@ -74,11 +86,17 @@ function apply(): void {
 }
 
 /**
- * Kobler opp typografiskaleringen. Kun iOS-native — se filkommentaren for
- * hvorfor Android og web er no-op.
+ * Kobler opp typografiskaleringen på native. Web er no-op: nettleserens egen
+ * tekstzoom virker der allerede.
  */
 export function initTextScale(): void {
-  if (!isNative() || nativePlatform() !== "ios") return;
+  if (!isNative()) return;
+  const platform = nativePlatform();
+  if (platform === "android") {
+    void readAndroidFontScale().then(apply);
+    return;
+  }
+  if (platform !== "ios") return;
   apply();
   // Dynamic Type endres i Innstillinger, altså mens appen er i bakgrunnen —
   // ingen resize fyrer av seg selv. Mål på nytt når appen kommer tilbake.

@@ -41,6 +41,13 @@ const row: Row = {
 
 const noop = () => {};
 
+// Typekontrakt (kjøres av tsc): uten editOnly er radhandlingene påkrevd, så
+// en glemt onDelete ikke gir en sletteknapp som ikke gjør noe.
+export function _listingRowRequiresActions() {
+  // @ts-expect-error onPromote … onDelete mangler
+  return <ListingRow row={row} isVehicle={false} activePromotion={null} busy={false} />;
+}
+
 describe("ListingRow", () => {
   it("shows the promote action for every user, not just demo/admin roles", () => {
     const { getAllByText } = renderWithClient(

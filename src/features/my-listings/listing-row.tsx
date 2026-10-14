@@ -82,6 +82,32 @@ function daysLeft(expires_at: string | null): number | null {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+type RowActions = {
+  onPromote: () => void;
+  onMarkSold: () => void;
+  onReactivate: () => void;
+  onRepublish: () => void;
+  onPublishDraft: () => void;
+  onDelete: () => void;
+};
+
+type ListingRowProps = {
+  row: Row;
+  /** Whether the listing's category is under Bil og MC — gates the native-only
+   * "legg til 360°-opptak"-action (draft/active rows only). */
+  isVehicle: boolean;
+  activePromotion: { expires_at: string | null; is_gift: boolean } | null;
+  busy: boolean;
+  /** Render only the listing link in console surfaces. */
+  readOnly?: boolean;
+} & (
+  | ({ editOnly?: false } & RowActions)
+  | ({
+      /** Bare «Rediger»: status og sletting håndteres i annonsens redigeringsvisning. */
+      editOnly: true;
+    } & { [K in keyof RowActions]?: never })
+);
+
 export function ListingRow({
   row,
   isVehicle,
@@ -95,25 +121,7 @@ export function ListingRow({
   busy,
   readOnly = false,
   editOnly = false,
-}: {
-  row: Row;
-  /** Whether the listing's category is under Bil og MC — gates the native-only
-   * "legg til 360°-opptak"-action (draft/active rows only). */
-  isVehicle: boolean;
-  activePromotion: { expires_at: string | null; is_gift: boolean } | null;
-  // Påkrevd unntatt i `editOnly`/`readOnly`, der radhandlingene ikke vises.
-  onPromote?: () => void;
-  onMarkSold?: () => void;
-  onReactivate?: () => void;
-  onRepublish?: () => void;
-  onPublishDraft?: () => void;
-  onDelete?: () => void;
-  busy: boolean;
-  /** Render only the listing link in console surfaces. */
-  readOnly?: boolean;
-  /** Bare «Rediger»: status og sletting håndteres i annonsens redigeringsvisning. */
-  editOnly?: boolean;
-}) {
+}: ListingRowProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const native = useIsNative();
   const promotionAllowed = useNativePromotionAllowed();

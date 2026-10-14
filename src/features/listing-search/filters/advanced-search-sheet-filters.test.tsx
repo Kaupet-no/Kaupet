@@ -23,7 +23,11 @@ vi.mock("@/components/attribute-fields", () => ({
   }),
 }));
 vi.mock("@/features/listing-search/use-retain-category-attributes", () => ({
-  useRetainCategoryAttributes: () => () => ({ kept: {}, droppedLabels: [] }),
+  useRetainCategoryAttributes: () => ({
+    retain: () => ({ kept: {}, dropped: [], droppedLabels: [] }),
+    categoryNotice: [],
+    changeCategories: () => ({}),
+  }),
 }));
 vi.mock("@/components/location-filter", () => ({
   LocationPicker: () => null,

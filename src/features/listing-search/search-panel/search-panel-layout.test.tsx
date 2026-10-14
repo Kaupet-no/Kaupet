@@ -9,7 +9,11 @@ import { SearchFilterSidebar } from "./search-filter-sidebar";
 import { SearchPanel } from "./search-panel";
 
 vi.mock("@/features/listing-search/use-retain-category-attributes", () => ({
-  useRetainCategoryAttributes: () => (attributes: unknown) => attributes,
+  useRetainCategoryAttributes: () => ({
+    retain: (attributes: unknown) => ({ kept: attributes, dropped: [], droppedLabels: [] }),
+    categoryNotice: [],
+    changeCategories: (_previous: unknown, _next: unknown, attributes: unknown) => attributes,
+  }),
 }));
 vi.mock("vaul", () => ({
   Drawer: {

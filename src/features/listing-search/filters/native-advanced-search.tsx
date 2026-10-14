@@ -70,23 +70,15 @@ export function NativeAdvancedSearch({
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
   // Kategoribytte fjerner attributter de nye kategoriene ikke har (KG-29-F01).
-  const retainForCategories = useRetainCategoryAttributes(categories);
-  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
+  // Notis og verdi beregnes fra samme forhåndsvisning; andre endringer går
+  // uendret til setV, så funksjonelle oppdateringer beholdes.
+  const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
   const setValue = (next: SetStateAction<AdvancedSearchValue>) => {
-    const preview = typeof next === "function" ? next(v) : next;
-    if (preview.categories.join("\0") !== v.categories.join("\0")) {
-      setCategoryNotice(
-        retainForCategories(preview.attributes ?? {}, preview.categories).droppedLabels,
-      );
-    }
-    setV((previous) => {
-      const value = typeof next === "function" ? next(previous) : next;
-      return value.categories.join("\0") === previous.categories.join("\0")
-        ? value
-        : {
-            ...value,
-            attributes: retainForCategories(value.attributes ?? {}, value.categories).kept,
-          };
+    const value = typeof next === "function" ? next(v) : next;
+    if (value.categories.join("\0") === v.categories.join("\0")) return setV(next);
+    setV({
+      ...value,
+      attributes: changeCategories(v.categories, value.categories, value.attributes ?? {}),
     });
   };
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { buildTree, type Category } from "@/lib/categories";
@@ -8,15 +8,22 @@ import {
   type AttributeFilterValue,
 } from "@/lib/category-filters";
 
+type Attributes = Record<string, AttributeFilterValue>;
+
 /** Attributtene som overlever et kategoribytte: verdier de nye kategoriene
  * også har beholdes, resten (og avhengige filtre uten forutsetning) fjernes,
  * så skjulte filtre ikke snevrer inn søket (KG-29-F01, KG-30-F01). Samme
- * regel som SearchPanel. Før filtrene er lastet fjernes alt, som før. */
+ * regel som SearchPanel. Før filtrene er lastet fjernes alt, som før.
+ *
+ * `changeCategories` er felles for alle søkeflatene: uendrede kategorier gir
+ * attributtene tilbake urørt; et bytte gir de som overlever og oppdaterer
+ * `categoryNotice` med etikettene som ble fjernet. */
 export function useRetainCategoryAttributes(categories: Category[]) {
   const { data: allFilters } = useAllCategoryFilters();
   const tree = useMemo(() => buildTree(categories), [categories]);
-  return useCallback(
-    (attributes: Record<string, AttributeFilterValue>, slugs: string[]) => {
+  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
+  const retain = useCallback(
+    (attributes: Attributes, slugs: string[]) => {
       const result = allFilters
         ? retainSearchAttributes(
             attributes,
@@ -41,4 +48,14 @@ export function useRetainCategoryAttributes(categories: Category[]) {
     },
     [allFilters, tree],
   );
+  const changeCategories = useCallback(
+    (previous: string[], next: string[], attributes: Attributes): Attributes => {
+      if (previous.join("\0") === next.join("\0")) return attributes;
+      const retained = retain(attributes, next);
+      setCategoryNotice(retained.droppedLabels);
+      return retained.kept;
+    },
+    [retain],
+  );
+  return { retain, categoryNotice, changeCategories };
 }

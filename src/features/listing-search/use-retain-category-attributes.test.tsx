@@ -35,7 +35,7 @@ it("beholder verdier den nye kategorien har og fjerner resten", () => {
     ]),
   );
   expect(
-    result.current(
+    result.current.retain(
       {
         color: { kind: "select", value: "red" },
         fuel_type: { kind: "select", value: "diesel" },

@@ -75,9 +75,8 @@ export function AdvancedSearchSheet({
 }: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
-  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
   const { data: allFilters } = useAllCategoryFilters();
-  const retainForCategories = useRetainCategoryAttributes(categories);
+  const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
@@ -214,11 +213,14 @@ export function AdvancedSearchSheet({
               categories={categories}
               selected={v.categories}
               // Attributter de nye kategoriene ikke har, fjernes (KG-29-F01).
-              onChange={(slugs) => {
-                const retained = retainForCategories(v.attributes ?? {}, slugs);
-                setCategoryNotice(retained.droppedLabels);
-                setV({ ...v, categories: slugs, catMode: "any", attributes: retained.kept });
-              }}
+              onChange={(slugs) =>
+                setV({
+                  ...v,
+                  categories: slugs,
+                  catMode: "any",
+                  attributes: changeCategories(v.categories, slugs, v.attributes ?? {}),
+                })
+              }
             />
 
             {categoryNotice.length > 0 && (

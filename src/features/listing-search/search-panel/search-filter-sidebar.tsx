@@ -52,16 +52,13 @@ export function SearchFilterSidebar({
   // Samme regler som SearchPanel: ved kategoribytte beholdes verdier den
   // nye kategorien også har, og avhengige filtre fjernes sammen med
   // forutsetningen (KG-30-F01).
-  const [categoryNotice, setCategoryNotice] = useState<string[]>([]);
-  const retainForCategories = useRetainCategoryAttributes(categories);
+  const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
   const setValue = (next: React.SetStateAction<AdvancedSearchValue>) => {
     const value = typeof next === "function" ? next(applied.value) : next;
-    const changedCategory = value.categories.join("\0") !== applied.value.categories.join("\0");
-    const retained = changedCategory
-      ? retainForCategories(applied.attributes, value.categories)
-      : null;
-    if (retained) setCategoryNotice(retained.droppedLabels);
-    onApply({ value, attributes: retained?.kept ?? applied.attributes });
+    onApply({
+      value,
+      attributes: changeCategories(applied.value.categories, value.categories, applied.attributes),
+    });
   };
 
   const onAttributeChange = (key: string, value: AttributeFilterValue | undefined) => {

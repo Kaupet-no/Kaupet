@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Gir et åpent overlay sin egen historikk-oppføring, slik at Android-
@@ -26,9 +26,30 @@ import { useEffect, useRef } from "react";
 type Entry = {
   close: () => void;
   popped: boolean;
+  /** Render-rekkefølge: en forelder rendres før overlayene den inneholder. */
+  order: number;
   releaseTimer?: ReturnType<typeof setTimeout>;
 };
 const stack: Entry[] = [];
+let renderSeq = 0;
+// Nivåer lagt til i samme effektrunde (samme commit). React kjører barnets
+// effekt før forelderens, så åpnes forelder og barn samtidig, sorteres de
+// etter render-rekkefølge i stedet for effektrekkefølge.
+let batch: Entry[] | null = null;
+
+function insert(entry: Entry) {
+  if (!batch) {
+    batch = [];
+    queueMicrotask(() => {
+      batch = null;
+    });
+  }
+  let index = stack.length;
+  while (index > 0 && batch.includes(stack[index - 1]) && stack[index - 1].order > entry.order)
+    index--;
+  stack.splice(index, 0, entry);
+  batch.push(entry);
+}
 // history.back() fra egen opprydding gir også popstate; den skal ikke lukke
 // nivået under.
 let ignoredPops = 0;
@@ -48,6 +69,7 @@ function onPop() {
 
 export function useOverlayHistory(enabled: boolean, onClose: () => void) {
   const onCloseRef = useRef(onClose);
+  const [order] = useState(() => ++renderSeq);
   useEffect(() => {
     onCloseRef.current = onClose;
   });
@@ -65,8 +87,8 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
       clearTimeout(entry.releaseTimer);
       entry.releaseTimer = undefined;
     } else {
-      entry = { close: () => {}, popped: false };
-      stack.push(entry);
+      entry = { close: () => {}, popped: false, order };
+      insert(entry);
       history.pushState({ overlay: true, overlayLevel: stack.length }, "");
     }
     const current = entry;
@@ -89,5 +111,5 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
         }
       }, 0);
     };
-  }, [enabled]);
+  }, [enabled, order]);
 }

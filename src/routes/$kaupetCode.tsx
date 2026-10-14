@@ -505,8 +505,9 @@ function ListingDetailPage() {
           : null,
       };
     },
-    // Et nytt forsøk finner ikke en fjernet annonse.
-    retry: (failureCount, error) => !(error instanceof ListingNotFoundError) && failureCount < 3,
+    // Et nytt forsøk finner ikke en fjernet annonse. Ellers samme ene forsøk
+    // som QueryClient-standarden (`retry: 1` i src/router.tsx).
+    retry: (failureCount, error) => !(error instanceof ListingNotFoundError) && failureCount < 1,
   });
   const organization = data?.organization ?? null;
   const hasEffectiveOrganizationProff = organization?.has_active_proff ?? false;

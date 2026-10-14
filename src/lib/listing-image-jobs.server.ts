@@ -352,8 +352,9 @@ export async function processListingImageJob(
     // kjører. Claimet (attempts) er tokenet: en worker som har mistet jobben,
     // skriver verken bilderad eller status. Samme regel som
     // complete_listing_image_job: én bilderad per kilde-URL i annonsen.
-    // ponytail: sjekk-så-skriv, ikke atomisk; to workere innenfor samme
-    // millisekunder kan fortsatt begge skrive. Erstattes av RPC-en i B5b.
+    // ponytail: sjekk-så-skriv, ikke atomisk; mister workeren claimet mellom
+    // sjekken og done-oppdateringen, ryddes egen bilderad bort etterpå, men
+    // den kan være synlig et øyeblikk. Erstattes av RPC-en i B5b.
     const { data: ownedJob, error: ownedError } = await deps.supabaseAdmin
       .from("listing_image_jobs")
       .select("id")
@@ -372,17 +373,23 @@ export async function processListingImageJob(
       .limit(1)
       .maybeSingle();
     if (existingError) throw new Error(`Kunne ikke sjekke bilderad: ${existingError.message}`);
+    let insertedImageId: string | null = null;
     if (!existingImage) {
-      const { error: insertError } = await deps.supabaseAdmin.from("listing_images").insert({
-        listing_id: job.listing_id,
-        storage_path: key,
-        sort_order: job.sort_order,
-        source_url: job.source_url,
-      });
+      const { data: inserted, error: insertError } = await deps.supabaseAdmin
+        .from("listing_images")
+        .insert({
+          listing_id: job.listing_id,
+          storage_path: key,
+          sort_order: job.sort_order,
+          source_url: job.source_url,
+        })
+        .select("id")
+        .single();
       if (insertError) throw new Error(`Kunne ikke lagre bilderad: ${insertError.message}`);
+      insertedImageId = inserted.id;
     }
 
-    const { error: updateError } = await deps.supabaseAdmin
+    const { data: completed, error: updateError } = await deps.supabaseAdmin
       .from("listing_image_jobs")
       .update({
         status: "done",
@@ -394,8 +401,23 @@ export async function processListingImageJob(
       })
       .eq("id", job.id)
       .eq("status", "processing")
-      .eq("attempts", job.attempts);
+      .eq("attempts", job.attempts)
+      .select("id");
     if (updateError) throw new Error(`Kunne ikke oppdatere jobbstatus: ${updateError.message}`);
+    // Jobben ble tatt over eller erstattet etter sjekken over: fjern
+    // bilderaden vi selv la inn, så en erstattet synk ikke får bildet tilbake.
+    if (!completed?.length) {
+      if (insertedImageId) {
+        const { error: deleteError } = await deps.supabaseAdmin
+          .from("listing_images")
+          .delete()
+          .eq("id", insertedImageId);
+        if (deleteError) {
+          throw new Error(`Kunne ikke fjerne foreldet bilderad: ${deleteError.message}`);
+        }
+      }
+      return { outcome: "stale", jobId: job.id };
+    }
 
     return { outcome: "done", jobId: job.id, storagePath: key };
   } catch (cause) {

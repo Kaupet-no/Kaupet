@@ -64,9 +64,12 @@ function buildAdmin(
     existingImage?: { id: string };
     /** Jobben er claimet på nytt av en annen worker. */
     lostClaim?: boolean;
+    /** Claimet mistes mellom eierskapssjekken og done-oppdateringen. */
+    lostClaimOnComplete?: boolean;
   } = {},
 ) {
   const updates: Array<{ table: string; payload: unknown; filters: unknown[][] }> = [];
+  const deletes: Array<{ table: string; filters: unknown[][] }> = [];
   const registered: string[] = [];
   const admin = {
     rpc: (name: string, args: { _key: string }) => {
@@ -91,14 +94,23 @@ function buildAdmin(
       };
       return {
         select: () => query,
-        insert: (payload: unknown) => {
+        insert: () => {
           uploadEvents.push("insert");
-          return Promise.resolve({
-            data: null,
-            error: options.insertError ?? null,
-            payload,
-            table,
-          });
+          const result = options.insertError
+            ? { data: null, error: options.insertError }
+            : { data: { id: "img-new" }, error: null };
+          return { select: () => ({ single: () => Promise.resolve(result) }) };
+        },
+        delete: () => {
+          const filters: unknown[][] = [];
+          const chain = {
+            eq: (...args: unknown[]) => {
+              filters.push(args);
+              deletes.push({ table, filters });
+              return Promise.resolve({ data: null, error: null });
+            },
+          };
+          return chain;
         },
         update: (payload: unknown) => {
           const filters: unknown[][] = [];
@@ -107,9 +119,11 @@ function buildAdmin(
               filters.push(args);
               return chain;
             },
+            select: () => chain,
             then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
               updates.push({ table, payload, filters });
-              return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+              const data = options.lostClaimOnComplete ? [] : [{ id: "job-1" }];
+              return Promise.resolve({ data, error: null }).then(resolve, reject);
             },
           };
           return chain;
@@ -117,7 +131,7 @@ function buildAdmin(
       };
     },
   };
-  return { admin, updates, registered };
+  return { admin, updates, deletes, registered };
 }
 
 describe("processListingImageJob", () => {
@@ -195,6 +209,31 @@ describe("processListingImageJob", () => {
     expect(result.outcome).toBe("stale");
     expect(uploadEvents).not.toContain("insert");
     expect(updates).toHaveLength(0);
+  });
+
+  it("fjerner egen bilderad når claimet mistes før done-oppdateringen", async () => {
+    const { admin, deletes } = buildAdmin({ lostClaimOnComplete: true });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(deletes).toEqual([{ table: "listing_images", filters: [["id", "img-new"]] }]);
+  });
+
+  it("sletter ikke en bilderad den ikke selv la inn når claimet mistes", async () => {
+    const { admin, deletes } = buildAdmin({
+      existingImage: { id: "img-1" },
+      lostClaimOnComplete: true,
+    });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(deletes).toHaveLength(0);
   });
 
   it("registreringsfeil gir retry uten å skrive noen objekter", async () => {

@@ -419,7 +419,7 @@ function ListingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.promotion, search.promo_id]);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["listing", kaupetCode],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -696,7 +696,9 @@ function ListingDetailPage() {
     });
   }, [data?.id, data?.seller_id, logView, user?.id]);
 
-  if (isLoading) {
+  // Et nytt forsøk etter feil holder queryen i feilstatus (isLoading er
+  // false); vis lasting så «Prøv på nytt» gir respons.
+  if (isLoading || (!data && isFetching)) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">

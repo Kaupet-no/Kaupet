@@ -3,6 +3,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Midlertidig: spiller av engangsmigrasjoner på nytt. Slettes sammen med
+// listing_attribute_cleanup_backup når tallryddingen (B16) er verifisert i
+// produksjon, sammen med .sql.in-malene, test:db-migration og CI-linjen.
+// Feiler den fordi senere migrasjoner har endret skjemaet: slett, ikke reparer.
+
 // Supabase CLI mounts test files, but not sibling migrations. Inline the actual
 // migration so the regression tests its SQL rather than a separately maintained copy.
 const directory = mkdtempSync(join(tmpdir(), "kaupet-migration-test-"));

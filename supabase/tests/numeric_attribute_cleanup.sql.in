@@ -28,9 +28,9 @@ VALUES ('00000000-0000-4000-8000-00000000f206', '00000000-0000-4000-8000-0000000
 
 -- Migrasjonen er allerede anvendt i teststacken. Triggeren opprettes på nytt
 -- nedenfor; transaksjonens rollback gjenoppretter originalen.
-DROP TRIGGER categories_refresh_listing_search_after_move ON public.categories;
-DROP FUNCTION public.refresh_listing_search_vector_after_category_move();
-DROP TABLE public.listing_attribute_cleanup_backup;
+DROP TRIGGER IF EXISTS categories_refresh_listing_search_after_move ON public.categories;
+DROP FUNCTION IF EXISTS public.refresh_listing_search_vector_after_category_move();
+DROP TABLE IF EXISTS public.listing_attribute_cleanup_backup;
 INSERT INTO public.listings (id, seller_id, category_id, title, status, attributes, updated_at) VALUES
   ('00000000-0000-4000-8000-00000000f207', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Norske tallformater', 'draft', jsonb_build_object('cleanup_size', '150 000', 'cleanup_width', '12,5'), '2026-01-01T00:00:00Z'),
   ('00000000-0000-4000-8000-00000000f208', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Tvetydig komma', 'draft', jsonb_build_object('cleanup_size', '12,500', 'cleanup_width', '1,500'), '2026-01-01T00:00:00Z'),

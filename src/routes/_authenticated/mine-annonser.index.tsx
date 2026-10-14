@@ -142,8 +142,10 @@ function MyListingsPage() {
 
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("listings").delete().eq("id", id);
+      const { data, error } = await supabase.from("listings").delete().eq("id", id).select("id");
       if (error) throw error;
+      // RLS kan la DELETE uten tilgang lykkes uten å treffe noe (KG-22-F03).
+      if (data?.length !== 1) throw new Error("Annonsen ble ikke slettet. Prøv igjen.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });

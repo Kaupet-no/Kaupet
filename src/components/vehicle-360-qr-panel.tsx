@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Smartphone, Trash2 } from "lucide-react";
@@ -18,7 +18,7 @@ import {
  * genererer automatisk en QR-kode brukeren *kan* skanne med Kaupet-appen for
  * å ta opptak av en 360°-bildesekvens av kjøretøyet — helt valgfritt, ingen
  * knapp å trykke for å be om koden. QR-koden er en kortlivet capability og
- * roteres automatisk når den er utløpt eller brukt. Krever en persistert
+ * kan fornyes når den er utløpt. Krever en persistert
  * draft, siden mobilopptaket knyttes til en ekte listing_id. `ensureDraftId`
  * løser dette automatisk for kjøretøy — tittelen genereres av
  * kjøretøysoppslaget (Årsmodell/Merke/Modell), ikke skrevet inn av brukeren
@@ -36,6 +36,8 @@ export function Vehicle360QrPanel({
   const deleteFrames = useServerFn(deleteVehicle360Frames);
 
   const [qrSrc, setQrSrc] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const generationRef = useRef(0);
@@ -58,24 +60,50 @@ export function Vehicle360QrPanel({
   );
 
   async function generateQr() {
+    const myGeneration = ++generationRef.current;
+    setGenerating(true);
     setQrError(null);
+    setQrSrc(null);
+    setExpiresAt(null);
+    setExpired(false);
     try {
       const id = draftId ?? (await ensureDraftId());
-      if (!id) return;
-      const myGeneration = ++generationRef.current;
-      setGenerating(true);
-      setQrSrc(null);
-      const { token } = await createSession({ data: { listingId: id } });
-      const url = `https://kaupet.no/360-opptak/${token}`;
+      if (!id || generationRef.current !== myGeneration) return;
+      const { token, expiresAt: expiry } = await createSession({ data: { listingId: id } });
+      if (generationRef.current !== myGeneration) return;
+      const url = `${window.location.origin}/360-opptak/${token}`;
       const dataUrl = await generateBrandedQrDataUrl(url);
-      if (generationRef.current === myGeneration) setQrSrc(dataUrl);
+      if (generationRef.current !== myGeneration) return;
+      setExpiresAt(expiry);
+      setQrSrc(dataUrl);
     } catch (e) {
+      if (generationRef.current !== myGeneration) return;
       console.error("[vehicle-360] kunne ikke starte opptaksøkt", e);
       setQrError("Kunne ikke generere QR-kode.");
     } finally {
-      setGenerating(false);
+      if (generationRef.current === myGeneration) setGenerating(false);
     }
   }
+
+  useEffect(
+    () => () => {
+      generationRef.current += 1;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const timer = window.setTimeout(
+      () => {
+        generationRef.current += 1;
+        setQrSrc(null);
+        setExpired(true);
+      },
+      Math.max(0, new Date(expiresAt).getTime() - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [expiresAt]);
 
   // Genereres automatisk så snart et utkast finnes (eller kan opprettes) —
   // brukeren skal aldri måtte be om QR-koden, kun skanne den om de ønsker.
@@ -92,7 +120,10 @@ export function Vehicle360QrPanel({
       await deleteFrames({ data: { listingId: draftId } });
       showSuccessToast("360°-bildene ble fjernet");
       framesQuery.refetch();
+      generationRef.current += 1;
       autoTriedRef.current = false;
+      setExpiresAt(null);
+      setExpired(false);
       setQrSrc(null);
     } catch {
       showErrorToast("Kunne ikke fjerne bildene");
@@ -154,7 +185,9 @@ export function Vehicle360QrPanel({
           )}
           {!generating && !qrSrc && !qrError && (
             <span className="px-3 text-center text-xs text-muted-foreground">
-              Fullfør kjøretøysoppslaget for å få QR-koden
+              {expired
+                ? "QR-koden er utløpt. Lag en ny kode."
+                : "Fullfør kjøretøysoppslaget for å få QR-koden"}
             </span>
           )}
         </div>
@@ -167,7 +200,7 @@ export function Vehicle360QrPanel({
             onClick={generateQr}
             disabled={generating}
           >
-            <RefreshCw className="size-3.5" /> Prøv igjen
+            <RefreshCw className="size-3.5" /> {expired ? "Lag ny QR-kode" : "Prøv igjen"}
           </Button>
         )}
       </div>

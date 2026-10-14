@@ -22,7 +22,13 @@ export type ListingFieldPatch =
       no_known_issues: boolean;
       maintenance_history: string | null;
     }
-  | { group: "attributes"; attributes: Record<string, unknown> }
+  | {
+      group: "attributes";
+      attributes: Record<string, unknown>;
+      /** Nøkler brukeren har tømt. Uten dem ville sammenslåingen med
+       * databasens attributter lagt gamle verdier tilbake (KG-22-F01). */
+      removedKeys?: string[];
+    }
   | { group: "category"; category_id: string; attributes: Record<string, unknown> };
 
 /**
@@ -95,10 +101,13 @@ export async function saveListingField(
         .eq("id", listingId)
         .single();
       if (readErr) throw readErr;
-      const merged = {
+      const merged: Record<string, unknown> = {
         ...((current?.attributes as Record<string, unknown>) ?? {}),
         ...patch.attributes,
       };
+      for (const key of patch.removedKeys ?? []) {
+        if (!(key in patch.attributes)) delete merged[key];
+      }
       updateData = { attributes: merged as unknown as Json };
       break;
     }
@@ -110,6 +119,16 @@ export async function saveListingField(
       break;
   }
 
-  const { error } = await supabase.from("listings").update(updateData).eq("id", listingId);
+  // RLS kan la en UPDATE uten tilgang (eller mot en slettet annonse) lykkes
+  // uten å treffe noe; «Lagret» skal bare vises når raden faktisk ble
+  // oppdatert (KG-22-F03).
+  const { data: updated, error } = await supabase
+    .from("listings")
+    .update(updateData)
+    .eq("id", listingId)
+    .select("id");
   if (error) throw error;
+  if (updated?.length !== 1) {
+    throw new Error("Endringen ble ikke lagret. Last siden på nytt og prøv igjen.");
+  }
 }

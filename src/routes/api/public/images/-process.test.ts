@@ -62,6 +62,7 @@ describe("images process endpoint", () => {
       customerFailed: 1,
       retryPending: 1,
       internalFailed: 1,
+      stale: 0,
     });
     expect(processListingImageJob).toHaveBeenCalledTimes(4);
   });
@@ -78,6 +79,7 @@ describe("images process endpoint", () => {
       customerFailed: 0,
       retryPending: 0,
       internalFailed: 0,
+      stale: 0,
     });
     expect(processListingImageJob).not.toHaveBeenCalled();
   });

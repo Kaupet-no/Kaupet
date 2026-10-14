@@ -183,3 +183,14 @@ describe("useAnnonserSearchState", () => {
     expect(typeof next.attrs).toBe("string");
   });
 });
+
+it.each(["brand_select", "model_select"] as const)(
+  "KG-30-F02: dynamisk %s overlever med select, multiselect og exclude",
+  (type) => {
+    for (const attrs of ["brand:s:Volvo", "brand:m:Volvo", "brand:x:Volvo"]) {
+      const filter = { ...fuelFilter("child-1", []), key: "brand", type, options: null };
+      const { navigate } = setup({ categories: ["mobil"], attrs }, [filter]);
+      expect(navigate).not.toHaveBeenCalled();
+    }
+  },
+);

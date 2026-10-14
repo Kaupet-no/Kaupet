@@ -24,10 +24,11 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { formatErrorMessage } from "@/lib/errors";
 import { invalidateSharedCategoryQueries } from "@/lib/reference-query-invalidation";
 import {
-  DEFAULT_FIELD_GROUPS,
-  normalizeFieldGroupKeys,
+  effectiveFlowForCategory,
   resolveWizardPages,
 } from "@/features/listing-creation/category-flows";
+import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
+import { useCategories } from "@/hooks/use-categories";
 import {
   FIELD_GROUP_LABELS_NB,
   LOCKED_FIELD_GROUP_KEYS,
@@ -105,11 +106,26 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     },
   });
 
+  // Uten egen rad arver kategorien nærmeste forelders flyt; editoren må vise
+  // og lagre den, ikke standardflyten (KG-11-F01).
+  const flowsQuery = useAllCategoryFlows();
+  const categoriesQuery = useCategories();
+  const loading = isLoading || flowsQuery.isLoading || categoriesQuery.isLoading;
+  const loadError = isError ? flowError : (flowsQuery.error ?? categoriesQuery.error);
+
   const hasCustomFlow = !!flowRow;
 
   const [fieldGroups, setFieldGroups] = useState<string[] | null>(null);
-  const storedFieldGroups =
-    fieldGroups ?? normalizeFieldGroupKeys(flowRow?.field_groups ?? DEFAULT_FIELD_GROUPS);
+  const effectiveFieldGroups = effectiveFlowForCategory(
+    category.id,
+    // Egen rad fra dialogens egen spørring vinner over en eldre delt cache.
+    [
+      ...(flowsQuery.data ?? []).filter((f) => f.category_id !== category.id),
+      ...(flowRow ? [flowRow] : []),
+    ],
+    new Map((categoriesQuery.data ?? []).map((c) => [c.id, c])),
+  ).fieldGroups.filter((key) => key !== "category-select");
+  const storedFieldGroups = fieldGroups ?? effectiveFieldGroups;
   const middleOrder = [
     ...storedFieldGroups.filter((k) => MIDDLE_FIELD_GROUP_KEYS.includes(k)),
     ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
@@ -238,20 +254,20 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
         flyt, eller standardflyten hvis ingen har en.
       </p>
 
-      {isLoading ? (
+      {loading ? (
         <div className="flex justify-center py-6">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
-      ) : isError ? (
+      ) : loadError ? (
         <p className="py-2 text-sm text-destructive">
-          {formatErrorMessage(flowError, "Kunne ikke laste annonseflyten")}
+          {formatErrorMessage(loadError, "Kunne ikke laste annonseflyten")}
         </p>
       ) : (
         <div className="space-y-4">
           {!hasCustomFlow && (
             <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-              Denne kategorien har ingen egen flyt ennå — bruker standardflyten (eller nærmeste
-              overordnede kategoris flyt, hvis satt).
+              Denne kategorien har ingen egen flyt ennå — viser flyten den arver fra nærmeste
+              overordnede kategori (eller standardflyten). Lagre gir kategorien en egen kopi.
             </p>
           )}
 
@@ -378,7 +394,8 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
         )}
         <Button
           type="button"
-          disabled={save.isPending || isLoading}
+          // Lagre etter en hentefeil ville overskrevet flyten med en fallback.
+          disabled={save.isPending || loading || !!loadError}
           onClick={() => save.mutate({ nextFieldGroups: activeFieldGroups })}
         >
           {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}

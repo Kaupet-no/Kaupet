@@ -8,10 +8,12 @@ import { summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
 
 /**
  * Resets only the filters owned by the advanced-search panel (categories,
- * price, condition, extra search lines) while preserving the fields owned by
- * the search bar above it — query terms, location, and sort. Resetting those
- * from inside this panel would be surprising, since the user didn't touch
- * them here.
+ * price, condition, extra search lines and the category attributes that
+ * depend on them) while preserving the fields owned by the search bar above
+ * it — query terms, location, and sort. Resetting those from inside this
+ * panel would be surprising, since the user didn't touch them here.
+ * Attributes are cleared with the categories: kept, they would narrow the
+ * search with no visible control left (KG-29-F01).
  */
 export function resetAdvancedSearchValue(v: AdvancedSearchValue): AdvancedSearchValue {
   return {
@@ -19,7 +21,7 @@ export function resetAdvancedSearchValue(v: AdvancedSearchValue): AdvancedSearch
     terms: v.terms,
     location: v.location,
     sort: v.sort,
-    attributes: v.attributes,
+    attributes: {},
   };
 }
 

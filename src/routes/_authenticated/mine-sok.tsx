@@ -67,7 +67,7 @@ import {
   type SavedSearch,
   type SearchCriteria,
 } from "@/lib/saved-searches";
-import { encodeAttrFilters } from "@/features/listing-search/search-schema";
+import { writeAppliedSearchState } from "@/features/listing-search/search-schema";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-sok")({
@@ -177,24 +177,15 @@ function MineSokPage() {
     }
   };
 
+  // Samme serialisering som søkesiden, så radius og ekstra søkegrupper
+  // følger med (KG-25-F03).
   const runSearch = (c: SearchCriteria) => {
     navigate({
       to: "/annonser",
-      search: {
-        q: c.q ?? (c.terms ?? []).join(" "),
-        qMode: c.qMode ?? "all",
-        categories: c.categories ?? [],
-        catMode: c.catMode ?? "any",
-        conditions: c.conditions ?? [],
-        includeFree: c.includeFree ?? true,
-        min: c.min ?? undefined,
-        max: c.max ?? undefined,
-        sort: c.sort ?? "new",
-        lat: c.lat ?? undefined,
-        lng: c.lng ?? undefined,
-        attrs: encodeAttrFilters(c.attributes ?? {}),
-        loc: c.loc,
-      } as never,
+      search: writeAppliedSearchState({
+        value: criteriaToValue(c),
+        attributes: c.attributes ?? {},
+      }) as never,
     });
   };
 

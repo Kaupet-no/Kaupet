@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
@@ -88,6 +88,15 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     }
   }
 
+  // Sene svar (bildeforberedelse, token og selve kallet) gjelder bare
+  // forespørselen og inputrevisjonen de ble startet for (KG-21-F01).
+  const revisionRef = useRef(revision);
+  useEffect(() => {
+    revisionRef.current = revision;
+  }, [revision]);
+  const identifyGeneration = useRef(0);
+  const attributesGeneration = useRef(0);
+
   async function getVerifiedToken() {
     try {
       const token = await turnstileRef.current?.getResponsePromise();
@@ -134,6 +143,10 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
   // Trykket på knappen er samtykket: hjelpeteksten under den forklarer KI-
   // bruken og lenker til personvernerklæringen.
   async function analyzePhotos() {
+    const generation = ++identifyGeneration.current;
+    const startRevision = revision;
+    const stale = () =>
+      generation !== identifyGeneration.current || revisionRef.current !== startRevision;
     setConsentedRevision(revision);
     setStatus("analyzing");
     try {
@@ -141,11 +154,13 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
         images.map((image) => image.file),
         "identify",
       );
+      if (stale()) return;
       if (prepared.length === 0) {
         setStatus("unavailable");
         return;
       }
       const token = await takeVerifiedToken();
+      if (stale()) return;
       if (!token) {
         setStatus("verification-required");
         return;
@@ -159,6 +174,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
           turnstileToken: token,
         },
       });
+      if (stale()) return;
       if (
         result.status !== "unavailable" &&
         "categories" in result &&
@@ -171,7 +187,7 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
         setStatus("unavailable");
       }
     } catch {
-      setStatus("unavailable");
+      if (!stale()) setStatus("unavailable");
     }
   }
 
@@ -194,25 +210,30 @@ export function usePhotoSuggestion(params: { images: PendingImage[]; title: stri
     categorySlug: string,
   ): Promise<{ key: string; value: string | number | boolean }[]> {
     if (!canRequestAttributes) return [];
+    const generation = ++attributesGeneration.current;
+    const startRevision = revision;
+    const stale = () =>
+      generation !== attributesGeneration.current || revisionRef.current !== startRevision;
     setAttributeSuggestionLoading(true);
     try {
       const prepared = await preparePhotoSuggestionImages(
         images.map((image) => image.file),
         "attributes",
       );
-      if (prepared.length === 0) return [];
+      if (prepared.length === 0 || stale()) return [];
       const token = await takeVerifiedToken();
-      if (!token) return [];
+      if (!token || stale()) return [];
       const result = await suggestListingFromPhotos({
         data: { operation: "attributes", images: prepared, categorySlug, turnstileToken: token },
       });
+      if (stale()) return [];
       return result.status !== "unavailable" && Array.isArray(result.attributes)
         ? result.attributes
         : [];
     } catch {
       return [];
     } finally {
-      setAttributeSuggestionLoading(false);
+      if (generation === attributesGeneration.current) setAttributeSuggestionLoading(false);
     }
   }
 

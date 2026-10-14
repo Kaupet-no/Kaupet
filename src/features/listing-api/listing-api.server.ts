@@ -438,6 +438,7 @@ export async function upsertListingApi(params: {
     rows: [row],
     mode: "upsert",
     dryRun,
+    allowDraftStatus,
   });
 
   if (result.status === "failed") {

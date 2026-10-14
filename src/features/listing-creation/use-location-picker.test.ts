@@ -195,4 +195,72 @@ describe("useLocationPicker", () => {
     expect(setValue).not.toHaveBeenCalledWith("city", "Oslo", { shouldValidate: false });
     expect(result.current.coords).toEqual({ lat: 60.4, lng: 5.3 });
   });
+
+  // KG-33-F02: Oslo-koordinatene ble stående etter et feilet oppslag for 5003.
+  it("fjerner koordinatene fra forrige postnummer når et nytt oppslag feiler", async () => {
+    lookupPostalCodeMock.mockResolvedValueOnce({ city: "Oslo", lat: 59.9, lng: 10.7 });
+    lookupPostalCodeMock.mockResolvedValueOnce(null);
+    const setValue = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ postalCode }) => useLocationPicker({ postalCode, setValue }),
+      { initialProps: { postalCode: "" } },
+    );
+    act(() => {
+      result.current.lastEditedRef.current = "postal_code";
+    });
+    rerender({ postalCode: "0152" });
+    await waitFor(() => expect(result.current.coords).toEqual({ lat: 59.9, lng: 10.7 }));
+    rerender({ postalCode: "5003" });
+    expect(result.current.coords).toBeNull();
+    await waitFor(() => expect(lookupPostalCodeMock).toHaveBeenCalledTimes(2));
+    expect(result.current.coords).toBeNull();
+  });
+
+  // KG-33-F01: et sent GPS-svar gjeninnførte posisjonen etter bytte til postnummer.
+  it("ignorerer et sent GPS-svar etter bytte til postnummer", async () => {
+    let resolvePosition!: (value: unknown) => void;
+    getCurrentPositionMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePosition = resolve;
+      }),
+    );
+    reverseGeocodeAddressMock.mockResolvedValue({ city: "Oslo", postal_code: "0152" });
+    const setValue = vi.fn();
+    const { result } = renderHook(() => useLocationPicker({ postalCode: "", setValue }));
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.fetchMyLocation();
+    });
+    act(() => result.current.switchToPostal());
+    await act(async () => {
+      resolvePosition({ coords: { latitude: 59.9, longitude: 10.7 } });
+      await pending;
+    });
+
+    expect(result.current.locationMethod).toBe("postal");
+    expect(result.current.coords).toBeNull();
+    expect(result.current.locationLoading).toBe(false);
+    expect(setValue).not.toHaveBeenCalledWith("postal_code", "0152", expect.anything());
+  });
+
+  it("et sent GPS-feilsvar nullstiller ikke et nyere valg", async () => {
+    let rejectPosition!: (reason: unknown) => void;
+    getCurrentPositionMock.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectPosition = reject;
+      }),
+    );
+    const { result } = renderHook(() => useLocationPicker({ postalCode: "", setValue: vi.fn() }));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.fetchMyLocation();
+    });
+    act(() => result.current.switchToPostal());
+    await act(async () => {
+      rejectPosition(new Error("timeout"));
+      await pending;
+    });
+    expect(result.current.locationMethod).toBe("postal");
+  });
 });

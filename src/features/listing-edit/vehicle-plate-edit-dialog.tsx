@@ -15,10 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
-import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
 import { useCategories } from "@/hooks/use-categories";
 import { vehicleCategoryGroupFor, type CategoryNode } from "@/lib/category-filters";
-import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
+import {
+  applyVehicleLookup,
+  useVehicleLookupFlow,
+} from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { saveListingField } from "./save-listing-field";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 
@@ -82,23 +85,17 @@ export function VehiclePlateEditDialog({
       const vehicleGroup = currentCategoryId
         ? vehicleCategoryGroupFor(currentCategoryId, allFilters ?? [], categoriesById)
         : null;
-      const nextAttributes: Record<string, unknown> = {
-        ...attributes,
-        is_registered: true,
-        registration_number: lookup.registrationNumber,
-        vehicle_lookup: JSON.stringify(lookup),
-      };
-      if (lookup.year) nextAttributes.year = lookup.year;
-      if (lookup.fuel_type) nextAttributes.fuel_type = lookup.fuel_type;
-      if (lookup.weight_kg != null) nextAttributes.weight_kg = lookup.weight_kg;
-      if (lookup.transmission) nextAttributes.transmission = lookup.transmission;
-      if (lookup.color) nextAttributes.color = lookup.color;
-      if (lookup.power_hk != null) nextAttributes.power_hk = lookup.power_hk;
-      if (lookup.drive_type) nextAttributes.drive_type = lookup.drive_type;
+      // Samme mapping som veiviseren, så et nytt kjennemerke ikke arver
+      // forrige kjøretøys data og merke/modell følger med (KG-20-F01).
+      const nextAttributes = applyVehicleLookup(attributes as AttributeMap, lookup);
 
       await saveListingField(
         listingId,
-        { group: "attributes", attributes: nextAttributes },
+        {
+          group: "attributes",
+          attributes: nextAttributes,
+          removedKeys: Object.keys(attributes).filter((key) => !(key in nextAttributes)),
+        },
         { behavior: getCategoryBehavior(vehicleGroup) },
       );
       await queryClient.invalidateQueries({ queryKey: ["listing", kaupetCode] });

@@ -15,29 +15,13 @@ import { buildTree } from "@/lib/categories";
 import {
   effectiveFiltersForCategories,
   setAttributeFilterValue,
+  searchFilterMatchesValue,
   type AttributeFilterValue,
   type CategoryFilter,
 } from "@/lib/category-filters";
 
 type Search = z.infer<typeof searchSchema>;
 type Category = { id: string; slug: string; name_nb: string; parent_id: string | null };
-
-/** Whether `filter`'s own options actually contain the value(s) held in
- * `value` — used to disambiguate a shared attribute key (e.g. "fuel_type")
- * between categories that define completely different vocabularies for it.
- * Kinds without an option list (boolean/text/range) have nothing to
- * validate against, so they're treated as a match by default. */
-function filterMatchesValue(
-  filter: CategoryFilter,
-  value: AttributeFilterValue | undefined,
-): boolean {
-  if (!value) return false;
-  if (value.kind === "select") return !!filter.options?.some((o) => o.value === value.value);
-  if (value.kind === "multiselect" || value.kind === "exclude") {
-    return value.values.every((v) => filter.options?.some((o) => o.value === v));
-  }
-  return true;
-}
 
 /**
  * Derives all the search-page state that follows purely from the URL search
@@ -96,8 +80,8 @@ export function useAnnonserSearchState(params: {
       // value, so the chip shows the right label/option instead of an
       // arbitrary other category's vocabulary.
       if (
-        !filterMatchesValue(existing, attrValues[f.key]) &&
-        filterMatchesValue(f, attrValues[f.key])
+        !searchFilterMatchesValue(existing, attrValues[f.key]) &&
+        searchFilterMatchesValue(f, attrValues[f.key])
       ) {
         byKey.set(f.key, f);
       }
@@ -128,7 +112,7 @@ export function useAnnonserSearchState(params: {
     // verdi fra den forrige kategorien ville ellers blitt liggende og
     // filtrert bort alt uten å vises noe sted.
     const isAllowed = (key: string, value: AttributeFilterValue) =>
-      allowedFilters.some((f) => f.key === key && filterMatchesValue(f, value));
+      allowedFilters.some((f) => f.key === key && searchFilterMatchesValue(f, value));
     const hasStale = Object.entries(attrValues).some(([k, v]) => !isAllowed(k, v));
     if (!hasStale) return;
 

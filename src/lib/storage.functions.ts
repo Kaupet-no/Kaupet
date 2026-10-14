@@ -26,11 +26,13 @@
 // bruker samme regler som `avatars_owner_insert` og
 // `organization_logos_superuser_insert` krevde før migreringen til R2 — se
 // kommentarene ved hver funksjon.
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Database } from "@/integrations/supabase/types";
 import { ClientError } from "@/lib/to-client-error";
 import { deleteObject, presignGetUrl, putObject } from "@/lib/r2.server";
 import { pathFromPublicImageUrl, publicImageUrl } from "@/lib/image-url";
@@ -301,12 +303,44 @@ export const deletePreviousOrganizationLogo = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-// Meldingsvedlegg ligger i den private VEDLEGG-bucketen. Autorisasjon
-// speiler message_attachments_participant_insert/_read
-// (20260902150000_storage_bucket_policies.sql): brukeren må være buyer_id
-// eller seller_id i samtalen som første path-segment peker på. Se
-// blocks.functions.ts (createBlock) for samme oppslagsmønster mot
-// conversations.
+type AttachmentConversation = {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  listing: {
+    organization_id: string | null;
+    organization_location_id: string | null;
+    seller_id: string;
+  } | null;
+};
+
+const ATTACHMENT_CONVERSATION_SELECT =
+  "id, buyer_id, seller_id, listing:listings(organization_id, organization_location_id, seller_id)";
+
+/** Samme deltakerregel som meldingene selv (messages-policyene og
+ * send_message): kjøper, selger eller bedriftsbruker med
+ * can_access_organization_chat for annonsens lokasjon (KG-10-F02). */
+async function canUseConversationAttachments(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  conversation: AttachmentConversation,
+): Promise<boolean> {
+  if (conversation.buyer_id === userId || conversation.seller_id === userId) return true;
+  const listing = conversation.listing;
+  if (!listing?.organization_id || !listing.organization_location_id) return false;
+  const { data, error } = await supabase.rpc("can_access_organization_chat", {
+    _organization_id: listing.organization_id,
+    _location_id: listing.organization_location_id,
+    _seller_id: listing.seller_id,
+    _user_id: userId,
+  });
+  if (error) throw new Error("Kunne ikke sjekke tilgang til samtalen");
+  return data === true;
+}
+
+// Meldingsvedlegg ligger i den private VEDLEGG-bucketen. Autorisasjonen
+// følger meldingene: deltaker i samtalen som første path-segment peker på,
+// eller bedriftsbruker med chattilgang (se canUseConversationAttachments).
 export const uploadMessageAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((formData: FormData) => {
@@ -326,11 +360,11 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
 
     const { data: conv, error } = await context.supabase
       .from("conversations")
-      .select("id, buyer_id, seller_id")
+      .select(ATTACHMENT_CONVERSATION_SELECT)
       .eq("id", data.conversationId)
-      .maybeSingle();
+      .maybeSingle<AttachmentConversation>();
     if (error) throw new Error("Kunne ikke sjekke tilgang til samtalen");
-    if (!conv || (conv.buyer_id !== context.userId && conv.seller_id !== context.userId)) {
+    if (!conv || !(await canUseConversationAttachments(context.supabase, context.userId, conv))) {
       throw new ClientError("Du er ikke deltaker i denne samtalen", 403);
     }
     const otherPartyId = conv.buyer_id === context.userId ? conv.seller_id : conv.buyer_id;
@@ -354,7 +388,7 @@ export const uploadMessageAttachment = createServerFn({ method: "POST" })
   });
 
 // Returnerer presignerte GET-URL-er kun for stiene brukeren faktisk har
-// tilgang til (deltaker i samtalen — se uploadMessageAttachment). Stier
+// tilgang til (samme regel som uploadMessageAttachment). Stier
 // brukeren ikke har tilgang til utelates i stedet for å kaste, siden en
 // liste kan inneholde vedlegg fra flere samtaler.
 export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
@@ -370,23 +404,37 @@ export const signMessageAttachmentUrls = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }): Promise<Record<string, string>> => {
-    const conversationIds = Array.from(new Set(data.paths.map((p) => p.split("/", 1)[0])));
+  .handler(async ({ data: input, context }): Promise<Record<string, string>> => {
+    const conversationIds = Array.from(new Set(input.paths.map((p) => p.split("/", 1)[0])));
     if (conversationIds.length === 0) return {};
 
-    const { data: convs, error } = await context.supabase
+    const { data, error } = await context.supabase
       .from("conversations")
-      .select("id, buyer_id, seller_id")
+      .select(ATTACHMENT_CONVERSATION_SELECT)
       .in("id", conversationIds);
     if (error) throw new Error("Kunne ikke sjekke tilgang til samtalene");
+    const convs = (data ?? []) as unknown as AttachmentConversation[];
 
-    const allowedConversationIds = new Set(
-      (convs ?? [])
-        .filter((c) => c.buyer_id === context.userId || c.seller_id === context.userId)
-        .map((c) => c.id),
+    // Samme bedrift/lokasjon/selger gir samme svar: ett RPC-kall per
+    // kombinasjon, ikke per samtale (Worker-grensen for underforespørsler).
+    const accessByListing = new Map<string, Promise<boolean>>();
+    const access = await Promise.all(
+      convs.map(async (c) => {
+        const cacheKey =
+          c.buyer_id === context.userId || c.seller_id === context.userId || !c.listing
+            ? null
+            : `${c.listing.organization_id}/${c.listing.organization_location_id}/${c.listing.seller_id}`;
+        let allowed = cacheKey ? accessByListing.get(cacheKey) : undefined;
+        if (!allowed) {
+          allowed = canUseConversationAttachments(context.supabase, context.userId, c);
+          if (cacheKey) accessByListing.set(cacheKey, allowed);
+        }
+        return (await allowed) ? c.id : null;
+      }),
     );
+    const allowedConversationIds = new Set(access.filter((id): id is string => id !== null));
 
-    const allowedPaths = data.paths.filter((p) => allowedConversationIds.has(p.split("/", 1)[0]));
+    const allowedPaths = input.paths.filter((p) => allowedConversationIds.has(p.split("/", 1)[0]));
     const urls = await Promise.all(
       allowedPaths.map((path) => presignGetUrl("VEDLEGG", path, ATTACHMENT_URL_TTL_SECONDS)),
     );

@@ -1,3 +1,4 @@
+import { displayPriceNok } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import type { ListingCardData } from "@/lib/listing-card-data";
@@ -138,21 +139,31 @@ export function useSearchResultsShell({
   // autoAppliedText above) — if so, the original word goes back into the
   // search box instead of vanishing, since the automation guessing wrong
   // shouldn't cost the user what they typed.
-  const removeAttrWithRestore = (key: string, value?: string, restoreOverride?: string) => {
+  // `value` kan være flere verdier: en samlet tolkningsbrikke («Utstyr:
+  // kamera, soltak») fjerner nøyaktig de viste verdiene (KG-28-F03).
+  const removeAttrWithRestore = (
+    key: string,
+    value?: string | string[],
+    restoreOverride?: string,
+  ) => {
     const current = attrValues[key];
-    const composite =
-      value !== undefined && current?.kind === "exclude"
-        ? `${key}:!${value}`
-        : `${key}:${value ?? ""}`;
-    const restoreText = autoAppliedText[composite] ?? restoreOverride;
-    if (value !== undefined && current?.kind === "multiselect") {
-      const next = current.values.filter((v) => v !== value);
+    const values = value === undefined ? [] : Array.isArray(value) ? value : [value];
+    const composites =
+      values.length === 0
+        ? [`${key}:`]
+        : values.map((v) => (current?.kind === "exclude" ? `${key}:!${v}` : `${key}:${v}`));
+    const restoreText =
+      restoreOverride ??
+      ([...new Set(composites.map((c) => autoAppliedText[c]).filter(Boolean))].join(" ") ||
+        undefined);
+    if (values.length > 0 && current?.kind === "multiselect") {
+      const next = current.values.filter((v) => !values.includes(v));
       handleAttrValueChange(
         key,
         next.length > 0 ? { kind: "multiselect", values: next } : undefined,
       );
-    } else if (value !== undefined && current?.kind === "exclude") {
-      const next = current.values.filter((v) => v !== value);
+    } else if (values.length > 0 && current?.kind === "exclude") {
+      const next = current.values.filter((v) => !values.includes(v));
       handleAttrValueChange(key, next.length > 0 ? { kind: "exclude", values: next } : undefined);
     } else {
       handleAttrValueChange(key, undefined);
@@ -160,7 +171,7 @@ export function useSearchResultsShell({
     if (restoreText) {
       setAutoAppliedText((prev) => {
         const next = { ...prev };
-        delete next[composite];
+        for (const composite of composites) delete next[composite];
         return next;
       });
       markIgnored?.(restoreText);
@@ -221,6 +232,8 @@ export function useSearchResultsShell({
     cover_path: l.cover_path,
     category_slug: l.category_slug,
     attributes: l.attributes,
+    mileage_km: l.mileage_km,
+    engine_hours: l.engine_hours,
     sold_at: l.sold_at,
   }));
 
@@ -230,7 +243,7 @@ export function useSearchResultsShell({
       id: l.id,
       kaupet_code: l.kaupet_code,
       title: l.title,
-      price_nok: l.price_nok,
+      price_nok: displayPriceNok(l),
       is_free: l.is_free,
       lat: l.lat,
       lng: l.lng,

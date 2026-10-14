@@ -75,12 +75,17 @@ export async function resolveTextToFilters(params: {
   if (!q) return { q, attrPatch: {}, criteria: [] };
   const criterionPositions = new Map<string, number>();
   const criterionMatchedText = new Map<string, string>();
+  // Alle fraser for samme kriterium huskes, så fjerning av brikken legger
+  // hele den opprinnelige teksten tilbake, ikke bare første frase (KG-28-F03).
   const rememberPosition = (key: string, matchedText: string) => {
     const position = params.q.toLocaleLowerCase().indexOf(matchedText.toLocaleLowerCase());
     if (position < (criterionPositions.get(key) ?? Infinity)) {
       criterionPositions.set(key, position);
-      criterionMatchedText.set(key, matchedText);
     }
+    const previous = criterionMatchedText.get(key);
+    if (!previous) criterionMatchedText.set(key, matchedText);
+    else if (!previous.includes(matchedText))
+      criterionMatchedText.set(key, `${previous} ${matchedText}`);
   };
 
   // "attribute" is last-priority: it infers a category from a body-type

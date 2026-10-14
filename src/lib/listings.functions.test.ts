@@ -9,6 +9,8 @@ const db = vi.hoisted(() => ({
   /** Overrides the row an update query returns (null = the guarded update matched nothing). */
   updateResult: undefined as Record<string, unknown> | null | undefined,
   inserts: [] as Array<{ table: string; value: unknown }>,
+  tableErrors: {} as Record<string, unknown>,
+  tableData: {} as Record<string, unknown[]>,
 }));
 const assertUserNotRateLimited = vi.hoisted(() => vi.fn());
 
@@ -48,6 +50,8 @@ vi.mock("@/integrations/supabase/client.server", () => ({
       let inserted: unknown;
       let updating = false;
       const result = () => {
+        if (db.tableErrors[table]) return { data: null, error: db.tableErrors[table] };
+        if (db.tableData[table]) return { data: db.tableData[table], error: null };
         if (updating && db.updateResult !== undefined)
           return { data: db.updateResult, error: null };
         if (table === "organization_members") return { data: db.membership, error: null };
@@ -66,7 +70,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         return { data: [], count: 0, error: null };
       };
       const query: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte"]) {
+      for (const method of ["select", "eq", "gte", "in"]) {
         query[method] = () => query;
       }
       query.update = (value: unknown) => {
@@ -99,6 +103,7 @@ vi.mock("@/lib/turnstile.server", () => ({ verifyTurnstileToken: vi.fn() }));
 
 import {
   createListing,
+  getListingKaupetCodeById,
   republishListing,
   saveDraftListing,
   updateListingStatus,
@@ -147,6 +152,8 @@ beforeEach(() => {
   db.rpc.mockReset();
   db.inserts = [];
   db.updates.mockReset();
+  db.tableErrors = {};
+  db.tableData = {};
   assertUserNotRateLimited.mockReset().mockResolvedValue(undefined);
 });
 
@@ -282,6 +289,32 @@ describe("organization listing creation authorization (SEC-07)", () => {
       }
     },
   );
+
+  it("melder konflikt når annonsen endres mellom kontroll og republisering", async () => {
+    db.listing = {
+      id: "00000000-0000-0000-0000-000000000014",
+      seller_id: "user-id",
+      organization_id: null,
+      organization_location_id: null,
+      status: "archived",
+      title: "Gyldig annonsetittel",
+      description: "Dette er en gyldig annonsebeskrivelse.",
+      condition: "good",
+      can_ship: false,
+      postal_code: "0123",
+      city: "Oslo",
+      is_free: true,
+      price_nok: null,
+      category_id: categoryId,
+      attributes: {},
+      updated_at: "2026-01-01T00:00:00Z",
+    };
+    db.updateResult = null;
+
+    await expect(republishListing({ data: { id: db.listing.id as string } })).rejects.toMatchObject(
+      { status: 409 },
+    );
+  });
 
   it("fails closed when the authoritative permission RPC errors", async () => {
     setOrganization("superuser");
@@ -552,3 +585,155 @@ describe("atomic draft publication (CRE-30..33)", () => {
     expect(db.updates).not.toHaveBeenCalled();
   });
 });
+
+describe("publiseringskontroller (B8)", () => {
+  const draft = {
+    id: "00000000-0000-4000-8000-000000000031",
+    seller_id: "user-id",
+    organization_id: organizationId,
+    organization_location_id: locationId,
+    status: "draft",
+    kaupet_code: "ABC131",
+    category_id: categoryId,
+    title: "Gyldig annonsetittel",
+    description: "Dette er en gyldig annonsebeskrivelse.",
+    postal_code: "0123",
+    city: "Oslo",
+    is_free: true,
+    price_nok: null,
+    condition: "good",
+    can_ship: false,
+    attributes: {},
+  };
+
+  // KG-16-F01: can_update ga publiseringsrett uten opprettingsrett.
+  it("republisering av bedriftsutkast krever opprettingsrett", async () => {
+    setOrganization("member");
+    db.listing = draft;
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "can_update_organization_listing") return { data: true, error: null };
+      if (name === "organization_has_proff_access") return { data: true, error: null };
+      if (name === "can_create_organization_listing") return { data: false, error: null };
+      return { data: null, error: null };
+    });
+    await expect(republishListing({ data: { id: draft.id } })).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(db.updates).not.toHaveBeenCalled();
+  });
+
+  // KG-16-F02: feil ved henting av reglene ble behandlet som «ingen regler».
+  it.each(["category_filters", "categories", "category_flows"])(
+    "publiserer ikke når %s ikke kan hentes",
+    async (table) => {
+      setOrganization("superuser");
+      db.rpc.mockImplementation(async (name: string) => ({
+        data: name === "can_create_organization_listing" ? true : null,
+        error: null,
+      }));
+      db.tableErrors = { [table]: { message: "timeout" } };
+      await expect(createListing({ data: listingInput })).rejects.toThrow();
+      expect(db.inserts).toEqual([]);
+      expect(db.updates).not.toHaveBeenCalled();
+    },
+  );
+
+  // KG-16-F03: legacy-lenken ga 404 for en nylig solgt, offentlig annonse.
+  it("legacy-lenken finner en solgt annonse som fortsatt er offentlig", async () => {
+    db.listing = { kaupet_code: "SOLGT1", status: "sold", sold_at: new Date().toISOString() };
+    db.rpc.mockResolvedValue({ data: true, error: null });
+    expect(await getListingKaupetCodeById({ data: { listing_id: draft.id } })).toEqual({
+      kaupet_code: "SOLGT1",
+    });
+    expect(db.rpc).toHaveBeenCalledWith("listing_is_public", {
+      _status: "sold",
+      _sold_at: db.listing.sold_at,
+    });
+  });
+
+  it("legacy-lenken skjuler en annonse som ikke lenger er offentlig", async () => {
+    db.listing = { kaupet_code: "GAMMEL", status: "sold", sold_at: "2020-01-01T00:00:00Z" };
+    db.rpc.mockResolvedValue({ data: false, error: null });
+    expect(await getListingKaupetCodeById({ data: { listing_id: draft.id } })).toEqual({
+      kaupet_code: null,
+    });
+  });
+});
+
+// KG-27-F02 (B16b): et ikke-numerisk tallfelt stoppet senere søk for alle.
+it("avviser et ikke-numerisk tallattributt før publisering", async () => {
+  setOrganization("superuser");
+  db.rpc.mockImplementation(async (name: string) => ({
+    data: name === "can_create_organization_listing" ? true : null,
+    error: null,
+  }));
+  db.tableData = {
+    category_filters: [
+      {
+        id: "f1",
+        category_id: categoryId,
+        key: "horsepower",
+        label_nb: "Hestekrefter",
+        type: "range",
+        sort_order: 0,
+      },
+    ],
+    categories: [{ id: categoryId, parent_id: null }],
+    category_flows: [],
+  };
+  await expect(
+    createListing({ data: { ...listingInput, attributes: { horsepower: "oops" } } }),
+  ).rejects.toMatchObject({ status: 400, message: "Hestekrefter må være et tall." });
+  expect(db.inserts).toEqual([]);
+});
+
+it.each(["create", "republish"])(
+  "%s normaliserer eldre tallstrenger før validering og lagring",
+  async (operation) => {
+    setOrganization("superuser");
+    db.rpc.mockImplementation(async (name: string) => ({
+      data: [
+        "can_create_organization_listing",
+        "can_update_organization_listing",
+        "organization_has_proff_access",
+      ].includes(name)
+        ? true
+        : null,
+      error: null,
+    }));
+    db.tableData = {
+      category_filters: [
+        {
+          id: "f1",
+          category_id: categoryId,
+          key: "width_cm",
+          label_nb: "Bredde",
+          type: "number",
+          sort_order: 0,
+        },
+      ],
+      categories: [{ id: categoryId, parent_id: null }],
+      category_flows: [],
+    };
+    const attributes = { width_cm: "40", brand: "2020" };
+    if (operation === "create") {
+      await createListing({ data: { ...listingInput, attributes } });
+      expect(db.inserts.find((row) => row.table === "listings")?.value).toMatchObject({
+        attributes: { width_cm: 40, brand: "2020" },
+      });
+    } else {
+      db.listing = {
+        ...listingInput,
+        id: categoryId,
+        seller_id: "user-id",
+        organization_id: organizationId,
+        status: "draft",
+        attributes,
+      };
+      await republishListing({ data: { id: categoryId } });
+      expect(db.updates).toHaveBeenCalledWith(
+        expect.objectContaining({ attributes: { width_cm: 40, brand: "2020" }, status: "active" }),
+      );
+    }
+  },
+);

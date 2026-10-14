@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { ArrowLeft, Building2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import type { ProffOrganizationPresentation } from "@/components/listing-detail/
 import { supabase } from "@/integrations/supabase/client";
 import { toListingCardData } from "@/lib/listing-card-data";
 import { organizationLogoUrl } from "@/lib/organization-logo-url";
+
+const PAGE_SIZE = 24;
 
 export const Route = createFileRoute("/bedrift/$organizationId")({
   loader: async ({ params }) => {
@@ -54,9 +57,13 @@ export const Route = createFileRoute("/bedrift/$organizationId")({
 
 function OrganizationListingsPage() {
   const organization = Route.useLoaderData();
-  const listingsQuery = useQuery({
+  // Siden hentes én side om gangen (KG-06-F02): en stor forhandler skal ikke
+  // laste ned alle annonsene sine før noe vises.
+  const listingsQuery = useInfiniteQuery({
     queryKey: ["organization-listings-page", organization.id],
-    queryFn: async () => {
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: { nextOffset: number | null }) => lastPage.nextOffset ?? undefined,
+    queryFn: async ({ pageParam }) => {
       const { data, error } = await supabase
         .from("listings")
         .select(
@@ -64,13 +71,20 @@ function OrganizationListingsPage() {
         )
         .eq("organization_id", organization.id)
         .eq("status", "active")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(pageParam, pageParam + PAGE_SIZE - 1);
       if (error) throw error;
-      return (data ?? []).map((row) =>
+      const rows = (data ?? []).map((row) =>
         toListingCardData(row as Parameters<typeof toListingCardData>[0]),
       );
+      return { rows, nextOffset: rows.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null };
     },
   });
+  const listings = useMemo(
+    () => listingsQuery.data?.pages.flatMap((page) => page.rows) ?? [],
+    [listingsQuery.data],
+  );
 
   const brand: ProffOrganizationPresentation = {
     id: organization.id,
@@ -113,12 +127,26 @@ function OrganizationListingsPage() {
           <p role="alert" className="mt-6 text-sm text-destructive">
             Kunne ikke laste bedriftens annonser. Prøv igjen senere.
           </p>
-        ) : listingsQuery.data.length ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {listingsQuery.data.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
-          </div>
+        ) : listings.length ? (
+          <>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {listings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
+            {listingsQuery.hasNextPage && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void listingsQuery.fetchNextPage()}
+                  disabled={listingsQuery.isFetchingNextPage}
+                >
+                  {listingsQuery.isFetchingNextPage ? "Laster …" : "Last inn flere annonser"}
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <p className="mt-6 text-sm text-muted-foreground">
             Bedriften har ingen aktive annonser akkurat nå.

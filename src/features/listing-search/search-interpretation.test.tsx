@@ -79,4 +79,44 @@ describe("SearchInterpretation", () => {
     fireEvent.click(getByRole("button", { name: /Fjern Under .*søket/ }));
     expect(onPriceRemove).toHaveBeenCalledWith("under 300000kr");
   });
+
+  // KG-28-F03: fjerning av «Utstyr: Kamera, Soltak» fjernet bare kamera.
+  it("fjerner hele det samlede kriteriet brikken viser", () => {
+    const onAttributeRemove = vi.fn();
+    const { getByRole } = render(
+      <SearchInterpretation
+        criteria={[
+          {
+            kind: "attribute",
+            key: "equipment",
+            value: { kind: "multiselect", values: ["camera", "roof"] },
+            source: "text",
+            matchedText: "kamera soltak",
+          },
+        ]}
+        categories={[]}
+        filters={[
+          {
+            ...filter,
+            key: "equipment",
+            label_nb: "Utstyr",
+            type: "multiselect",
+            options: [
+              { value: "camera", label_nb: "Kamera" },
+              { value: "roof", label_nb: "Soltak" },
+            ],
+          },
+        ]}
+        onCategoryChange={vi.fn()}
+        onAttributeChange={vi.fn()}
+        onAttributeRemove={onAttributeRemove}
+      />,
+    );
+    fireEvent.click(getByRole("button", { name: "Fjern Utstyr: Kamera, Soltak fra søket" }));
+    expect(onAttributeRemove).toHaveBeenCalledWith(
+      "equipment",
+      ["camera", "roof"],
+      "kamera soltak",
+    );
+  });
 });

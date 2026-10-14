@@ -437,3 +437,70 @@ describe("syncListings", () => {
     });
   });
 });
+
+// KG-08-F01: MCP-standarden «nytt utkast» ble avvist av den delte synkvalideringen.
+describe("syncListings — utkast via MCP", () => {
+  const draftRow = () => makeRow({ status: "draft" as BulkImportRow["status"] });
+
+  it("oppretter ny annonse som utkast når allowDraftStatus er satt", async () => {
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: () => ({ data: { status: "created", listing_id: "listing-1" }, error: null }),
+    });
+    const [result] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+      allowDraftStatus: true,
+    });
+    expect(result.status).toBe("created");
+    const rpcArgs = (supabaseAdmin.rpc as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(rpcArgs._listing.status).toBe("draft");
+  });
+
+  it("avviser fortsatt utkast for REST/Excel og for eksisterende referanser", async () => {
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["external-1"],
+      rpcImpl: () => ({ data: { status: "updated", listing_id: "listing-1" }, error: null }),
+    });
+    const [rest] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+    });
+    const [existing] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+      allowDraftStatus: true,
+    });
+    expect(rest.status).toBe("failed");
+    expect(existing.status).toBe("failed");
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalled();
+  });
+});
+
+it.each(["40", "oops"])("synk validerer og normaliserer tallfeltet %j før RPC", async (width) => {
+  const ctx = makeContext();
+  ctx.filters = [
+    {
+      id: "f1",
+      category_id: categoryId,
+      key: "width_cm",
+      label_nb: "Bredde",
+      type: "number",
+      sort_order: 0,
+    } as SyncContext["filters"][number],
+  ];
+  const admin = makeSupabaseAdmin({
+    rpcImpl: (_name, args) => {
+      expect(args._listing).toMatchObject({ attributes: { width_cm: 40, brand: "2020" } });
+      return { data: { status: "created", listing_id: "listing-1" }, error: null };
+    },
+  });
+  const result = await syncListings(admin, ctx, {
+    importId,
+    mode: "create",
+    rows: [makeRow({ attributes: { width_cm: width, brand: "2020" } })],
+  });
+  expect(result[0].status).toBe(width === "40" ? "created" : "failed");
+});

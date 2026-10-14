@@ -82,6 +82,32 @@ function daysLeft(expires_at: string | null): number | null {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+type RowActions = {
+  onPromote: () => void;
+  onMarkSold: () => void;
+  onReactivate: () => void;
+  onRepublish: () => void;
+  onPublishDraft: () => void;
+  onDelete: () => void;
+};
+
+type ListingRowProps = {
+  row: Row;
+  /** Whether the listing's category is under Bil og MC — gates the native-only
+   * "legg til 360°-opptak"-action (draft/active rows only). */
+  isVehicle: boolean;
+  activePromotion: { expires_at: string | null; is_gift: boolean } | null;
+  busy: boolean;
+  /** Render only the listing link in console surfaces. */
+  readOnly?: boolean;
+} & (
+  | ({ editOnly?: false } & RowActions)
+  | ({
+      /** Bare «Rediger»: status og sletting håndteres i annonsens redigeringsvisning. */
+      editOnly: true;
+    } & { [K in keyof RowActions]?: never })
+);
+
 export function ListingRow({
   row,
   isVehicle,
@@ -94,22 +120,8 @@ export function ListingRow({
   onDelete,
   busy,
   readOnly = false,
-}: {
-  row: Row;
-  /** Whether the listing's category is under Bil og MC — gates the native-only
-   * "legg til 360°-opptak"-action (draft/active rows only). */
-  isVehicle: boolean;
-  activePromotion: { expires_at: string | null; is_gift: boolean } | null;
-  onPromote: () => void;
-  onMarkSold: () => void;
-  onReactivate: () => void;
-  onRepublish: () => void;
-  onPublishDraft: () => void;
-  onDelete: () => void;
-  busy: boolean;
-  /** Render only the listing link in console surfaces. */
-  readOnly?: boolean;
-}) {
+  editOnly = false,
+}: ListingRowProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const native = useIsNative();
   const promotionAllowed = useNativePromotionAllowed();
@@ -230,7 +242,19 @@ export function ListingRow({
             size="icon"
           />
         )}
-        {!readOnly && (
+        {!readOnly && editOnly && (
+          <Button size="icon" variant="ghost" className="shrink-0" asChild>
+            <Link
+              to="/$kaupetCode"
+              params={{ kaupetCode: row.kaupet_code }}
+              search={{ edit: true }}
+              aria-label="Rediger"
+            >
+              <Pencil className="size-5" />
+            </Link>
+          </Button>
+        )}
+        {!readOnly && !editOnly && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -263,7 +287,7 @@ export function ListingRow({
                   <DropdownMenuItem
                     onClick={() => {
                       void hapticImpact("medium");
-                      onMarkSold();
+                      onMarkSold?.();
                     }}
                   >
                     <CheckCircle2 className="size-4" /> Marker som solgt
@@ -298,7 +322,7 @@ export function ListingRow({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {!readOnly && deleteDialog}
+        {!readOnly && !editOnly && deleteDialog}
       </li>
     );
   }
@@ -350,7 +374,7 @@ export function ListingRow({
               <Pencil className="size-4" /> Rediger
             </Button>
           </Link>
-          {row.status === "active" ? (
+          {editOnly ? null : row.status === "active" ? (
             <>
               {activePromotion ? (
                 <Button
@@ -385,36 +409,38 @@ export function ListingRow({
               <RotateCcw className="size-4" /> Reaktiver
             </Button>
           )}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-destructive"
-                disabled={busy}
-                aria-label="Slett"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Slette annonsen?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Dette kan ikke angres. Annonsen «{row.title}» blir fjernet permanent.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={onDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          {!editOnly && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive"
+                  disabled={busy}
+                  aria-label="Slett"
                 >
-                  Slett
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <Trash2 className="size-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Slette annonsen?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Dette kan ikke angres. Annonsen «{row.title}» blir fjernet permanent.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={onDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Slett
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       )}
     </li>

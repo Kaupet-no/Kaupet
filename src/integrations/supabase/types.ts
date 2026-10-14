@@ -3710,6 +3710,13 @@ export type Database = {
           cnt: number
         }[]
       }
+      listing_is_public: {
+        Args: {
+          _sold_at: string | null
+          _status: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: boolean
+      }
       listing_matches_attribute_filters: {
         Args: { _attributes: Json; _filters: Json }
         Returns: boolean

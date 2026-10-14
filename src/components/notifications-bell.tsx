@@ -5,7 +5,7 @@ import { Bell, CheckCheck, ChevronRight, ShieldAlert, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { useUnreadSystemMessagesCount } from "@/hooks/use-unread";
+import { useUnreadNotificationsCount, useUnreadSystemMessagesCount } from "@/hooks/use-unread";
 import { NotificationItemContent } from "@/components/notification-item-content";
 import { useIsNative } from "@/hooks/use-is-native";
 import { Button } from "@/components/ui/button";
@@ -123,11 +123,13 @@ export function NotificationsBell() {
   // er nettets eneste inngang dit, så de telles med i badgen her — samme
   // regel som Meg-fanen i appen.
   const unreadSystem = useUnreadSystemMessagesCount();
+  // Full telling, ikke bare de 30 i forhåndsvisningen (KG-25-F02) — samme
+  // tall som Meg-fanen.
+  const unread = useUnreadNotificationsCount();
 
   if (!user) return null;
 
   const notifications = data ?? [];
-  const unread = notifications.filter((n) => !n.read_at).length;
   const badgeCount = unread + unreadSystem;
 
   const handleMarkAllRead = async () => {

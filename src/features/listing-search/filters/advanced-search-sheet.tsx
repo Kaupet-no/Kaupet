@@ -1,3 +1,5 @@
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { ActiveFilters } from "./active-filters";
 import { useMemo, useState } from "react";
 import { ChevronDown, X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
@@ -21,9 +23,11 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { ModeToggle } from "@/features/listing-search/filters/search-term-mode-toggle";
 import { TermGroupEditor } from "@/features/listing-search/filters/term-group-editor";
-import { type Category } from "@/lib/categories";
+import { buildTree, type Category } from "@/lib/categories";
+import { effectiveFiltersForCategories, retainSearchAttributes } from "@/lib/category-filters";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
+import { useRetainCategoryAttributes } from "@/features/listing-search/use-retain-category-attributes";
 import {
   buildAdvancedSearchCriteria,
   mergeAdvancedSearchGroups,
@@ -72,6 +76,17 @@ export function AdvancedSearchSheet({
 }: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
+  const { data: allFilters } = useAllCategoryFilters();
+  const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
+  const attributeFilters = useMemo(() => {
+    if (!v.categories.length) return allFilters ?? [];
+    const tree = buildTree(categories);
+    return effectiveFiltersForCategories(
+      v.categories.map((slug) => tree.bySlug.get(slug)?.id).filter((id): id is string => !!id),
+      allFilters ?? [],
+      tree.byId,
+    );
+  }, [allFilters, categories, v.categories]);
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
@@ -207,7 +222,50 @@ export function AdvancedSearchSheet({
             <CategorySlugPicker
               categories={categories}
               selected={v.categories}
-              onChange={(slugs) => setV({ ...v, categories: slugs, catMode: "any" })}
+              // Attributter de nye kategoriene ikke har, fjernes (KG-29-F01).
+              onChange={(slugs) =>
+                setV({
+                  ...v,
+                  categories: slugs,
+                  catMode: "any",
+                  attributes: changeCategories(v.categories, slugs, v.attributes ?? {}),
+                })
+              }
+            />
+
+            {categoryNotice.length > 0 && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {categoryNotice.join(", ")} ble fjernet ved kategoribyttet.
+              </p>
+            )}
+            <ActiveFilters
+              search={{ q: "", qMode: v.qMode, extraGroups: [] }}
+              terms={[]}
+              onUpdate={() => {}}
+              attrFilters={attributeFilters}
+              attrValues={v.attributes}
+              onRemoveAttr={(key, value) => {
+                setV((previous) => {
+                  const attributes = { ...previous.attributes };
+                  const current = attributes[key];
+                  if (
+                    value !== undefined &&
+                    (current?.kind === "multiselect" || current?.kind === "exclude")
+                  ) {
+                    const values = current.values.filter((item) => item !== value);
+                    if (values.length) attributes[key] = { ...current, values };
+                    else delete attributes[key];
+                  } else {
+                    delete attributes[key];
+                  }
+                  return {
+                    ...previous,
+                    attributes: allFilters
+                      ? retainSearchAttributes(attributes, attributeFilters).kept
+                      : attributes,
+                  };
+                });
+              }}
             />
 
             {/* Pris */}

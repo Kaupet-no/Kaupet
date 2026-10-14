@@ -730,20 +730,14 @@ export function SearchResultsPage({
                 );
                 removeAttrWithRestore(key, undefined, criterion?.matchedText);
               }}
-              onAttributeRemove={(key, value, matchedText) => {
+              onAttributeRemove={(key, values, matchedText) => {
                 const criterion = interpretedCriteria.find(
-                  (item) =>
-                    item.kind === "attribute" &&
-                    item.key === key &&
-                    (value == null ||
-                      (item.value.kind === "multiselect" || item.value.kind === "exclude"
-                        ? item.value.values.includes(value)
-                        : true)),
+                  (item) => item.kind === "attribute" && item.key === key,
                 );
                 setInterpretedCriteria((previous) =>
                   previous.filter((item) => item.kind !== "attribute" || item.key !== key),
                 );
-                removeAttrWithRestore(key, value, matchedText ?? criterion?.matchedText);
+                removeAttrWithRestore(key, values, matchedText ?? criterion?.matchedText);
               }}
               onPriceRemove={(matchedText) => {
                 setInterpretedCriteria((previous) =>

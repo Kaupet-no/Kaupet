@@ -118,6 +118,7 @@ describe("upsert_listing — utkast-default", () => {
   });
 
   it("publish: true gir en aktiv (publisert) annonse", async () => {
+    getListingApi.mockRejectedValue(notFound);
     upsertListingApi.mockResolvedValue({
       importId: "imp-1",
       status: "created",
@@ -133,12 +134,33 @@ describe("upsert_listing — utkast-default", () => {
       price: 1000,
       publish: true,
     });
-    // publish:true skal ikke trenge å sjekke om annonsen finnes fra før.
-    expect(getListingApi).not.toHaveBeenCalled();
     expect(upsertListingApi).toHaveBeenCalledWith(
       expect.objectContaining({ body: expect.objectContaining({ status: "active" }) }),
     );
     expect(result.text).toMatch(/publisert/);
+  });
+
+  // KG-08-F02: publish gjelder bare nye annonser.
+  it("publish: true på en solgt annonse beholder statusen", async () => {
+    getListingApi.mockResolvedValue({ externalRef: "SKU-5", status: "sold" });
+    upsertListingApi.mockResolvedValue({
+      importId: "imp-1",
+      status: "updated",
+      externalRef: "SKU-5",
+      listingId: "l5",
+    });
+    const { findMcpTool } = await import("./mcp-tools");
+    await findMcpTool("upsert_listing")!.execute(auth(), {
+      externalRef: "SKU-5",
+      category: "sykler",
+      title: "En fin sykkel",
+      description: "En beskrivelse på minst tjue tegn.",
+      price: 1000,
+      publish: true,
+    });
+    expect(upsertListingApi).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.not.objectContaining({ status: expect.anything() }) }),
+    );
   });
 
   it("en EKSISTERENDE annonse beholder status uendret når status ikke er gitt eksplisitt", async () => {

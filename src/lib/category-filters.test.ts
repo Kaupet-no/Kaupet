@@ -6,6 +6,8 @@ import {
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
+  normalizeNumericAttributes,
+  findNonNumericAttribute,
   retainSearchAttributes,
   NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
@@ -275,7 +277,12 @@ describe("applyAttributeFilters", () => {
 describe("retainSearchAttributes", () => {
   const brand = f({ category_id: "main", key: "brand", type: "brand_select" });
   const model = f({ category_id: "main", key: "model", type: "model_select" });
-  const motor = f({ category_id: "main", key: "motor", type: "select" });
+  const motor = f({
+    category_id: "main",
+    key: "motor",
+    type: "select",
+    options: [{ value: "uten_motor", label_nb: "Uten motor" }],
+  });
   const hp = f({
     category_id: "main",
     key: "hp",
@@ -283,9 +290,72 @@ describe("retainSearchAttributes", () => {
     depends_on_key: "motor",
     depends_on_not_value: "uten_motor",
   });
-  const color = f({ category_id: "main", key: "color" });
+  const color = f({
+    category_id: "main",
+    key: "color",
+    options: [{ value: "rod", label_nb: "Rød" }],
+  });
   const filters = [brand, model, motor, hp, color];
   const range: AttributeFilterValue = { kind: "range", min: 100 };
+
+  it.each([
+    { kind: "select", value: "diesel" },
+    { kind: "multiselect", values: ["gass", "diesel"] },
+    { kind: "exclude", values: ["diesel"] },
+  ] as AttributeFilterValue[])("drops an option absent from the new category ($kind)", (value) => {
+    const fuel = f({
+      category_id: "other",
+      key: "fuel_type",
+      options: [{ value: "gass", label_nb: "Gass" }],
+    });
+    expect(retainSearchAttributes({ fuel_type: value }, [fuel], { dropUnknown: true })).toEqual({
+      kept: {},
+      dropped: ["fuel_type"],
+    });
+  });
+
+  it.each([
+    { kind: "select", value: "gass" },
+    { kind: "multiselect", values: ["gass"] },
+    { kind: "exclude", values: ["gass"] },
+  ] as AttributeFilterValue[])("keeps valid options in the new category ($kind)", (value) => {
+    const fuel = f({
+      category_id: "other",
+      key: "fuel_type",
+      options: [{ value: "gass", label_nb: "Gass" }],
+    });
+    expect(
+      retainSearchAttributes({ fuel_type: value }, [fuel], { dropUnknown: true }).kept,
+    ).toEqual({ fuel_type: value });
+  });
+
+  it("keeps reference-table brand and model values without static options", () => {
+    const values: Record<string, AttributeFilterValue> = {
+      brand: { kind: "select", value: "Volvo" },
+      model: { kind: "select", value: "XC60" },
+      hp: range,
+    };
+    expect(
+      retainSearchAttributes(values, [brand, model, { ...hp, depends_on_key: null }], {
+        dropUnknown: true,
+      }).kept,
+    ).toEqual(values);
+  });
+
+  it("drops dependencies after removing an invalid option, regardless of key order", () => {
+    const fuel = f({
+      category_id: "other",
+      key: "motor",
+      options: [{ value: "gass", label_nb: "Gass" }],
+    });
+    expect(
+      retainSearchAttributes(
+        { hp: range, motor: { kind: "select", value: "diesel" } },
+        [fuel, { ...hp, depends_on_value: "diesel", depends_on_not_value: null }],
+        { dropUnknown: true },
+      ).kept,
+    ).toEqual({});
+  });
 
   it("drops Modell once Merke is cleared", () => {
     const { kept, dropped } = retainSearchAttributes(
@@ -319,5 +389,62 @@ describe("retainSearchAttributes", () => {
       { dropUnknown: true },
     );
     expect(Object.keys(kept)).toEqual(["color"]);
+  });
+});
+
+describe("normalisering av tallattributter (ekvivalensklasser)", () => {
+  const filters = [f({ category_id: "main", key: "year", type: "number" })];
+
+  it.each([
+    ["2020", 2020],
+    ["0", 0],
+    ["-12.5", -12.5],
+    ["150 000", 150000],
+    ["1\u00a0500", 1500],
+    ["12,5", 12.5],
+    ["12,50", 12.5],
+    ["1234,567", 1234.567],
+    [2020, 2020],
+  ])("normaliserer gyldig tall %j til %j", (year, expected) => {
+    const attributes = { year, brand: "2020" };
+    const normalized = normalizeNumericAttributes("sub", filters, byId, attributes);
+    expect(normalized).toEqual({ year: expected, brand: "2020" });
+    expect(attributes.year).toBe(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)).toBeNull();
+  });
+
+  it.each([
+    "",
+    "oops",
+    "12,500",
+    "-1,500",
+    "150.000",
+    "-1.500",
+    "æøå😀",
+    "0x10",
+    "Infinity",
+    "9".repeat(400),
+    true,
+    ["2020"],
+  ])("lar ugyldig tall %j bli avvist av valideringen", (year) => {
+    const normalized = normalizeNumericAttributes("sub", filters, byId, { year });
+    expect(normalized.year).toEqual(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)?.key).toBe("year");
+  });
+
+  it.each([null, undefined])("beholder et usatt valgfritt felt %j", (year) => {
+    const normalized = normalizeNumericAttributes("sub", filters, byId, { year });
+    expect(normalized.year).toBe(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)).toBeNull();
+  });
+
+  it("respekterer barnets filtertype og ignorerer andre kategorier", () => {
+    const overridden = [...filters, f({ category_id: "sub", key: "year", type: "select" })];
+    expect(normalizeNumericAttributes("sub", overridden, byId, { year: "2020" })).toEqual({
+      year: "2020",
+    });
+    expect(normalizeNumericAttributes("other", filters, byId, { year: "2020" })).toEqual({
+      year: "2020",
+    });
   });
 });

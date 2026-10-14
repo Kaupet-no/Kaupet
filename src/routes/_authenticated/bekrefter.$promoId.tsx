@@ -34,6 +34,8 @@ function ConfirmPage() {
   const attemptsRef = useRef(0);
   const navigatedRef = useRef(false);
   const [hardFailed, setHardFailed] = useState(false);
+  // Øker ved «Prøv igjen» så effekten starter en ny avstemmingsrunde.
+  const [round, setRound] = useState(0);
 
   const mutation = useMutation({
     mutationFn: () => reconcile({ data: { promotion_id: promoId } }),
@@ -52,6 +54,8 @@ function ConfirmPage() {
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    attemptsRef.current = 0;
+    navigatedRef.current = false;
 
     const tick = async () => {
       attemptsRef.current += 1;
@@ -89,7 +93,7 @@ function ConfirmPage() {
       if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promoId]);
+  }, [promoId, round]);
 
   if (hardFailed) {
     return (
@@ -103,10 +107,9 @@ function ConfirmPage() {
           <Button
             variant="outline"
             onClick={() => {
-              attemptsRef.current = 0;
               setHardFailed(false);
               mutation.reset();
-              void router.invalidate();
+              setRound((r) => r + 1);
             }}
           >
             Prøv igjen

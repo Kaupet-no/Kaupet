@@ -49,6 +49,7 @@ export const Route = createFileRoute("/api/public/images/process")({
           customerFailed: 0,
           retryPending: 0,
           internalFailed: 0,
+          stale: 0,
         };
 
         // Sekvensielt, ikke parallelt: hver jobb gjør et eksternt
@@ -69,6 +70,9 @@ export const Route = createFileRoute("/api/public/images/process")({
               break;
             case "internal_failed":
               summary.internalFailed += 1;
+              break;
+            case "stale":
+              summary.stale += 1;
               break;
           }
         }

@@ -161,27 +161,21 @@ const PrefsSchema = z.object({
   email_wtb_matches: z.boolean(),
 });
 
+// Delvis oppdatering: utelatte felt beholder lagret verdi (eller
+// databasens standard for en ny rad). Push-prompten endrer bare én
+// varseltype og skal ikke måtte kjenne de øvrige (KG-25-F01).
+const PrefsPatchSchema = PrefsSchema.partial().refine((patch) => Object.keys(patch).length > 0, {
+  message: "Ingen innstillinger å lagre.",
+});
+
 export const updateNotificationPreferences = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => PrefsSchema.parse(data))
+  .validator((data: unknown) => PrefsPatchSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { error } = await supabase.from("notification_preferences").upsert(
-      {
-        user_id: userId,
-        web_push_messages: data.web_push_messages,
-        web_push_saved_searches: data.web_push_saved_searches,
-        web_push_price_drops: data.web_push_price_drops,
-        web_push_sold: data.web_push_sold,
-        web_push_wtb_matches: data.web_push_wtb_matches,
-        email_messages: data.email_messages,
-        email_saved_searches: data.email_saved_searches,
-        email_price_drops: data.email_price_drops,
-        email_sold: data.email_sold,
-        email_wtb_matches: data.email_wtb_matches,
-      },
-      { onConflict: "user_id" },
-    );
+    const { error } = await supabase
+      .from("notification_preferences")
+      .upsert({ user_id: userId, ...data }, { onConflict: "user_id" });
     if (error) {
       throw await toClientError("database", error);
     }

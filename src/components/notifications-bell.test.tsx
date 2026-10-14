@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NotificationsBell } from "./notifications-bell";
 
 let unreadSystem = 0;
+let unreadNotifications = 0;
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, ...props }: React.ComponentProps<"a"> & { to: string }) => (
@@ -20,7 +21,10 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/hooks/use-is-native", () => ({ useIsNative: () => false }));
-vi.mock("@/hooks/use-unread", () => ({ useUnreadSystemMessagesCount: () => unreadSystem }));
+vi.mock("@/hooks/use-unread", () => ({
+  useUnreadSystemMessagesCount: () => unreadSystem,
+  useUnreadNotificationsCount: () => unreadNotifications,
+}));
 vi.mock("@/lib/notifications", () => ({
   listEnrichedNotifications: async () => ({ items: [], hasMore: false }),
   markAllNotificationsRead: vi.fn(),
@@ -36,6 +40,7 @@ vi.mock("@/integrations/supabase/client", () => {
 afterEach(() => {
   cleanup();
   unreadSystem = 0;
+  unreadNotifications = 0;
 });
 
 function renderBell() {
@@ -78,4 +83,11 @@ describe("NotificationsBell – meldinger fra Kaupet-teamet", () => {
     await screen.findByText(/Ingen varsler ennå/);
     expect(screen.queryByRole("link", { name: /Kaupet-teamet/ })).toBeNull();
   });
+});
+
+// KG-25-F02: badgen telte bare uleste blant de 30 som forhåndsvises.
+it("teller alle uleste varsler, også utenfor forhåndsvisningen", async () => {
+  unreadNotifications = 31;
+  renderBell();
+  expect(await screen.findByRole("button", { name: "Varsler, 31 uleste" })).toBeTruthy();
 });

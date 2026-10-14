@@ -163,7 +163,9 @@ jobs:
           exit 1
 
       - name: Test database transactions
-        run: bunx supabase test db
+        run: |
+          bunx supabase test db
+          bun run test:db-migration
 
       - name: Run RLS integration tests
         run: bun run test:rls

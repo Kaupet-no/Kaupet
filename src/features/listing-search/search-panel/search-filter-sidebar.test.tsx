@@ -25,6 +25,10 @@ vi.mock("@/lib/native", () => ({
   checkLocationPermission: async () => "prompt",
 }));
 vi.mock("@/lib/product-analytics", () => ({ trackProductEvent: () => {} }));
+vi.mock("@/hooks/use-category-filters", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useAllCategoryFilters: () => ({ data: [] }),
+}));
 
 class ResizeObserverMock {
   observe() {}
@@ -60,6 +64,7 @@ describe("SearchFilterSidebar", () => {
 
     expect(onApply.mock.calls[0][0].value.categories).toEqual([]);
     expect(onApply.mock.calls[0][0].attributes).toEqual({});
+    expect(getByRole("status").textContent).toContain("make");
   });
 
   it("lar brukeren fjerne et aktivt prisfilter fra oppsummeringen", () => {
@@ -212,5 +217,56 @@ describe("priceBoundsForMax", () => {
   it("bevarer aktive verdier og gir en brukbar fallback uten pris", () => {
     expect(priceBoundsForMax(null, { min: 25_000, max: 50_000 }).max).toBe(50_000);
     expect(priceBoundsForMax(null).max).toBe(1_000);
+  });
+
+  // KG-30-F01: et avhengig filter (effekt for diesel) ble stående når diesel ble fjernet.
+  it("fjerner avhengige filtre sammen med forutsetningen", () => {
+    const base = {
+      category_id: "bil",
+      unit: null,
+      options: null,
+      sort_order: 0,
+      is_primary: true,
+      depends_on_not_value: null,
+      is_optional: false,
+    };
+    const onApply = vi.fn();
+    const { getByRole } = render(
+      <SearchFilterSidebar
+        results={{
+          applied: {
+            value: { ...defaultAdvancedSearchValue(), categories: ["bil"] },
+            attributes: {
+              fuel_type: { kind: "select", value: "diesel" },
+              diesel_power: { kind: "range", min: 100 },
+            },
+          },
+          attributeFilters: [
+            {
+              ...base,
+              id: "fuel",
+              key: "fuel_type",
+              label_nb: "Drivstoff",
+              type: "select",
+              depends_on_key: null,
+              depends_on_value: null,
+            },
+            {
+              ...base,
+              id: "power",
+              key: "diesel_power",
+              label_nb: "Effekt",
+              type: "range",
+              depends_on_key: "fuel_type",
+              depends_on_value: "diesel",
+            },
+          ],
+          onApply,
+        }}
+        categories={[{ id: "bil", slug: "bil", name_nb: "Bil", parent_id: null }]}
+      />,
+    );
+    fireEvent.click(getByRole("button", { name: /^Fjern Drivstoff/ }));
+    expect(onApply.mock.calls[0][0].attributes).toEqual({});
   });
 });

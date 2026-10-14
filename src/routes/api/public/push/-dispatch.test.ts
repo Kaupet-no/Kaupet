@@ -198,6 +198,27 @@ describe("push dispatch endpoint", () => {
     expect(payload.url).toBe("/meldinger/conv-1");
   });
 
+  // KG-25-F04: serveren signerte alltid med den hardkodede produksjonsnøkkelen.
+  it("signerer med den samme byggkonfigurerte offentlige nøkkelen som klienten", async () => {
+    vi.stubEnv("VITE_VAPID_PUBLIC_KEY", "staging-public-key");
+    setAdmin(
+      buildAdmin({
+        message: { id: "m1", sender_id: "seller-1", conversation_id: "conv-1", body: "Hei" },
+        conversation: { buyer_id: "buyer-1", seller_id: "seller-1" },
+        profile: { display_name: "Kari Selger" },
+        prefs: { web_push_messages: true },
+        subs: [SUB],
+      }),
+    );
+    await postPayload({ type: "message", message_id: "11111111-1111-1111-1111-111111111111" });
+    vi.unstubAllEnvs();
+    expect(setVapidDetails).toHaveBeenCalledWith(
+      expect.any(String),
+      "staging-public-key",
+      "test-private-key",
+    );
+  });
+
   it("does not wait for a provider response body to finish", async () => {
     const cancelBody = vi.fn(() => new Promise<void>(() => {}));
     fetchMock.mockResolvedValueOnce(

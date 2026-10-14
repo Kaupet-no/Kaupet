@@ -29,10 +29,10 @@ export default defineConfig({
       ],
       // Hev tersklene etter målt dekning, se docs/TESTSTRATEGI.md § 9.
       thresholds: {
-        statements: 40,
-        branches: 34,
-        functions: 33,
-        lines: 41,
+        statements: 49,
+        branches: 42,
+        functions: 40,
+        lines: 50,
       },
     },
   },

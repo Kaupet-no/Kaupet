@@ -7,6 +7,7 @@ import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { invalidateSharedVehicleQueries } from "@/lib/reference-query-invalidation";
+import { useAllVehicleModelClasses } from "@/lib/vehicle/vehicle-brands";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,6 +132,12 @@ function VehicleBrandsCrud() {
     queryFn: () => listFn() as Promise<Row[]>,
   });
 
+  // Klassene hentes for seg: admin-RPC-en finner dem bare via modellene, så
+  // en ny klasse uten modeller kunne aldri velges til sin første modell
+  // (KG-11-F02). Delt, paginert spørring som invalidateSharedVehicleQueries
+  // oppdaterer.
+  const { data: approvedClasses } = useAllVehicleModelClasses();
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin-vehicle-brands-with-models"] });
     invalidateSharedVehicleQueries(qc);
@@ -167,14 +174,11 @@ function VehicleBrandsCrud() {
   // grupperer da modellene rett under merket, uendret fra i dag.
   const classesForBrand: ModelClass[] = useMemo(() => {
     if (!selectedBrand) return [];
-    const byId = new Map<string, ModelClass>();
-    for (const r of rows ?? []) {
-      if (r.brand_id === selectedBrand.id && r.class_id && r.class_name) {
-        byId.set(r.class_id, { id: r.class_id, name: r.class_name });
-      }
-    }
-    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "nb-NO"));
-  }, [rows, selectedBrand]);
+    return (approvedClasses ?? [])
+      .filter((c) => c.brand_id === selectedBrand.id)
+      .map((c) => ({ id: c.id, name: c.name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "nb-NO"));
+  }, [approvedClasses, selectedBrand]);
 
   const deleteBrand = ({ id, onDone }: { id: string; onDone: () => void }) => {
     deleteBrandFn({ data: { id } })

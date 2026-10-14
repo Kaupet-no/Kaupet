@@ -1,7 +1,12 @@
 import type { HistoryState } from "@tanstack/react-router";
 import { defaultAdvancedSearchValue } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
-import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
+import {
+  effectiveFiltersForCategory,
+  retainSearchAttributes,
+  type CategoryFilter,
+  type VehicleBrandGroup,
+} from "@/lib/category-filters";
 import { resolveTextToFilters, type InterpretedCriterion } from "./resolve-text-to-filters";
 import {
   writeAppliedSearchState,
@@ -46,23 +51,54 @@ export async function resolveAppliedSearch({
     criteria: [],
   }));
 
+  // Kategorien som brukes og den som vises i «Tolket som» må samsvare
+  // (KG-28-F04): et kategoriord som ikke allerede er valgt erstatter de
+  // valgte kategoriene, og attributter som ikke finnes der fjernes. Er
+  // ordet en overkategori av alle valg («bil» med «Elbil» valgt), er valget
+  // allerede smalere: det beholdes, og kategoritolkningen utelates.
+  const selected = applied.value.categories;
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const bySlug = new Map(categories.map((category) => [category.slug, category]));
+  const textCategory = resolved.categorySlug ? bySlug.get(resolved.categorySlug) : undefined;
+  const coversSelection =
+    !!textCategory &&
+    selected.length > 0 &&
+    selected.every((slug) => {
+      for (let c = bySlug.get(slug); c; c = c.parent_id ? byId.get(c.parent_id) : undefined) {
+        if (c.id === textCategory.id) return true;
+      }
+      return false;
+    });
+  const replacedCategory = selected.length > 0 && !coversSelection ? textCategory : undefined;
+  const previousAttributes = replacedCategory
+    ? retainSearchAttributes(
+        applied.attributes,
+        effectiveFiltersForCategory(replacedCategory.id, allFilters, byId),
+        { dropUnknown: true },
+      ).kept
+    : applied.attributes;
+  const criteria = coversSelection
+    ? resolved.criteria.filter((criterion) => criterion.kind !== "category")
+    : resolved.criteria;
+
   return {
     applied: {
       value: {
         ...applied.value,
         terms: resolved.q.split(/\s+/).filter(Boolean),
-        categories:
-          applied.value.categories.length > 0
-            ? applied.value.categories
+        categories: replacedCategory
+          ? [replacedCategory.slug]
+          : selected.length > 0
+            ? selected
             : resolved.categorySlug
               ? [resolved.categorySlug]
               : [],
         min: resolved.minPrice ?? applied.value.min,
         max: resolved.maxPrice ?? applied.value.max,
       },
-      attributes: { ...applied.attributes, ...resolved.attrPatch },
+      attributes: { ...previousAttributes, ...resolved.attrPatch },
     },
-    criteria: resolved.criteria,
+    criteria,
   };
 }
 

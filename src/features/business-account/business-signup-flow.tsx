@@ -215,7 +215,10 @@ export function BusinessSignupFlow({
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: submittedEmail,
-        options: { emailRedirectTo: `${webOrigin()}/bekreft-epost` },
+        options: {
+          emailRedirectTo: `${webOrigin()}/bekreft-epost`,
+          captchaToken: (await getCaptchaToken()) ?? undefined,
+        },
       });
       if (error) throw error;
       resendCooldown.startCooldown();
@@ -223,6 +226,7 @@ export function BusinessSignupFlow({
     } catch (error: unknown) {
       setStepError(formatErrorMessage(error, "Kunne ikke sende e-post. Prøv igjen."));
     } finally {
+      turnstileRef.current?.reset();
       setResendLoading(false);
     }
   };
@@ -246,6 +250,13 @@ export function BusinessSignupFlow({
           <p role="alert" className="text-sm text-destructive">
             {stepError}
           </p>
+        )}
+        {turnstileEnabled && (
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+            options={{ appearance: "interaction-only", action: "kaupet" }}
+          />
         )}
         <Button
           type="button"

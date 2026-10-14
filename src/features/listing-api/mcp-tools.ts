@@ -473,23 +473,18 @@ const upsertListing: McpTool = {
 
     let sentStatus = explicitStatus;
     if (!explicitStatus) {
-      if (publish === true) {
-        sentStatus = "active";
-      } else {
-        // Sikkerhetsdefault (plan, fase 5): finn ut om dette er en NY
-        // annonse — kun da settes «draft». En eksisterende annonse skal
-        // ALDRI få statusen sin endret implisitt. Ett ekstra lesekall, men
-        // ingen ekstra rategrense-forbruk (telles ikke separat — kun selve
-        // tools/call-kallet er talt).
-        let exists = true;
-        try {
-          await api.getListingApi({ auth, externalRef });
-        } catch (error) {
-          if (isNotFoundError(error)) exists = false;
-          else throw error;
-        }
-        if (!exists) sentStatus = "draft";
+      // `publish` gjelder bare nye annonser: en eksisterende annonse skal
+      // ALDRI få statusen endret implisitt, heller ikke solgt/arkivert
+      // (KG-08-F02). Ett ekstra lesekall avgjør om annonsen finnes; det
+      // telles ikke separat mot rategrensen.
+      let exists = true;
+      try {
+        await api.getListingApi({ auth, externalRef });
+      } catch (error) {
+        if (isNotFoundError(error)) exists = false;
+        else throw error;
       }
+      if (!exists) sentStatus = publish === true ? "active" : "draft";
     }
 
     const body = withoutUndefined({ ...rest, status: sentStatus });

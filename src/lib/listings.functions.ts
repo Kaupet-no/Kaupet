@@ -8,6 +8,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
   effectiveFiltersForCategory,
+  findNonNumericAttribute,
+  normalizeNumericAttributes,
   getMissingRequiredFilters,
   normalizeFilter,
   isBoatCategory,
@@ -31,6 +33,7 @@ import {
   type OrganizationListingLocation,
 } from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 
 const LISTING_CREATE_LIMIT_MESSAGE =
   "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.";
@@ -286,6 +289,16 @@ function validatePartFitment(
     throw new ClientError("Årsmodell fra kan ikke være høyere enn årsmodell til.", 400);
   }
 }
+function assertNumericAttributes(
+  categoryId: string | null,
+  filters: ReturnType<typeof normalizeFilter>[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+) {
+  const invalid = findNonNumericAttribute(categoryId, filters, categoriesById, attributes);
+  if (invalid) throw new ClientError(`${invalid.label_nb} må være et tall.`, 400);
+}
+
 async function validateExistingListingForPublish(
   supabaseAdmin: SupabaseClient,
   listing: ListingMutationRow,
@@ -307,7 +320,7 @@ async function validateExistingListingForPublish(
     (listing.price_nok == null ||
       !Number.isInteger(listing.price_nok) ||
       listing.price_nok < 0 ||
-      listing.price_nok > 10_000_000)
+      listing.price_nok > MAX_LISTING_PRICE_NOK)
   ) {
     throw new ClientError("Oppgi en gyldig pris før annonsen publiseres.", 400);
   }
@@ -351,7 +364,13 @@ async function validateExistingListingForPublish(
   );
   const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
   if (!attributesResult.success) throw new ClientError("Annonsens attributter er ugyldige.", 400);
-  const attributes = attributesResult.data;
+  const attributes = normalizeNumericAttributes(
+    listing.category_id,
+    normalizedFilters,
+    categoriesById,
+    attributesResult.data,
+  );
+  assertNumericAttributes(listing.category_id, normalizedFilters, categoriesById, attributes);
 
   if (categoryBehavior.requiresCategoryFilterValues) {
     const missing = getMissingRequiredFilters(
@@ -378,6 +397,7 @@ async function validateExistingListingForPublish(
     categoryBehavior,
   );
   if (fieldGroupError) throw new Error(fieldGroupError);
+  return attributes;
 }
 
 export const saveDraftListing = createServerFn({ method: "POST" })
@@ -398,7 +418,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           .nullable()
           .optional(),
         is_free: z.boolean().optional(),
-        price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+        price_nok: z.number().int().min(0).max(MAX_LISTING_PRICE_NOK).nullable().optional(),
         postal_code: z
           .string()
           .regex(/^\d{4}$/)
@@ -582,7 +602,7 @@ export const createListing = createServerFn({ method: "POST" })
         category_id: z.string().uuid(),
         condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable(),
         is_free: z.boolean(),
-        price_nok: z.number().int().min(0).max(10_000_000).nullable(),
+        price_nok: z.number().int().min(0).max(MAX_LISTING_PRICE_NOK).nullable(),
         postal_code: z
           .string()
           .regex(/^\d{4}$/)
@@ -623,7 +643,11 @@ export const createListing = createServerFn({ method: "POST" })
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
 
-    const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
+    const [
+      { data: filterRows, error: filterError },
+      { data: categoryRows, error: categoryError },
+      flowsResult,
+    ] = await Promise.all([
       supabaseAdmin
         .from("category_filters")
         .select(
@@ -632,36 +656,38 @@ export const createListing = createServerFn({ method: "POST" })
       supabaseAdmin.from("categories").select("id, parent_id"),
       supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
     ]);
+    // Uten reglene kan vi ikke vite hva som er påkrevd: avbryt i stedet for å
+    // validere mot tomme regler og publisere en ufullstendig annonse (KG-16-F02).
+    const rulesError = filterError ?? categoryError ?? flowsResult.error;
+    if (rulesError) throw await toClientError("database", rulesError);
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
     );
     const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
+    const attributes = normalizeNumericAttributes(
+      data.category_id,
+      normalizedFilters,
+      categoriesById,
+      data.attributes ?? {},
+    );
     const categoryBehavior = getCategoryBehavior(
       vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
       isBoatCategory(data.category_id, normalizedFilters, categoriesById),
     );
     const missing = categoryBehavior.requiresCategoryFilterValues
-      ? getMissingRequiredFilters(
-          data.category_id,
-          normalizedFilters,
-          categoriesById,
-          data.attributes ?? {},
-          [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
-        )
+      ? getMissingRequiredFilters(data.category_id, normalizedFilters, categoriesById, attributes, [
+          ...VEHICLE_EQUIPMENT_FILTER_KEYS,
+          ...categoryBehavior.requiredFilterExclusions,
+        ])
       : [];
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
+    assertNumericAttributes(data.category_id, normalizedFilters, categoriesById, attributes);
     if (categoryBehavior.requiresCategoryFilterValues) {
-      validatePartFitment(
-        data.category_id,
-        normalizedFilters,
-        categoriesById,
-        data.attributes ?? {},
-      );
+      validatePartFitment(data.category_id, normalizedFilters, categoriesById, attributes);
     }
 
-    // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
     const { fieldGroups } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
     const fieldGroupError = validateRequiredFieldGroups(
@@ -690,7 +716,7 @@ export const createListing = createServerFn({ method: "POST" })
       known_issues: data.known_issues ?? null,
       no_known_issues: !!data.no_known_issues,
       maintenance_history: data.maintenance_history ?? null,
-      ...(data.attributes !== undefined && { attributes: data.attributes }),
+      ...(data.attributes !== undefined && { attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
     };
@@ -824,9 +850,19 @@ export const republishListing = createServerFn({ method: "POST" })
     if (!["draft", "archived", "sold", "expired"].includes(listing.status)) {
       throw new ClientError("Annonsen kan ikke publiseres på nytt fra denne statusen.", 409);
     }
-    await validateExistingListingForPublish(supabaseAdmin, listing);
+    const attributes = await validateExistingListingForPublish(supabaseAdmin, listing);
     if (listing.status !== "draft") {
       await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
+    } else if (listing.organization_id) {
+      // Endringsrett (can_update) er ikke opprettingsrett: et bedriftsutkast
+      // publiseres med samme kontroll som createListing (KG-16-F01).
+      const ownership = await resolveListingOwnership(
+        supabaseAdmin,
+        userId,
+        listing.category_id,
+        listing.organization_location_id,
+      );
+      assertDraftOrganization(listing.organization_id, ownership.organization_id);
     }
 
     const now = new Date().toISOString();
@@ -835,16 +871,23 @@ export const republishListing = createServerFn({ method: "POST" })
     const { data: updated, error } = await supabaseAdmin
       .from("listings")
       .update({
+        attributes,
         status: "active",
         published_at: now,
         expires_at: expiresAt,
       })
       .eq("id", data.id)
       .eq("status", listing.status)
+      .eq("updated_at", listing.updated_at)
       .select("id, status, published_at, expires_at")
-      .single();
+      .maybeSingle();
     if (error) {
       throw await toClientError("republishListing.update", error, { listing_id: data.id });
+    }
+    // Ingen rad: annonsen ble endret (eller fikk ny status) etter at den ble
+    // validert, så publiseringen hadde vært basert på utdaterte data.
+    if (!updated) {
+      throw new ClientError("Annonsen ble endret samtidig. Last siden på nytt og prøv igjen.", 409);
     }
 
     return updated;
@@ -890,14 +933,24 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
     // must not use service-role to reveal a draft/disabled listing's code —
     // same visibility RLS gives everyone else. See
     // the internal security review, L-13.
+    // Synligheten er listing_is_public (aktiv, eller solgt de siste 30
+    // dagene), samme kontrakt som RLS og /$kaupetCode (KG-16-F03).
     const { data: row, error } = await supabaseAdmin
       .from("listings")
-      .select("kaupet_code")
+      .select("kaupet_code, status, sold_at")
       .eq("id", data.listing_id)
-      .eq("status", "active")
+      .in("status", ["active", "sold"])
       .maybeSingle();
     if (error) {
       throw await toClientError("database", error);
     }
-    return { kaupet_code: row?.kaupet_code ?? null };
+    if (!row) return { kaupet_code: null };
+    const { data: isPublic, error: publicError } = await supabaseAdmin.rpc("listing_is_public", {
+      _status: row.status,
+      _sold_at: row.sold_at,
+    });
+    if (publicError) {
+      throw await toClientError("database", publicError);
+    }
+    return { kaupet_code: isPublic === true ? row.kaupet_code : null };
   });

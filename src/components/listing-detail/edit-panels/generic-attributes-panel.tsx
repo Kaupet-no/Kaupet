@@ -25,7 +25,11 @@ export function GenericAttributesPanel({
   async function save() {
     setSaving(true);
     try {
-      await editCtx?.saveField({ group: "attributes", attributes: values });
+      await editCtx?.saveField({
+        group: "attributes",
+        attributes: values,
+        removedKeys: Object.keys(attributes).filter((key) => !(key in values)),
+      });
       onClose();
     } finally {
       setSaving(false);

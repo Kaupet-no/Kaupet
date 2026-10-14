@@ -79,4 +79,27 @@ describe("submitSearch", () => {
     });
     expect(committed).toMatchObject({ q: "", categories: ["bil"], attrs: "" });
   });
+
+  it("beholder en smalere valgt underkategori når teksten nevner overkategorien", async () => {
+    let committed: Record<string, unknown> | undefined;
+    let committedCriteria: unknown[] | undefined;
+    await submitSearch({
+      applied: {
+        value: { ...defaultAdvancedSearchValue(), categories: ["elbil"] },
+        attributes: { battery_kwh: { kind: "range", min: 60 } },
+      },
+      query: "bil",
+      categories: [
+        { id: "bil", slug: "bil", name_nb: "Bil", parent_id: null },
+        { id: "elbil", slug: "elbil", name_nb: "Elbil", parent_id: "bil" },
+      ],
+      commit: (search, criteria) => {
+        committed = search;
+        committedCriteria = criteria;
+      },
+    });
+    expect(committed).toMatchObject({ categories: ["elbil"] });
+    expect(String(committed?.attrs)).toContain("battery_kwh");
+    expect(committedCriteria?.some((c) => (c as { kind: string }).kind === "category")).toBe(false);
+  });
 });

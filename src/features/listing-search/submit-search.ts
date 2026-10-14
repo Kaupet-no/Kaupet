@@ -53,23 +53,32 @@ export async function resolveAppliedSearch({
 
   // Kategorien som brukes og den som vises i «Tolket som» må samsvare
   // (KG-28-F04): et kategoriord som ikke allerede er valgt erstatter de
-  // valgte kategoriene, og attributter som ikke finnes der fjernes.
+  // valgte kategoriene, og attributter som ikke finnes der fjernes. Er
+  // ordet en overkategori av et valg («bil» med «Elbil» valgt), er valget
+  // allerede smalere: det beholdes, og kategoritolkningen utelates.
   const selected = applied.value.categories;
-  const replacedCategory =
-    selected.length > 0 && resolved.categorySlug && !selected.includes(resolved.categorySlug)
-      ? categories.find((category) => category.slug === resolved.categorySlug)
-      : undefined;
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const bySlug = new Map(categories.map((category) => [category.slug, category]));
+  const textCategory = resolved.categorySlug ? bySlug.get(resolved.categorySlug) : undefined;
+  const coversSelection =
+    !!textCategory &&
+    selected.some((slug) => {
+      for (let c = bySlug.get(slug); c; c = c.parent_id ? byId.get(c.parent_id) : undefined) {
+        if (c.id === textCategory.id) return true;
+      }
+      return false;
+    });
+  const replacedCategory = selected.length > 0 && !coversSelection ? textCategory : undefined;
   const previousAttributes = replacedCategory
     ? retainSearchAttributes(
         applied.attributes,
-        effectiveFiltersForCategory(
-          replacedCategory.id,
-          allFilters,
-          new Map(categories.map((category) => [category.id, category])),
-        ),
+        effectiveFiltersForCategory(replacedCategory.id, allFilters, byId),
         { dropUnknown: true },
       ).kept
     : applied.attributes;
+  const criteria = coversSelection
+    ? resolved.criteria.filter((criterion) => criterion.kind !== "category")
+    : resolved.criteria;
 
   return {
     applied: {
@@ -88,7 +97,7 @@ export async function resolveAppliedSearch({
       },
       attributes: { ...previousAttributes, ...resolved.attrPatch },
     },
-    criteria: resolved.criteria,
+    criteria,
   };
 }
 

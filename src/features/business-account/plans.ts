@@ -132,8 +132,9 @@ export function hasPaidProffPeriod(
 
 /**
  * Same month arithmetic as Postgres `timestamptz + make_interval(months => n)`
- * in UTC (mark_organization_location_charge_invoiced): the day is clamped to
- * the target month's last day, so 31 Jan + 1 month is 28/29 Feb, not 3 Mar.
+ * in mark_organization_location_charge_invoiced, which is pinned to UTC
+ * (20261014102000_location_charge_period_utc.sql): the day is clamped to the
+ * target month's last day, so 31 Jan + 1 month is 28/29 Feb, not 3 Mar.
  */
 export function addMonthsClampedUtc(date: Date, months: number): Date {
   const result = new Date(date);

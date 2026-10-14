@@ -13,14 +13,38 @@ import { useEffect, useRef } from "react";
  * flater som med vilje ikke skal kunne lukkes med tilbake (onboarding).
  */
 
-// Telles på modulnivå, ikke per komponent: et lazy-lastet overlay
-// (`ImageLightbox` bak `Suspense`) monteres og remonteres rundt at chunken
-// løses, og en push/back per montering ville lagt igjen en ekstra oppføring
-// brukeren måtte trykke tilbake to ganger for å komme forbi. Målt i dev.
-// ponytail: én delt oppføring for alle åpne overlays — tilbake lukker da et
-// nøstet overlay og forelderen samtidig. Tell per nivå hvis nøsting blir vanlig.
-let openOverlays = 0;
-let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+// Én historikk-oppføring per åpent overlay-nivå, i en stack på modulnivå:
+// tilbake lukker bare øverste nivå, så et nøstet valgark lukkes uten at
+// filterpanelet bak forsvinner. Én felles popstate-lytter avgjør hvem som
+// lukkes; per-hook-lyttere ville latt flere nivåer reagere på samme pop.
+//
+// Modulnivå, ikke per komponent: et lazy-lastet overlay (`ImageLightbox` bak
+// `Suspense`) monteres og remonteres rundt at chunken løses, og en push/back
+// per montering ville lagt igjen en ekstra oppføring brukeren måtte trykke
+// tilbake to ganger for å komme forbi. Målt i dev. Derfor overtar en
+// montering øverste nivå hvis det er på vei til å ryddes.
+type Entry = {
+  close: () => void;
+  popped: boolean;
+  releaseTimer?: ReturnType<typeof setTimeout>;
+};
+const stack: Entry[] = [];
+// history.back() fra egen opprydding gir også popstate; den skal ikke lukke
+// nivået under.
+let ignoredPops = 0;
+let listening = false;
+
+function onPop() {
+  if (ignoredPops > 0) {
+    ignoredPops--;
+    return;
+  }
+  const top = stack.pop();
+  if (!top) return;
+  clearTimeout(top.releaseTimer);
+  top.popped = true;
+  top.close();
+}
 
 export function useOverlayHistory(enabled: boolean, onClose: () => void) {
   const onCloseRef = useRef(onClose);
@@ -30,37 +54,39 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
 
   useEffect(() => {
     if (!enabled) return;
-    let popped = false;
-
-    if (releaseTimer !== undefined) {
-      // En avmontering er på vei til å rydde oppføringen — overta den i stedet.
-      clearTimeout(releaseTimer);
-      releaseTimer = undefined;
-    } else {
-      if (openOverlays === 0) history.pushState({ overlay: true }, "");
-      openOverlays++;
+    if (!listening) {
+      window.addEventListener("popstate", onPop);
+      listening = true;
     }
 
-    const onPop = () => {
-      popped = true;
-      openOverlays = 0;
-      onCloseRef.current();
-    };
-    window.addEventListener("popstate", onPop);
+    let entry = stack.at(-1);
+    if (entry?.releaseTimer !== undefined) {
+      // En avmontering er på vei til å rydde oppføringen — overta den i stedet.
+      clearTimeout(entry.releaseTimer);
+      entry.releaseTimer = undefined;
+    } else {
+      entry = { close: () => {}, popped: false };
+      stack.push(entry);
+      history.pushState({ overlay: true, overlayLevel: stack.length }, "");
+    }
+    const current = entry;
+    current.close = () => onCloseRef.current();
 
     return () => {
-      window.removeEventListener("popstate", onPop);
-      if (popped) return;
+      if (current.popped) return;
       // Lukket på annen måte (X, Escape, klikk utenfor): rydd opp oppføringen.
       // Utsatt én tick slik at en umiddelbar remontering overtar den i stedet.
       // Guarden hindrer at vi navigerer feil vei når overlayet i stedet ble
       // avmontert av en ruteendring — da er toppen av stacken ruterens
       // tilstand, ikke vår.
-      releaseTimer = setTimeout(() => {
-        releaseTimer = undefined;
-        openOverlays--;
-        if (openOverlays === 0 && (history.state as { overlay?: boolean } | null)?.overlay)
+      current.releaseTimer = setTimeout(() => {
+        current.releaseTimer = undefined;
+        const index = stack.indexOf(current);
+        if (index >= 0) stack.splice(index, 1);
+        if ((history.state as { overlay?: unknown } | null)?.overlay) {
+          ignoredPops++;
           history.back();
+        }
       }, 0);
     };
   }, [enabled]);

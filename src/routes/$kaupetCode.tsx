@@ -267,26 +267,37 @@ export const Route = createFileRoute("/$kaupetCode")({
     // every other address this catch-all route sees, which was never an ad
     // to begin with (a typo, a stale link, a route that doesn't exist).
     const reason = (data as { reason?: "listing" | "unknown" } | undefined)?.reason;
-    const isListing = reason === "listing";
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-        <h1 className="font-display text-2xl">
-          {isListing ? "Fant ikke annonsen" : "Fant ikke siden"}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {isListing
-            ? "Annonsen kan ha blitt fjernet eller solgt."
-            : "Siden du prøvde å åpne finnes ikke."}
-        </p>
-        <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-          <Button className="mt-6" variant="outline">
-            Se flere annonser
-          </Button>
-        </Link>
-      </div>
-    );
+    return <RouteNotFound isListing={reason === "listing"} />;
   },
 });
+
+/** Annonsen fantes da loaderen kjørte, men klientens query finner den ikke
+ * (fjernet i mellomtiden). Vises som «ikke funnet», ikke som lastefeil. */
+class ListingNotFoundError extends Error {
+  constructor() {
+    super("Annonsen finnes ikke");
+  }
+}
+
+function RouteNotFound({ isListing }: { isListing: boolean }) {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+      <h1 className="font-display text-2xl">
+        {isListing ? "Fant ikke annonsen" : "Fant ikke siden"}
+      </h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {isListing
+          ? "Annonsen kan ha blitt fjernet eller solgt."
+          : "Siden du prøvde å åpne finnes ikke."}
+      </p>
+      <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+        <Button className="mt-6" variant="outline">
+          Se flere annonser
+        </Button>
+      </Link>
+    </div>
+  );
+}
 
 function RootSlugPage() {
   const loaderData = Route.useLoaderData();
@@ -419,7 +430,7 @@ function ListingDetailPage() {
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error("Annonsen finnes ikke");
+      if (!data) throw new ListingNotFoundError();
 
       // organizations has commercial columns (selected_plan, proff_access_until,
       // ...) that must not be publicly readable — organizations_public is a
@@ -494,6 +505,8 @@ function ListingDetailPage() {
           : null,
       };
     },
+    // Et nytt forsøk finner ikke en fjernet annonse.
+    retry: (failureCount, error) => !(error instanceof ListingNotFoundError) && failureCount < 3,
   });
   const organization = data?.organization ?? null;
   const hasEffectiveOrganizationProff = organization?.has_active_proff ?? false;
@@ -709,6 +722,7 @@ function ListingDetailPage() {
   }
   // Feil ved senere refetch beholder cachet annonse; bare uten data vises feilen.
   if (!data) {
+    if (error instanceof ListingNotFoundError) return <RouteNotFound isListing />;
     return error ? <ListingLoadError error={error} onRetry={() => void refetch()} /> : null;
   }
   const seller = data.seller;

@@ -66,8 +66,13 @@ function buildAdmin(
     lostClaim?: boolean;
     /** Claimet mistes mellom eierskapssjekken og done-oppdateringen. */
     lostClaimOnComplete?: boolean;
+    /** Jobben er slettet (erstattet av en ny synk) når claimet mistes. */
+    jobGone?: boolean;
+    /** Et nyere claim har lagt inn sin egen bilderad for samme plass. */
+    otherImage?: { id: string };
   } = {},
 ) {
+  let completeAttempted = false;
   const updates: Array<{ table: string; payload: unknown; filters: unknown[][] }> = [];
   const deletes: Array<{ table: string; filters: unknown[][] }> = [];
   const registered: string[] = [];
@@ -81,16 +86,23 @@ function buildAdmin(
       throw new Error(`unexpected RPC: ${name}`);
     },
     from: (table: string) => {
-      const data =
-        table === "listing_images"
-          ? (options.existingImage ?? null)
-          : options.lostClaim
-            ? null
-            : { id: "job-1" };
+      let excludesOwnRow = false;
       const query = {
         eq: () => query,
+        neq: () => {
+          excludesOwnRow = true;
+          return query;
+        },
         limit: () => query,
-        maybeSingle: () => Promise.resolve({ data, error: null }),
+        maybeSingle: () => {
+          const data =
+            table === "listing_images"
+              ? ((excludesOwnRow ? options.otherImage : options.existingImage) ?? null)
+              : options.lostClaim || (completeAttempted && options.jobGone)
+                ? null
+                : { id: "job-1" };
+          return Promise.resolve({ data, error: null });
+        },
       };
       return {
         select: () => query,
@@ -122,6 +134,7 @@ function buildAdmin(
             select: () => chain,
             then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
               updates.push({ table, payload, filters });
+              completeAttempted = true;
               const data = options.lostClaimOnComplete ? [] : [{ id: "job-1" }];
               return Promise.resolve({ data, error: null }).then(resolve, reject);
             },
@@ -211,8 +224,8 @@ describe("processListingImageJob", () => {
     expect(updates).toHaveLength(0);
   });
 
-  it("fjerner egen bilderad når claimet mistes før done-oppdateringen", async () => {
-    const { admin, deletes } = buildAdmin({ lostClaimOnComplete: true });
+  it("fjerner egen bilderad når jobben er erstattet før done-oppdateringen", async () => {
+    const { admin, deletes } = buildAdmin({ lostClaimOnComplete: true, jobGone: true });
     const result = await processListingImageJob(job(), {
       supabaseAdmin: admin as never,
       transformer: fakeTransformer(),
@@ -220,6 +233,31 @@ describe("processListingImageJob", () => {
     });
     expect(result.outcome).toBe("stale");
     expect(deletes).toEqual([{ table: "listing_images", filters: [["id", "img-new"]] }]);
+  });
+
+  it("fjerner egen bilderad når et nyere claim har sin egen", async () => {
+    const { admin, deletes } = buildAdmin({
+      lostClaimOnComplete: true,
+      otherImage: { id: "img-other" },
+    });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(deletes).toEqual([{ table: "listing_images", filters: [["id", "img-new"]] }]);
+  });
+
+  it("beholder egen bilderad når et nyere claim kan ha gjenbrukt den", async () => {
+    const { admin, deletes } = buildAdmin({ lostClaimOnComplete: true });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(deletes).toHaveLength(0);
   });
 
   it("sletter ikke en bilderad den ikke selv la inn når claimet mistes", async () => {

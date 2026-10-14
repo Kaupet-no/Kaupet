@@ -305,6 +305,35 @@ export type ProcessJobOutcome =
   | { outcome: "internal_failed"; jobId: string; message: string }
   | { outcome: "stale"; jobId: string };
 
+/** Claimet ble mistet etter at bilderaden ble lagt inn. Raden fjernes bare
+ * når jobben er borte (en ny synk erstattet den, og bildet skal ikke komme
+ * tilbake) eller når et nyere claim har sin egen rad. Ellers kan det nye
+ * claimet ha sett raden vår og hoppet over sin egen innsetting: da er det
+ * vår rad som er bildet. */
+async function shouldRemoveStaleImage(
+  job: ListingImageJobRow,
+  insertedImageId: string,
+  deps: ProcessJobDeps,
+): Promise<boolean> {
+  const { data: currentJob, error: jobError } = await deps.supabaseAdmin
+    .from("listing_image_jobs")
+    .select("id")
+    .eq("id", job.id)
+    .maybeSingle();
+  if (jobError) throw new Error(`Kunne ikke sjekke jobben: ${jobError.message}`);
+  if (!currentJob) return true;
+  const { data: otherImage, error: otherError } = await deps.supabaseAdmin
+    .from("listing_images")
+    .select("id")
+    .eq("listing_id", job.listing_id)
+    .eq("source_url", job.source_url)
+    .neq("id", insertedImageId)
+    .limit(1)
+    .maybeSingle();
+  if (otherError) throw new Error(`Kunne ikke sjekke bilderad: ${otherError.message}`);
+  return !!otherImage;
+}
+
 export async function processListingImageJob(
   job: ListingImageJobRow,
   deps: ProcessJobDeps,
@@ -351,10 +380,10 @@ export async function processListingImageJob(
     // Et utløpt lån kan claimes på nytt mens den første workeren fortsatt
     // kjører. Claimet (attempts) er tokenet: en worker som har mistet jobben,
     // skriver verken bilderad eller status. Samme regel som
-    // complete_listing_image_job: én bilderad per kilde-URL i annonsen.
-    // ponytail: sjekk-så-skriv, ikke atomisk; mister workeren claimet mellom
-    // sjekken og done-oppdateringen, ryddes egen bilderad bort etterpå, men
-    // den kan være synlig et øyeblikk. Erstattes av RPC-en i B5b.
+    // complete_listing_image_job: én bilderad per kilde-URL i annonsen (URL-en
+    // er unik per annonse i listing_image_jobs).
+    // ponytail: sjekk-så-skriv, ikke atomisk; se opprydding etter tapt claim
+    // under. Erstattes av RPC-en i B5b.
     const { data: ownedJob, error: ownedError } = await deps.supabaseAdmin
       .from("listing_image_jobs")
       .select("id")
@@ -404,10 +433,8 @@ export async function processListingImageJob(
       .eq("attempts", job.attempts)
       .select("id");
     if (updateError) throw new Error(`Kunne ikke oppdatere jobbstatus: ${updateError.message}`);
-    // Jobben ble tatt over eller erstattet etter sjekken over: fjern
-    // bilderaden vi selv la inn, så en erstattet synk ikke får bildet tilbake.
     if (!completed?.length) {
-      if (insertedImageId) {
+      if (insertedImageId && (await shouldRemoveStaleImage(job, insertedImageId, deps))) {
         const { error: deleteError } = await deps.supabaseAdmin
           .from("listing_images")
           .delete()

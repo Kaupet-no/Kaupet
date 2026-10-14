@@ -26,7 +26,6 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class NativeAccessibilityInstrumentedTest {
 
-    private static final String APP_PACKAGE = "no.kaupet.app";
     private static final long SHORT_TIMEOUT = 5_000;
     private static final long PAGE_TIMEOUT = 60_000;
 
@@ -48,8 +47,11 @@ public class NativeAccessibilityInstrumentedTest {
         disableAccessibilityServices();
         instrumentation.runOnMainSync(() -> WebStorage.getInstance().deleteAllData());
 
+        // Målpakken følger flavoren (no.kaupet.app.staging for staging), så den
+        // leses fra appen under test i stedet for å hardkodes.
         Context context = instrumentation.getTargetContext();
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(APP_PACKAGE);
+        Intent launchIntent =
+            context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         assertNotNull("Staging app must have a launcher activity", launchIntent);
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(launchIntent);
@@ -125,7 +127,7 @@ public class NativeAccessibilityInstrumentedTest {
 
         assertNotNull(
             "Native landing page must load after onboarding",
-            waitForNamedControl("Velg lokasjon: Hvor som helst", PAGE_TIMEOUT)
+            waitForNamedControl("Velg lokasjon: Hele Norge", PAGE_TIMEOUT)
         );
     }
 

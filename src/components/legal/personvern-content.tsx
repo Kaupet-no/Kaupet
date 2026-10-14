@@ -60,9 +60,10 @@ export function PersonvernContent() {
               kommentar). Disse er <strong>offentlig synlige</strong> på brukerprofilen.
             </li>
             <li>
-              <strong>Lagrede søk</strong> med søkekriterier (kategori, pris, sted og lignende
-              strukturerte filtre, ikke fritekst), og varsler om nye treff på disse søkene. Slike
-              varsler slettes 180 dager etter at du har lest dem.
+              <strong>Lagrede søk</strong> med søkekriteriene du selv lagrer, inkludert søkeord du
+              har skrevet inn, kategori, pris, sted og andre filtre, og varsler om nye treff på
+              disse søkene. Slike varsler slettes 180 dager etter at du har lest dem. Søkeordene
+              brukes bare til dine lagrede søk og varsler, ikke i bruksstatistikken beskrevet under.
             </li>
             <li>
               <strong>Rapporter</strong> du sender inn om upassende annonser, lagres slik at

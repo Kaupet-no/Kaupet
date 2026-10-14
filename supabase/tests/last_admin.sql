@@ -1,7 +1,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(7);
+SELECT plan(10);
 
 -- Isoler: bare de to testadministratorene finnes i transaksjonen.
 DELETE FROM public.user_roles WHERE role = 'admin';
@@ -30,8 +30,17 @@ SELECT throws_ok($$UPDATE public.user_roles SET user_id = '00000000-0000-4000-80
   'P0001', 'Kan ikke fjerne siste administrator', 'Flytting av siste adminrad avvises');
 SELECT throws_ok($$SELECT public.admin_revoke_role('00000000-0000-4000-8000-0000000000a1')$$,
   'P0001', 'Kan ikke fjerne siste administrator', 'RPC avviser fortsatt siste admin');
+SELECT throws_ok($$SELECT public.request_account_deletion('admin-a-pgtap@example.com')$$,
+  'P0001', 'Kan ikke slette kontoen til siste administrator',
+  'Siste admin kan ikke bestille kontosletting');
 SELECT lives_ok($$INSERT INTO public.user_roles (user_id, role)
   VALUES ('00000000-0000-4000-8000-0000000000a2', 'admin')$$, 'Ny admin kan legges til');
+SELECT lives_ok($$SELECT public.request_account_deletion('admin-a-pgtap@example.com')$$,
+  'Admin kan bestille kontosletting når en annen admin blir igjen');
+SELECT throws_ok($$DELETE FROM public.user_roles
+  WHERE user_id = '00000000-0000-4000-8000-0000000000a2' AND role = 'admin'$$,
+  'P0001', 'Kan ikke fjerne siste administrator',
+  'Admin med ventende sletting teller ikke som gjenværende');
 
 RESET ROLE;
 SELECT set_config('request.jwt.claims', '', true);

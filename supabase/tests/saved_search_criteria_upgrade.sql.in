@@ -1,0 +1,48 @@
+-- Feilgjetting/tilstandsovergang: oppgrader faktiske migrasjoner med eldre
+-- data som den gamle validatoren tillot. Alt gjenopprettes ved rollback.
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
+SET search_path = public, extensions;
+SELECT plan(6);
+
+-- Teststacken har allerede den nye validatoren. Gjenopprett den historiske
+-- definisjonen før fixtures opprettes, men behold den eksisterende CHECK.
+-- RESTORE_PREVIOUS_SAVED_SEARCH_VALIDATOR
+
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-4000-8000-00000000f301', 'saved-search-upgrade-pgtap@example.com');
+INSERT INTO public.saved_searches (id, user_id, name, criteria, notify) VALUES
+  ('00000000-0000-4000-8000-00000000f302', '00000000-0000-4000-8000-00000000f301',
+   'Ugyldig modus', '{"q":"sykkel","extraGroups":[{"mode":"kanskje","terms":[]}]}', true),
+  ('00000000-0000-4000-8000-00000000f303', '00000000-0000-4000-8000-00000000f301',
+   'Ugyldig liste', '{"q":"sykkel","extraGroups":{}}', true),
+  ('00000000-0000-4000-8000-00000000f304', '00000000-0000-4000-8000-00000000f301',
+   'Gyldig søk', '{"q":"sykkel","extraGroups":[{"mode":"any","exclude":true,"terms":["ødelagt"]}]}', true);
+CREATE TEMP TABLE previous_search_criteria AS
+  SELECT id, criteria FROM public.saved_searches
+  WHERE user_id = '00000000-0000-4000-8000-00000000f301';
+
+-- APPLY_SAVED_SEARCH_UPGRADE_MIGRATIONS
+
+SELECT is((SELECT count(*)::int FROM public.saved_searches
+  WHERE user_id = '00000000-0000-4000-8000-00000000f301'), 3,
+  'Oppgraderingen bevarer alle eldre søk');
+SELECT is((SELECT count(*)::int FROM public.saved_searches s
+  JOIN previous_search_criteria p USING (id) WHERE s.criteria = p.criteria), 3,
+  'Oppryddingen endrer ikke brukerens kriterier');
+SELECT is((SELECT count(*)::int FROM public.saved_searches
+  WHERE id IN ('00000000-0000-4000-8000-00000000f302', '00000000-0000-4000-8000-00000000f303')
+    AND NOT notify), 2, 'Varsling slås av for eldre ugyldige søk');
+SELECT ok((SELECT notify FROM public.saved_searches
+  WHERE id = '00000000-0000-4000-8000-00000000f304'), 'Gyldige søk beholder varsling');
+SELECT throws_ok($test$
+  INSERT INTO public.saved_searches (user_id, name, criteria, notify) VALUES
+    ('00000000-0000-4000-8000-00000000f301', 'Nytt ugyldig søk',
+     '{"extraGroups":[{"mode":"kanskje","terms":[]}]}', false)
+$test$, '23514', NULL::text, 'Nye ugyldige søk avvises også uten varsling');
+SELECT throws_ok($test$
+  UPDATE public.saved_searches SET notify = true
+  WHERE id = '00000000-0000-4000-8000-00000000f302'
+$test$, '23514', NULL::text, 'Varsling kan ikke reaktiveres for ugyldige kriterier');
+SELECT * FROM finish();
+ROLLBACK;

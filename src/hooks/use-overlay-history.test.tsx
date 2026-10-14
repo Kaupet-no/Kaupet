@@ -68,6 +68,19 @@ describe("useOverlayHistory", () => {
     expect(go).toHaveBeenCalledExactlyOnceWith(-1);
   });
 
+  it("går tilbake i samme tick som nivået ryddes, så et nytt overlay ikke får en død oppføring under seg", async () => {
+    const go = spyGo();
+    const { unmount } = renderHook(() => useOverlayHistory(true, () => {}));
+
+    const popped = nextPop();
+    unmount();
+    // Etter opprydningens tick: et overlay som åpnes nå, skal ligge på et
+    // nivå der forrige oppføring allerede er traversert bort.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1);
+    await popped;
+  });
+
   it("gjør ingenting når den er deaktivert", async () => {
     const go = spyGo();
     const push = vi.spyOn(history, "pushState");

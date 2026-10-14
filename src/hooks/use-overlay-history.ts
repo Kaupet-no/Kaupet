@@ -28,7 +28,9 @@ type Entry = {
   popped: boolean;
   /** Render-rekkefølge: en forelder rendres før overlayene den inneholder. */
   order: number;
-  releaseTimer?: ReturnType<typeof setTimeout>;
+  /** Avmontert, ryddes ved neste `flushReleases` med mindre en montering
+   * overtar den først. */
+  releasing: boolean;
 };
 const stack: Entry[] = [];
 let renderSeq = 0;
@@ -55,7 +57,7 @@ function insert(entry: Entry) {
 // `stack.length`) lukker ingenting, og en traversering som aldri fullføres
 // (avbrutt av en ruteendring) etterlater ingen teller som sluker neste trykk.
 let listening = false;
-let syncTimer: ReturnType<typeof setTimeout> | undefined;
+let releaseTimer: ReturnType<typeof setTimeout> | undefined;
 
 function levelOf(state: unknown): number {
   const level = (state as { overlayLevel?: unknown } | null)?.overlayLevel;
@@ -66,18 +68,21 @@ function onPop(event: PopStateEvent) {
   const level = levelOf(event.state);
   while (stack.length > level) {
     const top = stack.pop()!;
-    clearTimeout(top.releaseTimer);
+    top.releasing = false;
     top.popped = true;
     top.close();
   }
 }
 
-/** Gå tilbake forbi oppføringer for nivåer som er ryddet. Samles til ett
- * kall per tick, så flere nivåer som lukkes samtidig gir én traversering. */
-function scheduleSync() {
-  if (syncTimer !== undefined) return;
-  syncTimer = setTimeout(() => {
-    syncTimer = undefined;
+/** Rydder alle nivåer som ble avmontert, og går tilbake forbi oppføringene
+ * deres i samme tick. Én felles timer: flere nivåer som lukkes samtidig gir
+ * én traversering, og ingen montering kan komme mellom fjerning og
+ * traversering og etterlate en død oppføring. */
+function scheduleRelease() {
+  if (releaseTimer !== undefined) return;
+  releaseTimer = setTimeout(() => {
+    releaseTimer = undefined;
+    for (let i = stack.length - 1; i >= 0; i--) if (stack[i].releasing) stack.splice(i, 1);
     const excess = levelOf(history.state) - stack.length;
     if (excess > 0) history.go(-excess);
   }, 0);
@@ -98,12 +103,11 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
     }
 
     let entry = stack.at(-1);
-    if (entry?.releaseTimer !== undefined) {
+    if (entry?.releasing) {
       // En avmontering er på vei til å rydde oppføringen — overta den i stedet.
-      clearTimeout(entry.releaseTimer);
-      entry.releaseTimer = undefined;
+      entry.releasing = false;
     } else {
-      entry = { close: () => {}, popped: false, order };
+      entry = { close: () => {}, popped: false, order, releasing: false };
       insert(entry);
       history.pushState({ overlay: true, overlayLevel: stack.length }, "");
     }
@@ -114,15 +118,11 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
       if (current.popped) return;
       // Lukket på annen måte (X, Escape, klikk utenfor): rydd opp oppføringen.
       // Utsatt én tick slik at en umiddelbar remontering overtar den i stedet.
-      // scheduleSync går bare tilbake over egne nivåer: ble overlayet
+      // scheduleRelease går bare tilbake over egne nivåer: ble overlayet
       // avmontert av en ruteendring, er toppen av stacken ruterens tilstand
       // (nivå 0), ikke vår.
-      current.releaseTimer = setTimeout(() => {
-        current.releaseTimer = undefined;
-        const index = stack.indexOf(current);
-        if (index >= 0) stack.splice(index, 1);
-        scheduleSync();
-      }, 0);
+      current.releasing = true;
+      scheduleRelease();
     };
   }, [enabled, order]);
 }

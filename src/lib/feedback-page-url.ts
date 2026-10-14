@@ -3,7 +3,7 @@
  * origin, query (search text, invitation tokens) or fragment, and with
  * capability tokens in the path replaced by a placeholder.
  */
-export function sanitizeFeedbackPageUrl(raw: string | undefined): string | undefined {
+export function sanitizeFeedbackPageUrl(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   let pathname: string;
   try {

@@ -195,10 +195,17 @@ export function useSearchResultsShell({
   const {
     data: listingsData,
     isLoading,
+    isError,
+    isFetchNextPageError,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = useListingsQuery({ search, categories, effectiveCategories, terms });
+  // Første side feilet (ingen data å vise) skilles fra et vellykket tomt søk
+  // og fra feil ved neste side, der allerede lastede kort beholdes.
+  const loadError = isError && !listingsData;
+  const nextPageError = isFetchNextPageError;
   const { data: availablePriceMax } = useListingsPriceMax({
     search,
     categories,
@@ -298,6 +305,9 @@ export function useSearchResultsShell({
     listingsData,
     listings,
     isLoading,
+    loadError,
+    nextPageError,
+    retryListings: () => void refetch(),
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,

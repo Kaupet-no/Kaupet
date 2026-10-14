@@ -24,10 +24,11 @@ export function parseUserAgent(ua: string | null, platform: string): string {
     ? "Windows"
     : /Macintosh/.test(ua)
       ? "Mac"
-      : /Linux/.test(ua)
-        ? "Linux"
-        : /Android/.test(ua)
-          ? "Android"
+      : // Android-UA-er inneholder også «Linux», så Android må testes først.
+        /Android/.test(ua)
+        ? "Android"
+        : /Linux/.test(ua)
+          ? "Linux"
           : /iPhone|iPad/.test(ua)
             ? "iOS"
             : null;

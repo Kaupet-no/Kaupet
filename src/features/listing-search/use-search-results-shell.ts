@@ -194,7 +194,8 @@ export function useSearchResultsShell({
 
   const {
     data: listingsData,
-    isLoading,
+    isLoading: isFirstLoad,
+    isFetching,
     isError,
     isFetchNextPageError,
     refetch,
@@ -203,8 +204,12 @@ export function useSearchResultsShell({
     isFetchingNextPage,
   } = useListingsQuery({ search, categories, effectiveCategories, terms });
   // Første side feilet (ingen data å vise) skilles fra et vellykket tomt søk
-  // og fra feil ved neste side, der allerede lastede kort beholdes.
-  const loadError = isError && !listingsData;
+  // og fra feil ved neste side, der allerede lastede kort beholdes. Et nytt
+  // forsøk holder spørringen i feilstatus til det lykkes, så det vises som
+  // lasting i stedet for at feilflaten blir stående uendret.
+  const failedWithoutData = isError && !listingsData;
+  const isLoading = isFirstLoad || (failedWithoutData && isFetching);
+  const loadError = failedWithoutData && !isFetching;
   const nextPageError = isFetchNextPageError;
   const { data: availablePriceMax } = useListingsPriceMax({
     search,

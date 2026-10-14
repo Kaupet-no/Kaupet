@@ -129,3 +129,20 @@ export function hasPaidProffPeriod(
   const trialEnds = organization.proff_trial_ends_at;
   return !trialEnds || Date.parse(organization.proff_access_until!) > Date.parse(trialEnds);
 }
+
+/**
+ * Same month arithmetic as Postgres `timestamptz + make_interval(months => n)`
+ * in UTC (mark_organization_location_charge_invoiced): the day is clamped to
+ * the target month's last day, so 31 Jan + 1 month is 28/29 Feb, not 3 Mar.
+ */
+export function addMonthsClampedUtc(date: Date, months: number): Date {
+  const result = new Date(date);
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
+}

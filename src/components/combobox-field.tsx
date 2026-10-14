@@ -39,8 +39,9 @@ export function ComboboxMultiContent({
     <Command shouldFilter>
       <CommandInput placeholder={placeholder} value={search} onValueChange={setSearch} />
       {/* cmdk bruker aria-selected for aktiv (fokusert) rad; faktisk valg
-          annonseres med aria-checked, slik ARIA 1.2 beskriver for flervalg. */}
-      <CommandList aria-multiselectable>
+          annonseres med aria-checked. Ikke aria-multiselectable: da leser
+          skjermlesere cmdks aria-selected som valg, i strid med aria-checked. */}
+      <CommandList>
         <CommandEmpty>Ingen treff.</CommandEmpty>
         <CommandGroup>
           {options.map((o) => (

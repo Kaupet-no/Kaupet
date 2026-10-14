@@ -2,9 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-
-// Hold både URL-lengden og antall samtaler under PostgREST-grensene.
-const CONVERSATION_IDS_CHUNK_SIZE = 100;
+import { fetchAllPagesByIds } from "@/lib/fetch-all-pages";
 
 /** Én siste melding per samtale: en lang tråd må ikke bruke opp den
  * globale radgrensen og få andre samtaler til å se tomme ut. */
@@ -19,19 +17,21 @@ export async function lastConversationMessages(
       "body" | "sender_id" | "created_at" | "deleted_at" | "attachment_path"
     >
   >();
-  for (let from = 0; from < conversationIds.length; from += CONVERSATION_IDS_CHUNK_SIZE) {
-    const { data, error } = await client
+  const { data, error } = await fetchAllPagesByIds(conversationIds, (chunk, from, to) =>
+    client
       .from("conversations")
       .select("id, messages(body, sender_id, created_at, deleted_at, attachment_path)")
-      .in("id", conversationIds.slice(from, from + CONVERSATION_IDS_CHUNK_SIZE))
+      .in("id", chunk)
       .order("created_at", { referencedTable: "messages", ascending: false })
       .order("id", { referencedTable: "messages", ascending: false })
-      .limit(1, { referencedTable: "messages" });
-    if (error) throw error;
-    for (const conversation of data ?? []) {
-      const message = conversation.messages[0];
-      if (message) messages.set(conversation.id, message);
-    }
+      .limit(1, { referencedTable: "messages" })
+      .order("id")
+      .range(from, to),
+  );
+  if (data === null) throw error;
+  for (const conversation of data) {
+    const message = conversation.messages[0];
+    if (message) messages.set(conversation.id, message);
   }
   return messages;
 }

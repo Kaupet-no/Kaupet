@@ -1,4 +1,4 @@
-import { fetchAllPages } from "@/lib/fetch-all-pages";
+import { fetchAllPages, fetchAllPagesByIds } from "@/lib/fetch-all-pages";
 import { formatDateTime } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Clock, History } from "lucide-react";
@@ -111,10 +111,6 @@ function groupIntoRuns(rows: ImportHistoryRow[]): ImportRun[] {
   return [...byImportId.values()];
 }
 
-// Chunkstørrelse for `.in("listing_id", …)`-oppslaget under, av samme grunn
-// som REF_LOOKUP_CHUNK_SIZE i listing-sync.server.ts (kort URL).
-const LISTING_IDS_CHUNK_SIZE = 100;
-
 /** Henter bildestatus (steg 4) for et sett med annonse-id-er, gruppert per
  * annonse. Egen spørring mot `listing_image_jobs` — RLS begrenser den til
  * organisasjonens egne rader, og kolonne-grant-en (se migrasjonen) skjuler
@@ -126,29 +122,26 @@ async function fetchImageStatusByListingId(
     string,
     { processing: number; failed: number; failedMessages: string[] }
   >();
-  for (let offset = 0; offset < listingIds.length; offset += LISTING_IDS_CHUNK_SIZE) {
-    const chunk = listingIds.slice(offset, offset + LISTING_IDS_CHUNK_SIZE);
-    const { data, error } = await fetchAllPages((from, to) =>
-      supabase
-        .from("listing_image_jobs")
-        .select("listing_id, status, customer_error")
-        .in("listing_id", chunk)
-        .order("id")
-        .range(from, to),
-    );
-    if (error) throw error;
-    for (const job of data ?? []) {
-      const entry = result.get(job.listing_id) ?? { processing: 0, failed: 0, failedMessages: [] };
-      if (job.status === "pending" || job.status === "processing") {
-        entry.processing += 1;
-      } else if (job.status === "failed" && job.customer_error) {
-        entry.failed += 1;
-        if (!entry.failedMessages.includes(job.customer_error)) {
-          entry.failedMessages.push(job.customer_error);
-        }
+  const { data, error } = await fetchAllPagesByIds(listingIds, (chunk, from, to) =>
+    supabase
+      .from("listing_image_jobs")
+      .select("listing_id, status, customer_error")
+      .in("listing_id", chunk)
+      .order("id")
+      .range(from, to),
+  );
+  if (error) throw error;
+  for (const job of data ?? []) {
+    const entry = result.get(job.listing_id) ?? { processing: 0, failed: 0, failedMessages: [] };
+    if (job.status === "pending" || job.status === "processing") {
+      entry.processing += 1;
+    } else if (job.status === "failed" && job.customer_error) {
+      entry.failed += 1;
+      if (!entry.failedMessages.includes(job.customer_error)) {
+        entry.failedMessages.push(job.customer_error);
       }
-      result.set(job.listing_id, entry);
     }
+    result.set(job.listing_id, entry);
   }
   return result;
 }

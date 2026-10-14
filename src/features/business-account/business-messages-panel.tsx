@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
 import { supabase } from "@/integrations/supabase/client";
 import { lastConversationMessages, messagePreview } from "@/lib/conversation-messages";
-import { fetchAllPages } from "@/lib/fetch-all-pages";
+import { fetchAllPages, fetchAllPagesByIds } from "@/lib/fetch-all-pages";
 import { signListingImageUrls } from "@/lib/storage";
 
 type Props = { organization: BusinessOrganization; locationId: string | "all" };
@@ -44,23 +44,22 @@ type Profile = {
   deleted_at: string | null;
 };
 
-const BUYER_IDS_CHUNK_SIZE = 100;
 const conversationDateFormatter = new Intl.DateTimeFormat("nb-NO", {
   dateStyle: "medium",
   timeStyle: "short",
 });
 
 async function fetchBuyerProfiles(buyerIds: string[]): Promise<Profile[]> {
-  const profiles: Profile[] = [];
-  for (let from = 0; from < buyerIds.length; from += BUYER_IDS_CHUNK_SIZE) {
-    const { data, error } = await supabase
+  const { data, error } = await fetchAllPagesByIds(buyerIds, (chunk, from, to) =>
+    supabase
       .from("profiles")
       .select("id, display_name, avatar_url, deleted_at")
-      .in("id", buyerIds.slice(from, from + BUYER_IDS_CHUNK_SIZE));
-    if (error) throw error;
-    profiles.push(...(data ?? []));
-  }
-  return profiles;
+      .in("id", chunk)
+      .order("id")
+      .range(from, to),
+  );
+  if (data === null) throw error;
+  return data;
 }
 
 export function BusinessMessagesPanel({ organization, locationId }: Props) {

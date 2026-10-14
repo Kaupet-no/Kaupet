@@ -35,6 +35,8 @@ export function ImageLightbox({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [arrowsVisible, showArrows] = useAutoHide();
   // Zoomet bilde eier gesten selv — Emblas dra-gest slås av mens den varer.
+  // Bare aktiv slide kan være zoomet: et bilde som forlates nullstiller
+  // zoomen (`active`) og melder false, så sveipingen låses opp igjen.
   // Ref, ikke state: `watchDrag` leses ved pointerdown, og en reInit ville
   // hoppet karusellen tilbake til start.
   const zoomedRef = useRef(false);
@@ -153,6 +155,7 @@ export function ImageLightbox({
                   src={imgUrls[img.storage_path]}
                   alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
                   onZoomChange={onZoomChange}
+                  active={i + offset === currentIndex}
                   onDismiss={onClose}
                 />
                 {img.caption && (

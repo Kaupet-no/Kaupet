@@ -277,6 +277,21 @@ describe("bulk import parser", () => {
     expect(parsed.rows[0]?.rowNumber).toBe(3);
   });
 
+  it("leser norske tall og avviser punktum som tvetydig tusenskille", async () => {
+    const header = `${baseHeader};attr:mileage_km`;
+    const parsed = await parseImportFile(
+      file(
+        "annonser.csv",
+        `${header}\n${validRow};150 000\nid-2;sykler;En sykkel;Dette er en god beskrivelse av varen.;4500;150.000\n`,
+      ),
+      { mileage_km: { type: "number" } },
+    );
+    expect(parsed.rows.map((row) => row.attributes)).toEqual([{ mileage_km: 150000 }]);
+    expect(parsed.errors).toEqual([
+      expect.objectContaining({ rowNumber: 3, field: "attr:mileage_km" }),
+    ]);
+  });
+
   it("avviser stedskolonner fra den gamle malen med en forklarende feil", async () => {
     const csv = [
       "external_id;category;title;description;price;postal_code",

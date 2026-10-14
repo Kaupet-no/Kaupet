@@ -1,4 +1,4 @@
-import type { CategoryFilter, FilterType } from "@/lib/category-filters";
+import { parseNumericString, type CategoryFilter, type FilterType } from "@/lib/category-filters";
 import {
   BULK_IMPORT_COLUMNS,
   MAX_IMPORT_FILE_BYTES,
@@ -81,10 +81,8 @@ function parseAttributeCell(
         .filter((part) => part !== "");
     case "boolean":
       return parseBoolean(text);
-    case "number": {
-      const amount = Number(text.replaceAll(/\s/gu, "").replace(",", "."));
-      return Number.isFinite(amount) ? amount : undefined;
-    }
+    case "number":
+      return parseNumericString(text) ?? undefined;
     default:
       return toValue(text);
   }

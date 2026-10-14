@@ -350,6 +350,8 @@ describe("normalisering av tallattributter (ekvivalensklasser)", () => {
     "oops",
     "12,500",
     "-1,500",
+    "150.000",
+    "-1.500",
     "æøå😀",
     "0x10",
     "Infinity",

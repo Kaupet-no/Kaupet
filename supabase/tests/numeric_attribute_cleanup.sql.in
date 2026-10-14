@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(11);
+SELECT plan(12);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-4000-8000-00000000f001', 'numeric-cleanup-pgtap@example.com');
@@ -33,7 +33,8 @@ DROP FUNCTION public.refresh_listing_search_vector_after_category_move();
 DROP TABLE public.listing_attribute_cleanup_backup;
 INSERT INTO public.listings (id, seller_id, category_id, title, status, attributes, updated_at) VALUES
   ('00000000-0000-4000-8000-00000000f207', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Norske tallformater', 'draft', jsonb_build_object('cleanup_size', '150 000', 'cleanup_width', '12,5'), '2026-01-01T00:00:00Z'),
-  ('00000000-0000-4000-8000-00000000f208', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Tvetydig komma', 'draft', jsonb_build_object('cleanup_size', '12,500', 'cleanup_width', '1,500'), '2026-01-01T00:00:00Z');
+  ('00000000-0000-4000-8000-00000000f208', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Tvetydig komma', 'draft', jsonb_build_object('cleanup_size', '12,500', 'cleanup_width', '1,500'), '2026-01-01T00:00:00Z'),
+  ('00000000-0000-4000-8000-00000000f209', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f101', 'Tvetydig punktum', 'draft', jsonb_build_object('cleanup_size', '150.000', 'cleanup_width', '1.500'), '2026-01-01T00:00:00Z');
 -- updated_at settes av triggeren ved insert; still den tilbake for testen.
 ALTER TABLE public.listings DISABLE TRIGGER listings_set_updated_at;
 UPDATE public.listings SET updated_at = '2026-01-01T00:00:00Z' WHERE id = '00000000-0000-4000-8000-00000000f207';
@@ -50,6 +51,7 @@ SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000
 SELECT is((SELECT updated_at FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f207'), '2026-01-01T00:00:00Z'::timestamptz, 'Ryddingen endrer ikke updated_at');
 SELECT is((SELECT attributes FROM public.listing_attribute_cleanup_backup WHERE listing_id = '00000000-0000-4000-8000-00000000f204'), '{"cleanup_size":"oops","untouched":"40"}'::jsonb, 'Opprinnelige attributter er tatt vare på');
 SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f208'), '{"cleanup_size":"12,500","cleanup_width":"1,500"}'::jsonb, 'Tvetydig komma med tre sifre verken normaliseres eller fjernes');
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000f209'), '{"cleanup_size":"150.000","cleanup_width":"1.500"}'::jsonb, 'Punktum som tusenskille blir ikke til desimaltall');
 SELECT is((SELECT tgenabled::text FROM pg_trigger WHERE tgname = 'listings_match_wtb_listings'), 'O', 'Kjøpsønske-triggeren er slått på igjen etter ryddingen');
 SELECT * FROM finish();
 ROLLBACK;

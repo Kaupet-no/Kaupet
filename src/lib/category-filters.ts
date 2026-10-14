@@ -310,14 +310,17 @@ export function effectiveFiltersForCategory(
   return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
 }
 
-/** Tallstreng i norsk skrivemåte → kanonisk form: mellomrom som
- * tusenskille («150 000») fjernes og desimalkomma («12,5») blir punktum.
- * «12,500» kan være både 12,5 og 12 500 og blir stående, så valideringen
- * avviser den. Samme regel som tallryddingen i 20261013170000. */
-function canonicalNumericString(value: string): string {
+/** Tallstreng i norsk skrivemåte → tall: mellomrom som tusenskille
+ * («150 000») fjernes og desimalkomma («12,5») blir punktum. «12,500» og
+ * «150.000» kan være både desimal og tusenskille og gir null, så valideringen
+ * avviser dem. Samme regel som tallryddingen i 20261013170000. */
+export function parseNumericString(value: string): number | null {
   const stripped = value.replace(/[\s\u00a0\u2009\u202f]/g, "");
-  if (/^-?\d{1,3},\d{3}$/.test(stripped)) return stripped;
-  return stripped.replace(/^(-?\d+),(\d+)$/, "$1.$2");
+  if (/^-?\d{1,3}[.,]\d{3}$/.test(stripped)) return null;
+  const canonical = stripped.replace(/^(-?\d+),(\d+)$/, "$1.$2");
+  if (!/^-?[0-9]+(\.[0-9]+)?$/.test(canonical)) return null;
+  const parsed = Number(canonical);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /** Eldre importdata kan ha tallstrenger. Bare kategoriens effektive
@@ -334,10 +337,8 @@ export function normalizeNumericAttributes<T>(
     if ((filter.type !== "number" && filter.type !== "range") || typeof value !== "string") {
       continue;
     }
-    const canonical = canonicalNumericString(value);
-    if (/^-?[0-9]+(\.[0-9]+)?$/.test(canonical) && Number.isFinite(Number(canonical))) {
-      normalized[filter.key] = Number(canonical);
-    }
+    const parsed = parseNumericString(value);
+    if (parsed !== null) normalized[filter.key] = parsed;
   }
   return normalized;
 }

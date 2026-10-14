@@ -116,7 +116,7 @@ $$;
 -- Normaliser og rydd bare tallfelt i annonsens effektive kategori. Barnets
 -- filtertype overstyrer forelderen; samme nøkkel i andre kategorier er irrelevant.
 -- Tallstrenger med mellomrom som tusenskille («150 000») og desimalkomma
--- («12,5») normaliseres i stedet for å fjernes; tvetydige («12,500»)
+-- («12,5») normaliseres i stedet for å fjernes; tvetydige («12,500», «150.000»)
 -- beholdes urørt. Samme regel som
 -- normalizeNumericAttributes. Bare tallområder som fortsatt ikke er tall
 -- fjernes. Opprinnelige attributter for hver endret annonse lagres i
@@ -159,11 +159,11 @@ WITH RECURSIVE ancestors AS (
   LEFT JOIN effective_filters f ON f.category_id = l.category_id AND f.key = attr.key
   WHERE jsonb_typeof(l.attributes) = 'object'
 ), cleaned_attrs AS (
-  -- «12,500» kan være både 12,5 og 12 500: tvetydige verdier røres ikke,
+  -- «12,500» og «150.000» kan være både desimal og tusenskille: tvetydige verdier røres ikke,
   -- verken normaliseres eller fjernes, og må rettes av eieren.
   SELECT id, key, value, type,
-    COALESCE(stripped ~ '^-?[0-9]{1,3},[0-9]{3}$', false) AS ambiguous,
-    CASE WHEN stripped !~ '^-?[0-9]{1,3},[0-9]{3}$'
+    COALESCE(stripped ~ '^-?[0-9]{1,3}[.,][0-9]{3}$', false) AS ambiguous,
+    CASE WHEN stripped !~ '^-?[0-9]{1,3}[.,][0-9]{3}$'
       THEN regexp_replace(stripped, '^(-?[0-9]+),([0-9]+)$', '\1.\2')
     END AS cleaned
   FROM attrs

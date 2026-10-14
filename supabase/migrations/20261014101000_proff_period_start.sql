@@ -3,12 +3,15 @@
 -- 28. jan), så period_start i proff_orders kom tre dager for tidlig. Starten
 -- beregnes nå én gang under radlås, og slutten avledes fra den.
 -- Kroppen er ellers lik 20260902090000_proff_orders.sql (eneste definisjon).
+-- Festet til UTC som mark_organization_location_charge_invoiced
+-- (20261014102000): månedsaritmetikken skjer ellers i øktas TimeZone.
 
 CREATE OR REPLACE FUNCTION public.extend_proff_access(_organization_id uuid, _months integer)
 RETURNS TABLE (period_start timestamptz, period_end timestamptz)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
+SET timezone = 'UTC'
 AS $$
 DECLARE
   _start timestamptz;

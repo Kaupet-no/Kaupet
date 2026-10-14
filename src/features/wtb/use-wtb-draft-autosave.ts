@@ -268,10 +268,11 @@ export function useWtbDraftAutosave(
             radius_km: currentFields.radius_km ?? null,
           },
         });
-        if (!isCurrent()) return null;
         // Forkastet mens lagringen pågikk: gi ID-en til discardDraft, som
-        // sletter den, i stedet for å huske den.
+        // sletter den, i stedet for å huske den. Sjekkes før isCurrent, ellers
+        // ville utkastet blitt liggende om aktøren byttet underveis.
         if (generation !== discardGeneration.current) return result.id;
+        if (!isCurrent()) return null;
         if ("published" in result && result.published) {
           // A lost publish response: the want listing is live, so these edits were not saved.
           publishedId.current = result.id;

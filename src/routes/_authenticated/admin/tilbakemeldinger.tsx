@@ -238,7 +238,13 @@ function FeedbackAdminPage() {
                     )}
                   </TableCell>
                   <TableCell className="max-w-[160px] text-sm">
-                    {r.page_url ? (
+                    {r.page_url && /\/:[^/]/.test(r.page_url) ? (
+                      // Sanert sti med plassholder (f.eks. /360-opptak/:token)
+                      // peker ikke på en ekte side.
+                      <span className="block truncate" title={r.page_url}>
+                        {r.page_url}
+                      </span>
+                    ) : r.page_url ? (
                       <a
                         href={r.page_url}
                         target="_blank"

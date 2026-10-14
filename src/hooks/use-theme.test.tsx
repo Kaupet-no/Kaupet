@@ -6,7 +6,10 @@ import { ThemeProvider, useTheme } from "./use-theme";
 vi.mock("@/lib/native", () => ({ isNative: () => false }));
 vi.mock("@/lib/native-setup", () => ({ syncStatusBarTheme: vi.fn() }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.classList.remove("dark");
@@ -66,6 +69,5 @@ describe("useTheme", () => {
     expect(screen.getByTestId("theme").textContent).toBe("system");
     act(() => screen.getByText("set-dark").click());
     expect(screen.getByTestId("resolved").textContent).toBe("dark");
-    vi.restoreAllMocks();
   });
 });

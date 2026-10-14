@@ -51,4 +51,21 @@ describe("useTheme", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localStorage.getItem("kaupet_theme")).toBe("dark");
   });
+
+  it("starter og bytter tema selv om lagring er blokkert (KG-37-F04)", () => {
+    const blocked = () => {
+      throw new DOMException("blocked", "SecurityError");
+    };
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(screen.getByTestId("theme").textContent).toBe("system");
+    act(() => screen.getByText("set-dark").click());
+    expect(screen.getByTestId("resolved").textContent).toBe("dark");
+    vi.restoreAllMocks();
+  });
 });

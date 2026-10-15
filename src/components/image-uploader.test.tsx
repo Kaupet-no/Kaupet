@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({ isNative: vi.fn(() => false), takeNativePhoto: vi.fn() }));
 vi.mock("@/lib/native", () => native);
+const toast = vi.hoisted(() => ({ showErrorToast: vi.fn() }));
+vi.mock("@/lib/toast", () => toast);
+vi.mock("@/lib/image-compression", () => ({ compressImage: async (file: File) => file }));
+vi.mock("@/lib/image-metadata", () => ({ isAiGeneratedImage: async () => false }));
 
 import { ImageUploader, type PendingImage } from "./image-uploader";
 
@@ -27,6 +31,24 @@ function image(id: string, aiGenerated?: boolean): PendingImage {
 }
 
 describe("ImageUploader", () => {
+  it("legger til så mange valgte bilder som det er plass til, og sier fra om resten", async () => {
+    const existing = Array.from({ length: 98 }, (_, i) => image(`e${i}`));
+    const onChange = vi.fn();
+    render(<ImageUploader images={existing} onChange={onChange} />);
+    const files = ["a", "b", "c"].map(
+      (id) => new File(["foto"], `${id}.jpg`, { type: "image/jpeg" }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Velg bilder"), { target: { files } });
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+    const added = onChange.mock.calls[0][0].slice(98) as PendingImage[];
+    expect(added.map((img) => img.file.name)).toEqual(["a.jpg", "b.jpg"]);
+    expect(toast.showErrorToast).toHaveBeenCalledWith(
+      "En annonse kan ha maksimalt 100 bilder. De 2 første er lagt til.",
+    );
+  });
+
   it("åpner filvelgeren for galleriet i appen, så KI-metadataen bevares", () => {
     native.isNative.mockReturnValue(true);
     const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});

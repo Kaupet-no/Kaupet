@@ -156,21 +156,29 @@ export function ImageUploader({
     async (files: File[]) => {
       setProcessing(true);
       try {
-        if (images.length + files.length > MAX_LISTING_IMAGES) {
-          showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
+        const remaining = MAX_LISTING_IMAGES - images.length;
+        const limitMessage = `En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`;
+        if (remaining <= 0) {
+          showErrorToast(limitMessage);
           return;
         }
-        const [compressed, thumbs, aiFlags] = await Promise.all([
-          Promise.all(files.map((file) => compressImage(file, "listing"))),
-          Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
-          // Én fil om gangen: originalene kan være store, og mange samtidige
-          // lesinger kan få appen til å gå tom for minne.
-          (async () => {
-            const flags: boolean[] = [];
-            for (const file of files) flags.push(await isAiGeneratedImage(file));
-            return flags;
-          })(),
-        ]);
+        // Flervalg i galleriet har ingen grense, så overskuddet hoppes over.
+        const skipped = files.length > remaining;
+        files = files.slice(0, remaining);
+        // Én fil om gangen: originalene fra galleriet kan være store, og mange
+        // samtidige lesinger og komprimeringer kan få appen til å gå tom for minne.
+        const compressed: File[] = [];
+        const thumbs: File[] = [];
+        const aiFlags: boolean[] = [];
+        for (const file of files) {
+          aiFlags.push(await isAiGeneratedImage(file));
+          const [main, thumb] = await Promise.all([
+            compressImage(file, "listing"),
+            compressImage(file, "listing-thumb"),
+          ]);
+          compressed.push(main);
+          thumbs.push(thumb);
+        }
         const err = validateImages(compressed);
         if (err) {
           showErrorToast(describeImageError(err));
@@ -184,6 +192,7 @@ export function ImageUploader({
           aiGenerated: aiFlags[i],
         }));
         onChange([...images, ...next]);
+        if (skipped) showErrorToast(`${limitMessage} De ${remaining} første er lagt til.`);
       } catch (error) {
         showErrorToast(formatErrorMessage(error, "Kunne ikke behandle bildene. Prøv igjen."));
       } finally {

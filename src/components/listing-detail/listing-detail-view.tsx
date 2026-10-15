@@ -323,7 +323,11 @@ export function ListingDetailView({
       ? mileageKmRaw
       : null;
   const euControlStatus = isVehicleListing
-    ? parseEuControlStatus(attributes.eu_control_status)
+    ? parseEuControlStatus(
+        attributes.eu_control_status,
+        vehicleLookup?.next_eu_control ?? attributes.next_eu_control,
+        attributes.eu_control_exempt,
+      )
     : null;
   // Seller-confirmed override (see `vehicle-confirm/index.tsx`), stored
   // top-level like `mileage_km` — takes precedence over the SVV snapshot's
@@ -994,6 +998,12 @@ function ListingDetailViewBody({
                     mileageKm={mileageKm}
                     driveType={driveType}
                     euControlStatus={euControlStatus}
+                    nextEuControl={
+                      vehicleLookup?.next_eu_control ??
+                      (typeof attributes.next_eu_control === "string"
+                        ? attributes.next_eu_control
+                        : null)
+                    }
                     onClose={close}
                   />
                 )}

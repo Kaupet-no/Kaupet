@@ -1,5 +1,6 @@
 import { format, isValid, parse } from "date-fns";
 import { z } from "zod";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 
 /** Minimal category shape needed for filter inheritance (avoids requiring slug/name). */
 export type CategoryNode = { id: string; parent_id: string | null };
@@ -368,7 +369,14 @@ export function effectiveFiltersForCategory(
       (a, b) => depthOf(a.category_id, categoriesById) - depthOf(b.category_id, categoriesById),
     );
   for (const f of ordered) byKey.set(f.key, f);
-  return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
+  const filters = Array.from(byKey.values());
+  const behavior = getCategoryBehavior(
+    (filters.find((f) => f.type === "brand_select")?.unit as VehicleBrandGroup | null) ?? null,
+  );
+  const legacyKeys = new Set(
+    behavior.legacyFilterAliases.filter((a) => byKey.has(a.replacementKey)).map((a) => a.key),
+  );
+  return filters.filter((f) => !legacyKeys.has(f.key)).sort((a, b) => a.sort_order - b.sort_order);
 }
 
 /** Tallstreng i norsk skrivemåte → tall: mellomrom som tusenskille
@@ -517,6 +525,15 @@ export function getMissingRequiredFilters(
 ): CategoryFilter[] {
   const excluded = excludeKeys ? new Set(excludeKeys) : null;
   const effective = effectiveFiltersForCategory(categoryId, allFilters, categoriesById);
+  const behavior = getCategoryBehavior(
+    (effective.find((f) => f.type === "brand_select")?.unit as VehicleBrandGroup | null) ?? null,
+  );
+  attributes = { ...attributes };
+  for (const alias of behavior.legacyFilterAliases) {
+    if (attributes[alias.replacementKey] == null && attributes[alias.key] === alias.value) {
+      attributes[alias.replacementKey] = alias.replacementValue;
+    }
+  }
   const alternatives = effective.filter(isAlternativeFilter);
   const answeredByAlternative = new Set(
     alternatives

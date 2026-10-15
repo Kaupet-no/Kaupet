@@ -7,6 +7,7 @@ import {
   EU_CONTROL_STATUS_LABEL_NB,
   type EuControlStatus,
 } from "@/lib/vehicle/vehicle-options";
+import { todayIsoDate } from "@/lib/category-filters";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -27,11 +28,13 @@ export function VehicleFactsPanel({
   mileageKm,
   driveType,
   euControlStatus,
+  nextEuControl,
   onClose,
 }: {
   mileageKm: number | null;
   driveType: string | null;
   euControlStatus: EuControlStatus | null;
+  nextEuControl: string | null;
   onClose: () => void;
 }) {
   const editCtx = useListingEdit();
@@ -39,13 +42,14 @@ export function VehicleFactsPanel({
   const [drive, setDrive] = useState(driveType ?? "");
   const [euStatus, setEuStatus] = useState(euControlStatus);
   const [saving, setSaving] = useState(false);
+  const canChooseStatus = !nextEuControl || nextEuControl < todayIsoDate();
 
   async function save() {
     setSaving(true);
     try {
       const attrs: Record<string, unknown> = {};
       const removedKeys: string[] = [];
-      if (euStatus) attrs.eu_control_status = euStatus;
+      if (canChooseStatus && euStatus) attrs.eu_control_status = euStatus;
       else removedKeys.push("eu_control_status");
       if (km.trim() !== "") attrs.mileage_km = Number(km);
       else removedKeys.push("mileage_km");
@@ -89,16 +93,17 @@ export function VehicleFactsPanel({
           </SelectContent>
         </Select>
       </div>
-      {(Object.keys(EU_CONTROL_STATUS_LABEL_NB) as EuControlStatus[]).map((status) => (
-        <div key={status} className="flex min-h-12 items-center justify-between gap-3">
-          <Label htmlFor={`ef-eu-${status}`}>{EU_CONTROL_STATUS_LABEL_NB[status]}</Label>
-          <Switch
-            id={`ef-eu-${status}`}
-            checked={euStatus === status}
-            onCheckedChange={(checked) => setEuStatus(checked ? status : null)}
-          />
-        </div>
-      ))}
+      {canChooseStatus &&
+        (Object.keys(EU_CONTROL_STATUS_LABEL_NB) as EuControlStatus[]).map((status) => (
+          <div key={status} className="flex min-h-12 items-center justify-between gap-3">
+            <Label htmlFor={`ef-eu-${status}`}>{EU_CONTROL_STATUS_LABEL_NB[status]}</Label>
+            <Switch
+              id={`ef-eu-${status}`}
+              checked={euStatus === status}
+              onCheckedChange={(checked) => setEuStatus(checked ? status : null)}
+            />
+          </div>
+        ))}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>
           Avbryt

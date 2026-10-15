@@ -58,6 +58,13 @@ export type CategoryBehavior = {
   /** Attributter uten filterrad som lagres som ISO-dato og valideres som det
    * (filtre av typen `date` dekkes allerede av filtertypen). */
   extraDateAttributes: readonly DateAttribute[];
+  /** Eldre klienter kan fortsatt sende disse feltene under en overgang. */
+  legacyFilterAliases: readonly {
+    key: string;
+    replacementKey: string;
+    value: boolean;
+    replacementValue: string;
+  }[];
   /** Extra breadcrumb segments appended after the category chain, derived from the listing's attributes. */
   extraBreadcrumbSegments: (
     attributes: Record<string, unknown>,
@@ -73,6 +80,7 @@ const DEFAULT_BEHAVIOR: CategoryBehavior = {
   requiresCategoryFilterValues: true,
   requiredFilterExclusions: [],
   extraDateAttributes: [],
+  legacyFilterAliases: [],
   attributeReviewGroupKey: defaultAttributeReviewGroupKey,
   extraBreadcrumbSegments: (attributes, { rootCategorySlug, genericBrandFilter }) => {
     if (!genericBrandFilter) return [];
@@ -104,6 +112,14 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
   requiredFilterExclusions: ["cylinders", "engine_displacement_cc", "engine_code"],
   // Settes fra SVV-oppslaget eller datovelgeren i kjøretøyveiviseren.
   extraDateAttributes: [{ key: "first_registration_date", label_nb: "Førstegangsregistrering" }],
+  legacyFilterAliases: [
+    {
+      key: "eu_control_exempt",
+      replacementKey: "eu_control_status",
+      value: true,
+      replacementValue: "exempt",
+    },
+  ],
   attributeReviewGroupKey: (pages, vehicleRegistered) =>
     vehicleRegistered ? "vehicle-facts" : defaultAttributeReviewGroupKey(pages),
   extraBreadcrumbSegments: (attributes, { rootCategorySlug }) => {

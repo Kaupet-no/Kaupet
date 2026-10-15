@@ -51,7 +51,11 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
     ? (parseVehicleLookup(attributes.vehicle_lookup) ?? null)
     : null;
   const euControlStatus = isVehicleListing
-    ? parseEuControlStatus(attributes.eu_control_status)
+    ? parseEuControlStatus(
+        attributes.eu_control_status,
+        vehicleLookup?.next_eu_control ?? attributes.next_eu_control,
+        attributes.eu_control_exempt,
+      )
     : null;
   const driveTypeRaw = attributes.drive_type;
   const driveType =

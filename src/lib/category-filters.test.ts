@@ -555,3 +555,42 @@ describe("alternativer til en frist (Mangler/Fritatt EU-kontroll)", () => {
     ).toBe(false);
   });
 });
+
+describe("eldre fritaksfelt under klientovergangen", () => {
+  const filters = [
+    f({ category_id: "main", key: "brand", type: "brand_select", unit: "bil", is_optional: true }),
+    f({ category_id: "main", key: "next_eu_control", type: "date" }),
+    f({ category_id: "main", key: "eu_control_exempt", type: "boolean", is_optional: true }),
+    f({
+      category_id: "main",
+      key: "eu_control_status",
+      is_optional: true,
+      depends_on_key: "next_eu_control",
+    }),
+  ];
+
+  it("skjuler det gamle feltet bare når erstatningen finnes", () => {
+    expect(effectiveFiltersForCategory("sub", filters, byId).map((x) => x.key)).not.toContain(
+      "eu_control_exempt",
+    );
+    expect(
+      effectiveFiltersForCategory(
+        "sub",
+        filters.filter((x) => x.key !== "eu_control_status"),
+        byId,
+      ).map((x) => x.key),
+    ).toContain("eu_control_exempt");
+  });
+
+  it.each([
+    [true, []],
+    [false, ["next_eu_control"]],
+  ])(
+    "tolker eldre fritak %s ved publiseringsvalidering (beslutningstabell)",
+    (eu_control_exempt, expected) => {
+      expect(
+        getMissingRequiredFilters("sub", filters, byId, { eu_control_exempt }).map((x) => x.key),
+      ).toEqual(expected);
+    },
+  );
+});

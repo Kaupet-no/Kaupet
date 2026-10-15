@@ -1,3 +1,5 @@
+import { todayIsoDate } from "@/lib/category-filters";
+
 /** Selgerens alternativ til en tom eller passert «Neste EU-kontroll»
  * (`attributes.eu_control_status`, filterrad i 20261015140000). */
 export type EuControlStatus = "missing" | "exempt";
@@ -7,8 +9,15 @@ export const EU_CONTROL_STATUS_LABEL_NB: Record<EuControlStatus, string> = {
   exempt: "Fritatt for EU-kontroll",
 };
 
-export function parseEuControlStatus(value: unknown): EuControlStatus | null {
-  return value === "missing" || value === "exempt" ? value : null;
+export function parseEuControlStatus(
+  value: unknown,
+  nextEuControl?: unknown,
+  legacyExempt?: unknown,
+): EuControlStatus | null {
+  // Samme fristregel som filterDependencyMet, også for eldre lagrede verdier.
+  if (typeof nextEuControl === "string" && nextEuControl >= todayIsoDate()) return null;
+  if (value === "missing" || value === "exempt") return value;
+  return legacyExempt === true ? "exempt" : null;
 }
 
 /** "Hjuldrift"-alternativene brukt både i annonseopprettelse (der SVV ikke

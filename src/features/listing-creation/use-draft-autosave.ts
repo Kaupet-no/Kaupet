@@ -487,20 +487,27 @@ export function useDraftAutosave(fields: DraftFields) {
    * som allerede er lastet opp, gjenbrukes. Returnerer false ved feil; bildene
    * er da fortsatt lagret lokalt. */
   async function syncDraftImages(listingId: string): Promise<boolean> {
+    // En ventende lagring må synke nyeste bildeliste etter den pågående synken.
+    while (imageSyncInProgress.current) {
+      if (!(await imageSyncInProgress.current)) return false;
+    }
     if (!authenticated || !ownerId || !isCurrent() || publishPaused.current) return true;
     if (draftSavingStopped.current || draftRestorePending.current) return true;
-    if (imageSyncInProgress.current) return imageSyncInProgress.current;
+    if (draftIdRef.current !== listingId) return false;
     const run = (async () => {
       const images = latestImages.current;
       const remotes = new Map<string, RemoteImage>();
       let uploaded = false;
-      const keepRemotes = (synced: boolean) =>
-        setImages((current) =>
+      const keepRemotes = (synced: boolean) => {
+        const update = (current: PendingImage[]) =>
           current.map((image) => {
             const remote = remotes.get(image.id);
             return remote ? { ...image, remote: { ...remote, synced } } : image;
-          }),
-        );
+          });
+        // Neste lagring kan fortsette før React har rendret opplastingsreferansene.
+        latestImages.current = update(latestImages.current);
+        setImages(update);
+      };
       try {
         // Én og én: opplastingen er rate-begrenset per bruker.
         for (const image of images) {
@@ -539,12 +546,14 @@ export function useDraftAutosave(fields: DraftFields) {
         setDraftSaveMessage(draftSaveMessageRef.current);
         setDraftSaveError(true);
         return false;
-      } finally {
-        imageSyncInProgress.current = null;
       }
     })();
     imageSyncInProgress.current = run;
-    return run;
+    try {
+      return await run;
+    } finally {
+      imageSyncInProgress.current = null;
+    }
   }
 
   /** Lagrer felt og bilder i serverutkastet. */

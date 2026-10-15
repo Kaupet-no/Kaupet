@@ -328,6 +328,90 @@ describe("useDraftAutosave", () => {
     expect(syncDraftListingImagesMock).toHaveBeenCalledOnce();
   });
 
+  it.each([false, true])(
+    "synker bildeendringer etter uendrede lagringer (har bilder: %s)",
+    async (hasImages) => {
+      saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+      const file = new File(["x"], "a.webp", { type: "image/webp" });
+      const image: PendingImage = { id: "img-a", file, thumbFile: file, previewUrl: "blob:a" };
+      const { result } = renderHook(() => {
+        const [images, setImages] = useState<PendingImage[]>(hasImages ? [image] : []);
+        return {
+          setImages,
+          draft: useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages }),
+        };
+      });
+      await waitFor(() => expect(result.current.draft.draftChecked).toBe(true));
+      await act(async () => {
+        await result.current.draft.saveDraftWithImages();
+      });
+      await act(async () => {
+        await result.current.draft.saveDraftWithImages();
+      });
+      act(() => result.current.setImages(hasImages ? [] : [image]));
+      await act(async () => {
+        expect(await result.current.draft.saveDraftWithImages()).toBe("draft-1");
+      });
+      expect(syncDraftListingImagesMock.mock.calls.at(-1)?.[0].data.images).toHaveLength(
+        hasImages ? 0 : 1,
+      );
+    },
+  );
+
+  it.each(["legger til", "fjerner", "endrer bildetekst"])(
+    "lagrer nyeste bildeliste ved avslutning når brukeren %s under opplasting",
+    async (change) => {
+      saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+      let finishUpload!: (path: string) => void;
+      uploadListingImageMock.mockReturnValueOnce(
+        new Promise<string>((resolve) => {
+          finishUpload = resolve;
+        }),
+      );
+      const file = new File(["x"], "a.webp", { type: "image/webp" });
+      const image: PendingImage = { id: "img-a", file, thumbFile: file, previewUrl: "blob:a" };
+      const { result } = renderHook(() => {
+        const [images, setImages] = useState<PendingImage[]>([image]);
+        return {
+          setImages,
+          draft: useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages }),
+        };
+      });
+      await waitFor(() => expect(result.current.draft.draftChecked).toBe(true));
+      let background!: Promise<string | null>;
+      act(() => {
+        background = result.current.draft.saveDraftWithImages();
+      });
+      await waitFor(() => expect(uploadListingImageMock).toHaveBeenCalledOnce());
+      act(() =>
+        result.current.setImages(
+          change === "fjerner"
+            ? []
+            : change === "legger til"
+              ? [image, { ...image, id: "img-b" }]
+              : [{ ...image, caption: "Blå sykkel æøå 🚲" }],
+        ),
+      );
+      let saveOnExit!: Promise<string | null>;
+      act(() => {
+        saveOnExit = result.current.draft.saveDraftWithImages();
+      });
+      await act(async () => {
+        finishUpload("draft-1/a.webp");
+        await background;
+        expect(await saveOnExit).toBe("draft-1");
+      });
+      const savedImages = syncDraftListingImagesMock.mock.calls.at(-1)?.[0].data.images;
+      expect(savedImages).toHaveLength(change === "fjerner" ? 0 : change === "legger til" ? 2 : 1);
+      if (change !== "fjerner") {
+        expect(savedImages[0].id).toBe(
+          syncDraftListingImagesMock.mock.calls[0][0].data.images[0].id,
+        );
+      }
+      if (change === "endrer bildetekst") expect(savedImages[0].caption).toBe("Blå sykkel æøå 🚲");
+    },
+  );
+
   it("beholder bildene lokalt og melder feil når bildesynken feiler", async () => {
     saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
     syncDraftListingImagesMock.mockRejectedValue(new Error("nede"));

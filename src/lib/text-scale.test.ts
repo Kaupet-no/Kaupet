@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 const textScaleGet = vi.hoisted(() => vi.fn());
 vi.mock("@capacitor/core", () => ({ registerPlugin: () => ({ get: textScaleGet }) }));
+vi.mock("./native", () => ({ isNative: () => true, nativePlatform: () => "android" }));
 
-import { clampScale, measureTextScale, readAndroidFontScale } from "./text-scale";
+import { clampScale, initTextScale, measureTextScale, readAndroidFontScale } from "./text-scale";
 
 describe("clampScale", () => {
   it("holder seg innenfor 0,8–2 (WCAG 1.4.4-taket)", () => {
@@ -51,5 +52,20 @@ describe("readAndroidFontScale (KG-39-F02)", () => {
   it("er no-op når eldre app mangler broen", async () => {
     textScaleGet.mockRejectedValueOnce(new Error("not implemented"));
     expect(await readAndroidFontScale()).toBeNull();
+  });
+});
+
+describe("initTextScale på Android", () => {
+  it("husker skalaen til neste oppstart, så public/boot.js kan sette den før første opptegning", async () => {
+    const setProperty = vi.fn();
+    const setItem = vi.fn();
+    vi.stubGlobal("document", { documentElement: { style: { setProperty } } });
+    vi.stubGlobal("localStorage", { setItem, removeItem: vi.fn() });
+    textScaleGet.mockResolvedValueOnce({ fontScale: 1.3 });
+
+    initTextScale();
+    await vi.waitFor(() => expect(setItem).toHaveBeenCalledWith("kaupet_text_scale", "1.3"));
+    expect(setProperty).toHaveBeenCalledWith("--kaupet-text-scale", "1.3");
+    vi.unstubAllGlobals();
   });
 });

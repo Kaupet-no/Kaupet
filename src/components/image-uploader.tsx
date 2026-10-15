@@ -22,6 +22,8 @@ import { compressImage } from "@/lib/image-compression";
 import { isAiGeneratedImage } from "@/lib/image-metadata";
 import type { RemoteImage } from "@/features/listing-creation/draft-image-sync";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AiImageBadge, AiImageInfo } from "@/components/ai-image-info";
 import { isNative, pickNativePhotos } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -114,6 +116,7 @@ function SortableImageItem({
           </button>
         </div>
       </div>
+      <AiImageBadge show={img.aiGenerated} inline />
       <input
         type="text"
         value={img.caption ?? ""}
@@ -139,6 +142,7 @@ export function ImageUploader({
   const captureInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const aiImageCount = images.filter((image) => image.aiGenerated).length;
 
   // Revoke object URLs on unmount
   useEffect(() => {
@@ -389,6 +393,30 @@ export function ImageUploader({
               </ul>
             </SortableContext>
           </DndContext>
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {aiImageCount > 0 && (
+              <Alert
+                role="region"
+                aria-label="Informasjon om bildemerking"
+                className="border-0 bg-surface"
+              >
+                <AlertTitle>
+                  {aiImageCount} av {images.length} {images.length === 1 ? "bilde" : "bilder"} blir
+                  merket
+                </AlertTitle>
+                <AlertDescription>
+                  <p>
+                    {aiImageCount === 1
+                      ? "Bildefilen oppgir at KI er brukt. Dette bildet får et merke som er synlig for alle som ser annonsen."
+                      : "Bildefilene oppgir at KI er brukt. Disse bildene får et merke som er synlig for alle som ser annonsen."}
+                  </p>
+                  <AiImageInfo className="mt-1 justify-start px-0 underline underline-offset-4">
+                    Om merkingen
+                  </AiImageInfo>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Dra bildene for å endre rekkefølgen. Det første bildet blir hovedbildet.
           </p>

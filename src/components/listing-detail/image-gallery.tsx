@@ -48,7 +48,7 @@ import {
   type InlineListingImages,
 } from "@/features/listing-edit/use-inline-listing-images";
 import { IMAGE_ACCEPT } from "@/lib/storage";
-import { AiImageBadge } from "@/components/listing-detail/ai-image-badge";
+import { AiImageBadge } from "@/components/ai-image-info";
 type ListingImage = {
   storage_path: string;
   sort_order: number;

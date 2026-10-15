@@ -7,7 +7,7 @@ import {
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { ZoomableImage } from "@/components/listing-detail/zoomable-image";
-import { AiImageBadge } from "@/components/listing-detail/ai-image-badge";
+import { AiImageBadge } from "@/components/ai-image-info";
 import { useAutoHide, autoHideClass } from "@/hooks/use-auto-hide";
 import { lockPortraitOnPhone, unlockOrientation } from "@/lib/orientation";
 

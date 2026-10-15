@@ -35,10 +35,12 @@ SET attributes = (attributes - 'eu_control_exempt')
        THEN '{"eu_control_status":"exempt"}'::jsonb ELSE '{}'::jsonb END
 WHERE attributes ? 'eu_control_exempt';
 
+-- Kjøpsønsker lagrer valgfelt som liste (wtb-criteria-types.ts), så
+-- skjemaet viser valget ved redigering.
 UPDATE public.wtb_listings
 SET attributes = (attributes - 'eu_control_exempt')
   || CASE WHEN attributes->'eu_control_exempt' = 'true'::jsonb
-       THEN '{"eu_control_status":"exempt"}'::jsonb ELSE '{}'::jsonb END
+       THEN '{"eu_control_status":["exempt"]}'::jsonb ELSE '{}'::jsonb END
 WHERE attributes ? 'eu_control_exempt';
 
 -- Lagrede søk: {kind:boolean,value:true} blir {kind:select,value:exempt};

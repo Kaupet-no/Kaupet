@@ -141,6 +141,31 @@ describe("syncListings", () => {
     ]);
   });
 
+  it("normaliserer norske datoer til ISO og avviser datoer som ikke kan tolkes", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "created" }, error: null };
+      },
+    });
+    const results = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [
+        makeRow({ rowNumber: 2, externalId: "ok", attributes: { next_eu_control: "31.12.2027" } }),
+        makeRow({ rowNumber: 3, externalId: "feil", attributes: { next_eu_control: "snart" } }),
+      ],
+      mode: "create",
+    });
+    expect(results[0]).toMatchObject({ status: "created" });
+    expect(JSON.stringify(rpc.mock.calls[0][0])).toContain('"next_eu_control":"2027-12-31"');
+    expect(results[1]).toMatchObject({
+      status: "failed",
+      error: "Neste EU-kontroll må være en dato, f.eks. 2027-05-31.",
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
   it("dry_run sender _dry_run: true og skriver ikke kvote", async () => {
     const rpc = vi.fn();
     const supabaseAdmin = makeSupabaseAdmin({

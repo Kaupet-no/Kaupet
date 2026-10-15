@@ -1,3 +1,4 @@
+import { format, isValid, parse } from "date-fns";
 import { z } from "zod";
 
 /** Minimal category shape needed for filter inheritance (avoids requiring slug/name). */
@@ -366,6 +367,63 @@ export function normalizeNumericAttributes<T>(
   return normalized;
 }
 
+/** Attributter som lagres som ISO-dato (`yyyy-MM-dd`) og fylles inn med
+ * datovelger (`EuControlDateField`). Nøkkelbasert, som `NUMERIC_DIGIT_CAPS`:
+ * `next_eu_control` er en `text`-filter i category_filters, og
+ * `first_registration_date` er et rått attributt uten filterrad. */
+export const DATE_ATTRIBUTE_LABELS: Record<string, string> = {
+  next_eu_control: "Neste EU-kontroll",
+  first_registration_date: "Førstegangsregistrering",
+};
+
+const ISO_DATE = "yyyy-MM-dd";
+/** Excel lagrer datoer som dager siden 1899-12-30. */
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
+
+function toIsoDate(value: unknown): string | null {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value < 1 || value > 2_958_465) return null;
+    return new Date(EXCEL_EPOCH_UTC + value * 86_400_000).toISOString().slice(0, 10);
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  for (const pattern of [ISO_DATE, "d.M.yyyy"]) {
+    const parsed = parse(text, pattern, new Date(2000, 0, 1));
+    // `parse` godtar f.eks. «2027-5-1»; krev at formatet faktisk stemmer.
+    if (isValid(parsed) && /^\d{4}-\d{2}-\d{2}$|^\d{1,2}\.\d{1,2}\.\d{4}$/.test(text)) {
+      return format(parsed, ISO_DATE);
+    }
+  }
+  return null;
+}
+
+/** Gjør om datoattributter fra import (ISO, `31.12.2027`, Excel-serienummer)
+ * til ISO. Verdier som ikke kan tolkes står urørt, så
+ * `findInvalidDateAttribute` kan avvise dem med en tydelig melding. */
+export function normalizeDateAttributes<T>(
+  attributes: Record<string, T>,
+): Record<string, T | string> {
+  const normalized: Record<string, T | string> = { ...attributes };
+  for (const key of Object.keys(DATE_ATTRIBUTE_LABELS)) {
+    const iso = toIsoDate(normalized[key]);
+    if (iso) normalized[key] = iso;
+  }
+  return normalized;
+}
+
+/** Første datoattributt som har en verdi, men ikke er en gyldig ISO-dato.
+ * Ugyldige datoer ødela tidligere visning og matching nedstrøms. */
+export function findInvalidDateAttribute(
+  attributes: Record<string, unknown>,
+): { key: string; label_nb: string } | null {
+  for (const [key, label_nb] of Object.entries(DATE_ATTRIBUTE_LABELS)) {
+    const value = attributes[key];
+    if (value === undefined || value === null || value === "") continue;
+    if (typeof value !== "string" || toIsoDate(value) !== value) return { key, label_nb };
+  }
+  return null;
+}
+
 /**
  * Første tallfelt (filtertype range/number) som har en verdi som ikke er et
  * endelig tall. Søket og forsiden leser disse som tall; en lagret tekst som
@@ -422,6 +480,9 @@ export function getMissingRequiredFilters(
     ) {
       return true;
     }
+    // En ugyldig dato (fra gammel fritekst) vises tom i datovelgeren; da
+    // skal den også telle som ikke utfylt.
+    if (Object.hasOwn(DATE_ATTRIBUTE_LABELS, f.key)) return toIsoDate(v) !== v;
     if (typeof v === "string") return v.trim() === "";
     if (Array.isArray(v)) return v.length === 0;
     return false;

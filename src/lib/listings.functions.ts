@@ -10,6 +10,7 @@ import {
   effectiveFiltersForCategory,
   findNonNumericAttribute,
   normalizeNumericAttributes,
+  findInvalidDateAttribute,
   getMissingRequiredFilters,
   normalizeFilter,
   isBoatCategory,
@@ -289,7 +290,7 @@ function validatePartFitment(
     throw new ClientError("Årsmodell fra kan ikke være høyere enn årsmodell til.", 400);
   }
 }
-function assertNumericAttributes(
+function assertAttributeFormats(
   categoryId: string | null,
   filters: ReturnType<typeof normalizeFilter>[],
   categoriesById: Map<string, CategoryNode>,
@@ -297,6 +298,8 @@ function assertNumericAttributes(
 ) {
   const invalid = findNonNumericAttribute(categoryId, filters, categoriesById, attributes);
   if (invalid) throw new ClientError(`${invalid.label_nb} må være et tall.`, 400);
+  const invalidDate = findInvalidDateAttribute(attributes);
+  if (invalidDate) throw new ClientError(`${invalidDate.label_nb} må være en gyldig dato.`, 400);
 }
 
 async function validateExistingListingForPublish(
@@ -370,7 +373,7 @@ async function validateExistingListingForPublish(
     categoriesById,
     attributesResult.data,
   );
-  assertNumericAttributes(listing.category_id, normalizedFilters, categoriesById, attributes);
+  assertAttributeFormats(listing.category_id, normalizedFilters, categoriesById, attributes);
 
   if (categoryBehavior.requiresCategoryFilterValues) {
     const missing = getMissingRequiredFilters(
@@ -708,7 +711,7 @@ export const createListing = createServerFn({ method: "POST" })
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
-    assertNumericAttributes(data.category_id, normalizedFilters, categoriesById, attributes);
+    assertAttributeFormats(data.category_id, normalizedFilters, categoriesById, attributes);
     if (categoryBehavior.requiresCategoryFilterValues) {
       validatePartFitment(data.category_id, normalizedFilters, categoriesById, attributes);
     }

@@ -338,6 +338,10 @@ async function parseXlsx(file: File): Promise<unknown[][]> {
     const workbook = XLSX.read(await file.arrayBuffer(), {
       type: "array",
       sheetRows: XLSX_PHYSICAL_ROW_LIMIT,
+      // Datoceller leses ellers som «5/31/27» (Excels amerikanske standard);
+      // ISO er formatet datoattributtene lagres i (se DATE_ATTRIBUTE_LABELS).
+      cellDates: true,
+      dateNF: "yyyy-mm-dd",
     });
     if (workbook.SheetNames.length === 0) {
       throw new ImportFileError("Excel-filen mangler et regneark.");

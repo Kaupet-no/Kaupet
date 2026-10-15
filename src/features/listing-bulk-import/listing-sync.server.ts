@@ -7,6 +7,8 @@ import {
   normalizeFilter,
   normalizeNumericAttributes,
   findNonNumericAttribute,
+  findInvalidDateAttribute,
+  normalizeDateAttributes,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -85,7 +87,8 @@ function safeRowError(message: string): string {
   if (
     message.startsWith("Fyll inn:") ||
     message.startsWith("Velg ") ||
-    message.startsWith("Legg til ")
+    message.startsWith("Legg til ") ||
+    / må være (et tall|en dato, f\.eks\. \d{4}-\d{2}-\d{2})\.$/.test(message)
   ) {
     return message;
   }
@@ -298,6 +301,8 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
   const attributes = row.attributes;
   const invalid = findNonNumericAttribute(category.id, ctx.filters, ctx.categoriesById, attributes);
   if (invalid) return `${invalid.label_nb} må være et tall.`;
+  const invalidDate = findInvalidDateAttribute(attributes);
+  if (invalidDate) return `${invalidDate.label_nb} må være en dato, f.eks. 2027-05-31.`;
   const behavior = getCategoryBehavior(
     vehicleCategoryGroupFor(category.id, ctx.filters, ctx.categoriesById),
     isBoatCategory(category.id, ctx.filters, ctx.categoriesById),
@@ -342,11 +347,13 @@ export function validateSyncRow(
   const normalized = normalizeBulkImportRow(schemaResult.data, row.rowNumber);
   if (isDraft) (normalized as { status?: string }).status = "draft";
   const category = resolveCategory(normalized.category, ctx.categories);
-  normalized.attributes = normalizeNumericAttributes(
-    category?.id ?? null,
-    ctx.filters,
-    ctx.categoriesById,
-    normalized.attributes,
+  normalized.attributes = normalizeDateAttributes(
+    normalizeNumericAttributes(
+      category?.id ?? null,
+      ctx.filters,
+      ctx.categoriesById,
+      normalized.attributes,
+    ),
   );
   const validationError = validateRowFields(normalized, ctx);
   if (validationError) return { ok: false, error: safeRowError(validationError) };

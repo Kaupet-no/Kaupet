@@ -1,5 +1,5 @@
 import { useState, type ComponentProps } from "react";
-import { format, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { nb } from "react-day-picker/locale";
 
@@ -30,7 +30,9 @@ export function DesktopDatePicker({
   max: string;
 } & Pick<ComponentProps<"button">, "aria-invalid" | "aria-describedby" | "aria-required">) {
   const [open, setOpen] = useState(false);
-  const selected = value ? parseISO(value) : undefined;
+  const parsed = value ? parseISO(value) : undefined;
+  const selected = parsed && isValid(parsed) ? parsed : undefined;
+  const invalid = !!value && !selected;
   const minDate = parseISO(min);
   const maxDate = parseISO(max);
   // Etiketten (htmlFor) navngir knappen; datoen leses som beskrivelse.
@@ -46,6 +48,7 @@ export function DesktopDatePicker({
         <Button
           {...ariaProps}
           id={id}
+          aria-invalid={invalid || ariaProps["aria-invalid"] || undefined}
           aria-describedby={[valueId, describedBy].filter(Boolean).join(" ")}
           type="button"
           variant="outline"

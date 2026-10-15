@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EuControlDateField } from "./eu-control-date-field";
@@ -27,5 +27,37 @@ describe("EuControlDateField", () => {
     expect(field.min).toBe("2026-09-09");
     expect(field.max).toBe("2030-12-31");
     vi.useRealTimers();
+  });
+
+  it("bruker shadcn-kalenderen med måned/år-nedtrekk på brede skjermer", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    const onChange = vi.fn();
+    render(
+      <EuControlDateField
+        id="eu"
+        value="2027-03-14"
+        min="2026-01-01"
+        max="2030-12-31"
+        onChange={onChange}
+      />,
+    );
+
+    const trigger = await screen.findByRole(
+      "button",
+      { name: /14\.03\.2027/ },
+      // Kalenderen lastes lazy; første import i testmiljøet kan ta et par sekunder.
+      { timeout: 5000 },
+    );
+    fireEvent.click(trigger);
+    expect(await screen.findByRole("combobox", { name: "Velg år" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Velg måned" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /20\. mars 2027/ }));
+    expect(onChange).toHaveBeenCalledWith("2027-03-20");
+    vi.unstubAllGlobals();
   });
 });

@@ -23,7 +23,6 @@ import {
 } from "@/lib/category-filters";
 import { useAttributeRangeBounds, dynamicBoundsForFilter } from "./use-attribute-bounds";
 import {
-  EU_CONTROL_KEY,
   isWtbDateMinValue,
   isWtbRangeValue,
   type WtbAttributeMap,
@@ -209,7 +208,7 @@ export function WtbCriteriaFields({
 }
 
 function criterionLabel(filter: CategoryFilter) {
-  if (filter.key === EU_CONTROL_KEY) return "Neste EU-kontroll (tidligst)";
+  if (filter.type === "date") return `${filter.label_nb} (tidligst)`;
   return filter.unit && filter.type !== "brand_select"
     ? `${filter.label_nb} (${filter.unit})`
     : filter.label_nb;
@@ -251,7 +250,7 @@ function WtbCriterionField({
     );
   }
 
-  if (filter.key === EU_CONTROL_KEY) {
+  if (filter.type === "date") {
     const minDate = isWtbDateMinValue(value) ? value.minDate : "";
     return (
       <div className="space-y-2">

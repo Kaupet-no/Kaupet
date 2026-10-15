@@ -11,7 +11,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DATE_ATTRIBUTE_LABELS,
   effectiveFiltersForCategory,
   filterDependencyMet,
   getMissingRequiredFilters,
@@ -406,7 +405,7 @@ function AttributeField({
           <span className="font-normal text-muted-foreground"> (valgfritt)</span>
         )}
       </Label>
-      {Object.hasOwn(DATE_ATTRIBUTE_LABELS, filter.key) ? (
+      {filter.type === "date" ? (
         // Kun datovelger: fritekst ga ugyldige datoer som ødela visning og
         // matching. En passert frist er reell (forfalt EU-kontroll).
         <EuControlDateField

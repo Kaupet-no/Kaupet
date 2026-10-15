@@ -4,6 +4,7 @@ import {
   newImagesPerDayLimitMessage,
   newListingsPerDayLimitMessage,
 } from "@/lib/integration-limits";
+import { normalizeFilter } from "@/lib/category-filters";
 import type { BulkImportRow } from "./import-schema";
 import { syncListings, type SyncContext } from "./listing-sync.server";
 
@@ -149,14 +150,34 @@ describe("syncListings", () => {
         return { data: { status: "created" }, error: null };
       },
     });
-    const results = await syncListings(supabaseAdmin, makeContext(), {
-      importId,
-      rows: [
-        makeRow({ rowNumber: 2, externalId: "ok", attributes: { next_eu_control: "31.12.2027" } }),
-        makeRow({ rowNumber: 3, externalId: "feil", attributes: { next_eu_control: "snart" } }),
-      ],
-      mode: "create",
+    const dateFilter = normalizeFilter({
+      id: "f-eu",
+      category_id: categoryId,
+      key: "next_eu_control",
+      label_nb: "Neste EU-kontroll",
+      type: "date",
+      unit: null,
+      options: null,
+      sort_order: 0,
+      is_primary: false,
+      is_optional: true,
     });
+    const results = await syncListings(
+      supabaseAdmin,
+      { ...makeContext(), filters: [dateFilter] },
+      {
+        importId,
+        rows: [
+          makeRow({
+            rowNumber: 2,
+            externalId: "ok",
+            attributes: { next_eu_control: "31.12.2027" },
+          }),
+          makeRow({ rowNumber: 3, externalId: "feil", attributes: { next_eu_control: "snart" } }),
+        ],
+        mode: "create",
+      },
+    );
     expect(results[0]).toMatchObject({ status: "created" });
     expect(JSON.stringify(rpc.mock.calls[0][0])).toContain('"next_eu_control":"2027-12-31"');
     expect(results[1]).toMatchObject({

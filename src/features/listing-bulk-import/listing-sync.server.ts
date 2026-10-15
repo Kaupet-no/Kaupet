@@ -291,6 +291,13 @@ export async function loadSyncContext(
   };
 }
 
+function behaviorFor(categoryId: string, ctx: SyncContext) {
+  return getCategoryBehavior(
+    vehicleCategoryGroupFor(categoryId, ctx.filters, ctx.categoriesById),
+    isBoatCategory(categoryId, ctx.filters, ctx.categoriesById),
+  );
+}
+
 function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null {
   const category = resolveCategory(row.category, ctx.categories);
   if (!category) return "Kategorien finnes ikke. Bruk kategorinavnet eller slug-en fra malen.";
@@ -301,12 +308,15 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
   const attributes = row.attributes;
   const invalid = findNonNumericAttribute(category.id, ctx.filters, ctx.categoriesById, attributes);
   if (invalid) return `${invalid.label_nb} må være et tall.`;
-  const invalidDate = findInvalidDateAttribute(attributes);
-  if (invalidDate) return `${invalidDate.label_nb} må være en dato, f.eks. 2027-05-31.`;
-  const behavior = getCategoryBehavior(
-    vehicleCategoryGroupFor(category.id, ctx.filters, ctx.categoriesById),
-    isBoatCategory(category.id, ctx.filters, ctx.categoriesById),
+  const behavior = behaviorFor(category.id, ctx);
+  const invalidDate = findInvalidDateAttribute(
+    category.id,
+    ctx.filters,
+    ctx.categoriesById,
+    attributes,
+    behavior.extraDateAttributes,
   );
+  if (invalidDate) return `${invalidDate.label_nb} må være en dato, f.eks. 2027-05-31.`;
   const missing = behavior.requiresCategoryFilterValues
     ? getMissingRequiredFilters(category.id, ctx.filters, ctx.categoriesById, attributes, [
         ...VEHICLE_EQUIPMENT_FILTER_KEYS,
@@ -347,13 +357,13 @@ export function validateSyncRow(
   const normalized = normalizeBulkImportRow(schemaResult.data, row.rowNumber);
   if (isDraft) (normalized as { status?: string }).status = "draft";
   const category = resolveCategory(normalized.category, ctx.categories);
+  const categoryId = category?.id ?? null;
   normalized.attributes = normalizeDateAttributes(
-    normalizeNumericAttributes(
-      category?.id ?? null,
-      ctx.filters,
-      ctx.categoriesById,
-      normalized.attributes,
-    ),
+    categoryId,
+    ctx.filters,
+    ctx.categoriesById,
+    normalizeNumericAttributes(categoryId, ctx.filters, ctx.categoriesById, normalized.attributes),
+    categoryId ? behaviorFor(categoryId, ctx).extraDateAttributes : [],
   );
   const validationError = validateRowFields(normalized, ctx);
   if (validationError) return { ok: false, error: safeRowError(validationError) };

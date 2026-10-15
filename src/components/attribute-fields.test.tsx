@@ -75,7 +75,9 @@ describe("AttributeFields", () => {
   });
 
   it("rendrer datoattributter som datovelger, aldri fritekst", () => {
-    filters.current = [{ ...textFilter, key: "next_eu_control", label_nb: "Neste EU-kontroll" }];
+    filters.current = [
+      { ...textFilter, key: "next_eu_control", label_nb: "Neste EU-kontroll", type: "date" },
+    ];
     const onChange = vi.fn();
     render(
       <AttributeFields

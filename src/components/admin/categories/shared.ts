@@ -51,6 +51,7 @@ export const FILTER_TYPES: FilterType[] = [
   "range",
   "boolean",
   "text",
+  "date",
 ];
 
 export type EditableFilter = {

@@ -452,29 +452,40 @@ describe("normalisering av tallattributter (ekvivalensklasser)", () => {
 });
 
 describe("datoattributter", () => {
+  const filters = [f({ category_id: "main", key: "next_eu_control", type: "date" })];
+  const extra = [{ key: "first_registration_date", label_nb: "Førstegangsregistrering" }];
+  const normalize = (attributes: Record<string, unknown>) =>
+    normalizeDateAttributes("sub", filters, byId, attributes, extra);
+  const findInvalid = (attributes: Record<string, unknown>) =>
+    findInvalidDateAttribute("sub", filters, byId, attributes, extra);
+
   it("normaliserer ISO, norsk format og Excel-serienummer til ISO", () => {
-    expect(normalizeDateAttributes({ next_eu_control: "2027-05-31" }).next_eu_control).toBe(
+    expect(normalize({ next_eu_control: "2027-05-31" }).next_eu_control).toBe("2027-05-31");
+    expect(normalize({ next_eu_control: "1.5.2027" }).next_eu_control).toBe("2027-05-01");
+    // 46538 = 2027-05-31 i Excel
+    expect(normalize({ first_registration_date: 46538 }).first_registration_date).toBe(
       "2027-05-31",
     );
-    expect(normalizeDateAttributes({ next_eu_control: "1.5.2027" }).next_eu_control).toBe(
-      "2027-05-01",
-    );
-    // 46538 = 2027-05-31 i Excel
-    expect(
-      normalizeDateAttributes({ first_registration_date: 46538 }).first_registration_date,
-    ).toBe("2027-05-31");
-    expect(normalizeDateAttributes({ next_eu_control: "snart" }).next_eu_control).toBe("snart");
+    expect(normalize({ next_eu_control: "snart" }).next_eu_control).toBe("snart");
   });
 
   it("finner datoer som ikke er gyldig ISO", () => {
-    expect(findInvalidDateAttribute({ next_eu_control: "2027-05-31" })).toBeNull();
-    expect(findInvalidDateAttribute({ next_eu_control: "" })).toBeNull();
-    expect(findInvalidDateAttribute({ next_eu_control: "2027-13-01" })?.key).toBe(
-      "next_eu_control",
-    );
-    expect(findInvalidDateAttribute({ first_registration_date: "31.12" })?.label_nb).toBe(
+    expect(findInvalid({ next_eu_control: "2027-05-31" })).toBeNull();
+    expect(findInvalid({ next_eu_control: "" })).toBeNull();
+    expect(findInvalid({ next_eu_control: "2027-13-01" })?.key).toBe("next_eu_control");
+    expect(findInvalid({ first_registration_date: "31.12" })?.label_nb).toBe(
       "Førstegangsregistrering",
     );
-    expect(findInvalidDateAttribute({ next_eu_control: 46538 })?.key).toBe("next_eu_control");
+    expect(findInvalid({ next_eu_control: 46538 })?.key).toBe("next_eu_control");
+  });
+
+  it("styres av filtertypen, ikke nøkkelen", () => {
+    const textFilters = [f({ category_id: "main", key: "next_eu_control", type: "text" })];
+    expect(findInvalidDateAttribute("sub", textFilters, byId, { next_eu_control: "snart" })).toBe(
+      null,
+    );
+    expect(
+      findInvalidDateAttribute("sub", filters, byId, { first_registration_date: "31.12" }),
+    ).toBeNull();
   });
 });

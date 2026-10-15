@@ -28,7 +28,6 @@ import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
 import { ComboboxMultiContent } from "@/components/combobox-field";
 import { EuControlDateField } from "@/components/eu-control-date-field";
-import { EU_CONTROL_KEY } from "@/features/wtb/wtb-criteria-types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 
@@ -238,16 +237,14 @@ export function CategoryFilterFields({
             </div>
           );
         }
-        // "Tidligst neste EU-kontroll" — a search-only earliest-date filter,
-        // not the plain text box its category_filters.type="text" would
-        // otherwise render. Mirrors the same key's date picker in the WTB
-        // criteria form (wtb-criteria-fields.tsx).
-        if (f.key === EU_CONTROL_KEY) {
+        // Datofiltre søkes som tidligste dato (date_min), som datovelgeren i
+        // ønskeliste-skjemaet (wtb-criteria-fields.tsx).
+        if (f.type === "date") {
           const minDate = current?.kind === "date_min" ? current.value : "";
           return (
             <div key={f.id} className="space-y-2">
               <div className="flex items-center gap-1.5">
-                <Label>Tidligst neste EU-kontroll</Label>
+                <Label>{f.label_nb} (tidligst)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
@@ -259,7 +256,8 @@ export function CategoryFilterFields({
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-64 text-xs text-muted-foreground">
-                    Søket matcher annonser der neste EU-kontroll er på valgt dato eller senere.
+                    Søket matcher annonser der {f.label_nb.toLocaleLowerCase("nb-NO")} er på valgt
+                    dato eller senere.
                   </PopoverContent>
                 </Popover>
               </div>

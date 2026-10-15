@@ -36,6 +36,8 @@ describe("EuControlDateField", () => {
       addEventListener: () => {},
       removeEventListener: () => {},
     }));
+    // Forhåndslast den lazy kalenderen, så findByRole ikke avhenger av importtid.
+    await import("./desktop-date-picker");
     const onChange = vi.fn();
     render(
       <EuControlDateField
@@ -47,17 +49,13 @@ describe("EuControlDateField", () => {
       />,
     );
 
-    const trigger = await screen.findByRole(
-      "button",
-      { name: /14\.03\.2027/ },
-      // Kalenderen lastes lazy; første import i testmiljøet kan ta et par sekunder.
-      { timeout: 5000 },
-    );
+    const trigger = await screen.findByRole("button", { name: /14\.03\.2027/ });
     fireEvent.click(trigger);
     expect(await screen.findByRole("combobox", { name: "Velg år" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Velg måned" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /20\. mars 2027/ }));
     expect(onChange).toHaveBeenCalledWith("2027-03-20");
     vi.unstubAllGlobals();
-  });
+    // Første import av react-day-picker tar flere sekunder når hele suiten kjører parallelt.
+  }, 30_000);
 });

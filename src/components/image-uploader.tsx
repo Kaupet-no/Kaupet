@@ -24,7 +24,7 @@ import type { RemoteImage } from "@/features/listing-creation/draft-image-sync";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AiImageBadge, AiImageInfo } from "@/components/ai-image-info";
-import { isNative, pickNativePhotos } from "@/lib/native";
+import { isNative, takeNativePhoto } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 
 export type PendingImage = {
@@ -163,7 +163,13 @@ export function ImageUploader({
         const [compressed, thumbs, aiFlags] = await Promise.all([
           Promise.all(files.map((file) => compressImage(file, "listing"))),
           Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
-          Promise.all(files.map(isAiGeneratedImage)),
+          // Én fil om gangen: originalene kan være store, og mange samtidige
+          // lesinger kan få appen til å gå tom for minne.
+          (async () => {
+            const flags: boolean[] = [];
+            for (const file of files) flags.push(await isAiGeneratedImage(file));
+            return flags;
+          })(),
         ]);
         const err = validateImages(compressed);
         if (err) {
@@ -194,15 +200,14 @@ export function ImageUploader({
     e.target.value = "";
   };
 
-  const pickNative = async (source: "camera" | "gallery") => {
+  const takePhoto = async () => {
     try {
-      const remaining = MAX_LISTING_IMAGES - images.length;
-      if (remaining <= 0) {
+      if (images.length >= MAX_LISTING_IMAGES) {
         showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
         return;
       }
-      const files = await pickNativePhotos(source, remaining);
-      if (files.length) await addFiles(files);
+      const file = await takeNativePhoto();
+      if (file) await addFiles([file]);
     } catch (e: unknown) {
       showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
     }
@@ -280,7 +285,7 @@ export function ImageUploader({
             type="button"
             variant="default"
             className="gap-2"
-            onClick={() => void pickNative("camera")}
+            onClick={() => void takePhoto()}
             disabled={processing}
           >
             <Camera className="size-4" /> Ta bilde
@@ -288,7 +293,9 @@ export function ImageUploader({
           <Button
             type="button"
             variant="outline"
-            onClick={() => void pickNative("gallery")}
+            // Filvelgeren gir originalfilen med KI-metadata; Camera-pluginen koder
+            // bildet på nytt og fjerner den.
+            onClick={() => inputRef.current?.click()}
             disabled={processing}
           >
             Velg fra bilder

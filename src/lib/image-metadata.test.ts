@@ -45,4 +45,11 @@ describe("isAiGeneratedImage", () => {
     expect(await isAiGeneratedImage(blob(SOI, ascii(iptc + "digitalCapture"), EOI))).toBe(false);
     expect(await isAiGeneratedImage(blob(SOI, EOI))).toBe(false);
   });
+
+  it("finds a marker that crosses a 1 MiB read boundary", async () => {
+    const marker = ascii(iptc + "trainedAlgorithmicMedia");
+    const padding = new Array(1024 * 1024 - 20).fill(0x20);
+    expect(await isAiGeneratedImage(blob(SOI, padding, marker, EOI))).toBe(true);
+    expect(await isAiGeneratedImage(blob(SOI, padding, padding, marker, EOI))).toBe(true);
+  });
 });

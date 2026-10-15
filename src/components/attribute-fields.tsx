@@ -31,7 +31,11 @@ import {
   VehicleModelWithClassField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 
-/** Hvor langt tilbake en dato kan velges ved opprettelse. */
+/** Hvor langt tilbake en dato kan velges ved opprettelse. Sammen med
+ * EuControlDateField sin standard-max (fire år frem) passer grensene for
+ * EU-kontroll, den eneste datofiltertypen i dag.
+ * ponytail: faste grenser for alle datofiltre; legg min/max på filterraden
+ * når en datotype trenger andre grenser. */
 const DATE_YEARS_BACK = 10;
 
 export type AttributeMap = Record<string, AttributeValue>;

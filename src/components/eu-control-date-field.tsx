@@ -10,8 +10,8 @@ function isoDate(d: Date): string {
 }
 
 /**
- * Datofelt for EU-kontroll (og andre datoattributter, se
- * `DATE_ATTRIBUTE_KEYS`). `<input type="date">` snakker allerede ISO
+ * Datofelt for EU-kontroll og andre datoattributter (filtertypen `date` og
+ * `CategoryBehavior.extraDateAttributes`). `<input type="date">` snakker allerede ISO
  * (`yyyy-MM-dd`) — samme format som SVV leverer og som vi lagrer — og gir
  * brukeren plattformens egen datovelger, som er den native appen vil ha.
  * Brukeren kan ikke skrive fritekst, så et ugyldig format kan ikke oppstå.

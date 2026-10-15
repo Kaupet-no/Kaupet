@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, renderHook } from "@testing-library/react";
+import { createBrowserHistory } from "@tanstack/history";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useOverlayHistory } from "./use-overlay-history";
 
@@ -220,4 +221,25 @@ describe("useOverlayHistory", () => {
       await tick();
     },
   );
+
+  it("ruteoppføringer etter et overlay beholder en gyldig indeks, så en blocker ikke laster siden på nytt", async () => {
+    const router = createBrowserHistory();
+    router.push("/a");
+    await Promise.resolve();
+    const overlay = renderHook(() => useOverlayHistory(true, () => {}));
+    router.push("/b");
+    await tick();
+    overlay.unmount();
+    await tick();
+    expect(Number.isInteger((history.state as { __TSR_index?: number }).__TSR_index)).toBe(true);
+
+    const unblock = router.block({ blockerFn: () => true, enableBeforeUnload: false });
+    const go = vi.spyOn(history, "go").mockImplementation(() => {});
+    await pressBack();
+    await tick();
+    // Tidligere `go(NaN)`, som er `go(0)`: last siden på nytt.
+    expect(go).toHaveBeenCalledExactlyOnceWith(1);
+    unblock();
+    router.destroy();
+  });
 });

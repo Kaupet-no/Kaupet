@@ -114,7 +114,21 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
       if (stack.length === 0) stackId = Math.random();
       entry = { close: () => {}, popped: false, order, releasing: false };
       insert(entry);
-      history.pushState({ overlay: true, overlayStackId: stackId, overlayLevel: stack.length }, "");
+      // Behold ruterens tilstand og tell opp indeksen: TanStack History regner
+      // retning som differansen i `__TSR_index`. Uten den får neste
+      // ruteoppføring NaN, og en blocker angrer en pop med `history.go(NaN)`,
+      // som laster siden på nytt.
+      const prev = history.state as { __TSR_index?: unknown } | null;
+      history.pushState(
+        {
+          ...prev,
+          __TSR_index: (typeof prev?.__TSR_index === "number" ? prev.__TSR_index : 0) + 1,
+          overlay: true,
+          overlayStackId: stackId,
+          overlayLevel: stack.length,
+        },
+        "",
+      );
     }
     const current = entry;
     current.close = () => onCloseRef.current();

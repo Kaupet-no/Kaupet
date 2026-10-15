@@ -479,6 +479,15 @@ describe("datoattributter", () => {
     expect(findInvalid({ next_eu_control: 46538 })?.key).toBe("next_eu_control");
   });
 
+  it("normaliserer Excel-serienummer som tekst (ekvivalensklasser og grenseverdier)", () => {
+    expect(normalize({ next_eu_control: " 46538 " }).next_eu_control).toBe("2027-05-31");
+    expect(normalize({ next_eu_control: "2958465" }).next_eu_control).toBe("9999-12-31");
+    for (const value of ["0", "-1", "2958466", "46538.5", "46538abc", "", "   "]) {
+      expect(normalize({ next_eu_control: value }).next_eu_control).toBe(value);
+    }
+    expect(findInvalid({ next_eu_control: "46538" })?.key).toBe("next_eu_control");
+  });
+
   it("styres av filtertypen, ikke nøkkelen", () => {
     const textFilters = [f({ category_id: "main", key: "next_eu_control", type: "text" })];
     expect(findInvalidDateAttribute("sub", textFilters, byId, { next_eu_control: "snart" })).toBe(

@@ -384,6 +384,8 @@ function toIsoDate(value: unknown): string | null {
   }
   if (typeof value !== "string") return null;
   const text = value.trim();
+  // Filparseren leser også numeriske Excel-/CSV-celler som tekst.
+  if (/^\d+$/.test(text)) return toIsoDate(Number(text));
   for (const pattern of [ISO_DATE, "d.M.yyyy"]) {
     const parsed = parse(text, pattern, new Date(2000, 0, 1));
     // `parse` godtar f.eks. «2027-5-1»; krev at formatet faktisk stemmer.

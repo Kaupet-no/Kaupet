@@ -8,6 +8,7 @@ import {
 } from "./parse-import-file";
 import { parsePriceNok, validateBulkImportRow } from "./import-schema";
 import { validateSyncRow, type SyncContext } from "./listing-sync.server";
+import { normalizeFilter } from "@/lib/category-filters";
 
 const baseHeader = "external_id;category;title;description;price";
 const validRow = "id-1;sykler;En sykkel;Dette er en god beskrivelse av varen.;4500";
@@ -156,6 +157,57 @@ describe("bulk import parser", () => {
         flows: [],
       };
       expect(validateSyncRow(parsed.rows[0], context)).toMatchObject({ ok: true });
+    },
+  );
+
+  it.each(["csv", "xlsx"])(
+    "normaliserer Excel-serienummer fra %s gjennom servervalidering (ekvivalensklasser)",
+    async (extension) => {
+      const headers = [...baseHeader.split(";"), "attr:next_eu_control", "condition", "can_ship"];
+      const row = [...validRow.split(";"), 46538, "good", "true"];
+      let input = file("datoer.csv", `${headers.join(";")}\n${row.join(";")}`);
+      if (extension === "xlsx") {
+        const XLSX = await import("@e965/xlsx");
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, row]), "Annonser");
+        input = new File(
+          [XLSX.write(workbook, { type: "array", bookType: "xlsx" })],
+          "datoer.xlsx",
+        );
+      }
+      const parsed = await parseImportFile(input, { next_eu_control: { type: "date" } });
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.rows).toHaveLength(1);
+      const category = { id: "sykler", parent_id: null, slug: "sykler", name_nb: "Sykler" };
+      const context: SyncContext = {
+        organizationId: "org-1",
+        userId: "user-1",
+        locationId: "loc-1",
+        source: "api",
+        location: { postal_code: "0150", city: "Oslo", lat: 59.91, lng: 10.75, address_line: null },
+        categoryAccess: "all",
+        allowedCategoryIds: new Set(),
+        categories: [category],
+        categoriesById: new Map([[category.id, category]]),
+        filters: [
+          normalizeFilter({
+            id: "f-date",
+            category_id: category.id,
+            key: "next_eu_control",
+            label_nb: "Neste EU-kontroll",
+            type: "date",
+            unit: null,
+            options: null,
+            sort_order: 0,
+            is_primary: false,
+          }),
+        ],
+        flows: [],
+      };
+      expect(validateSyncRow(parsed.rows[0], context)).toMatchObject({
+        ok: true,
+        row: { attributes: { next_eu_control: "2027-05-31" } },
+      });
     },
   );
 

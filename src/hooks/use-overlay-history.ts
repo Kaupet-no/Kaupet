@@ -33,6 +33,8 @@ type Entry = {
   releasing: boolean;
 };
 const stack: Entry[] = [];
+// En forlatt historikkoppføring må ikke tolkes som et nivå i en ny stack.
+let stackId = 0;
 let renderSeq = 0;
 // Nivåer lagt til i samme effektrunde (samme commit). React kjører barnets
 // effekt før forelderens, så åpnes forelder og barn samtidig, sorteres de
@@ -60,7 +62,9 @@ let listening = false;
 let releaseTimer: ReturnType<typeof setTimeout> | undefined;
 
 function levelOf(state: unknown): number {
-  const level = (state as { overlayLevel?: unknown } | null)?.overlayLevel;
+  const entry = state as { overlayStackId?: unknown; overlayLevel?: unknown } | null;
+  if (entry?.overlayStackId !== stackId) return 0;
+  const level = entry.overlayLevel;
   return typeof level === "number" ? level : 0;
 }
 
@@ -107,9 +111,10 @@ export function useOverlayHistory(enabled: boolean, onClose: () => void) {
       // En avmontering er på vei til å rydde oppføringen — overta den i stedet.
       entry.releasing = false;
     } else {
+      if (stack.length === 0) stackId = Math.random();
       entry = { close: () => {}, popped: false, order, releasing: false };
       insert(entry);
-      history.pushState({ overlay: true, overlayLevel: stack.length }, "");
+      history.pushState({ overlay: true, overlayStackId: stackId, overlayLevel: stack.length }, "");
     }
     const current = entry;
     current.close = () => onCloseRef.current();

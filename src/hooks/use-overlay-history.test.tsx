@@ -191,4 +191,33 @@ describe("useOverlayHistory", () => {
     next.unmount();
     await tick();
   });
+
+  it.each([false, true])(
+    "lukker nye overlays med ett tilbake etter navigasjon fra et gammelt (nøstet: %s)",
+    async (nested) => {
+      // NAT-02: tilstandsovergang fra forlatt historikk til en ny overlay-stack.
+      const first = renderHook(() => useOverlayHistory(true, () => {}));
+      history.pushState({ route: "ny" }, "");
+      first.unmount();
+      await tick();
+
+      await pressBack();
+      const closeParent = vi.fn();
+      const parent = renderHook(() => useOverlayHistory(true, closeParent));
+
+      if (nested) {
+        const closeChild = vi.fn();
+        const child = renderHook(() => useOverlayHistory(true, closeChild));
+        await pressBack();
+        expect(closeChild).toHaveBeenCalledTimes(1);
+        expect(closeParent).not.toHaveBeenCalled();
+        child.unmount();
+      }
+
+      await pressBack();
+      expect(closeParent).toHaveBeenCalledTimes(1);
+      parent.unmount();
+      await tick();
+    },
+  );
 });

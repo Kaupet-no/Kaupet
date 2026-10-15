@@ -11,6 +11,8 @@ const db = vi.hoisted(() => ({
   inserts: [] as Array<{ table: string; value: unknown }>,
   tableErrors: {} as Record<string, unknown>,
   tableData: {} as Record<string, unknown[]>,
+  /** Brukerens RLS-klient (`context.supabase`). */
+  userClient: null as unknown,
 }));
 const assertUserNotRateLimited = vi.hoisted(() => vi.fn());
 
@@ -23,10 +25,15 @@ vi.mock("@tanstack/react-start", () => ({
   }),
   createServerFn: () => {
     let validator: (input: unknown) => unknown = (input) => input;
-    let handler: ((input: { data: unknown; context: { userId: string } }) => unknown) | undefined;
+    let handler:
+      | ((input: { data: unknown; context: { userId: string; supabase: unknown } }) => unknown)
+      | undefined;
     const fn = (input: { data?: unknown } = {}) => {
       if (!handler) throw new Error("server handler not configured");
-      return handler({ data: validator(input.data), context: { userId: "user-id" } });
+      return handler({
+        data: validator(input.data),
+        context: { userId: "user-id", supabase: db.userClient },
+      });
     };
     Object.assign(fn, {
       middleware: () => fn,
@@ -107,6 +114,7 @@ import {
   republishListing,
   saveDraftListing,
   syncDraftListingImages,
+  updateListingAttributes,
   updateListingStatus,
 } from "./listings.functions";
 
@@ -777,5 +785,77 @@ describe("syncDraftListingImages", () => {
       }),
     ).rejects.toThrow();
     expect(db.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateListingAttributes", () => {
+  const listingId = "00000000-0000-0000-0000-000000000021";
+  const userUpdate = vi.fn();
+
+  beforeEach(() => {
+    userUpdate.mockReset();
+    db.userClient = {
+      from: () => {
+        const query: Record<string, unknown> = {};
+        query.select = () => query;
+        query.eq = () => query;
+        query.maybeSingle = async () => ({
+          data: { category_id: categoryId, attributes: { color: "red", vehicle_lookup: "{}" } },
+          error: null,
+        });
+        query.update = (value: unknown) => {
+          userUpdate(value);
+          return {
+            eq: () => ({ select: async () => ({ data: [{ id: listingId }], error: null }) }),
+          };
+        };
+        return query;
+      },
+    };
+    db.tableData = {
+      category_filters: [
+        { id: "f1", category_id: categoryId, key: "seats", label_nb: "Seter", type: "number" },
+        {
+          id: "f2",
+          category_id: categoryId,
+          key: "next_eu_control",
+          label_nb: "Neste EU-kontroll",
+          type: "date",
+        },
+      ],
+      categories: [{ id: categoryId, parent_id: null }],
+    };
+  });
+
+  it.each([
+    [{ seats: "mange" }, "Seter må være et tall."],
+    [{ next_eu_control: "31.12.2027" }, "Neste EU-kontroll må være en gyldig dato."],
+    [{ next_eu_control: "2027-02-30" }, "Neste EU-kontroll må være en gyldig dato."],
+  ])("avviser ugyldig format %j ved redigering", async (attributes, message) => {
+    await expect(
+      updateListingAttributes({ data: { id: listingId, attributes } }),
+    ).rejects.toMatchObject({ status: 400, message });
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  // KG-22-F01: et tømt felt ble lagt tilbake av sammenslåingen med databasen.
+  it("fletter med lagrede attributter, fjerner tømte og normaliserer tall", async () => {
+    await updateListingAttributes({
+      data: {
+        id: listingId,
+        attributes: { seats: "7", next_eu_control: "2027-05-31" },
+        removedKeys: ["color"],
+      },
+    });
+    expect(userUpdate).toHaveBeenCalledWith({
+      attributes: { seats: 7, next_eu_control: "2027-05-31", vehicle_lookup: "{}" },
+    });
+  });
+
+  it("erstatter attributtene ved kategoribytte", async () => {
+    await updateListingAttributes({
+      data: { id: listingId, attributes: {}, category_id: categoryId },
+    });
+    expect(userUpdate).toHaveBeenCalledWith({ attributes: {}, category_id: categoryId });
   });
 });

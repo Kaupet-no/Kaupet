@@ -34,6 +34,7 @@ import {
   type OrganizationListingLocation,
 } from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Json } from "@/integrations/supabase/types";
 import { MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 
 const LISTING_CREATE_LIMIT_MESSAGE =
@@ -1000,4 +1001,94 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
       throw await toClientError("database", publicError);
     }
     return { kaupet_code: isPublic === true ? row.kaupet_code : null };
+  });
+
+/**
+ * Lagrer attributter (og ev. ny kategori) for en eksisterende annonse fra
+ * inline-redigeringen. Samme tall-/datokontroll som opprettelse og
+ * publisering; skrivingen går som brukeren, så RLS avgjør tilgang og
+ * hvilken kategori annonsen kan flyttes til.
+ */
+export const updateListingAttributes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        attributes: z.record(z.string(), z.unknown()),
+        /** Nøkler brukeren har tømt (KG-22-F01). */
+        removedKeys: z.array(z.string()).optional(),
+        /** Satt ved kategoribytte: attributtene erstattes i stedet for å flettes. */
+        category_id: z.string().uuid().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: current, error: readError } = await context.supabase
+      .from("listings")
+      .select("category_id, attributes")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (readError) throw await toClientError("updateListingAttributes.read", readError);
+    if (!current) throw new ClientError("Annonsen finnes ikke.", 404);
+    const categoryId = data.category_id ?? current.category_id;
+
+    const supabaseAdmin = await getSupabaseAdmin();
+    const [{ data: filterRows, error: filterError }, { data: categoryRows, error: categoryError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("category_filters")
+          .select(
+            "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+          ),
+        supabaseAdmin.from("categories").select("id, parent_id"),
+      ]);
+    const rulesError = filterError ?? categoryError;
+    if (rulesError) throw await toClientError("database", rulesError);
+    const categoriesById = new Map<string, CategoryNode>(
+      (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    );
+    const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
+    // Bare det brukeren sender valideres: en eldre ugyldig verdi i et annet
+    // felt skal ikke sperre redigering av resten.
+    const patch = normalizeNumericAttributes(
+      categoryId,
+      normalizedFilters,
+      categoriesById,
+      data.attributes,
+    );
+    assertAttributeFormats(
+      categoryId,
+      normalizedFilters,
+      categoriesById,
+      patch,
+      getCategoryBehavior(
+        vehicleCategoryGroupFor(categoryId, normalizedFilters, categoriesById),
+        isBoatCategory(categoryId, normalizedFilters, categoriesById),
+      ),
+    );
+
+    let attributes: Record<string, unknown> = patch;
+    if (!data.category_id) {
+      // Flere inline-paneler skriver til samme JSON-kolonne, så flett med
+      // det som ligger der.
+      attributes = { ...((current.attributes as Record<string, unknown>) ?? {}), ...patch };
+      for (const key of data.removedKeys ?? []) {
+        if (!(key in patch)) delete attributes[key];
+      }
+    }
+
+    // RLS kan la en UPDATE uten tilgang lykkes uten å treffe noe (KG-22-F03).
+    const { data: updated, error } = await context.supabase
+      .from("listings")
+      .update({
+        attributes: attributes as Json,
+        ...(data.category_id && { category_id: data.category_id }),
+      })
+      .eq("id", data.id)
+      .select("id");
+    if (error) throw await toClientError("updateListingAttributes", error, { listing_id: data.id });
+    if (updated?.length !== 1) {
+      throw new ClientError("Endringen ble ikke lagret. Last siden på nytt og prøv igjen.", 409);
+    }
   });

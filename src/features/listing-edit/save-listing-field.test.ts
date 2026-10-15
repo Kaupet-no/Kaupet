@@ -5,6 +5,8 @@ const db = vi.hoisted(() => ({
   updatedRows: [{ id: "listing-1" }] as unknown[],
   update: vi.fn(),
 }));
+const updateListingAttributes = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/listings.functions", () => ({ updateListingAttributes }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => {
@@ -31,16 +33,20 @@ beforeEach(() => {
   db.current = { color: "red", seats: 5, vehicle_lookup: "{}" };
   db.updatedRows = [{ id: "listing-1" }];
   db.update.mockReset();
+  updateListingAttributes.mockReset();
 });
 
-// KG-22-F01: et tømt felt ble lagt tilbake av sammenslåingen med databasen.
-it("fjerner tømte attributter og beholder andre panelers nøkler", async () => {
+// Attributter skrives via serveren, som validerer tall- og datoformat.
+it("sender attributter og tømte nøkler til serverfunksjonen", async () => {
   await saveListingField(
     "listing-1",
     { group: "attributes", attributes: { seats: 7 }, removedKeys: ["color"] },
     { behavior },
   );
-  expect(db.update).toHaveBeenCalledWith({ attributes: { seats: 7, vehicle_lookup: "{}" } });
+  expect(updateListingAttributes).toHaveBeenCalledWith({
+    data: { id: "listing-1", attributes: { seats: 7 }, removedKeys: ["color"] },
+  });
+  expect(db.update).not.toHaveBeenCalled();
 });
 
 // KG-22-F03: en UPDATE som ikke traff noen rad ble meldt som lagret.

@@ -460,7 +460,10 @@ function NewWtbPage() {
 
   const shouldBlockNav = !published && (title.trim().length > 0 || stepIndex > 0);
   const blocker = useBlocker({
-    shouldBlockFn: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
+    // Samme pathname = et overlay (f.eks. GuestPublishSheet) rydder sin egen history-oppføring
+    // ved lukking — se useOverlayHistory. Det er ikke en sideforlatelse.
+    shouldBlockFn: ({ current, next }) =>
+      !bypassNavigationBlockerRef.current && shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
     enableBeforeUnload: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
   });

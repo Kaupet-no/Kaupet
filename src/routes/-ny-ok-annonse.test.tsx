@@ -35,7 +35,10 @@ const mocks = vi.hoisted(() => ({
   useBlocker: vi.fn(
     (_options: {
       enableBeforeUnload: boolean | (() => boolean);
-      shouldBlockFn: () => boolean;
+      shouldBlockFn: (args: {
+        current: { pathname: string };
+        next: { pathname: string };
+      }) => boolean;
     }) => ({ status: "idle" }),
   ),
 }));
@@ -115,6 +118,24 @@ function setMockDraft() {
   };
 }
 
+const leavePage = { current: { pathname: "/ny-ok-annonse" }, next: { pathname: "/" } };
+
+it("blokkerer ikke når et overlay rydder sin egen historikkoppføring", () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WantPage />
+    </QueryClientProvider>,
+  );
+  const options = mocks.useBlocker.mock.calls.at(-1)![0];
+  expect(options.shouldBlockFn(leavePage)).toBe(true);
+  expect(
+    options.shouldBlockFn({
+      current: { pathname: "/ny-ok-annonse" },
+      next: { pathname: "/ny-ok-annonse" },
+    }),
+  ).toBe(false);
+});
+
 it("omgår avslutningsvernet når brukeren starter på nytt etter kontobytte", () => {
   mocks.actorChanged = true;
   render(
@@ -128,10 +149,10 @@ it("omgår avslutningsvernet når brukeren starter på nytt etter kontobytte", (
       ? options.enableBeforeUnload()
       : options.enableBeforeUnload;
   expect(beforeUnloadEnabled()).toBe(true);
-  expect(options.shouldBlockFn()).toBe(true);
+  expect(options.shouldBlockFn(leavePage)).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Åpne en ny annonse med denne kontoen" }));
   expect(beforeUnloadEnabled()).toBe(false);
-  expect(options.shouldBlockFn()).toBe(false);
+  expect(options.shouldBlockFn(leavePage)).toBe(false);
 });
 
 it("avviser utkasttilbudet uten å blokkere når brukeren går videre", async () => {

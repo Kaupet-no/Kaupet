@@ -9,6 +9,7 @@ type StoredImage = {
   file: File;
   thumbFile: File;
   caption?: string;
+  aiGenerated?: boolean;
   remote?: RemoteImage;
   sortOrder: number;
 };
@@ -69,6 +70,7 @@ export async function saveDraftImages(images: PendingImage[], actorKey = "guest"
     file: image.file,
     thumbFile: image.thumbFile,
     caption: image.caption,
+    aiGenerated: image.aiGenerated,
     remote: image.remote,
     sortOrder,
   }));
@@ -89,6 +91,7 @@ export async function loadDraftImages(actorKey = "guest"): Promise<PendingImage[
       file: image.file,
       thumbFile: image.thumbFile,
       caption: image.caption,
+      aiGenerated: image.aiGenerated,
       remote: image.remote,
       previewUrl: URL.createObjectURL(image.file),
     }));

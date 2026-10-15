@@ -516,6 +516,7 @@ export function useDraftAutosave(fields: DraftFields) {
             storage_path: remote.path,
             sort_order: sortOrder,
             caption: image.caption?.trim() || null,
+            ai_generated: !!image.aiGenerated,
           };
         });
         const signature = JSON.stringify([listingId, refs]);

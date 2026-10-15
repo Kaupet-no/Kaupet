@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { containsImageMetadata } from "./image-metadata";
+import { containsImageMetadata, isAiGeneratedImage } from "./image-metadata";
 
 // Minimal JPEG byte sequences — enough to exercise the marker search without
 // needing a real, fully-formed JPEG file.
@@ -27,5 +27,22 @@ describe("containsImageMetadata", () => {
     const jpeg = bytes(SOI, [0xff, 0xdb, 0x00, 0x03, 0x00, ...ascii("data")], EOI);
 
     expect(containsImageMetadata(jpeg)).toBe(false);
+  });
+});
+
+describe("isAiGeneratedImage", () => {
+  const iptc = "http://cv.iptc.org/newscodes/digitalsourcetype/";
+  const blob = (...parts: number[][]) => new Blob([new Uint8Array(parts.flat())]);
+
+  it("detects trained and composite AI source types", async () => {
+    for (const type of ["trainedAlgorithmicMedia", "compositeWithTrainedAlgorithmicMedia"]) {
+      const file = blob(SOI, ascii("jumb c2pa " + iptc + type), EOI);
+      expect(await isAiGeneratedImage(file)).toBe(true);
+    }
+  });
+
+  it("ignores camera captures and images without metadata", async () => {
+    expect(await isAiGeneratedImage(blob(SOI, ascii(iptc + "digitalCapture"), EOI))).toBe(false);
+    expect(await isAiGeneratedImage(blob(SOI, EOI))).toBe(false);
   });
 });

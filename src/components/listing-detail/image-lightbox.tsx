@@ -7,10 +7,16 @@ import {
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { ZoomableImage } from "@/components/listing-detail/zoomable-image";
+import { AiImageBadge } from "@/components/listing-detail/ai-image-badge";
 import { useAutoHide, autoHideClass } from "@/hooks/use-auto-hide";
 import { lockPortraitOnPhone, unlockOrientation } from "@/lib/orientation";
 
-type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
+type ListingImage = {
+  storage_path: string;
+  sort_order: number;
+  caption?: string | null;
+  ai_generated?: boolean;
+};
 
 type Props = {
   images: ListingImage[];
@@ -163,6 +169,7 @@ export function ImageLightbox({
                     {img.caption}
                   </p>
                 )}
+                <AiImageBadge show={img.ai_generated} />
               </div>
             ))}
           </div>

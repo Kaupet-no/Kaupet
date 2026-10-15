@@ -48,7 +48,13 @@ import {
   type InlineListingImages,
 } from "@/features/listing-edit/use-inline-listing-images";
 import { IMAGE_ACCEPT } from "@/lib/storage";
-type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
+import { AiImageBadge } from "@/components/listing-detail/ai-image-badge";
+type ListingImage = {
+  storage_path: string;
+  sort_order: number;
+  caption?: string | null;
+  ai_generated?: boolean;
+};
 
 function ImageCaption({ caption }: { caption?: string | null }) {
   if (!caption) return null;
@@ -263,6 +269,7 @@ export function ImageGallery({
                         />
                       )}
                       <ImageCaption caption={img.caption} />
+                      <AiImageBadge show={img.ai_generated} />
                     </div>
                   </CarouselItem>
                 );

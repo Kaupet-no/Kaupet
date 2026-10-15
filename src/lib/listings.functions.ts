@@ -407,6 +407,7 @@ const listingImageRefsSchema = z
       storage_path: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
       sort_order: z.number().int().min(0).max(99),
       caption: z.string().trim().max(140).nullable(),
+      ai_generated: z.boolean().optional(),
     }),
   )
   .max(100);

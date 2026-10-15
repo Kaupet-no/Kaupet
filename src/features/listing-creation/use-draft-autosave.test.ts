@@ -316,6 +316,7 @@ describe("useDraftAutosave", () => {
             storage_path: "draft-1/bilde.webp",
             sort_order: 0,
             caption: "Front",
+            ai_generated: false,
           },
         ],
       },

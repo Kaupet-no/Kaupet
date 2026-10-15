@@ -19,6 +19,7 @@ import {
   validateImages,
 } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
+import { isAiGeneratedImage } from "@/lib/image-metadata";
 import type { RemoteImage } from "@/features/listing-creation/draft-image-sync";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhotos } from "@/lib/native";
@@ -30,6 +31,8 @@ export type PendingImage = {
   thumbFile: File;
   previewUrl: string;
   caption?: string;
+  /** KI-generert ifølge originalfilens C2PA-/IPTC-metadata. */
+  aiGenerated?: boolean;
   /** Satt når bildet er lastet opp til et serverutkast (se draft-image-sync.ts). */
   remote?: RemoteImage;
 };
@@ -153,9 +156,10 @@ export function ImageUploader({
           showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
           return;
         }
-        const [compressed, thumbs] = await Promise.all([
+        const [compressed, thumbs, aiFlags] = await Promise.all([
           Promise.all(files.map((file) => compressImage(file, "listing"))),
           Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
+          Promise.all(files.map(isAiGeneratedImage)),
         ]);
         const err = validateImages(compressed);
         if (err) {
@@ -167,6 +171,7 @@ export function ImageUploader({
           file,
           thumbFile: thumbs[i],
           previewUrl: URL.createObjectURL(file),
+          aiGenerated: aiFlags[i],
         }));
         onChange([...images, ...next]);
       } catch (error) {

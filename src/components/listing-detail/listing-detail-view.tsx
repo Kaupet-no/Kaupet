@@ -191,7 +191,12 @@ export type ListingDetailViewProps = {
    * to a single plain category link (using `category` above) when omitted —
    * the pre-publish preview doesn't have the category tree on hand. */
   breadcrumb?: ListingDetailBreadcrumbItem[];
-  images: { storage_path: string; sort_order: number; caption?: string | null }[];
+  images: {
+    storage_path: string;
+    sort_order: number;
+    caption?: string | null;
+    ai_generated?: boolean;
+  }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
   /** Whether this category uses delivery choices. False for Bil/MC and Båt. */
@@ -650,7 +655,12 @@ function ListingDetailViewBody({
   setMapOverlayOpen: (v: boolean) => void;
   closeLightbox: () => void;
   closeMapOverlay: () => void;
-  sortedImages: { storage_path: string; sort_order: number; caption?: string | null }[];
+  sortedImages: {
+    storage_path: string;
+    sort_order: number;
+    caption?: string | null;
+    ai_generated?: boolean;
+  }[];
   showStickyContact: boolean;
   priceLabel: string;
   priceBlock: ReactNode;

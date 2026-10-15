@@ -7,6 +7,7 @@ import {
   parseImportFile,
 } from "./parse-import-file";
 import { parsePriceNok, validateBulkImportRow } from "./import-schema";
+import { validateSyncRow, type SyncContext } from "./listing-sync.server";
 
 const baseHeader = "external_id;category;title;description;price";
 const validRow = "id-1;sykler;En sykkel;Dette er en god beskrivelse av varen.;4500";
@@ -101,6 +102,62 @@ describe("bulk import parser", () => {
     const parsed = await parseImportFile(new File([bytes], "annonser.xlsx"));
     expect(parsed.rows[0]?.externalId).toBe("xlsx-1");
   });
+
+  it.each(["m/d/yy", "mm/dd/yyyy", "dd.mm.yyyy", "yyyy-mm-dd"])(
+    "godtar Excel-datoer med celleformat %s gjennom servervalidering (ekvivalensklasser)",
+    async (dateFormat) => {
+      const XLSX = await import("@e965/xlsx");
+      const sheet = XLSX.utils.aoa_to_sheet([
+        [
+          ...baseHeader.split(";"),
+          "attr:next_eu_control",
+          "attr:first_registration_date",
+          "condition",
+          "can_ship",
+        ],
+        [
+          "xlsx-dato",
+          "sykler",
+          "En sykkel",
+          "Dette er en god beskrivelse av varen.",
+          4500,
+          new Date("2027-05-31T00:00:00Z"),
+          new Date("2018-03-08T00:00:00Z"),
+          "good",
+          "true",
+        ],
+      ]);
+      sheet.F2.z = dateFormat;
+      sheet.G2.z = dateFormat;
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, "Annonser");
+      const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+      const parsed = await parseImportFile(new File([bytes], "datoer.xlsx"));
+
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.rows).toHaveLength(1);
+      expect(parsed.rows[0].attributes).toEqual({
+        next_eu_control: "2027-05-31",
+        first_registration_date: "2018-03-08",
+      });
+      expect(parsed.rows[0].priceNok).toBe(4500);
+      const category = { id: "sykler", parent_id: null, slug: "sykler", name_nb: "Sykler" };
+      const context: SyncContext = {
+        organizationId: "org-1",
+        userId: "user-1",
+        locationId: "loc-1",
+        source: "api",
+        location: { postal_code: "0150", city: "Oslo", lat: 59.91, lng: 10.75, address_line: null },
+        categoryAccess: "all",
+        allowedCategoryIds: new Set(),
+        categories: [category],
+        categoriesById: new Map([[category.id, category]]),
+        filters: [],
+        flows: [],
+      };
+      expect(validateSyncRow(parsed.rows[0], context)).toMatchObject({ ok: true });
+    },
+  );
 
   // KG-09-F02: SheetJS sin sheetRows kuttet rad 501 bort uten feil.
   it("avviser 501 XLSX-annonser i stedet for å avkorte dem stille", async () => {

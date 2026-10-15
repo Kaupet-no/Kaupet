@@ -193,6 +193,23 @@ describe("usePublishListing", () => {
     });
   });
 
+  it("prøver miniatyren på nytt når den feilet under autolagringen", async () => {
+    const [synced] = pendingImages("a");
+    synced.remote = {
+      id: "row-a",
+      path: "draft-1/a.webp",
+      uploadedAt: 0,
+      synced: true,
+      thumbMissing: true,
+    };
+    createListing.mockResolvedValue({ id: "draft-1", kaupet_code: "ABC123" });
+    const { result } = setup([synced]);
+    act(() => result.current.publishOnce(values));
+    await waitFor(() => expect(result.current.state.publishedOpen).toBe(true));
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(uploadThumb).toHaveBeenCalledWith({ path: "draft-1/a.webp", file: synced.thumbFile });
+  });
+
   it.each([
     { elapsed: 23 * 60 * 60 * 1000 - 1, reupload: false },
     { elapsed: 23 * 60 * 60 * 1000, reupload: true },

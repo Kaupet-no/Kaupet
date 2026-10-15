@@ -99,6 +99,67 @@ describe("AttributeFields", () => {
     expect(onChange).toHaveBeenCalledWith({ next_eu_control: "2027-05-31" });
   });
 
+  it("viser Mangler/Fritatt som brytere når fristen er passert, og fjerner dem ved ny dato", () => {
+    vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+    const date = {
+      ...textFilter,
+      key: "next_eu_control",
+      label_nb: "Neste EU-kontroll",
+      type: "date" as const,
+    };
+    const status: CategoryFilter = {
+      ...selectFilter(0),
+      id: "filter-eu-status",
+      key: "eu_control_status",
+      label_nb: "EU-kontrollstatus",
+      sort_order: 2,
+      depends_on_key: "next_eu_control",
+      options: [
+        { value: "missing", label_nb: "Mangler EU-kontroll" },
+        { value: "exempt", label_nb: "Fritatt for EU-kontroll" },
+      ],
+    };
+    filters.current = [date, status];
+    const onChange = vi.fn();
+    const props = {
+      categoryId: "category-1",
+      categories: [{ id: "category-1", parent_id: null }],
+      onChange,
+      required: true,
+      showErrors: true,
+      // Kun datoen er valgt ut; alternativene følger med.
+      filterKeys: ["next_eu_control"],
+    };
+    const { rerender } = render(
+      <AttributeFields {...props} value={{ next_eu_control: "2026-01-31" }} />,
+    );
+
+    const input = screen.getByLabelText("Neste EU-kontroll *") as HTMLInputElement;
+    expect(input.min).toBe("2026-10-15");
+    expect(screen.getByText(/Datoen er passert/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("switch", { name: "Mangler EU-kontroll" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      next_eu_control: "2026-01-31",
+      eu_control_status: "missing",
+    });
+
+    rerender(
+      <AttributeFields
+        {...props}
+        value={{ next_eu_control: "2026-01-31", eu_control_status: "missing" }}
+      />,
+    );
+    expect(screen.queryByText(/Datoen er passert/)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Neste EU-kontroll/), {
+      target: { value: "2027-05-31" },
+    });
+    expect(onChange).toHaveBeenLastCalledWith({ next_eu_control: "2027-05-31" });
+
+    rerender(<AttributeFields {...props} value={{ next_eu_control: "2027-05-31" }} />);
+    expect(screen.queryByRole("switch")).toBeNull();
+    vi.useRealTimers();
+  });
+
   it("rendrer ≤6 alternativer som chip-radiogruppe med mulighet til å fjerne valgfritt valg", () => {
     filters.current = [selectFilter(4)];
     const onChange = vi.fn();

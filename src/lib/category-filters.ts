@@ -177,6 +177,36 @@ export function normalizeFilter(row: {
   };
 }
 
+/**
+ * En avhengighet uten verdi (`depends_on_key` satt, begge verdiene null) gjør
+ * filteret til et alternativ til feltet det peker på — f.eks. «Mangler
+ * EU-kontroll» for Neste EU-kontroll. Alternativet gjelder når feltet er tomt
+ * eller en passert dato, og et valgt alternativ gjør feltet ikke påkrevd.
+ * Et datofelt med alternativer er en frist: en passert dato teller som ubesvart.
+ */
+export function isAlternativeFilter(
+  filter: Pick<CategoryFilter, "depends_on_key" | "depends_on_value" | "depends_on_not_value">,
+): boolean {
+  return (
+    !!filter.depends_on_key &&
+    filter.depends_on_value == null &&
+    filter.depends_on_not_value == null
+  );
+}
+
+/** Dagens dato som ISO (`yyyy-MM-dd`) i brukerens tidssone. */
+export function todayIsoDate(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function hasAttributeValue(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function isPassedDate(value: unknown): boolean {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && value < todayIsoDate();
+}
+
 /** Returns whether a filter's dependency (if any) is satisfied by the current
  * attribute values — e.g. Motorsport's "Gren"/"Klasse" only apply once
  * "Er bilen lisensiert?" is true. Filters without a dependency always apply. */
@@ -185,6 +215,10 @@ export function filterDependencyMet(
   attributes: Record<string, AttributeValue>,
 ): boolean {
   if (!filter.depends_on_key) return true;
+  if (isAlternativeFilter(filter)) {
+    const parent = attributes[filter.depends_on_key];
+    return parent === undefined || parent === null || parent === "" || isPassedDate(parent);
+  }
   if (filter.depends_on_not_value != null) {
     return String(attributes[filter.depends_on_key]) !== filter.depends_on_not_value;
   }
@@ -482,7 +516,15 @@ export function getMissingRequiredFilters(
   excludeKeys?: readonly string[],
 ): CategoryFilter[] {
   const excluded = excludeKeys ? new Set(excludeKeys) : null;
-  const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
+  const effective = effectiveFiltersForCategory(categoryId, allFilters, categoriesById);
+  const alternatives = effective.filter(isAlternativeFilter);
+  const answeredByAlternative = new Set(
+    alternatives
+      .filter((a) => filterDependencyMet(a, attributes) && hasAttributeValue(attributes[a.key]))
+      .map((a) => a.depends_on_key),
+  );
+  const hasAlternatives = (key: string) => alternatives.some((a) => a.depends_on_key === key);
+  const filters = effective.filter(
     // "range" is search-only, and "registration_number" is set by the
     // vehicle wizard itself (SVV lookup, or left unset for a manually
     // entered unregistered vehicle) rather than filled in by the user as a
@@ -494,6 +536,7 @@ export function getMissingRequiredFilters(
       !f.is_optional &&
       f.key !== "registration_number" &&
       !excluded?.has(f.key) &&
+      !answeredByAlternative.has(f.key) &&
       filterDependencyMet(f, attributes),
   );
   return filters.filter((f) => {
@@ -507,7 +550,9 @@ export function getMissingRequiredFilters(
     }
     // En ugyldig dato (fra gammel fritekst) vises tom i datovelgeren; da
     // skal den også telle som ikke utfylt.
-    if (f.type === "date") return toIsoDate(v) !== v;
+    if (f.type === "date") {
+      return toIsoDate(v) !== v || (hasAlternatives(f.key) && isPassedDate(v));
+    }
     if (typeof v === "string") return v.trim() === "";
     if (Array.isArray(v)) return v.length === 0;
     return false;

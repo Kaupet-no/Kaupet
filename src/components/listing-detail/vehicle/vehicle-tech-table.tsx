@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
+import { EU_CONTROL_STATUS_LABEL_NB, type EuControlStatus } from "@/lib/vehicle/vehicle-options";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL_BY_SLUG } from "@/lib/constants";
 import {
@@ -25,7 +26,7 @@ type Row = { label: string; value: string };
 export function VehicleTechTable({
   vehicleLookup,
   mileageKm,
-  euControlExempt,
+  euControlStatus,
   driveType,
   axleConfig,
   condition,
@@ -33,10 +34,10 @@ export function VehicleTechTable({
 }: {
   vehicleLookup: VehicleLookupResult | null;
   mileageKm: number | null;
-  /** Ikke en del av SVV-oppslaget — brukerens eget svar på om tilhengeren er
-   * fritatt for periodisk kjøretøykontroll, lagret som en vanlig attributt
-   * (ikke i `vehicle_lookup`-snapshoten). */
-  euControlExempt?: boolean | null;
+  /** Ikke en del av SVV-oppslaget — selgerens «Mangler»/«Fritatt» for
+   * periodisk kjøretøykontroll, lagret som en vanlig attributt (ikke i
+   * `vehicle_lookup`-snapshoten). Har forrang over fristen. */
+  euControlStatus?: EuControlStatus | null;
   /** Selgerens bekreftede verdi (`attributes.drive_type`), som har forrang
    * over `vehicleLookup.drive_type` — se `vehicle-info-grid.tsx`. */
   driveType?: string | null;
@@ -112,13 +113,10 @@ export function VehicleTechTable({
     rows.push({ label: "Bruktimportert", value: vehicleLookup.imported_used ? "Ja" : "Nei" });
   if (vehicleLookup?.first_registration_date)
     rows.push({ label: "Førstegangsregistrering", value: vehicleLookup.first_registration_date });
-  if (euControlExempt == null) {
-    if (vehicleLookup?.next_eu_control)
-      rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
-  } else {
-    rows.push({ label: "Fritatt for EU-kontroll", value: euControlExempt ? "Ja" : "Nei" });
-    if (!euControlExempt && vehicleLookup?.next_eu_control)
-      rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
+  if (euControlStatus) {
+    rows.push({ label: "EU-kontroll", value: EU_CONTROL_STATUS_LABEL_NB[euControlStatus] });
+  } else if (vehicleLookup?.next_eu_control) {
+    rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
   }
   if (vehicleLookup?.vin) rows.push({ label: "VIN", value: vehicleLookup.vin });
 

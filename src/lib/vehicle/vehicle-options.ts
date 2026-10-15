@@ -1,3 +1,16 @@
+/** Selgerens alternativ til en tom eller passert «Neste EU-kontroll»
+ * (`attributes.eu_control_status`, filterrad i 20261015140000). */
+export type EuControlStatus = "missing" | "exempt";
+
+export const EU_CONTROL_STATUS_LABEL_NB: Record<EuControlStatus, string> = {
+  missing: "Mangler EU-kontroll",
+  exempt: "Fritatt for EU-kontroll",
+};
+
+export function parseEuControlStatus(value: unknown): EuControlStatus | null {
+  return value === "missing" || value === "exempt" ? value : null;
+}
+
 /** "Hjuldrift"-alternativene brukt både i annonseopprettelse (der SVV ikke
  * kan avgjøre det automatisk) og ved redigering av publisert annonse. Kun for
  * Bil/ATV — tyngre kjøretøy (bobil/lastebil/buss) bruker

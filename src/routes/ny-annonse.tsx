@@ -702,7 +702,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     brand: "Merke",
     model: "Modell",
     sleeping_places: "Soveplasser",
-    eu_control_exempt: "EU-kontroll",
     mileage_km: "Kilometerstand",
     drive_type: "Hjuldrift",
     axle_config: "Akselkombinasjon",
@@ -723,10 +722,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
       .find((group) => group.fieldsToValidate?.includes(field as keyof ListingForm))?.key;
     if (exact) return exact;
     const candidates =
-      field === "brand" ||
-      field === "model" ||
-      field === "sleeping_places" ||
-      field === "eu_control_exempt"
+      field === "brand" || field === "model" || field === "sleeping_places"
         ? ["vehicle-registration", "boat-facts", "category-attributes"]
         : field === "mileage_km" || field === "drive_type" || field === "axle_config"
           ? ["vehicle-facts", "category-attributes"]

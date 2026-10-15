@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   findInvalidDateAttribute,
   normalizeDateAttributes,
   applyAttributeFilters,
   effectiveFiltersForCategory,
+  filterDependencyMet,
+  searchFilterDependencyMet,
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
@@ -496,5 +498,60 @@ describe("datoattributter", () => {
     expect(
       findInvalidDateAttribute("sub", filters, byId, { first_registration_date: "31.12" }),
     ).toBeNull();
+  });
+});
+
+describe("alternativer til en frist (Mangler/Fritatt EU-kontroll)", () => {
+  const date = f({ category_id: "main", key: "next_eu_control", type: "date" });
+  const status = f({
+    category_id: "main",
+    key: "eu_control_status",
+    is_optional: true,
+    depends_on_key: "next_eu_control",
+    options: [
+      { value: "missing", label_nb: "Mangler EU-kontroll" },
+      { value: "exempt", label_nb: "Fritatt for EU-kontroll" },
+    ],
+  });
+  const filters = [date, status];
+  const missing = (attributes: Record<string, string>) =>
+    getMissingRequiredFilters("sub", filters, byId, attributes).map((x) => x.key);
+
+  afterEach(() => vi.useRealTimers());
+  beforeEach(() => vi.setSystemTime(new Date("2026-10-15T12:00:00")));
+
+  it("gjelder bare når datoen er tom eller passert (grenseverdier rundt i dag)", () => {
+    expect(filterDependencyMet(status, {})).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "" })).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-14" })).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(false);
+    expect(filterDependencyMet(status, { next_eu_control: "2027-01-01" })).toBe(false);
+  });
+
+  it("krever dato i dag eller senere, med mindre et alternativ er valgt", () => {
+    expect(missing({})).toEqual(["next_eu_control"]);
+    expect(missing({ next_eu_control: "2026-10-14" })).toEqual(["next_eu_control"]);
+    expect(missing({ next_eu_control: "2026-10-15" })).toEqual([]);
+    expect(missing({ eu_control_status: "missing" })).toEqual([]);
+    expect(missing({ next_eu_control: "2026-01-01", eu_control_status: "exempt" })).toEqual([]);
+    // Et utdatert alternativ ved en fremtidig dato gjelder ikke, men datoen er gyldig.
+    expect(missing({ next_eu_control: "2027-01-01", eu_control_status: "missing" })).toEqual([]);
+  });
+
+  it("godtar fortsatt passerte datoer i datofelt uten alternativer", () => {
+    expect(
+      getMissingRequiredFilters("sub", [date], byId, { next_eu_control: "2020-01-01" }),
+    ).toEqual([]);
+  });
+
+  it("skjules i søket når tidligste dato er i dag eller senere", () => {
+    expect(searchFilterDependencyMet(status, {}, filters)).toBe(true);
+    expect(
+      searchFilterDependencyMet(
+        status,
+        { next_eu_control: { kind: "date_min", value: "2027-01-01" } },
+        filters,
+      ),
+    ).toBe(false);
   });
 });

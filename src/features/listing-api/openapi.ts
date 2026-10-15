@@ -257,14 +257,17 @@ export function buildOpenApiDocument() {
                             label: { type: "string" },
                             type: {
                               type: "string",
+                              description: "date = ISO-dato (yyyy-MM-dd).",
                               enum: [
                                 "select",
                                 "multiselect",
                                 "number",
+                                "range",
                                 "boolean",
                                 "text",
                                 "brand_select",
                                 "model_select",
+                                "date",
                               ],
                             },
                             required: { type: "boolean" },

@@ -3,10 +3,8 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/native", () => ({
-  isNative: () => false,
-  pickNativePhotos: vi.fn(),
-}));
+const native = vi.hoisted(() => ({ isNative: vi.fn(() => false), takeNativePhoto: vi.fn() }));
+vi.mock("@/lib/native", () => native);
 
 import { ImageUploader, type PendingImage } from "./image-uploader";
 
@@ -29,6 +27,22 @@ function image(id: string, aiGenerated?: boolean): PendingImage {
 }
 
 describe("ImageUploader", () => {
+  it("åpner filvelgeren for galleriet i appen, så KI-metadataen bevares", () => {
+    native.isNative.mockReturnValue(true);
+    const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    render(<ImageUploader images={[]} onChange={vi.fn()} />);
+
+    screen.getByRole("button", { name: "Velg fra bilder" }).click();
+
+    expect(click).toHaveBeenCalledOnce();
+    expect((click.mock.contexts[0] as HTMLInputElement).getAttribute("aria-label")).toBe(
+      "Velg bilder",
+    );
+    expect(native.takeNativePhoto).not.toHaveBeenCalled();
+    click.mockRestore();
+    native.isNative.mockReturnValue(false);
+  });
+
   it("viser «Ta bilde» og «Velg fra bilder» som to handlinger på web, med kamera-capture på input", () => {
     render(<ImageUploader images={[]} onChange={vi.fn()} />);
 

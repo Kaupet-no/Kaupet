@@ -12,6 +12,7 @@ import {
   validateImages,
 } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
+import { isAiGeneratedImage } from "@/lib/image-metadata";
 import { supabase } from "@/integrations/supabase/client";
 
 export type InlineImageItem = {
@@ -123,9 +124,10 @@ export function useInlineListingImages(params: {
         },
       ]);
       try {
-        const [compressed, thumb] = await Promise.all([
+        const [compressed, thumb, aiGenerated] = await Promise.all([
           compressImage(file, "listing"),
           compressImage(file, "listing-thumb"),
+          isAiGeneratedImage(file),
         ]);
         const path = await uploadListingImage({ listingId, file: compressed });
         await uploadListingImageThumb({ path, file: thumb }).catch((err) =>
@@ -136,6 +138,7 @@ export function useInlineListingImages(params: {
           storage_path: path,
           sort_order: sortOrder,
           caption: null,
+          ai_generated: aiGenerated,
         });
         if (error) throw error;
         setItems((curr) =>

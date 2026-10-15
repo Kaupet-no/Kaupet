@@ -889,6 +889,7 @@ export type Database = {
       }
       listing_images: {
         Row: {
+          ai_generated: boolean
           caption: string | null
           created_at: string
           id: string
@@ -898,6 +899,7 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          ai_generated?: boolean
           caption?: string | null
           created_at?: string
           id?: string
@@ -907,6 +909,7 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          ai_generated?: boolean
           caption?: string | null
           created_at?: string
           id?: string

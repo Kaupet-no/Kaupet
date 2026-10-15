@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const embla = vi.hoisted(() => {
@@ -36,6 +36,7 @@ vi.mock("@/lib/orientation", () => ({
 vi.mock("@/components/listing-detail/vehicle/vehicle-360-viewer", () => ({
   Vehicle360Viewer: () => null,
 }));
+vi.mock("@/hooks/use-form-factor", () => ({ useIsNarrow: () => false }));
 
 import { ImageLightbox } from "./image-lightbox";
 
@@ -52,6 +53,30 @@ function doubleTap(el: Element) {
 const canDrag = () => embla.options!.watchDrag(embla.api);
 
 describe("ImageLightbox – zoom per slide (KG-31-F02)", () => {
+  it("åpner og lukker KI-forklaringen uten å lukke bildegalleriet (A11Y-04)", async () => {
+    const onClose = vi.fn();
+    const { getByRole, queryByRole } = render(
+      <ImageLightbox
+        images={[{ storage_path: "a", sort_order: 0, ai_generated: true }]}
+        imgUrls={{ a: "https://img/a" }}
+        initialIndex={0}
+        title="Sofa"
+        onClose={onClose}
+      />,
+    );
+    const trigger = getByRole("button", { name: "Merket som KI" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(getByRole("dialog", { name: "Merket som KI-generert" })).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "Lukk forklaring" }));
+    await waitFor(() => {
+      expect(queryByRole("dialog", { name: "Merket som KI-generert" })).toBeNull();
+      expect(getByRole("dialog", { name: "Bildegalleri for Sofa" })).toBeTruthy();
+      expect(document.activeElement).toBe(trigger);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("låser opp sveiping når man går fra et zoomet bilde til neste", () => {
     embla.state.index = 0;
     const { getByAltText, getByRole } = render(

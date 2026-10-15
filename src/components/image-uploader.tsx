@@ -19,9 +19,12 @@ import {
   validateImages,
 } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
+import { isAiGeneratedImage } from "@/lib/image-metadata";
 import type { RemoteImage } from "@/features/listing-creation/draft-image-sync";
 import { Button } from "@/components/ui/button";
-import { isNative, pickNativePhotos } from "@/lib/native";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AiImageBadge, AiImageInfo } from "@/components/ai-image-info";
+import { isNative, takeNativePhoto } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 
 export type PendingImage = {
@@ -30,6 +33,8 @@ export type PendingImage = {
   thumbFile: File;
   previewUrl: string;
   caption?: string;
+  /** KI-generert ifølge originalfilens C2PA-/IPTC-metadata. */
+  aiGenerated?: boolean;
   /** Satt når bildet er lastet opp til et serverutkast (se draft-image-sync.ts). */
   remote?: RemoteImage;
 };
@@ -111,6 +116,7 @@ function SortableImageItem({
           </button>
         </div>
       </div>
+      <AiImageBadge show={img.aiGenerated} inline />
       <input
         type="text"
         value={img.caption ?? ""}
@@ -136,6 +142,7 @@ export function ImageUploader({
   const captureInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const aiImageCount = images.filter((image) => image.aiGenerated).length;
 
   // Revoke object URLs on unmount
   useEffect(() => {
@@ -149,14 +156,29 @@ export function ImageUploader({
     async (files: File[]) => {
       setProcessing(true);
       try {
-        if (images.length + files.length > MAX_LISTING_IMAGES) {
-          showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
+        const remaining = MAX_LISTING_IMAGES - images.length;
+        const limitMessage = `En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`;
+        if (remaining <= 0) {
+          showErrorToast(limitMessage);
           return;
         }
-        const [compressed, thumbs] = await Promise.all([
-          Promise.all(files.map((file) => compressImage(file, "listing"))),
-          Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
-        ]);
+        // Flervalg i galleriet har ingen grense, så overskuddet hoppes over.
+        const skipped = files.length > remaining;
+        files = files.slice(0, remaining);
+        // Én fil om gangen: originalene fra galleriet kan være store, og mange
+        // samtidige lesinger og komprimeringer kan få appen til å gå tom for minne.
+        const compressed: File[] = [];
+        const thumbs: File[] = [];
+        const aiFlags: boolean[] = [];
+        for (const file of files) {
+          aiFlags.push(await isAiGeneratedImage(file));
+          const [main, thumb] = await Promise.all([
+            compressImage(file, "listing"),
+            compressImage(file, "listing-thumb"),
+          ]);
+          compressed.push(main);
+          thumbs.push(thumb);
+        }
         const err = validateImages(compressed);
         if (err) {
           showErrorToast(describeImageError(err));
@@ -167,8 +189,10 @@ export function ImageUploader({
           file,
           thumbFile: thumbs[i],
           previewUrl: URL.createObjectURL(file),
+          aiGenerated: aiFlags[i],
         }));
         onChange([...images, ...next]);
+        if (skipped) showErrorToast(`${limitMessage} De ${remaining} første er lagt til.`);
       } catch (error) {
         showErrorToast(formatErrorMessage(error, "Kunne ikke behandle bildene. Prøv igjen."));
       } finally {
@@ -185,15 +209,14 @@ export function ImageUploader({
     e.target.value = "";
   };
 
-  const pickNative = async (source: "camera" | "gallery") => {
+  const takePhoto = async () => {
     try {
-      const remaining = MAX_LISTING_IMAGES - images.length;
-      if (remaining <= 0) {
+      if (images.length >= MAX_LISTING_IMAGES) {
         showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
         return;
       }
-      const files = await pickNativePhotos(source, remaining);
-      if (files.length) await addFiles(files);
+      const file = await takeNativePhoto();
+      if (file) await addFiles([file]);
     } catch (e: unknown) {
       showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
     }
@@ -271,7 +294,7 @@ export function ImageUploader({
             type="button"
             variant="default"
             className="gap-2"
-            onClick={() => void pickNative("camera")}
+            onClick={() => void takePhoto()}
             disabled={processing}
           >
             <Camera className="size-4" /> Ta bilde
@@ -279,7 +302,9 @@ export function ImageUploader({
           <Button
             type="button"
             variant="outline"
-            onClick={() => void pickNative("gallery")}
+            // Filvelgeren gir originalfilen med KI-metadata; Camera-pluginen koder
+            // bildet på nytt og fjerner den.
+            onClick={() => inputRef.current?.click()}
             disabled={processing}
           >
             Velg fra bilder
@@ -384,6 +409,30 @@ export function ImageUploader({
               </ul>
             </SortableContext>
           </DndContext>
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {aiImageCount > 0 && (
+              <Alert
+                role="region"
+                aria-label="Informasjon om bildemerking"
+                className="border-0 bg-surface"
+              >
+                <AlertTitle>
+                  {aiImageCount} av {images.length} {images.length === 1 ? "bilde" : "bilder"} blir
+                  merket
+                </AlertTitle>
+                <AlertDescription>
+                  <p>
+                    {aiImageCount === 1
+                      ? "Bildefilen oppgir at KI er brukt. Dette bildet får et merke som er synlig for alle som ser annonsen."
+                      : "Bildefilene oppgir at KI er brukt. Disse bildene får et merke som er synlig for alle som ser annonsen."}
+                  </p>
+                  <AiImageInfo className="mt-1 justify-start px-0 underline underline-offset-4">
+                    Om merkingen
+                  </AiImageInfo>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Dra bildene for å endre rekkefølgen. Det første bildet blir hovedbildet.
           </p>

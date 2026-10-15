@@ -148,6 +148,7 @@ export function usePublishListing({
         storage_path: string;
         sort_order: number;
         caption: string | null;
+        ai_generated: boolean;
       }> = [];
       // Attach images to the draft before making it public.
       if (images.length > 0) {
@@ -181,7 +182,13 @@ export function usePublishListing({
               );
             done += 1;
             setUploadProgress({ done, total: images.length });
-            return { id, storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
+            return {
+              id,
+              storage_path: path,
+              sort_order: i,
+              caption: img.caption?.trim() || null,
+              ai_generated: !!img.aiGenerated,
+            };
           }),
         );
         await Promise.all(thumbPromises);

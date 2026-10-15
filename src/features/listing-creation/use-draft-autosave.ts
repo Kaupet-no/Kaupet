@@ -535,6 +535,9 @@ export function useDraftAutosave(fields: DraftFields) {
         }
         if (!isCurrent()) return false;
         if (uploaded || images.some((image) => !image.remote?.synced)) keepRemotes(true);
+        draftSaveMessageRef.current = null;
+        setDraftSaveMessage(null);
+        setDraftSaveError(false);
         return true;
       } catch (error) {
         if (!isCurrent()) return false;

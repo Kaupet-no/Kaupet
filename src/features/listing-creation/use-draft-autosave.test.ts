@@ -439,6 +439,31 @@ describe("useDraftAutosave", () => {
     });
   });
 
+  it("fjerner lagringsfeilen når bildesynken lykkes etter nettverksfeil", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+    syncDraftListingImagesMock.mockRejectedValueOnce(new Error("Nettverket er nede"));
+    const file = new File(["x"], "a.webp", { type: "image/webp" });
+    const { result } = renderHook(() => {
+      const [images, setImages] = useState<PendingImage[]>([
+        { id: "img-1", file, thumbFile: file, previewUrl: "blob:a" },
+      ]);
+      return useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages });
+    });
+    await waitFor(() => expect(result.current.draftChecked).toBe(true));
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBeNull();
+    });
+    expect(result.current.draftSaveError).toBe(true);
+    expect(result.current.draftSaveMessage).toBeTruthy();
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBe("draft-1");
+    });
+    expect(result.current.draftSaveError).toBe(false);
+    expect(result.current.draftSaveMessage).toBeNull();
+  });
+
   it("KG-18-F02: går videre uten svar forkaster lokalt utkast, men ikke serverutkastet", async () => {
     localStorage.setItem(
       DRAFT_KEY,

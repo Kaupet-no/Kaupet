@@ -1,0 +1,73 @@
+-- Spill av begge migrasjoner mot eldre data; ingen testdata blir stående.
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
+SET search_path = public, extensions;
+SELECT plan(18);
+
+DROP TRIGGER IF EXISTS listings_compat_eu_control ON public.listings;
+DROP TRIGGER IF EXISTS wtb_listings_compat_eu_control ON public.wtb_listings;
+DROP FUNCTION IF EXISTS public.sync_legacy_eu_control_attributes();
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-4000-8000-00000000e001', 'eu-compat-pgtap@example.com'),
+  ('00000000-0000-4000-8000-00000000e002', 'eu-compat-other-pgtap@example.com');
+INSERT INTO public.categories (slug, name_nb) VALUES ('tilhenger-leaf', 'Tilhenger')
+ON CONFLICT (slug) DO NOTHING;
+INSERT INTO public.category_filters (category_id, key, label_nb, type, is_optional)
+SELECT id, 'next_eu_control', 'Neste EU-kontroll', 'date', true FROM public.categories WHERE slug = 'tilhenger-leaf'
+ON CONFLICT (category_id, key) DO NOTHING;
+INSERT INTO public.category_filters (category_id, key, label_nb, type, is_optional)
+SELECT id, 'eu_control_exempt', 'Fritatt for EU-kontroll', 'boolean', false FROM public.categories WHERE slug = 'tilhenger-leaf'
+ON CONFLICT (category_id, key) DO NOTHING;
+INSERT INTO public.listings (id, seller_id, title, status, attributes) VALUES
+  ('00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e001', 'Eldre fritatt tilhenger', 'draft', '{"eu_control_exempt":true,"color":"red"}');
+INSERT INTO public.wtb_listings (id, user_id, title, status, attributes) VALUES
+  ('00000000-0000-4000-8000-00000000e201', '00000000-0000-4000-8000-00000000e001', 'Eldre kjøpsønske', 'draft', '{"eu_control_exempt":true}');
+
+-- APPLY_EU_STATUS_MIGRATION
+-- APPLY_EU_COMPAT_MIGRATION
+
+SELECT ok(EXISTS(SELECT 1 FROM public.category_filters f JOIN public.categories c ON c.id = f.category_id
+  WHERE c.slug = 'tilhenger-leaf' AND f.key = 'eu_control_exempt' AND f.type = 'boolean' AND f.is_optional), 'Gammel veiviser får fortsatt fritaksspørsmålet');
+SELECT is((SELECT attributes->'eu_control_exempt' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e101'), 'true'::jsonb, 'Gamle klienter leser fortsatt fritatte annonser');
+SELECT is((SELECT attributes->>'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e101'), 'exempt', 'Ny status bevares');
+SELECT is((SELECT attributes->'eu_control_exempt' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e201'), 'true'::jsonb, 'Gamle klienter leser fortsatt fritatte kjøpsønsker');
+SELECT is((SELECT attributes->'eu_control_status' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e201'), '["exempt"]'::jsonb, 'Kjøpsønskets status er fortsatt en liste');
+
+INSERT INTO public.listings (id, seller_id, title, status, attributes) VALUES
+  ('00000000-0000-4000-8000-00000000e102', '00000000-0000-4000-8000-00000000e001', 'Ny fra gammel klient', 'draft', '{"eu_control_exempt":true}');
+SELECT is((SELECT attributes->>'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e102'), 'exempt', 'Gammel klient kan fortsatt opprette en fritatt annonse');
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000e001","role":"authenticated"}';
+UPDATE public.listings SET attributes = attributes || '{"eu_control_exempt":false}'::jsonb WHERE id = '00000000-0000-4000-8000-00000000e102';
+RESET ROLE;
+SELECT ok(NOT (SELECT attributes ? 'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e102'), 'Gammel klient kan oppheve fritaket');
+UPDATE public.listings SET attributes = attributes || '{"eu_control_status":"missing"}'::jsonb WHERE id = '00000000-0000-4000-8000-00000000e102';
+SELECT is((SELECT attributes->'eu_control_exempt' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e102'), 'false'::jsonb, 'Ny Mangler-status er ikke fritak hos gammel klient');
+UPDATE public.listings SET attributes = attributes || jsonb_build_object('next_eu_control', (CURRENT_DATE + 365)::text) WHERE id = '00000000-0000-4000-8000-00000000e102';
+SELECT ok(NOT (SELECT attributes ? 'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e102'), 'Ny fremtidig dato fjerner gammel Mangler-status');
+SELECT ok((SELECT listing_matches_attribute_filters(attributes, jsonb_build_object('next_eu_control', jsonb_build_object('kind', 'date_min', 'value', CURRENT_DATE::text))) FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e102'), 'Visning og dato-filter bruker samme gyldige frist');
+UPDATE public.listings SET attributes = attributes || '{"eu_control_status":"missing"}'::jsonb WHERE id = '00000000-0000-4000-8000-00000000e102';
+SELECT ok(NOT (SELECT attributes ? 'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e102'), 'Direkte skriving kan ikke lagre Mangler sammen med fremtidig frist');
+
+INSERT INTO public.wtb_listings (id, user_id, title, status, attributes) VALUES
+  ('00000000-0000-4000-8000-00000000e202', '00000000-0000-4000-8000-00000000e001', 'Nytt kjøpsønske fra gammel klient', 'draft', '{"eu_control_exempt":true}');
+SELECT is((SELECT attributes->'eu_control_status' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e202'), '["exempt"]'::jsonb, 'Gammel klient kan opprette nytt fritakskriterium');
+UPDATE public.wtb_listings SET attributes = '{"eu_control_status":["missing","exempt"]}' WHERE id = '00000000-0000-4000-8000-00000000e202';
+SELECT ok(NOT (SELECT attributes ? 'eu_control_exempt' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e202'), 'Flere aksepterte statuser snevres ikke inn av et boolsk alias');
+UPDATE public.wtb_listings SET attributes = '{}' WHERE id = '00000000-0000-4000-8000-00000000e202';
+SELECT is((SELECT attributes FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e202'), '{}'::jsonb, 'Tømt kriterium forblir ubegrenset');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-4000-8000-00000000e002","role":"authenticated"}';
+UPDATE public.listings SET attributes = '{"eu_control_status":"missing"}' WHERE id = '00000000-0000-4000-8000-00000000e101';
+RESET ROLE;
+SELECT is((SELECT attributes->>'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e101'), 'exempt', 'Annen bruker kan ikke endre fritaket');
+SET LOCAL ROLE anon;
+SELECT throws_ok($test$UPDATE public.listings SET attributes = '{"eu_control_status":"missing"}' WHERE id = '00000000-0000-4000-8000-00000000e101'$test$, '42501', NULL::text, 'Anonym kan ikke endre fritaket');
+RESET ROLE;
+SELECT ok(NOT has_function_privilege('authenticated', 'public.sync_legacy_eu_control_attributes()', 'EXECUTE'), 'Triggerfunksjonen kan ikke kalles direkte av klienter');
+INSERT INTO public.listings (id, seller_id, title, status, attributes) VALUES
+  ('00000000-0000-4000-8000-00000000e103', '00000000-0000-4000-8000-00000000e001', 'Vanlig annonse', 'draft', '{"color":"blue"}');
+SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e103'), '{"color":"blue"}'::jsonb, 'Andre annonser får ikke kjøretøyattributter');
+SELECT * FROM finish();
+ROLLBACK;

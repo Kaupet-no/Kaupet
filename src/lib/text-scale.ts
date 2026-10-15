@@ -50,6 +50,9 @@ const BASE_BODY_PX = 17;
 /** CSS-variabelen Tailwinds `--text-*`-tokens multipliseres med, se styles.css. */
 const SCALE_PROPERTY = "--kaupet-text-scale";
 
+/** Sist kjente Android-skala, lest av public/boot.js før første opptegning. */
+const ANDROID_SCALE_KEY = "kaupet_text_scale";
+
 // ponytail: taket er 200 % (WCAG 1.4.4). iOS' største tilgjengelighets-
 // størrelser går til ~3,1x, men appen er ikke verifisert over 200 % — hev
 // taket når layouten faktisk er sett på de størrelsene.
@@ -93,7 +96,18 @@ export function initTextScale(): void {
   if (!isNative()) return;
   const platform = nativePlatform();
   if (platform === "android") {
-    void readAndroidFontScale().then(apply);
+    void readAndroidFontScale().then((scale) => {
+      apply(scale);
+      // Broen svarer først etter første opptegning. public/boot.js setter
+      // sist kjente skala før den, så oppstart ikke hopper; bare første
+      // start etter en endring av tekststørrelsen gjør det.
+      try {
+        if (scale == null) localStorage.removeItem(ANDROID_SCALE_KEY);
+        else localStorage.setItem(ANDROID_SCALE_KEY, String(scale));
+      } catch {
+        /* lagring utilgjengelig */
+      }
+    });
     return;
   }
   if (platform !== "ios") return;

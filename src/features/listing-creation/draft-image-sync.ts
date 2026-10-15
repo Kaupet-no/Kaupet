@@ -8,6 +8,8 @@ export type RemoteImage = {
   uploadedAt: number;
   /** Raden finnes på utkastet, så filen er referert og ryddes ikke bort. */
   synced?: boolean;
+  /** Miniatyren feilet; publiseringen prøver den på nytt. */
+  thumbMissing?: boolean;
 };
 
 // Unreferenced uploads can be deleted after 24 hours; leave one hour of margin.
@@ -34,8 +36,10 @@ export async function uploadDraftImage(
 ): Promise<RemoteImage> {
   const uploadedAt = Date.now();
   const path = await uploadListingImage({ listingId, file: image.file });
-  await uploadListingImageThumb({ path, file: image.thumbFile }).catch((err) =>
-    console.warn("Kunne ikke laste opp kort-thumbnail for utkastbilde", err),
-  );
-  return { id: crypto.randomUUID(), path, uploadedAt };
+  const remote: RemoteImage = { id: crypto.randomUUID(), path, uploadedAt };
+  await uploadListingImageThumb({ path, file: image.thumbFile }).catch((err) => {
+    console.warn("Kunne ikke laste opp kort-thumbnail for utkastbilde", err);
+    remote.thumbMissing = true;
+  });
+  return remote;
 }

@@ -171,7 +171,8 @@ export function usePublishListing({
             // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
             // hvis thumbnailen mangler, så en feil her skal ikke stoppe
             // publiseringen — men samles opp og vises til brukeren etterpå.
-            if (!remote)
+            // Autolagringen har lastet opp miniatyren, med mindre den feilet.
+            if (!remote || remote.thumbMissing)
               thumbPromises.push(
                 uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
                   console.warn("Kunne ikke laste opp kort-thumbnail", err);

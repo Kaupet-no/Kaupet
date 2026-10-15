@@ -3418,6 +3418,16 @@ export type Database = {
           updated_at: string
         }[]
       }
+      complete_listing_image_job: {
+        Args: {
+          _attempt: number
+          _content_hash: string
+          _job_id: string
+          _storage_path: string
+          _transformations: number
+        }
+        Returns: string
+      }
       compute_wtb_matches: {
         Args: {
           _attributes: Json
@@ -4084,6 +4094,14 @@ export type Database = {
           p_filter_synonyms: Json
           p_synced_by: string
         }
+        Returns: undefined
+      }
+      sync_draft_listing_images: {
+        Args: { _images: Json; _listing_id: string; _user_id: string }
+        Returns: Json
+      }
+      sync_listing_images: {
+        Args: { _images: Json; _listing_id: string }
         Returns: undefined
       }
       sync_organization_entitlements: {

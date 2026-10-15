@@ -925,7 +925,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     hasDraftData,
     draftChecked,
     flushLocalDraft,
-    saveDraftToSupabase,
+    saveDraftWithImages,
     retryDraftAfterConflict,
     ensureDraftId,
     restoreDraft: restoreDraftFields,
@@ -2024,7 +2024,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
             return true;
           }
           setIsSavingDraft(true);
-          const id = await saveDraftToSupabase();
+          const id = await saveDraftWithImages();
           setIsSavingDraft(false);
           if (!id) return false;
           blocker.proceed?.();

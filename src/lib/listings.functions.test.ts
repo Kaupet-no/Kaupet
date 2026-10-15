@@ -106,6 +106,7 @@ import {
   getListingKaupetCodeById,
   republishListing,
   saveDraftListing,
+  syncDraftListingImages,
   updateListingStatus,
 } from "./listings.functions";
 
@@ -737,3 +738,44 @@ it.each(["create", "republish"])(
     }
   },
 );
+describe("syncDraftListingImages", () => {
+  const draftId = "00000000-0000-4000-8000-000000000031";
+  const image = {
+    id: "00000000-0000-4000-8000-000000000032",
+    storage_path: `${draftId}/00000000-0000-4000-8000-000000000033.webp`,
+    sort_order: 0,
+    caption: null,
+  };
+  beforeEach(() => {
+    db.rpc.mockReset().mockResolvedValue({ data: { already_published: false }, error: null });
+  });
+
+  it("knytter bildene til utkastet som innlogget bruker", async () => {
+    await expect(syncDraftListingImages({ data: { draftId, images: [image] } })).resolves.toEqual({
+      already_published: false,
+    });
+    expect(db.rpc).toHaveBeenCalledWith("sync_draft_listing_images", {
+      _listing_id: draftId,
+      _user_id: "user-id",
+      _images: [image],
+    });
+  });
+
+  it("avviser en annen aktør enn den innloggede", async () => {
+    await expect(
+      syncDraftListingImages({
+        data: { expected_user_id: "00000000-0000-4000-8000-000000000034", draftId, images: [] },
+      }),
+    ).rejects.toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+
+  it("avviser bildestier utenfor tillatt format", async () => {
+    await expect(async () =>
+      syncDraftListingImages({
+        data: { draftId, images: [{ ...image, storage_path: "../annen/fil.webp" }] },
+      }),
+    ).rejects.toThrow();
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+});

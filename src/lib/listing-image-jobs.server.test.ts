@@ -58,93 +58,48 @@ function fakeTransformer(bytes = new Uint8Array(100)): ImageTransformer {
 }
 
 function buildAdmin(
-  options: {
-    registrationError?: Error;
-    insertError?: Error;
-    existingImage?: { id: string };
-    /** Jobben er claimet på nytt av en annen worker. */
-    lostClaim?: boolean;
-    /** Claimet mistes mellom eierskapssjekken og done-oppdateringen. */
-    lostClaimOnComplete?: boolean;
-    /** Jobben er slettet (erstattet av en ny synk) når claimet mistes. */
-    jobGone?: boolean;
-    /** Et nyere claim har lagt inn sin egen bilderad for samme plass. */
-    otherImage?: { id: string };
-  } = {},
+  options: { registrationError?: Error; insertError?: Error; completion?: "done" | "stale" } = {},
 ) {
-  let completeAttempted = false;
-  const updates: Array<{ table: string; payload: unknown; filters: unknown[][] }> = [];
-  const deletes: Array<{ table: string; filters: unknown[][] }> = [];
+  const updates: Array<{ table: string; payload: unknown; filters: Record<string, unknown> }> = [];
   const registered: string[] = [];
+  const completions: Array<Record<string, unknown>> = [];
   const admin = {
-    rpc: (name: string, args: { _key: string }) => {
+    rpc: (name: string, args: Record<string, unknown>) => {
       uploadEvents.push(name);
       if (name === "register_standard_upload_object") {
-        registered.push(args._key);
+        registered.push(args._key as string);
         return Promise.resolve({ data: null, error: options.registrationError ?? null });
+      }
+      if (name === "complete_listing_image_job") {
+        uploadEvents.push("insert");
+        completions.push(args);
+        if (options.insertError) return Promise.resolve({ data: null, error: options.insertError });
+        // Fullføring skriver «done» atomisk sammen med bilderaden.
+        updates.push({
+          table: "listing_image_jobs",
+          payload: { status: "done", customer_error: null, internal_error: null },
+          filters: {},
+        });
+        return Promise.resolve({ data: options.completion ?? "done", error: null });
       }
       throw new Error(`unexpected RPC: ${name}`);
     },
-    from: (table: string) => {
-      let excludesOwnRow = false;
-      const query = {
-        eq: () => query,
-        neq: () => {
-          excludesOwnRow = true;
-          return query;
-        },
-        limit: () => query,
-        maybeSingle: () => {
-          const data =
-            table === "listing_images"
-              ? ((excludesOwnRow ? options.otherImage : options.existingImage) ?? null)
-              : options.lostClaim || (completeAttempted && options.jobGone)
-                ? null
-                : { id: "job-1" };
-          return Promise.resolve({ data, error: null });
-        },
-      };
-      return {
-        select: () => query,
-        insert: () => {
-          uploadEvents.push("insert");
-          const result = options.insertError
-            ? { data: null, error: options.insertError }
-            : { data: { id: "img-new" }, error: null };
-          return { select: () => ({ single: () => Promise.resolve(result) }) };
-        },
-        delete: () => {
-          const filters: unknown[][] = [];
-          const chain = {
-            eq: (...args: unknown[]) => {
-              filters.push(args);
-              deletes.push({ table, filters });
-              return Promise.resolve({ data: null, error: null });
-            },
-          };
-          return chain;
-        },
-        update: (payload: unknown) => {
-          const filters: unknown[][] = [];
-          const chain = {
-            eq: (...args: unknown[]) => {
-              filters.push(args);
-              return chain;
-            },
-            select: () => chain,
-            then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
-              updates.push({ table, payload, filters });
-              completeAttempted = true;
-              const data = options.lostClaimOnComplete ? [] : [{ id: "job-1" }];
-              return Promise.resolve({ data, error: null }).then(resolve, reject);
-            },
-          };
-          return chain;
-        },
-      };
-    },
+    from: (table: string) => ({
+      update: (payload: unknown) => {
+        const entry = { table, payload, filters: {} as Record<string, unknown> };
+        updates.push(entry);
+        const chain = {
+          eq: (column: string, value: unknown) => {
+            entry.filters[column] = value;
+            return chain;
+          },
+          then: (resolve: (value: unknown) => unknown) => resolve({ data: null, error: null }),
+        };
+        return chain;
+      },
+    }),
   };
-  return { admin, updates, deletes, registered };
+  return { admin, updates, registered, completions };
 }
 
 describe("processListingImageJob", () => {
@@ -178,100 +133,6 @@ describe("processListingImageJob", () => {
     expect(
       uploadEvents.filter((event) => event === "register_standard_upload_object"),
     ).toHaveLength(2);
-  });
-
-  it("legger ikke inn en ny bilderad når et tidligere claim allerede gjorde det", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jpegResponse());
-    const { admin, updates } = buildAdmin({ existingImage: { id: "img-1" } });
-
-    const result = await processListingImageJob(job(), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl,
-    });
-
-    expect(result.outcome).toBe("done");
-    expect(uploadEvents).not.toContain("insert");
-    expect(updates.find((u) => u.table === "listing_image_jobs")?.payload).toMatchObject({
-      status: "done",
-    });
-  });
-
-  it("skriver status bare for eget claim (status og attempts)", async () => {
-    const { admin, updates } = buildAdmin();
-    await processListingImageJob(job({ attempts: 3 }), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
-    });
-    expect(updates.find((u) => u.table === "listing_image_jobs")?.filters).toEqual(
-      expect.arrayContaining([
-        ["status", "processing"],
-        ["attempts", 3],
-      ]),
-    );
-  });
-
-  it("en worker som har mistet claimet skriver verken bilderad eller status", async () => {
-    const { admin, updates } = buildAdmin({ lostClaim: true });
-    const result = await processListingImageJob(job(), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
-    });
-    expect(result.outcome).toBe("stale");
-    expect(uploadEvents).not.toContain("insert");
-    expect(updates).toHaveLength(0);
-  });
-
-  it("fjerner egen bilderad når jobben er erstattet før done-oppdateringen", async () => {
-    const { admin, deletes } = buildAdmin({ lostClaimOnComplete: true, jobGone: true });
-    const result = await processListingImageJob(job(), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
-    });
-    expect(result.outcome).toBe("stale");
-    expect(deletes).toEqual([{ table: "listing_images", filters: [["id", "img-new"]] }]);
-  });
-
-  it("fjerner egen bilderad når et nyere claim har sin egen", async () => {
-    const { admin, deletes } = buildAdmin({
-      lostClaimOnComplete: true,
-      otherImage: { id: "img-other" },
-    });
-    const result = await processListingImageJob(job(), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
-    });
-    expect(result.outcome).toBe("stale");
-    expect(deletes).toEqual([{ table: "listing_images", filters: [["id", "img-new"]] }]);
-  });
-
-  it("beholder egen bilderad når et nyere claim kan ha gjenbrukt den", async () => {
-    const { admin, deletes } = buildAdmin({ lostClaimOnComplete: true });
-    const result = await processListingImageJob(job(), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
-    });
-    expect(result.outcome).toBe("stale");
-    expect(deletes).toHaveLength(0);
-  });
-
-  it("sletter ikke en bilderad den ikke selv la inn når claimet mistes", async () => {
-    const { admin, deletes } = buildAdmin({
-      existingImage: { id: "img-1" },
-      lostClaimOnComplete: true,
-    });
-    const result = await processListingImageJob(job(), {
-      supabaseAdmin: admin as never,
-      transformer: fakeTransformer(),
-      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
-    });
-    expect(result.outcome).toBe("stale");
-    expect(deletes).toHaveLength(0);
   });
 
   it("registreringsfeil gir retry uten å skrive noen objekter", async () => {
@@ -650,5 +511,38 @@ describe("processListingImageJob", () => {
 
   it("CustomerImageError kan konstrueres direkte (brukt av klassifiseringstester over)", () => {
     expect(new CustomerImageError("x").message).toBe("x");
+  });
+
+  // KG-10-F01: bilderad og «done» skrives atomisk og bare for gjeldende claim.
+  it("fullfører via complete_listing_image_job med claimets forsøksnummer", async () => {
+    const { admin, completions } = buildAdmin();
+    await processListingImageJob(job({ attempts: 3 }), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(completions).toHaveLength(1);
+    expect(completions[0]).toMatchObject({ _job_id: "job-1", _attempt: 3 });
+  });
+
+  it("skriver ingenting mer når jobben er erstattet eller tatt over", async () => {
+    const { admin, updates } = buildAdmin({ completion: "stale" });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(updates.filter((u) => (u.payload as { status?: string }).status !== "done")).toEqual([]);
+  });
+
+  it("feilstatus skrives bare mens claimet fortsatt eier jobben", async () => {
+    const { admin, updates } = buildAdmin({ insertError: new Error("database nede") });
+    await processListingImageJob(job({ attempts: 2 }), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(updates[0]?.filters).toEqual({ id: "job-1", status: "processing", attempts: 2 });
   });
 });

@@ -4,10 +4,10 @@ import { Loader2 } from "lucide-react";
 import { useListingEdit } from "@/features/listing-edit/edit-mode-context";
 import {
   DRIVE_TYPE_OPTIONS,
+  hasUpcomingEuControlDate,
   EU_CONTROL_STATUS_LABEL_NB,
   type EuControlStatus,
 } from "@/lib/vehicle/vehicle-options";
-import { todayIsoDate } from "@/lib/category-filters";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -42,7 +42,7 @@ export function VehicleFactsPanel({
   const [drive, setDrive] = useState(driveType ?? "");
   const [euStatus, setEuStatus] = useState(euControlStatus);
   const [saving, setSaving] = useState(false);
-  const canChooseStatus = !nextEuControl || nextEuControl < todayIsoDate();
+  const canChooseStatus = !hasUpcomingEuControlDate(nextEuControl);
 
   async function save() {
     setSaving(true);

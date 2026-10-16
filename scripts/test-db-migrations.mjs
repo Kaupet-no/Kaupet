@@ -54,6 +54,12 @@ try {
       )
       .replace("-- APPLY_EU_COMPAT_MIGRATION", () =>
         readFileSync("supabase/migrations/20261016001000_preserve_legacy_eu_control.sql", "utf8"),
+      )
+      .replace("-- APPLY_EU_CLEAR_MIGRATION", () =>
+        readFileSync(
+          "supabase/migrations/20261016140000_clear_legacy_wtb_eu_exemption.sql",
+          "utf8",
+        ),
       ),
   );
   const result = spawnSync(

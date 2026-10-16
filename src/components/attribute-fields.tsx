@@ -3,6 +3,7 @@ import { useAllCategoryFilters } from "@/hooks/use-category-filters";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -11,9 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  todayIsoDate,
   effectiveFiltersForCategory,
   filterDependencyMet,
   getMissingRequiredFilters,
+  isAlternativeFilter,
   NUMERIC_DIGIT_CAPS,
   PART_FITMENT_SCOPE_KEY,
   PART_FITMENT_VEHICLE_IDS_KEY,
@@ -90,15 +93,22 @@ export function AttributeFields({
   const hiddenKeySet = useMemo(() => new Set(hiddenKeys ?? []), [hiddenKeys]);
   const filterKeySet = useMemo(() => (filterKeys ? new Set(filterKeys) : null), [filterKeys]);
 
+  const effectiveFilters = useMemo(
+    () => effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
+  );
   const filters = useMemo(
     () =>
-      effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById).filter(
-        (f) =>
-          !hiddenKeySet.has(f.key) &&
-          (!filterKeySet || filterKeySet.has(f.key)) &&
-          filterDependencyMet(f, value),
-      ),
-    [categoryId, allFilters, categoriesById, hiddenKeySet, filterKeySet, value],
+      effectiveFilters.filter((f) => {
+        // Alternativer (Mangler/Fritatt) følger feltet de er alternativ til.
+        const scopeKey = isAlternativeFilter(f) ? f.depends_on_key! : f.key;
+        return (
+          !hiddenKeySet.has(scopeKey) &&
+          (!filterKeySet || filterKeySet.has(scopeKey)) &&
+          filterDependencyMet(f, value)
+        );
+      }),
+    [effectiveFilters, hiddenKeySet, filterKeySet, value],
   );
 
   const missingKeys = useMemo(() => {
@@ -115,6 +125,12 @@ export function AttributeFields({
     const next = { ...value };
     if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) delete next[key];
     else next[key] = v;
+    // Et valgt alternativ gjelder ikke lenger når datoen settes frem i tid.
+    for (const f of filters) {
+      if (isAlternativeFilter(f) && f.depends_on_key === key && !filterDependencyMet(f, next)) {
+        delete next[f.key];
+      }
+    }
     onChange(next);
   };
 
@@ -175,6 +191,11 @@ export function AttributeFields({
             />
           );
         }
+        const isDeadline =
+          f.type === "date" &&
+          effectiveFilters.some((a) => isAlternativeFilter(a) && a.depends_on_key === f.key);
+        const current = value[f.key];
+        const passed = isDeadline && typeof current === "string" && current < todayIsoDate();
         return (
           <AttributeField
             key={f.id}
@@ -182,7 +203,14 @@ export function AttributeFields({
             value={value[f.key]}
             onChange={(v) => set(f.key, v)}
             required={required}
-            error={missingKeys.has(f.key) ? `Fyll inn ${f.label_nb.toLowerCase()}` : undefined}
+            minDate={isDeadline ? todayIsoDate() : undefined}
+            error={
+              !missingKeys.has(f.key)
+                ? undefined
+                : passed
+                  ? "Datoen er passert. Velg en ny dato eller et av valgene under."
+                  : `Fyll inn ${f.label_nb.toLowerCase()}`
+            }
           />
         );
       })}
@@ -196,12 +224,15 @@ function AttributeField({
   onChange,
   required,
   error,
+  minDate,
 }: {
   filter: CategoryFilter;
   value: AttributeValue | undefined;
   onChange: (v: AttributeValue | undefined) => void;
   required?: boolean;
   error?: string;
+  /** Tidligste dato som kan velges; frister med alternativer starter i dag. */
+  minDate?: string;
 }) {
   const label = filter.unit ? `${filter.label_nb} (${filter.unit})` : filter.label_nb;
   const fieldId = `attr-${filter.key}`;
@@ -254,6 +285,23 @@ function AttributeField({
             {error}
           </p>
         )}
+      </div>
+    );
+  }
+
+  if (filter.type === "select" && isAlternativeFilter(filter)) {
+    // Gjensidig utelukkende brytere under feltet de er alternativ til.
+    return (
+      <div role="group" aria-label={filter.label_nb} className="space-y-1">
+        {(filter.options ?? []).map((o) => (
+          <label key={o.value} className="flex min-h-12 items-center justify-between gap-3 text-sm">
+            {o.label_nb}
+            <Switch
+              checked={value === o.value}
+              onCheckedChange={(checked) => onChange(checked ? o.value : undefined)}
+            />
+          </label>
+        ))}
       </div>
     );
   }
@@ -411,11 +459,11 @@ function AttributeField({
       </Label>
       {filter.type === "date" ? (
         // Kun datovelger: fritekst ga ugyldige datoer som ødela visning og
-        // matching. En passert frist er reell (forfalt EU-kontroll).
+        // matching. En passert frist besvares med et alternativ i stedet.
         <EuControlDateField
           id={fieldId}
           value={typeof value === "string" ? value : ""}
-          min={`${new Date().getFullYear() - DATE_YEARS_BACK}-01-01`}
+          min={minDate ?? `${new Date().getFullYear() - DATE_YEARS_BACK}-01-01`}
           onChange={(v) => onChange(v || undefined)}
           aria-required={showRequiredMark || undefined}
           aria-invalid={!!error}

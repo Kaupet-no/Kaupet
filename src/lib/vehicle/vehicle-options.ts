@@ -1,3 +1,35 @@
+import { isMatch } from "date-fns";
+import { todayIsoDate } from "@/lib/category-filters";
+
+/** Selgerens alternativ til en tom eller passert «Neste EU-kontroll»
+ * (`attributes.eu_control_status`, filterrad i 20261015140000). */
+export type EuControlStatus = "missing" | "exempt";
+
+export const EU_CONTROL_STATUS_LABEL_NB: Record<EuControlStatus, string> = {
+  missing: "Mangler EU-kontroll",
+  exempt: "Fritatt for EU-kontroll",
+};
+
+/** Bare en gyldig ISO-frist i dag eller senere erstatter et statusvalg. */
+export function hasUpcomingEuControlDate(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    isMatch(value, "yyyy-MM-dd") &&
+    value >= todayIsoDate()
+  );
+}
+
+export function parseEuControlStatus(
+  value: unknown,
+  nextEuControl?: unknown,
+  legacyExempt?: unknown,
+): EuControlStatus | null {
+  if (hasUpcomingEuControlDate(nextEuControl)) return null;
+  if (value === "missing" || value === "exempt") return value;
+  return legacyExempt === true ? "exempt" : null;
+}
+
 /** "Hjuldrift"-alternativene brukt både i annonseopprettelse (der SVV ikke
  * kan avgjøre det automatisk) og ved redigering av publisert annonse. Kun for
  * Bil/ATV — tyngre kjøretøy (bobil/lastebil/buss) bruker

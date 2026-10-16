@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   findInvalidDateAttribute,
   normalizeDateAttributes,
   applyAttributeFilters,
   effectiveFiltersForCategory,
+  filterDependencyMet,
+  todayIsoDate,
+  searchFilterDependencyMet,
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
@@ -497,4 +500,105 @@ describe("datoattributter", () => {
       findInvalidDateAttribute("sub", filters, byId, { first_registration_date: "31.12" }),
     ).toBeNull();
   });
+});
+
+describe("alternativer til en frist (Mangler/Fritatt EU-kontroll)", () => {
+  const date = f({ category_id: "main", key: "next_eu_control", type: "date" });
+  const status = f({
+    category_id: "main",
+    key: "eu_control_status",
+    is_optional: true,
+    depends_on_key: "next_eu_control",
+    options: [
+      { value: "missing", label_nb: "Mangler EU-kontroll" },
+      { value: "exempt", label_nb: "Fritatt for EU-kontroll" },
+    ],
+  });
+  const filters = [date, status];
+  const missing = (attributes: Record<string, string>) =>
+    getMissingRequiredFilters("sub", filters, byId, attributes).map((x) => x.key);
+
+  afterEach(() => vi.useRealTimers());
+  beforeEach(() => vi.setSystemTime(new Date("2026-10-15T12:00:00")));
+
+  it("gjelder bare når datoen er tom eller passert (grenseverdier rundt i dag)", () => {
+    expect(filterDependencyMet(status, {})).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "" })).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-14" })).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(false);
+    expect(filterDependencyMet(status, { next_eu_control: "2027-01-01" })).toBe(false);
+  });
+
+  it("regner «i dag» i norsk tid, også når prosessen går i UTC", () => {
+    // 00:30 i Oslo, men fortsatt 15. oktober i UTC (workeren).
+    vi.setSystemTime(new Date("2026-10-15T22:30:00Z"));
+    expect(todayIsoDate()).toBe("2026-10-16");
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(true);
+  });
+
+  it("krever dato i dag eller senere, med mindre et alternativ er valgt", () => {
+    expect(missing({})).toEqual(["next_eu_control"]);
+    expect(missing({ next_eu_control: "2026-10-14" })).toEqual(["next_eu_control"]);
+    expect(missing({ next_eu_control: "2026-10-15" })).toEqual([]);
+    expect(missing({ eu_control_status: "missing" })).toEqual([]);
+    expect(missing({ next_eu_control: "2026-01-01", eu_control_status: "exempt" })).toEqual([]);
+    // Et utdatert alternativ ved en fremtidig dato gjelder ikke, men datoen er gyldig.
+    expect(missing({ next_eu_control: "2027-01-01", eu_control_status: "missing" })).toEqual([]);
+  });
+
+  it("godtar fortsatt passerte datoer i datofelt uten alternativer", () => {
+    expect(
+      getMissingRequiredFilters("sub", [date], byId, { next_eu_control: "2020-01-01" }),
+    ).toEqual([]);
+  });
+
+  it("skjules i søket når tidligste dato er i dag eller senere", () => {
+    expect(searchFilterDependencyMet(status, {}, filters)).toBe(true);
+    expect(
+      searchFilterDependencyMet(
+        status,
+        { next_eu_control: { kind: "date_min", value: "2027-01-01" } },
+        filters,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("eldre fritaksfelt under klientovergangen", () => {
+  const filters = [
+    f({ category_id: "main", key: "brand", type: "brand_select", unit: "bil", is_optional: true }),
+    f({ category_id: "main", key: "next_eu_control", type: "date" }),
+    f({ category_id: "main", key: "eu_control_exempt", type: "boolean", is_optional: true }),
+    f({
+      category_id: "main",
+      key: "eu_control_status",
+      is_optional: true,
+      depends_on_key: "next_eu_control",
+    }),
+  ];
+
+  it("skjuler det gamle feltet bare når erstatningen finnes", () => {
+    expect(effectiveFiltersForCategory("sub", filters, byId).map((x) => x.key)).not.toContain(
+      "eu_control_exempt",
+    );
+    expect(
+      effectiveFiltersForCategory(
+        "sub",
+        filters.filter((x) => x.key !== "eu_control_status"),
+        byId,
+      ).map((x) => x.key),
+    ).toContain("eu_control_exempt");
+  });
+
+  it.each([
+    [true, []],
+    [false, ["next_eu_control"]],
+  ])(
+    "tolker eldre fritak %s ved publiseringsvalidering (beslutningstabell)",
+    (eu_control_exempt, expected) => {
+      expect(
+        getMissingRequiredFilters("sub", filters, byId, { eu_control_exempt }).map((x) => x.key),
+      ).toEqual(expected);
+    },
+  );
 });

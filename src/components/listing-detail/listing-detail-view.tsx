@@ -55,6 +55,7 @@ import {
 import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
 import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
+import { parseEuControlStatus, type EuControlStatus } from "@/lib/vehicle/vehicle-options";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -321,9 +322,13 @@ export function ListingDetailView({
     isVehicleListing && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
       ? mileageKmRaw
       : null;
-  const euControlExemptRaw = attributes.eu_control_exempt;
-  const euControlExempt =
-    isVehicleListing && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
+  const euControlStatus = isVehicleListing
+    ? parseEuControlStatus(
+        attributes.eu_control_status,
+        vehicleLookup?.next_eu_control ?? attributes.next_eu_control,
+        attributes.eu_control_exempt,
+      )
+    : null;
   // Seller-confirmed override (see `vehicle-confirm/index.tsx`), stored
   // top-level like `mileage_km` — takes precedence over the SVV snapshot's
   // `vehicle_lookup.drive_type`, which is often `null` when SVV doesn't
@@ -516,7 +521,7 @@ export function ListingDetailView({
       isVehicleListing={isVehicleListing}
       vehicleLookup={vehicleLookup}
       mileageKm={mileageKm}
-      euControlExempt={euControlExempt}
+      euControlStatus={euControlStatus}
       driveType={driveType}
       axleConfig={axleConfig}
       avgiftNote={avgiftNote}
@@ -605,7 +610,7 @@ function ListingDetailViewBody({
   isVehicleListing,
   vehicleLookup,
   mileageKm,
-  euControlExempt,
+  euControlStatus,
   driveType,
   axleConfig,
   avgiftNote,
@@ -668,7 +673,7 @@ function ListingDetailViewBody({
   isVehicleListing: boolean;
   vehicleLookup: ReturnType<typeof parseVehicleLookup>;
   mileageKm: number | null;
-  euControlExempt: boolean | null;
+  euControlStatus: EuControlStatus | null;
   driveType: string | null;
   axleConfig: string | null;
   avgiftNote: string | null;
@@ -983,7 +988,7 @@ function ListingDetailViewBody({
                   <VehicleInfoGrid
                     vehicleLookup={vehicleLookup}
                     mileageKm={mileageKm}
-                    euControlExempt={euControlExempt}
+                    euControlStatus={euControlStatus}
                     driveType={driveType}
                     attributes={attributes}
                   />
@@ -992,7 +997,13 @@ function ListingDetailViewBody({
                   <VehicleFactsPanel
                     mileageKm={mileageKm}
                     driveType={driveType}
-                    euControlExempt={euControlExempt}
+                    euControlStatus={euControlStatus}
+                    nextEuControl={
+                      vehicleLookup?.next_eu_control ??
+                      (typeof attributes.next_eu_control === "string"
+                        ? attributes.next_eu_control
+                        : null)
+                    }
                     onClose={close}
                   />
                 )}
@@ -1125,7 +1136,7 @@ function ListingDetailViewBody({
                   <VehicleTechTable
                     vehicleLookup={vehicleLookup}
                     mileageKm={mileageKm}
-                    euControlExempt={euControlExempt}
+                    euControlStatus={euControlStatus}
                     driveType={driveType}
                     axleConfig={axleConfig}
                     condition={condition}

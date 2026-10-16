@@ -3,6 +3,7 @@ import { ChevronDown, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -15,6 +16,7 @@ import {
 import {
   PART_FITMENT_VEHICLE_IDS_KEY,
   SEARCH_MULTISELECT_KEYS,
+  todayIsoDate,
   type AttributeFilterValue,
   type CategoryFilter,
   type VehicleBrandGroup,
@@ -266,6 +268,20 @@ export function CategoryFilterFields({
                 value={minDate}
                 onChange={(v) => onChange(f.key, v ? { kind: "date_min", value: v } : undefined)}
               />
+              {/* Snarvei for «bare gyldig EU-kontroll»: skjuler passerte og
+                  manglende datoer. ponytail: lagrede søk fryser dagens dato. */}
+              <label className="flex min-h-12 items-center justify-between gap-3 text-sm">
+                Kun i dag eller senere
+                <Switch
+                  checked={!!minDate && minDate >= todayIsoDate()}
+                  onCheckedChange={(checked) =>
+                    onChange(
+                      f.key,
+                      checked ? { kind: "date_min", value: todayIsoDate() } : undefined,
+                    )
+                  }
+                />
+              </label>
             </div>
           );
         }

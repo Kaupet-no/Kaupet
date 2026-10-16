@@ -49,7 +49,6 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "imported_used",
   "color",
   "next_eu_control",
-  "eu_control_exempt",
   "sleeping_places",
   "power_hk",
   "cylinders",

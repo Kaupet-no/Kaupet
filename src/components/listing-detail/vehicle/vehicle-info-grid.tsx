@@ -13,6 +13,7 @@
 
 import { formatDateShort, formatNokNumber } from "@/lib/format";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
+import { EU_CONTROL_STATUS_LABEL_NB, type EuControlStatus } from "@/lib/vehicle/vehicle-options";
 import {
   BODY_TYPE_LABEL_NB,
   COLOR_LABEL_NB,
@@ -58,15 +59,15 @@ type SpecItem = {
 export function VehicleInfoGrid({
   vehicleLookup,
   mileageKm,
-  euControlExempt,
+  euControlStatus,
   driveType,
   attributes,
 }: {
   vehicleLookup: VehicleLookupResult | null;
   mileageKm: number | null;
-  /** Ikke en del av SVV-oppslaget — brukerens eget svar på om kjøretøyet er
-   * fritatt for periodisk kjøretøykontroll (se `vehicle-tech-table.tsx`). */
-  euControlExempt?: boolean | null;
+  /** Ikke en del av SVV-oppslaget — selgerens «Mangler»/«Fritatt» for
+   * periodisk kjøretøykontroll; vises der fristen ellers står. */
+  euControlStatus?: EuControlStatus | null;
   /** The listing's own `attributes`, used wherever the SVV snapshot is null. */
   attributes?: Attrs;
   /** Selgerens bekreftede verdi (`attributes.drive_type`), som har forrang
@@ -119,12 +120,12 @@ export function VehicleInfoGrid({
   if (seats) {
     items.push({ key: "seats", icon: Users, label: "Seter", value: `${seats} seter` });
   }
-  if (euControlExempt) {
+  if (euControlStatus) {
     items.push({
       key: "eu_control",
       icon: CalendarCheck,
       label: "EU-kontroll",
-      value: "Fritatt for EU-kontroll",
+      value: EU_CONTROL_STATUS_LABEL_NB[euControlStatus],
     });
   } else {
     const nextEuControl = vehicleLookup?.next_eu_control ?? attrStr(attrs, "next_eu_control");

@@ -109,10 +109,10 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         return { field: "model", message: "Velg modell før du går videre." };
       }
       if (lookup) return null;
-      // Bobil/campingvogn og tilhenger har hvert sitt påkrevde spørsmål SVV
-      // aldri kan svare på. Registrerte kjøretøy får feltene på vehicle-facts
-      // sammen med andre manglende tekniske opplysninger; manuelle kjøretøy
-      // fyller dem på vehicle-registration.
+      // Bobil/campingvogn har et påkrevd spørsmål SVV aldri kan svare på.
+      // Registrerte kjøretøy får feltet på vehicle-facts sammen med andre
+      // manglende tekniske opplysninger; manuelle kjøretøy fyller det på
+      // vehicle-registration.
       const slug = ctx.categories.find((c) => c.id === ctx.categoryId)?.slug;
       if (
         (slug === "bobil" || slug === "campingvogn") &&
@@ -121,12 +121,6 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         return {
           field: "sleeping_places",
           message: "Fyll inn antall soveplasser før du går videre.",
-        };
-      }
-      if (slug === "tilhenger-leaf" && ctx.attributes.eu_control_exempt == null) {
-        return {
-          field: "eu_control_exempt",
-          message: "Svar på om hengeren er fritatt for EU-kontroll før du går videre.",
         };
       }
       const firstMissingFilter = ctx.missingFilters[0];

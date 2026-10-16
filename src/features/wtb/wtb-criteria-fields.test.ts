@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { WtbAttributeMap } from "./wtb-criteria-types";
 import { normalizeFilter } from "@/lib/category-filters";
 import {
   criterionSummary,
@@ -93,5 +94,45 @@ describe("pruneWtbCriteria", () => {
       depends_on_value: "electric",
     });
     expect(pruneWtbCriteria({ motor: ["mid"] }, [...filters, dependent])).toEqual({});
+  });
+});
+
+describe("fritak under klientovergangen", () => {
+  const vehicleFilters = [
+    normalizeFilter({
+      ...filters[0],
+      id: "brand",
+      category_id: "c",
+      key: "brand",
+      label_nb: "Merke",
+      type: "brand_select",
+      unit: "bil",
+    }),
+    normalizeFilter({
+      ...filters[0],
+      id: "eu",
+      category_id: "c",
+      key: "eu_control_status",
+      label_nb: "EU-status",
+      type: "select",
+    }),
+  ];
+  it("beholder eksisterende alias når fritakskriteriet er uendret", () => {
+    const values = { eu_control_status: ["exempt"], eu_control_exempt: true, brand: "Volvo" };
+    expect(pruneWtbCriteria(values, vehicleFilters)).toEqual(values);
+  });
+  it.each<WtbAttributeMap>([
+    {},
+    { eu_control_status: ["missing"] },
+    { eu_control_status: ["missing", "exempt"] },
+  ])("fjerner fritaksalias uten et tilsvarende kriterium %j", (values) => {
+    expect(pruneWtbCriteria({ ...values, eu_control_exempt: true }, vehicleFilters)).toEqual(
+      values,
+    );
+  });
+  it("fjerner fritaksalias ved bytte til en kategori uten EU-status", () => {
+    expect(
+      pruneWtbCriteria({ eu_control_status: ["exempt"], eu_control_exempt: true }, filters),
+    ).toEqual({});
   });
 });

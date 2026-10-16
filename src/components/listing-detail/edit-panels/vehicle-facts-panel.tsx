@@ -2,9 +2,14 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useListingEdit } from "@/features/listing-edit/edit-mode-context";
-import { DRIVE_TYPE_OPTIONS } from "@/lib/vehicle/vehicle-options";
+import {
+  DRIVE_TYPE_OPTIONS,
+  hasUpcomingEuControlDate,
+  EU_CONTROL_STATUS_LABEL_NB,
+  type EuControlStatus,
+} from "@/lib/vehicle/vehicle-options";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,30 +22,35 @@ import {
 
 /** Inline panel for editing vehicle spec facts (`VehicleInfoGrid`'s
  * seller-overridable subset: kilometerstand, hjuldrift, EU-kontroll
- * fritatt) — the rest of `VehicleInfoGrid` comes straight from the SVV
+ * mangler/fritatt) — the rest of `VehicleInfoGrid` comes straight from the SVV
  * snapshot (`vehicle_lookup`), which is only refreshed via the plate modal. */
 export function VehicleFactsPanel({
   mileageKm,
   driveType,
-  euControlExempt,
+  euControlStatus,
+  nextEuControl,
   onClose,
 }: {
   mileageKm: number | null;
   driveType: string | null;
-  euControlExempt: boolean | null;
+  euControlStatus: EuControlStatus | null;
+  nextEuControl: string | null;
   onClose: () => void;
 }) {
   const editCtx = useListingEdit();
   const [km, setKm] = useState(mileageKm != null ? String(mileageKm) : "");
   const [drive, setDrive] = useState(driveType ?? "");
-  const [exempt, setExempt] = useState(!!euControlExempt);
+  const [euStatus, setEuStatus] = useState(euControlStatus);
   const [saving, setSaving] = useState(false);
+  const canChooseStatus = !hasUpcomingEuControlDate(nextEuControl);
 
   async function save() {
     setSaving(true);
     try {
-      const attrs: Record<string, unknown> = { eu_control_exempt: exempt };
+      const attrs: Record<string, unknown> = {};
       const removedKeys: string[] = [];
+      if (canChooseStatus && euStatus) attrs.eu_control_status = euStatus;
+      else removedKeys.push("eu_control_status");
       if (km.trim() !== "") attrs.mileage_km = Number(km);
       else removedKeys.push("mileage_km");
       if (drive.trim() !== "") attrs.drive_type = drive.trim();
@@ -83,10 +93,17 @@ export function VehicleFactsPanel({
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-center gap-2">
-        <Checkbox checked={exempt} onCheckedChange={(c) => setExempt(!!c)} id="ef-eu" />
-        <Label htmlFor="ef-eu">Fritatt for EU-kontroll</Label>
-      </div>
+      {canChooseStatus &&
+        (Object.keys(EU_CONTROL_STATUS_LABEL_NB) as EuControlStatus[]).map((status) => (
+          <div key={status} className="flex min-h-12 items-center justify-between gap-3">
+            <Label htmlFor={`ef-eu-${status}`}>{EU_CONTROL_STATUS_LABEL_NB[status]}</Label>
+            <Switch
+              id={`ef-eu-${status}`}
+              checked={euStatus === status}
+              onCheckedChange={(checked) => setEuStatus(checked ? status : null)}
+            />
+          </div>
+        ))}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>
           Avbryt

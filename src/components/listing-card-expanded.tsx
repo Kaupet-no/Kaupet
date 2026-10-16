@@ -11,6 +11,7 @@ import { formatPrice, displayPriceNok } from "@/lib/format";
 import { useListingCardGallery } from "@/hooks/use-listing-card-gallery";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
+import { parseEuControlStatus } from "@/lib/vehicle/vehicle-options";
 
 type Props = {
   listing: ListingCardData;
@@ -49,7 +50,13 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
   const vehicleLookup = isVehicleListing
     ? (parseVehicleLookup(attributes.vehicle_lookup) ?? null)
     : null;
-  const euControlExempt = isVehicleListing && attributes.eu_control_exempt === true;
+  const euControlStatus = isVehicleListing
+    ? parseEuControlStatus(
+        attributes.eu_control_status,
+        vehicleLookup?.next_eu_control ?? attributes.next_eu_control,
+        attributes.eu_control_exempt,
+      )
+    : null;
   const driveTypeRaw = attributes.drive_type;
   const driveType =
     isVehicleListing && typeof driveTypeRaw === "string"
@@ -134,7 +141,7 @@ export const ListingCardExpanded = memo(function ListingCardExpanded({
                   vehicleLookup={vehicleLookup}
                   attributes={attributes}
                   mileageKm={typeof listing.mileage_km === "number" ? listing.mileage_km : null}
-                  euControlExempt={euControlExempt}
+                  euControlStatus={euControlStatus}
                   driveType={driveType}
                 />
               )}

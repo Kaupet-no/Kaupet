@@ -3,10 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Midlertidig: spiller av engangsmigrasjoner på nytt. Slettes sammen med
-// listing_attribute_cleanup_backup når tallryddingen (B16) er verifisert i
-// produksjon, sammen med .sql.in-malene, test:db-migration og CI-linjen.
-// Feiler den fordi senere migrasjoner har endret skjemaet: slett, ikke reparer.
+// Spiller av engangsmigrasjoner mot eldre data i transaksjoner som rulles tilbake.
 
 // Supabase CLI mounts test files, but not sibling migrations. Inline the actual
 // migration so the regression tests its SQL rather than a separately maintained copy.
@@ -47,6 +44,23 @@ try {
     readFileSync("supabase/tests/saved_search_criteria_upgrade.sql.in", "utf8")
       .replace("-- RESTORE_PREVIOUS_SAVED_SEARCH_VALIDATOR", () => previousValidator)
       .replace("-- APPLY_SAVED_SEARCH_UPGRADE_MIGRATIONS", () => upgrade),
+  );
+  const euControlPath = join(directory, "eu_control_compatibility.sql");
+  writeFileSync(
+    euControlPath,
+    readFileSync("supabase/tests/eu_control_compatibility.sql.in", "utf8")
+      .replace("-- APPLY_EU_STATUS_MIGRATION", () =>
+        readFileSync("supabase/migrations/20261015140000_eu_control_status.sql", "utf8"),
+      )
+      .replace("-- APPLY_EU_COMPAT_MIGRATION", () =>
+        readFileSync("supabase/migrations/20261016001000_preserve_legacy_eu_control.sql", "utf8"),
+      )
+      .replace("-- APPLY_EU_CLEAR_MIGRATION", () =>
+        readFileSync(
+          "supabase/migrations/20261016140000_clear_legacy_wtb_eu_exemption.sql",
+          "utf8",
+        ),
+      ),
   );
   const result = spawnSync(
     "bunx",

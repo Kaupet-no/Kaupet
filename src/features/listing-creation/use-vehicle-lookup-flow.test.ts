@@ -71,7 +71,6 @@ const lookupResult = {
   transmission: null,
   color: "Blå",
   next_eu_control: null,
-  eu_control_exempt: null,
   power_hk: 120,
   drive_type: null,
   axle_count: null,

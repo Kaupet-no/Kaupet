@@ -385,6 +385,8 @@ describe("syncListings", () => {
       _listing_id: "listing-1",
       _urls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
       _replace: true,
+      // KG-08-F03: aktøren kontrolleres i køgrensen, ikke bare ved upsert.
+      _user_id: makeContext().userId,
     });
   });
 

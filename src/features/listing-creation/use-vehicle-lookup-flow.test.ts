@@ -438,5 +438,16 @@ describe("applyVehicleLookup", () => {
       const afterB = applyVehicleLookup(afterA, { registrationNumber: "CD54321" } as never);
       expect(afterB).not.toHaveProperty("eu_control_status");
     });
+
+    it("lar ikke eldre klienters fritak fra forrige kjøretøy blokkere ny status", () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+      const afterA = {
+        ...applyVehicleLookup({}, { registrationNumber: "CD54321" } as never),
+        eu_control_exempt: true,
+      };
+      const afterB = applyVehicleLookup(afterA, passed);
+      expect(afterB.eu_control_status).toBe("missing");
+      expect(afterB).not.toHaveProperty("eu_control_exempt");
+    });
   });
 });

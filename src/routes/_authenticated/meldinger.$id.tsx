@@ -231,7 +231,7 @@ function ConversationPage() {
           .order("id", { ascending: true })
           .range(from, to),
       );
-      if (error) throw error;
+      if (data === null) throw error;
       return data;
     },
   });

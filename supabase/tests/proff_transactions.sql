@@ -1,7 +1,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(52);
+SELECT plan(57);
 
 INSERT INTO public.organizations (id, organization_number, legal_name, display_name,
   selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_access_until,
@@ -241,6 +241,36 @@ SELECT ok(NOT has_function_privilege('anon', 'public.register_proff_invoice_sent
   AND NOT has_function_privilege('authenticated', 'public.register_proff_invoice_sent(text,date,date,uuid,uuid,text,integer,uuid)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.register_proff_invoice_sent(text,date,date,uuid,uuid,text,integer,uuid)', 'EXECUTE'),
   'Fakturaregistrering er kun tilgjengelig for serveren');
+
+-- KG-14-F02: periodestart ved månedsslutt -------------------------------------
+INSERT INTO organizations (id, organization_number, legal_name, display_name, proff_access_until)
+VALUES ('00000000-0000-4000-8000-000000000108', '999000108', 'Månedsslutt AS', 'Månedsslutt',
+  '2027-01-31T12:00:00Z');
+CREATE TEMP TABLE month_end AS SELECT * FROM public.extend_proff_access(
+  '00000000-0000-4000-8000-000000000108', 1);
+SELECT is((SELECT period_start FROM month_end), '2027-01-31T12:00:00Z'::timestamptz,
+  'Perioden starter ved forrige slutt, ikke slutt minus én måned');
+SELECT is((SELECT period_end FROM month_end), '2027-02-28T12:00:00Z'::timestamptz,
+  'Perioden slutter ved klampet månedsslutt');
+SELECT is((SELECT proff_access_until FROM organizations WHERE id = '00000000-0000-4000-8000-000000000108'),
+  (SELECT period_end FROM month_end), 'Tilgangen følger periodeslutt');
+
+-- Øktas TimeZone skal ikke flytte klampingen: 30. jan 12:00Z er 31. jan
+-- lokalt i UTC+14, og lokal aritmetikk ville gitt 27. feb 12:00Z.
+INSERT INTO organizations (id, organization_number, legal_name, display_name, proff_access_until)
+VALUES ('00000000-0000-4000-8000-000000000109', '999000109', 'Tidssone AS', 'Tidssone',
+  '2027-01-30T12:00:00Z');
+SET LOCAL timezone = 'Pacific/Kiritimati';
+SELECT is((SELECT period_end FROM public.extend_proff_access('00000000-0000-4000-8000-000000000109', 1)),
+  '2027-02-28T12:00:00Z'::timestamptz, 'Proff-periodens månedsaritmetikk regnes i UTC');
+RESET timezone;
+
+-- KG-11-F03: addMonthsClampedUtc speiler denne aritmetikken i UTC.
+SELECT ok(
+  (SELECT 'TimeZone=UTC' = ANY(proconfig) FROM pg_proc
+   WHERE oid = 'public.mark_organization_location_charge_invoiced(uuid, timestamptz, text)'::regprocedure),
+  'fakturaperiodens månedsaritmetikk er festet til UTC'
+);
 
 SELECT * FROM finish();
 ROLLBACK;

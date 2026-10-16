@@ -12,12 +12,16 @@ const rows = [
     is_free: false,
     lat: 59,
     lng: 10,
+    mileage_km: 85000,
+    engine_hours: 123,
     sold_at: "2026-10-02T12:00:00Z",
   },
   { id: "active", price_nok: 0, is_free: true, lat: 59, lng: 10, sold_at: null },
 ];
+const listingsQuery = vi.hoisted(() => ({ override: null as Record<string, unknown> | null }));
 vi.mock("./use-listings-query", () => ({
-  useListingsQuery: () => ({ data: { pages: [{ rows, totalCount: 2 }] }, isLoading: false }),
+  useListingsQuery: () =>
+    listingsQuery.override ?? { data: { pages: [{ rows, totalCount: 2 }] }, isLoading: false },
   useListingsPriceMax: () => ({ data: 1000 }),
 }));
 vi.mock("./use-annonser-search-state", () => ({
@@ -34,7 +38,10 @@ vi.mock("./use-filter-facet-counts", () => ({ useFilterFacetCounts: () => ({}) }
 vi.mock("./use-text-to-filter-pipeline", () => ({ useTextToFilterPipeline: () => {} }));
 vi.mock("./zero-result-expansion", () => ({ useZeroResultExpansion: () => ({}) }));
 vi.mock("./search-panel/search-panel-context", () => ({ useRegisterSearchPanelResults: () => {} }));
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  listingsQuery.override = null;
+});
 
 it("beholder solgt-status og pris fra søkeresultatene til både kortene og kartet", () => {
   const { result } = renderHook(() =>
@@ -55,3 +62,48 @@ it("beholder solgt-status og pris fra søkeresultatene til både kortene og kart
     expect(listings[1]).toMatchObject({ id: "active", sold_at: null, price_nok: 0 });
   }
 });
+
+it.each([
+  [{ omregistreringsavgift_override_kr: 3000 }, 253000],
+  [{ omregistreringsavgift_override_kr: 3000, omregistreringsavgift_fritatt: true }, 250000],
+  [{ omregistreringsavgift_override_kr: 3000, omregistreringsavgift_inkludert: true }, 250000],
+])("KG-33-F03: kartet og kortene har samme kjøretøypris (%j)", (attributes, price) => {
+  Object.assign(rows[0], { category_slug: "bil", attributes, price_nok: 250000 });
+  const { result } = renderHook(() =>
+    useSearchResultsShell({
+      search: searchSchema.parse({}),
+      navigate: vi.fn(),
+      categories: [],
+      allFilters: [],
+      qDraft: "",
+      setQDraft: vi.fn(),
+      resolveCategoryId: () => null,
+      canRemoveCategoryInZeroResultExpansion: true,
+    }),
+  );
+  expect(result.current.mapListings[0].price_nok).toBe(price);
+  expect(result.current.cards[0]).toMatchObject({ mileage_km: 85000, engine_hours: 123 });
+});
+
+it.each([
+  [false, { isLoading: false, loadError: true }],
+  [true, { isLoading: true, loadError: false }],
+])(
+  "første side feilet (henter på nytt: %s) vises som feil eller lasting, ikke som 0 treff",
+  (isFetching, expected) => {
+    listingsQuery.override = { data: undefined, isLoading: false, isError: true, isFetching };
+    const { result } = renderHook(() =>
+      useSearchResultsShell({
+        search: searchSchema.parse({}),
+        navigate: vi.fn(),
+        categories: [],
+        allFilters: [],
+        qDraft: "",
+        setQDraft: vi.fn(),
+        resolveCategoryId: () => null,
+        canRemoveCategoryInZeroResultExpansion: true,
+      }),
+    );
+    expect(result.current).toMatchObject(expected);
+  },
+);

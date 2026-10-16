@@ -1,5 +1,6 @@
 import { formatNokNumber } from "@/lib/format";
 import {
+  AlertTriangle,
   ArrowUpDown,
   Expand,
   LayoutList,
@@ -81,6 +82,11 @@ type Props = {
   cards: ListingCardData[];
   totalCount: number | null;
   isLoading: boolean;
+  /** Første side feilet: vis feil og retry, ikke «0 treff». */
+  loadError?: boolean;
+  /** Neste side feilet: behold kortene og tilby retry av pagineringen. */
+  nextPageError?: boolean;
+  onRetry?: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   fetchNextPage: () => void;
@@ -132,6 +138,9 @@ export function ResultList({
   cards,
   totalCount,
   isLoading,
+  loadError = false,
+  nextPageError = false,
+  onRetry,
   hasNextPage,
   isFetchingNextPage,
   fetchNextPage,
@@ -268,7 +277,9 @@ export function ResultList({
           <span role="status" aria-live="polite" aria-atomic="true">
             {isLoading
               ? "Søker…"
-              : `${formatNokNumber(totalCount ?? cards.length)} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
+              : loadError
+                ? "Søket feilet"
+                : `${formatNokNumber(totalCount ?? cards.length)} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
           {toolbarLead}
         </div>
@@ -461,6 +472,19 @@ export function ResultList({
                 </div>
               ))}
             </div>
+          ) : loadError ? (
+            <EmptyState
+              icon={AlertTriangle}
+              title="Kunne ikke hente annonser"
+              description="Noe gikk galt under søket. Filtrene dine er beholdt."
+              action={
+                onRetry && (
+                  <Button variant="outline" onClick={onRetry}>
+                    Prøv igjen
+                  </Button>
+                )
+              }
+            />
           ) : cards.length === 0 ? (
             <EmptyState
               icon={SearchX}
@@ -561,7 +585,15 @@ export function ResultList({
             </div>
           )}
           {/* Infinite scroll sentinel — same pattern on web and native. */}
-          {!isLoading && hasNextPage && <div ref={sentinelRef} className="h-4" />}
+          {!isLoading && hasNextPage && !nextPageError && <div ref={sentinelRef} className="h-4" />}
+          {nextPageError && !isFetchingNextPage && (
+            <div role="alert" className="mt-6 flex flex-col items-center gap-2 text-center">
+              <p className="text-sm text-muted-foreground">Kunne ikke hente flere annonser.</p>
+              <Button variant="outline" size="sm" onClick={fetchNextPage}>
+                Prøv igjen
+              </Button>
+            </div>
+          )}
           {isFetchingNextPage && (
             <div className="mt-6 flex justify-center">
               <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />

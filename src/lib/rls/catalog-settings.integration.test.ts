@@ -410,6 +410,19 @@ describe.skipIf(!canRun)(
         expect(data).toHaveLength(0);
       }
     });
+
+    it("gir ingen klienter, heller ikke admin, tilgang til sikkerhetskopien fra tallryddingen", async () => {
+      const adminClient = await signIn(emails.admin);
+      const { data, error } = await adminClient
+        .from("listing_attribute_cleanup_backup")
+        .select("listing_id")
+        .limit(1);
+      if (error) {
+        expect(error).not.toBeNull();
+      } else {
+        expect(data).toHaveLength(0);
+      }
+    });
   },
 );
 

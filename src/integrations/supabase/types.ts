@@ -889,6 +889,7 @@ export type Database = {
       }
       listing_images: {
         Row: {
+          ai_generated: boolean
           caption: string | null
           created_at: string
           id: string
@@ -898,6 +899,7 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          ai_generated?: boolean
           caption?: string | null
           created_at?: string
           id?: string
@@ -907,6 +909,7 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          ai_generated?: boolean
           caption?: string | null
           created_at?: string
           id?: string
@@ -3329,6 +3332,16 @@ export type Database = {
           value: string
         }[]
       }
+      business_listing_stats_inputs: {
+        Args: {
+          _location_id: string | null
+          _organization_id: string
+          _sales_since: string
+          _user_id: string | null
+          _views_since: string
+        }
+        Returns: Json
+      }
       can_access_organization_chat: {
         Args: {
           _location_id: string
@@ -3407,6 +3420,16 @@ export type Database = {
           transformations: number
           updated_at: string
         }[]
+      }
+      complete_listing_image_job: {
+        Args: {
+          _attempt: number
+          _content_hash: string
+          _job_id: string
+          _storage_path: string
+          _transformations: number
+        }
+        Returns: string
       }
       compute_wtb_matches: {
         Args: {
@@ -3699,6 +3722,13 @@ export type Database = {
           attr_value: string
           cnt: number
         }[]
+      }
+      listing_is_public: {
+        Args: {
+          _sold_at: string | null
+          _status: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: boolean
       }
       listing_matches_attribute_filters: {
         Args: { _attributes: Json; _filters: Json }
@@ -4067,6 +4097,14 @@ export type Database = {
           p_filter_synonyms: Json
           p_synced_by: string
         }
+        Returns: undefined
+      }
+      sync_draft_listing_images: {
+        Args: { _images: Json; _listing_id: string; _user_id: string }
+        Returns: Json
+      }
+      sync_listing_images: {
+        Args: { _images: Json; _listing_id: string }
         Returns: undefined
       }
       sync_organization_entitlements: {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type SetStateAction } from "react";
 import { ArrowLeft, RotateCcw, Save, Search as SearchIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import type { LocationValue } from "@/components/location-filter";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
+import { useRetainCategoryAttributes } from "@/features/listing-search/use-retain-category-attributes";
 import {
   buildAdvancedSearchCriteria,
   mergeAdvancedSearchGroups,
@@ -68,6 +69,19 @@ export function NativeAdvancedSearch({
 }: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
+  // Kategoribytte fjerner attributter de nye kategoriene ikke har (KG-29-F01).
+  // Notis og verdi beregnes fra samme forhåndsvisning; andre endringer går
+  // uendret til setV, så funksjonelle oppdateringer beholdes.
+  const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
+  const setValue = (next: SetStateAction<AdvancedSearchValue>) => {
+    const value = typeof next === "function" ? next(v) : next;
+    if (value.categories.join("\0") === v.categories.join("\0")) return setV(next);
+    setV({
+      ...value,
+      attributes: changeCategories(v.categories, value.categories, value.attributes ?? {}),
+    });
+  };
+
   const draftAttributeValues = attributeValues ?? v.attributes;
   const handleDraftAttributeChange =
     onAttributeChange ??
@@ -132,8 +146,9 @@ export function NativeAdvancedSearch({
 
         <SearchFilterSections
           key={`${open}-${section}`}
+          categoryNotice={categoryNotice}
           value={v}
-          setValue={setV}
+          setValue={setValue}
           categories={categories}
           section={section}
           queryText={v.terms.join(" ")}

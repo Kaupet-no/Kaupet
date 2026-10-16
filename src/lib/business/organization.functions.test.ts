@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { supabaseAdmin, membership, hasEffectiveProffAccess } = vi.hoisted(() => ({
-  supabaseAdmin: { from: vi.fn() },
+  supabaseAdmin: { from: vi.fn(), rpc: vi.fn() },
   membership: { role: "member" as "member" | "superuser" },
   hasEffectiveProffAccess: vi.fn(),
 }));
@@ -44,114 +44,120 @@ vi.mock("@/lib/business/organization-access", async (importOriginal) => ({
 
 import { getBusinessListingStats } from "./organization.functions";
 
-/** Thenable spørringsbygger som returnerer `rows` for tabellen. */
-function table(rows: Record<string, unknown>[], filterListings = false) {
+/** Thenable spørringsbygger som returnerer `rows`. */
+function table(rows: Record<string, unknown>[]) {
   const query: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "gte", "order"]) query[method] = () => query;
-  const filters: Array<(row: Record<string, unknown>) => boolean> = [];
-  if (filterListings) {
-    query.eq = (column: string, value: unknown) => {
-      filters.push((row) => row[column] === value);
-      return query;
-    };
-    query.in = (column: string, values: unknown[]) => {
-      filters.push((row) => values.includes(row[column]));
-      return query;
-    };
-    query.or = (expression: string) => {
-      const match = expression.match(
-        /^organization_location_id\.in\.\(([^)]+)\),seller_id\.eq\.(.+)$/,
-      );
-      if (!match) throw new Error(`Uventet filter: ${expression}`);
-      filters.push(
-        (row) =>
-          match[1].split(",").includes(row.organization_location_id as string) ||
-          row.seller_id === match[2],
-      );
-      return query;
-    };
-  }
-  query.then = (resolve: (value: unknown) => unknown) =>
-    resolve({
-      data: rows.filter((row) => filters.every((filter) => filter(row))).slice(0, 1000),
-      error: null,
-    });
+  for (const method of ["select", "eq"]) query[method] = () => query;
+  query.then = (resolve: (value: unknown) => unknown) => resolve({ data: rows, error: null });
   return query;
 }
 
-const listing = (id: string, location: string, seller: string) => ({
-  id,
-  organization_id: "org-1",
-  status: "draft",
-  seller_id: seller,
-  organization_location_id: location,
-  created_at: "2026-10-01T00:00:00Z",
-  listing_view_totals: { total_views: 7 },
-});
+const LOCATION_A = "00000000-0000-4000-8000-00000000000a";
+const LOCATION_B = "00000000-0000-4000-8000-00000000000b";
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
+const emptyInputs = { listings: [], status_history: [], sales: [], view_days: [] };
+
+type Stats = {
+  current: Array<{ id: string; status: string; viewCount: number }>;
+  soldCount: number;
+  history: Array<{
+    date: string;
+    active: number;
+    inactive: number;
+    lowViews: number;
+    sold: number;
+  }>;
+};
 
 beforeEach(() => {
   membership.role = "member";
   hasEffectiveProffAccess.mockReset().mockResolvedValue(true);
-  supabaseAdmin.from.mockImplementation((name: string) => {
-    if (name === "organization_location_members") {
-      return table([
-        { location_id: "loc-a", listing_access: "all" },
-        { location_id: "loc-b", listing_access: "own" },
-      ]);
-    }
-    if (name === "listings") {
-      return table(
-        [
-          listing("a-other", "loc-a", "other-user"),
-          listing("b-own", "loc-b", "user-1"),
-          listing("b-other-draft", "loc-b", "other-user"),
-        ],
-        true,
-      );
-    }
-    return table([]);
-  });
+  supabaseAdmin.from.mockReset().mockImplementation(() => table([{ location_id: "loc-a" }]));
+  supabaseAdmin.rpc.mockReset().mockResolvedValue({ data: emptyInputs, error: null });
 });
 
-const call = () =>
+const call = (locationId: string | null = null, threshold = 10) =>
   getBusinessListingStats({
-    data: { locationId: null, threshold: 10, soldDays: 30 },
+    data: { locationId, threshold, soldDays: 30 },
     context: { userId: "user-1" },
-  } as never) as Promise<unknown>;
+  } as never) as Promise<Stats>;
 
-// KG-06-F04: «all» på én lokasjon fjernet selgerfilteret for alle tildelte
-// lokasjoner, så andres utkast ved B (der medlemmet bare har «own») ble vist.
-describe("getBusinessListingStats innsyn per lokasjon", () => {
-  it("viser alle ved «all»-lokasjonen, men bare egne ved «own»-lokasjonen", async () => {
-    const stats = await call();
-    expect(JSON.stringify(stats)).not.toContain("b-other-draft");
-    expect(JSON.stringify(stats)).toContain("a-other");
-    expect(JSON.stringify(stats)).toContain("b-own");
+describe("getBusinessListingStats", () => {
+  // KG-06-F04 / KG-06-F02: innsynet (can_view_organization_listing) og
+  // avkortingen ligger i RPC-en og testes i business-listing-stats.integration.test.ts.
+  it("henter grunnlaget i ett RPC-kall med brukeren og lokasjonen", async () => {
+    await call(LOCATION_A);
+    expect(supabaseAdmin.rpc).toHaveBeenCalledTimes(1);
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
+      "business_listing_stats_inputs",
+      expect.objectContaining({
+        _organization_id: "org-1",
+        _user_id: "user-1",
+        _location_id: LOCATION_A,
+      }),
+    );
+  });
+
+  it("avviser medlemmer uten tildeling på lokasjonen", async () => {
+    supabaseAdmin.from.mockImplementation(() => table([]));
+    await expect(call(LOCATION_B)).rejects.toThrow();
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalled();
   });
 
   it("avviser medlemmer når Proff er utløpt", async () => {
     hasEffectiveProffAccess.mockResolvedValue(false);
     await expect(call()).rejects.toThrow();
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalled();
   });
 
-  it("superbruker ser alle annonser uten Proff-oppslag", async () => {
+  it("superbruker henter statistikk uten tildelings- og Proff-oppslag", async () => {
     membership.role = "superuser";
-    const stats = await call();
-    expect(JSON.stringify(stats)).toContain("b-other-draft");
+    await call();
+    expect(supabaseAdmin.from).not.toHaveBeenCalled();
     expect(hasEffectiveProffAccess).not.toHaveBeenCalled();
   });
-  it("henter egne annonser før radgrensen ved over 1000 kollegaannonser (grenseverdi)", async () => {
-    const rows = [
-      ...Array.from({ length: 1000 }, (_, i) => listing(`other-${i}`, "loc-b", "other-user")),
-      listing("b-own-after-limit", "loc-b", "user-1"),
-    ];
-    supabaseAdmin.from.mockImplementation((name: string) => {
-      if (name === "organization_location_members")
-        return table([{ location_id: "loc-b", listing_access: "own" }]);
-      if (name === "listings") return table(rows, true);
-      return table([]);
+
+  it("kaster når RPC-en feiler", async () => {
+    supabaseAdmin.rpc.mockResolvedValue({ data: null, error: { message: "db nede" } });
+    await expect(call()).rejects.toThrow();
+  });
+
+  it("bygger dagsserien fra statushistorikk, visninger per dag og salg", async () => {
+    supabaseAdmin.rpc.mockResolvedValue({
+      data: {
+        listings: [
+          { id: "solgt", status: "sold", created_at: daysAgo(10), total_views: 20 },
+          { id: "uten-historikk", status: "active", created_at: daysAgo(5), total_views: 0 },
+        ],
+        status_history: [
+          { listing_id: "solgt", status: "active", changed_at: daysAgo(10) },
+          { listing_id: "solgt", status: "sold", changed_at: daysAgo(2) },
+        ],
+        sales: [{ listing_id: "solgt", confirmed_at: daysAgo(2) }],
+        // 15 av 20 visninger er kjent per dag; 5 ligger før vinduet.
+        view_days: [
+          { listing_id: "solgt", day: daysAgo(8).slice(0, 10), views: 10 },
+          { listing_id: "solgt", day: daysAgo(3).slice(0, 10), views: 5 },
+        ],
+      },
+      error: null,
     });
-    const stats = (await call()) as { current: Array<{ id: string }> };
-    expect(stats.current.map((row) => row.id)).toEqual(["b-own-after-limit"]);
+    const stats = await call(null, 15);
+    const at = (days: number) => stats.history.find((p) => p.date === daysAgo(days).slice(0, 10));
+
+    expect(stats.history).toHaveLength(365);
+    expect(stats.current.map((row) => [row.id, row.viewCount])).toEqual([
+      ["solgt", 20],
+      ["uten-historikk", 0],
+    ]);
+    expect(stats.soldCount).toBe(1);
+    expect(at(11)).toMatchObject({ active: 0, inactive: 0, lowViews: 0 });
+    // Terskel 15: 5 visninger fra før vinduet, +10 fra dag 8, +5 fra dag 3.
+    expect(at(9)).toMatchObject({ active: 1, inactive: 0, lowViews: 1 });
+    expect(at(6)).toMatchObject({ active: 1, inactive: 0, lowViews: 0 });
+    expect(at(4)).toMatchObject({ active: 2, inactive: 0, lowViews: 1 });
+    expect(at(1)).toMatchObject({ active: 1, inactive: 1, lowViews: 1, sold: 0 });
+    expect(at(2)).toMatchObject({ sold: 1 });
   });
 });

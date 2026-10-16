@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { applyAttributeFilters, type AttributeFilterValue } from "@/lib/category-filters";
+import {
+  buildListingsSearchRpcArgs,
+  runListingsSearch,
+} from "@/features/listing-search/listing-search-query";
+import { encodeAttrFilters, searchSchema } from "@/features/listing-search/search-schema";
+import { type AttributeFilterValue } from "@/lib/category-filters";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 type UseLandingResultCountArgs = {
@@ -9,6 +13,7 @@ type UseLandingResultCountArgs = {
   filterValues: Record<string, AttributeFilterValue>;
   priceMin: number | undefined;
   priceMax: number | undefined;
+  includeFree: boolean;
 };
 
 /** Live "N treff akkurat nå" count for the landing page's category
@@ -19,32 +24,35 @@ export function useLandingResultCount({
   filterValues,
   priceMin,
   priceMax,
+  includeFree,
 }: UseLandingResultCountArgs) {
   const countQueryInput = useMemo(
-    () => ({ categoryIds, filterValues, priceMin, priceMax }),
-    [categoryIds, filterValues, priceMin, priceMax],
+    () => ({ categoryIds, filterValues, priceMin, priceMax, includeFree }),
+    [categoryIds, filterValues, priceMin, priceMax, includeFree],
   );
   const debouncedCountInput = useDebouncedValue(countQueryInput, 300);
 
   const { data: resultCount } = useQuery({
     queryKey: ["landing-result-count", debouncedCountInput],
     enabled: debouncedCountInput.categoryIds.length > 0,
-    queryFn: async () => {
-      let qb = supabase
-        .from("listings")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "active")
-        .in("category_id", debouncedCountInput.categoryIds);
-      qb = applyAttributeFilters(qb, debouncedCountInput.filterValues);
-      if (typeof debouncedCountInput.priceMin === "number") {
-        qb = qb.gte("price_nok", debouncedCountInput.priceMin);
-      }
-      if (typeof debouncedCountInput.priceMax === "number") {
-        qb = qb.lte("price_nok", debouncedCountInput.priceMax);
-      }
-      const { count, error } = await qb;
-      if (error) throw error;
-      return count ?? 0;
+    queryFn: async ({ signal }) => {
+      const input = debouncedCountInput;
+      const args = buildListingsSearchRpcArgs({
+        search: searchSchema.parse({
+          attrs: encodeAttrFilters(input.filterValues),
+          min: input.priceMin,
+          max: input.priceMax,
+          includeFree: input.includeFree,
+        }),
+        categories: [],
+        effectiveCategories: [],
+        terms: [],
+        limit: 1,
+        offset: 0,
+        includeRecentlySold: true,
+      })!;
+      const rows = await runListingsSearch({ ...args, _category_ids: input.categoryIds }, signal);
+      return rows[0]?.total_count ?? 0;
     },
   });
 

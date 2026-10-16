@@ -59,7 +59,7 @@ const MANUAL_SPEC_SECTION_KEYS = {
     "max_tow_weight_kg",
     "seats",
   ],
-  flere: ["next_eu_control", "eu_control_exempt", "sleeping_places"],
+  flere: ["next_eu_control", "sleeping_places"],
 } as const;
 
 function hiddenKeysForManualSection(

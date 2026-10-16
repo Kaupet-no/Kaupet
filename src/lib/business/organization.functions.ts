@@ -37,6 +37,23 @@ export type BusinessListingStats = {
   history: BusinessListingHistoryPoint[];
 };
 
+/** Svaret fra business_listing_stats_inputs (20261013100000). */
+type BusinessListingStatsInputs = {
+  listings: Array<{
+    id: string;
+    status: Database["public"]["Enums"]["listing_status"];
+    created_at: string;
+    total_views: number | null;
+  }>;
+  status_history: Array<{
+    listing_id: string;
+    status: Database["public"]["Enums"]["listing_status"];
+    changed_at: string;
+  }>;
+  sales: Array<{ listing_id: string; confirmed_at: string }>;
+  view_days: Array<{ listing_id: string; day: string; views: number }>;
+};
+
 const businessListingStatsInput = z.object({
   locationId: uuid.nullable(),
   threshold: z.number().int().min(0).max(1_000_000),
@@ -55,23 +72,13 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
   .validator((input: unknown) => businessListingStatsInput.parse(input))
   .handler(async ({ data, context }): Promise<BusinessListingStats> => {
     const { supabaseAdmin, organizationId, role } = await requireOrganizationMember(context.userId);
-    // Medlemmer ser bare det can_view_organization_listing gir: per lokasjon
-    // («all» eller egne annonser) og bare med aktiv Proff (KG-06-F04).
-    let listingQuery = supabaseAdmin
-      .from("listings")
-      .select(
-        "id, status, seller_id, organization_location_id, created_at, listing_view_totals(total_views)",
-      )
-      .eq("organization_id", organizationId);
-
-    if (role === "superuser") {
-      if (data.locationId) {
-        listingQuery = listingQuery.eq("organization_location_id", data.locationId);
-      }
-    } else {
+    // Medlemmer må ha en lokasjonstildeling og aktiv Proff (KG-06-F04).
+    // Hvilke annonser de ser, avgjør business_listing_stats_inputs med
+    // can_view_organization_listing, samme regel som RLS.
+    if (role !== "superuser") {
       let assignmentsQuery = supabaseAdmin
         .from("organization_location_members")
-        .select("location_id, listing_access")
+        .select("location_id")
         .eq("organization_id", organizationId)
         .eq("user_id", context.userId);
       if (data.locationId) assignmentsQuery = assignmentsQuery.eq("location_id", data.locationId);
@@ -83,103 +90,60 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
       if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
         throw new Error(PROFF_REQUIRED_MESSAGE);
       }
-      const viewAllLocations = assignments
-        .filter((a) => a.listing_access === "all")
-        .map((a) => a.location_id as string);
-      const locationIds = assignments.map((assignment) => assignment.location_id as string);
-      listingQuery = listingQuery.in("organization_location_id", locationIds);
-      // Tilgang må filtreres før PostgRESTs radgrense, ikke i det avkortede svaret.
-      listingQuery = viewAllLocations.length
-        ? listingQuery.or(
-            `organization_location_id.in.(${viewAllLocations.join(",")}),seller_id.eq.${context.userId}`,
-          )
-        : listingQuery.eq("seller_id", context.userId);
     }
 
-    const { data: listings, error: listingsError } = await listingQuery;
-    if (listingsError) {
-      throw await toClientError("database", listingsError);
-    }
-    const rawListings = (listings ?? []) as unknown as Array<{
-      id: string;
-      status: Database["public"]["Enums"]["listing_status"];
-      created_at: string;
-      listing_view_totals: { total_views: number } | { total_views: number }[] | null;
-    }>;
-    const listingIds = rawListings.map((listing) => listing.id);
+    // Ett kall (KG-06-F02): grunnlaget kommer som ett jsonb-objekt, som ikke
+    // avkortes av max_rows, med visningene allerede summert per annonse og
+    // UTC-dag. Dagsløkken under er uendret.
     const historyStart = new Date(Date.now() - (BUSINESS_HISTORY_DAYS - 1) * DAY_MS);
-    const salesStart = new Date(Date.now() - BUSINESS_MAX_SOLD_DAYS * DAY_MS);
-    const [
-      { data: statusHistory, error: statusHistoryError },
-      { data: sales, error: salesError },
-      { data: viewEvents, error: viewEventsError },
-    ] = listingIds.length
-      ? await Promise.all([
-          supabaseAdmin
-            .from("listing_status_history")
-            .select("listing_id, status, changed_at")
-            .in("listing_id", listingIds)
-            .order("changed_at"),
-          supabaseAdmin
-            .from("listing_sales")
-            .select("listing_id, confirmed_at")
-            .in("listing_id", listingIds)
-            .gte("confirmed_at", salesStart.toISOString()),
-          supabaseAdmin
-            .from("listing_view_events")
-            .select("listing_id, created_at")
-            .in("listing_id", listingIds)
-            .gte("created_at", historyStart.toISOString()),
-        ])
-      : [
-          { data: [], error: null },
-          { data: [], error: null },
-          { data: [], error: null },
-        ];
-    if (statusHistoryError) {
-      throw await toClientError("database", statusHistoryError);
+    const { data: inputs, error: inputsError } = await supabaseAdmin.rpc(
+      "business_listing_stats_inputs",
+      {
+        _organization_id: organizationId,
+        _user_id: context.userId,
+        _location_id: data.locationId,
+        _views_since: historyStart.toISOString(),
+        _sales_since: new Date(Date.now() - BUSINESS_MAX_SOLD_DAYS * DAY_MS).toISOString(),
+      },
+    );
+    if (inputsError) {
+      throw await toClientError("database", inputsError);
     }
-    if (salesError) {
-      throw await toClientError("database", salesError);
-    }
-    if (viewEventsError) {
-      throw await toClientError("database", viewEventsError);
-    }
+    const {
+      listings,
+      status_history: statusHistory,
+      sales,
+      view_days: viewDays,
+    } = inputs as unknown as BusinessListingStatsInputs;
 
-    const current = rawListings.map((listing) => {
-      const totals = Array.isArray(listing.listing_view_totals)
-        ? listing.listing_view_totals[0]
-        : listing.listing_view_totals;
-      return {
-        id: listing.id,
-        status: listing.status,
-        viewCount: Number(totals?.total_views ?? 0),
-        createdAt: listing.created_at,
-      };
-    });
+    const current = listings.map((listing) => ({
+      id: listing.id,
+      status: listing.status,
+      viewCount: Number(listing.total_views ?? 0),
+      createdAt: listing.created_at,
+    }));
     const statusByListing = new Map<
       string,
       Array<{ status: Database["public"]["Enums"]["listing_status"]; changed_at: string }>
     >();
-    for (const row of statusHistory ?? []) {
+    for (const row of statusHistory) {
       const rows = statusByListing.get(row.listing_id) ?? [];
       rows.push({ status: row.status, changed_at: row.changed_at });
       statusByListing.set(row.listing_id, rows);
     }
     const eventsByListing = new Map<string, Map<string, number>>();
-    for (const event of viewEvents ?? []) {
-      const events = eventsByListing.get(event.listing_id) ?? new Map<string, number>();
-      const key = dayKey(event.created_at);
-      events.set(key, (events.get(key) ?? 0) + 1);
-      eventsByListing.set(event.listing_id, events);
+    for (const row of viewDays) {
+      const events = eventsByListing.get(row.listing_id) ?? new Map<string, number>();
+      events.set(row.day, Number(row.views));
+      eventsByListing.set(row.listing_id, events);
     }
     const soldByDay = new Map<string, number>();
-    for (const sale of sales ?? []) {
+    for (const sale of sales) {
       const key = dayKey(sale.confirmed_at);
       soldByDay.set(key, (soldByDay.get(key) ?? 0) + 1);
     }
     const soldSince = new Date(Date.now() - data.soldDays * DAY_MS);
-    const soldCount = (sales ?? []).filter(
+    const soldCount = sales.filter(
       (sale) => new Date(sale.confirmed_at).getTime() >= soldSince.getTime(),
     ).length;
     const history: BusinessListingHistoryPoint[] = [];

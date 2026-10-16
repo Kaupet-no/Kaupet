@@ -74,8 +74,12 @@ export function useListingsQuery({
           lng: l.display_lng as number | null,
           created_at: l.created_at,
           cover_path: l.cover_path,
-          mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
-          engine_hours: typeof engineHoursRaw === "number" ? engineHoursRaw : null,
+          mileage_km:
+            typeof mileageRaw === "number" && Number.isFinite(mileageRaw) ? mileageRaw : null,
+          engine_hours:
+            typeof engineHoursRaw === "number" && Number.isFinite(engineHoursRaw)
+              ? engineHoursRaw
+              : null,
           category_slug: l.category_slug,
           attributes: attrs,
           sold_at: l.sold_at,

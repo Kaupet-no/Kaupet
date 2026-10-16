@@ -302,7 +302,8 @@ export type ProcessJobOutcome =
   | { outcome: "done"; jobId: string; storagePath: string }
   | { outcome: "customer_failed"; jobId: string; message: string }
   | { outcome: "retry_pending"; jobId: string; nextAttemptAt: string }
-  | { outcome: "internal_failed"; jobId: string; message: string };
+  | { outcome: "internal_failed"; jobId: string; message: string }
+  | { outcome: "stale"; jobId: string };
 
 export async function processListingImageJob(
   job: ListingImageJobRow,
@@ -310,6 +311,15 @@ export async function processListingImageJob(
 ): Promise<ProcessJobOutcome> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const now = deps.now ?? (() => new Date());
+  // Feilstatus skrives bare mens dette claimet eier jobben (samme token som
+  // complete_listing_image_job), så en utløpt worker ikke overstyrer en ny.
+  const updateOwnedJob = (values: Database["public"]["Tables"]["listing_image_jobs"]["Update"]) =>
+    deps.supabaseAdmin
+      .from("listing_image_jobs")
+      .update(values)
+      .eq("id", job.id)
+      .eq("status", "processing")
+      .eq("attempts", job.attempts);
 
   try {
     const { bytes, contentType } = await fetchSourceImage(job.source_url, fetchImpl);
@@ -347,34 +357,31 @@ export async function processListingImageJob(
     await putObject("BILDER", key, compressed.main.bytes, compressed.main.contentType);
     await putObject("BILDER", thumbKey, compressed.thumb.bytes, compressed.thumb.contentType);
 
-    const { error: insertError } = await deps.supabaseAdmin.from("listing_images").insert({
-      listing_id: job.listing_id,
-      storage_path: key,
-      sort_order: job.sort_order,
-      source_url: job.source_url,
-    });
-    if (insertError) throw new Error(`Kunne ikke lagre bilderad: ${insertError.message}`);
-
-    const { error: updateError } = await deps.supabaseAdmin
-      .from("listing_image_jobs")
-      .update({
-        status: "done",
-        storage_path: key,
-        content_hash: hash,
-        transformations: compressed.transformations,
-        customer_error: null,
-        internal_error: null,
-      })
-      .eq("id", job.id);
-    if (updateError) throw new Error(`Kunne ikke oppdatere jobbstatus: ${updateError.message}`);
+    // Bilderad og «done» skrives atomisk, og bare så lenge dette claimet
+    // fortsatt eier jobben (KG-10-F01). «stale» betyr at jobben er erstattet
+    // av en ny synk eller tatt over etter utløpt lån; de opplastede objektene
+    // ryddes da av R2-registeret.
+    const { data: completion, error: completeError } = await deps.supabaseAdmin.rpc(
+      "complete_listing_image_job",
+      {
+        _job_id: job.id,
+        _attempt: job.attempts,
+        _storage_path: key,
+        _content_hash: hash,
+        _transformations: compressed.transformations,
+      },
+    );
+    if (completeError) throw new Error(`Kunne ikke fullføre bildejobb: ${completeError.message}`);
+    if (completion === "stale") return { outcome: "stale", jobId: job.id };
 
     return { outcome: "done", jobId: job.id, storagePath: key };
   } catch (cause) {
     if (cause instanceof CustomerImageError) {
-      await deps.supabaseAdmin
-        .from("listing_image_jobs")
-        .update({ status: "failed", customer_error: cause.message, internal_error: null })
-        .eq("id", job.id);
+      await updateOwnedJob({
+        status: "failed",
+        customer_error: cause.message,
+        internal_error: null,
+      });
       return { outcome: "customer_failed", jobId: job.id, message: cause.message };
     }
 
@@ -394,10 +401,11 @@ export async function processListingImageJob(
         listingId: job.listing_id,
         internalError: message,
       });
-      await deps.supabaseAdmin
-        .from("listing_image_jobs")
-        .update({ status: "failed", customer_error: finalMessage, internal_error: message })
-        .eq("id", job.id);
+      await updateOwnedJob({
+        status: "failed",
+        customer_error: finalMessage,
+        internal_error: message,
+      });
       return { outcome: "internal_failed", jobId: job.id, message: finalMessage };
     }
 
@@ -409,10 +417,11 @@ export async function processListingImageJob(
       internalError: message,
       nextAttemptAt,
     });
-    await deps.supabaseAdmin
-      .from("listing_image_jobs")
-      .update({ status: "pending", next_attempt_at: nextAttemptAt, internal_error: message })
-      .eq("id", job.id);
+    await updateOwnedJob({
+      status: "pending",
+      next_attempt_at: nextAttemptAt,
+      internal_error: message,
+    });
     return { outcome: "retry_pending", jobId: job.id, nextAttemptAt };
   }
 }

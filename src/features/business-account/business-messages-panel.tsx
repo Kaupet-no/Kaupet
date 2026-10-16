@@ -8,6 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
 import { supabase } from "@/integrations/supabase/client";
+import { lastConversationMessages, messagePreview } from "@/lib/conversation-messages";
+import { fetchAllPages, fetchAllPagesByIds } from "@/lib/fetch-all-pages";
 import { signListingImageUrls } from "@/lib/storage";
 
 type Props = { organization: BusinessOrganization; locationId: string | "all" };
@@ -33,7 +35,8 @@ type BusinessConversation = Omit<Conversation, "listing"> & {
   latest: Message | null;
 };
 
-type Message = { conversation_id: string; body: string; created_at: string; sender_id: string };
+type Message =
+  Awaited<ReturnType<typeof lastConversationMessages>> extends Map<string, infer M> ? M : never;
 type Profile = {
   id: string;
   display_name: string;
@@ -41,54 +44,54 @@ type Profile = {
   deleted_at: string | null;
 };
 
+const conversationDateFormatter = new Intl.DateTimeFormat("nb-NO", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+async function fetchBuyerProfiles(buyerIds: string[]): Promise<Profile[]> {
+  const { data, error } = await fetchAllPagesByIds(buyerIds, (chunk, from, to) =>
+    supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, deleted_at")
+      .in("id", chunk)
+      .order("id")
+      .range(from, to),
+  );
+  if (data === null) throw error;
+  return data;
+}
+
 export function BusinessMessagesPanel({ organization, locationId }: Props) {
   const conversationsQuery = useQuery({
     queryKey: ["business-messages", organization.id, locationId],
     staleTime: 30_000,
     queryFn: async (): Promise<BusinessConversation[]> => {
-      let query = supabase
-        .from("conversations")
-        .select(
-          "id, buyer_id, seller_id, listing_id, last_message_at, listing:listings!inner(id, title, organization_id, organization_location_id, listing_images(storage_path, sort_order))",
-        )
-        .eq("listing.organization_id", organization.id);
-      if (locationId !== "all") query = query.eq("listing.organization_location_id", locationId);
-      const { data, error } = await query.order("last_message_at", { ascending: false });
+      // Byggeren muterer seg selv, så hver side får en ny spørring.
+      const page = (from: number, to: number) => {
+        let query = supabase
+          .from("conversations")
+          .select(
+            "id, buyer_id, seller_id, listing_id, last_message_at, listing:listings!inner(id, title, organization_id, organization_location_id, listing_images(storage_path, sort_order))",
+          )
+          .eq("listing.organization_id", organization.id);
+        if (locationId !== "all") query = query.eq("listing.organization_location_id", locationId);
+        return query.order("last_message_at", { ascending: false }).order("id").range(from, to);
+      };
+      const { data, error } = await fetchAllPages(page);
       if (error) throw error;
-      const conversations = (data ?? []) as unknown as Conversation[];
+      const conversations = data as unknown as Conversation[];
       const ids = conversations.map((conversation) => conversation.id);
-      const userIds = Array.from(
-        new Set(
-          conversations.flatMap((conversation) => [conversation.buyer_id, conversation.seller_id]),
-        ),
+      const buyerIds = Array.from(
+        new Set(conversations.map((conversation) => conversation.buyer_id)),
       );
-      const [{ data: messages, error: messagesError }, { data: profiles, error: profilesError }] =
-        await Promise.all([
-          ids.length
-            ? supabase
-                .from("messages")
-                .select("conversation_id, body, created_at, sender_id")
-                .in("conversation_id", ids)
-                .order("created_at", { ascending: false })
-            : Promise.resolve({ data: [], error: null }),
-          userIds.length
-            ? supabase
-                .from("profiles")
-                .select("id, display_name, avatar_url, deleted_at")
-                .in("id", userIds)
-            : Promise.resolve({ data: [], error: null }),
-        ]);
-      if (messagesError) throw messagesError;
-      if (profilesError) throw profilesError;
-      const latestByConversation = new Map<string, Message>();
-      for (const message of (messages ?? []) as Message[]) {
-        if (!latestByConversation.has(message.conversation_id)) {
-          latestByConversation.set(message.conversation_id, message);
-        }
-      }
-      const profileById = new Map(
-        (profiles ?? []).map((profile) => [profile.id, profile as Profile]),
-      );
+      // Én siste melding per samtale (KG-06-F02): en lang tråd må ikke bruke
+      // opp radgrensen og få andre samtaler til å se tomme ut.
+      const [latestByConversation, profiles] = await Promise.all([
+        lastConversationMessages(ids),
+        fetchBuyerProfiles(buyerIds),
+      ]);
+      const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
       return conversations.map((conversation) => ({
         ...conversation,
         listing: Array.isArray(conversation.listing)
@@ -208,17 +211,14 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
                         {listing?.title ?? "Slettet annonse"}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                        {latest?.body ?? "Ingen meldinger enda"}
+                        {latest ? messagePreview(latest) : "Ingen meldinger enda"}
                       </span>
                     </span>
                     <time
                       className="hidden shrink-0 text-xs text-muted-foreground sm:block"
                       dateTime={conversation.last_message_at}
                     >
-                      {new Intl.DateTimeFormat("nb-NO", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(conversation.last_message_at))}
+                      {conversationDateFormatter.format(new Date(conversation.last_message_at))}
                     </time>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
                   </Link>

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { applyVehicleLookup, useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 
 vi.mock("@tanstack/react-start", () => ({
@@ -71,7 +71,6 @@ const lookupResult = {
   transmission: null,
   color: "Blå",
   next_eu_control: null,
-  eu_control_exempt: null,
   power_hk: 120,
   drive_type: null,
   axle_count: null,
@@ -354,5 +353,101 @@ describe("useVehicleLookupFlow", () => {
     // never reaches confirmVehicleData's caller (swallowed inside
     // proposeUnknownVehicle's own try/catch), so it can never block this.
     expect(goNext).toHaveBeenCalled();
+  });
+});
+
+// KG-20-F01: et nytt kjennemerke beholdt A sine tekniske data der B manglet verdi.
+describe("applyVehicleLookup", () => {
+  const lookupA = {
+    registrationNumber: "AB12345",
+    brand: "Volvo",
+    model: "V70",
+    next_eu_control: "2027-01-01",
+    drive_type: "awd",
+    power_hk: 200,
+  } as never;
+  const lookupB = { registrationNumber: "CD54321", brand: "Audi", model: "A4" } as never;
+
+  it("fjerner forrige kjøretøys oppslagsdata ved nytt kjennemerke", () => {
+    const afterA = applyVehicleLookup({ title_hint: "beholdes" }, lookupA);
+    const afterB = applyVehicleLookup(afterA, lookupB);
+    expect(afterB).toMatchObject({ registration_number: "CD54321", brand: "Audi", model: "A4" });
+    expect(afterB).not.toHaveProperty("next_eu_control");
+    expect(afterB).not.toHaveProperty("drive_type");
+    expect(afterB).not.toHaveProperty("power_hk");
+    expect(afterB.title_hint).toBe("beholdes");
+  });
+
+  it("fjerner hvert felt forrige oppslag fylte, ikke bare et utvalg", () => {
+    const fullA = {
+      registrationNumber: "AB12345",
+      brand: "Volvo",
+      model: "V70",
+      year: 2015,
+      fuel_type: "diesel",
+      weight_kg: 1600,
+      transmission: "automatic",
+      body_type: "stasjonsvogn",
+      next_eu_control: "2027-01-01",
+      power_hk: 200,
+      drive_type: "awd",
+      tow_hitch: true,
+      max_tow_weight_kg: 1800,
+      max_total_weight_kg: 2200,
+      length_m: 4.8,
+      seats: 5,
+      imported_used: false,
+      first_registration_date: "2015-03-01",
+      cylinders: 5,
+      engine_displacement_cc: 2400,
+      engine_code: "D5244T",
+      sleeping_places: 0,
+    } as never;
+    const afterA = applyVehicleLookup({ title_hint: "beholdes" }, fullA);
+    const afterB = applyVehicleLookup(afterA, { registrationNumber: "CD54321" } as never);
+    expect(afterB).toEqual({
+      title_hint: "beholdes",
+      is_registered: true,
+      registration_number: "CD54321",
+      vehicle_lookup: JSON.stringify({ registrationNumber: "CD54321" }),
+    });
+  });
+
+  it("beholder manuelle verdier når samme kjennemerke bekreftes igjen", () => {
+    const afterA = { ...applyVehicleLookup({}, lookupA), seats: 5 };
+    expect(applyVehicleLookup(afterA, lookupA).seats).toBe(5);
+  });
+
+  describe("EU-kontrollstatus", () => {
+    afterEach(() => vi.useRealTimers());
+    const passed = { registrationNumber: "AB12345", next_eu_control: "2026-01-01" } as never;
+
+    it("krysser av «Mangler EU-kontroll» når fristen er passert", () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+      expect(applyVehicleLookup({}, passed).eu_control_status).toBe("missing");
+    });
+
+    it("overstyrer ikke brukerens valg for samme kjennemerke", () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+      const afterA = { ...applyVehicleLookup({}, passed), eu_control_status: "exempt" };
+      expect(applyVehicleLookup(afterA, passed).eu_control_status).toBe("exempt");
+    });
+
+    it("fjerner forrige kjøretøys valg ved nytt kjennemerke", () => {
+      const afterA = { ...applyVehicleLookup({}, passed), eu_control_status: "exempt" };
+      const afterB = applyVehicleLookup(afterA, { registrationNumber: "CD54321" } as never);
+      expect(afterB).not.toHaveProperty("eu_control_status");
+    });
+
+    it("lar ikke eldre klienters fritak fra forrige kjøretøy blokkere ny status", () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+      const afterA = {
+        ...applyVehicleLookup({}, { registrationNumber: "CD54321" } as never),
+        eu_control_exempt: true,
+      };
+      const afterB = applyVehicleLookup(afterA, passed);
+      expect(afterB.eu_control_status).toBe("missing");
+      expect(afterB).not.toHaveProperty("eu_control_exempt");
+    });
   });
 });

@@ -28,7 +28,7 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: vi.fn() }));
 
-import { savePushSubscription } from "./push.functions";
+import { savePushSubscription, updateNotificationPreferences } from "./push.functions";
 
 const validSubscription = {
   platform: "web",
@@ -74,5 +74,21 @@ describe("savePushSubscription", () => {
       expect.objectContaining({ user_id: "user-1", endpoint: validSubscription.endpoint }),
       { onConflict: "endpoint" },
     );
+  });
+});
+
+// KG-25-F01: push-prompten sender bare én varseltype; servertillatelsen krevde
+// alle ti feltene, så aktiveringen ble avvist.
+describe("updateNotificationPreferences", () => {
+  it("lagrer bare feltene som sendes", async () => {
+    await updateNotificationPreferences({ data: { web_push_messages: true } });
+    expect(db.upsert).toHaveBeenCalledWith(
+      { user_id: "user-1", web_push_messages: true },
+      { onConflict: "user_id" },
+    );
+  });
+
+  it("avviser en tom oppdatering", () => {
+    expect(() => updateNotificationPreferences({ data: {} })).toThrow();
   });
 });

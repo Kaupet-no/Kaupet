@@ -3,10 +3,12 @@ import { isNative } from "@/lib/native";
 
 export const STAGING_HOST = "staging.kaupet.no";
 
-function isPrivateNetworkHost(host: string): boolean {
+export function isPrivateNetworkHost(host: string): boolean {
   const hostname = host.split(":")[0];
   return (
     hostname === "localhost" ||
+    // Android-skallet mapper localhost til loopback (se dev-server-url.ts).
+    /^127\./.test(hostname) ||
     /^10\./.test(hostname) ||
     /^192\.168\./.test(hostname) ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)

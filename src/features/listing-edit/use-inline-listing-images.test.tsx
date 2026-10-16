@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   const builder = {
     update: vi.fn(),
     eq: vi.fn(),
+    insert: vi.fn(async (_row: { sort_order: number }) => ({ error: null })),
   };
   builder.update.mockReturnValue(builder);
   builder.eq.mockImplementation((column: string) =>
@@ -25,13 +26,14 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: mocks.from },
 }));
 vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
-vi.mock("@/lib/image-compression", () => ({ compressImage: vi.fn() }));
+vi.mock("@/lib/image-compression", () => ({ compressImage: vi.fn(async (file: File) => file) }));
 vi.mock("@/lib/storage", () => ({
   deleteListingImage: vi.fn(),
   describeImageError: vi.fn(),
-  uploadListingImage: vi.fn(),
-  uploadListingImageThumb: vi.fn(),
-  validateImages: vi.fn(),
+  uploadListingImage: vi.fn(async ({ file }: { file: File }) => `listing-1/${file.name}`),
+  uploadListingImageThumb: vi.fn(async () => undefined),
+  validateImages: vi.fn(() => null),
+  MAX_LISTING_IMAGES: 20,
 }));
 
 import { useInlineListingImages } from "./use-inline-listing-images";
@@ -99,5 +101,17 @@ describe("useInlineListingImages", () => {
       "third.jpg",
       "second.jpg",
     ]);
+  });
+
+  // KG-22-F02: alle nye bilder i samme valg fikk samme sort_order.
+  it("gir hvert nytt bilde et eget, stigende sorteringsnummer", async () => {
+    const { result } = renderHook(() =>
+      useInlineListingImages({ listingId: "listing-1", images, imgUrls: {} }),
+    );
+    const files = ["a.jpg", "b.jpg", "c.jpg"].map((name) => new File(["x"], name));
+    await act(async () => {
+      await result.current.addFiles(files);
+    });
+    expect(mocks.builder.insert.mock.calls.map(([row]) => row.sort_order)).toEqual([3, 4, 5]);
   });
 });

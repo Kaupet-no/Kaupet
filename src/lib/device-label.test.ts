@@ -27,4 +27,10 @@ describe("parseUserAgent", () => {
   it("leser en UA med iPad i strengen som Safari på iOS", () => {
     expect(parseUserAgent(IPAD_DESKTOP_UA, "web")).toBe("Safari på iOS");
   });
+
+  it("leser Chrome på Android som Android, ikke Linux (KG-38-F02)", () => {
+    const ua =
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36";
+    expect(parseUserAgent(ua, "web")).toBe("Chrome på Android");
+  });
 });

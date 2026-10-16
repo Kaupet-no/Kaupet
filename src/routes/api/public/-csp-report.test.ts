@@ -48,4 +48,34 @@ describe("POST /api/public/csp-report", () => {
     expect(log.mock.calls[0]?.[1]).toContain('"document":"same-origin"');
     expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
   });
+
+  it("reads the Reporting API report-to format", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const secret = "private-token-123";
+    const response = await post(
+      JSON.stringify([
+        {
+          type: "csp-violation",
+          url: `https://kaupet.no/sok?q=${secret}`,
+          body: {
+            effectiveDirective: "script-src-elem",
+            blockedURL: `https://evil.example/x.js?t=${secret}`,
+            documentURL: `https://kaupet.no/sok?q=${secret}`,
+            sourceFile: "https://kaupet.no/assets/app.js",
+          },
+        },
+      ]),
+      { "content-type": "application/reports+json" },
+    );
+    expect(response.status).toBe(204);
+    expect(log.mock.calls[0]?.[1]).toBe(
+      JSON.stringify({
+        directive: "script-src-elem",
+        blocked: "external",
+        document: "same-origin",
+        source: "same-origin",
+      }),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+  });
 });

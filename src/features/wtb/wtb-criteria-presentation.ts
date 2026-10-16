@@ -1,4 +1,11 @@
-import type { CategoryFilter } from "@/lib/category-filters";
+import { getCategoryBehavior } from "@/lib/category-behavior";
+import {
+  filterDependencyMet,
+  pruneUntilStable,
+  type AttributeValue,
+  type CategoryFilter,
+  type VehicleBrandGroup,
+} from "@/lib/category-filters";
 import {
   isWtbDateMinValue,
   isWtbRangeValue,
@@ -6,6 +13,36 @@ import {
   type WtbAttributeMap,
   type WtbAttributeValue,
 } from "./wtb-criteria-types";
+
+/** Beholder bare kriterier som kategoriens filtre fortsatt viser (også
+ * avhengige filtre hvis forutsetning er borte), pluss fritekst. Brukes ved
+ * kategori- og merkebytte, så gamle, usynlige krav ikke stopper treff
+ * (KG-23-F02). `filters` er kategoriens effektive filtre. */
+export function pruneWtbCriteria(
+  value: WtbAttributeMap,
+  filters: CategoryFilter[],
+): WtbAttributeMap {
+  const byKey = new Map(filters.map((filter) => [filter.key, filter]));
+  const { legacyFilterAliases } = getCategoryBehavior(
+    (filters.find((filter) => filter.type === "brand_select")?.unit as VehicleBrandGroup) ?? null,
+  );
+  return pruneUntilStable(value, (key, kept) => {
+    if (key === WTB_FREETEXT_KEY) return true;
+    // Et fjernet alias betyr «Ingen begrensning» for eldre klienter i DB-triggeren.
+    const alias = legacyFilterAliases.find((candidate) => candidate.key === key);
+    if (alias && byKey.has(alias.replacementKey)) {
+      const replacement = kept[alias.replacementKey];
+      return (
+        Array.isArray(replacement) &&
+        replacement.length === 1 &&
+        replacement[0] === alias.replacementValue &&
+        kept[key] === alias.value
+      );
+    }
+    const filter = byKey.get(key);
+    return !!filter && filterDependencyMet(filter, kept as Record<string, AttributeValue>);
+  }).kept;
+}
 
 export function orderWtbCriteria(filters: CategoryFilter[], value: WtbAttributeMap) {
   return [...filters].sort((a, b) => Number(b.key in value) - Number(a.key in value));

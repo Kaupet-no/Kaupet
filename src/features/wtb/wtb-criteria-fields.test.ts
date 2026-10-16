@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { WtbAttributeMap } from "./wtb-criteria-types";
 import { normalizeFilter } from "@/lib/category-filters";
 import {
   criterionSummary,
   orderWtbCriteria,
+  pruneWtbCriteria,
   wtbCriteriaSummary,
 } from "./wtb-criteria-presentation";
 
@@ -66,5 +68,71 @@ describe("WTB-kriterieoversikt", () => {
         brand: "Trek",
       }),
     ).toBe("Type: Terrengsykkel · Rammestørrelse (cm): 40–70 · Merke: Trek");
+  });
+});
+
+// KG-23-F02: skjulte kriterier fra forrige kategori ble matchet mot nye annonser.
+describe("pruneWtbCriteria", () => {
+  it("fjerner kriterier den nye kategorien ikke har, men beholder fritekst", () => {
+    expect(
+      pruneWtbCriteria({ type: ["mountain"], fuel_type: ["diesel"], __freetext: "ABS" }, filters),
+    ).toEqual({ type: ["mountain"], __freetext: "ABS" });
+  });
+
+  it("fjerner avhengige kriterier når forutsetningen er borte", () => {
+    const dependent = normalizeFilter({
+      id: "motor",
+      category_id: "category",
+      key: "motor",
+      label_nb: "Motor",
+      type: "select",
+      options: null,
+      unit: null,
+      sort_order: 3,
+      is_primary: false,
+      depends_on_key: "type",
+      depends_on_value: "electric",
+    });
+    expect(pruneWtbCriteria({ motor: ["mid"] }, [...filters, dependent])).toEqual({});
+  });
+});
+
+describe("fritak under klientovergangen", () => {
+  const vehicleFilters = [
+    normalizeFilter({
+      ...filters[0],
+      id: "brand",
+      category_id: "c",
+      key: "brand",
+      label_nb: "Merke",
+      type: "brand_select",
+      unit: "bil",
+    }),
+    normalizeFilter({
+      ...filters[0],
+      id: "eu",
+      category_id: "c",
+      key: "eu_control_status",
+      label_nb: "EU-status",
+      type: "select",
+    }),
+  ];
+  it("beholder eksisterende alias når fritakskriteriet er uendret", () => {
+    const values = { eu_control_status: ["exempt"], eu_control_exempt: true, brand: "Volvo" };
+    expect(pruneWtbCriteria(values, vehicleFilters)).toEqual(values);
+  });
+  it.each<WtbAttributeMap>([
+    {},
+    { eu_control_status: ["missing"] },
+    { eu_control_status: ["missing", "exempt"] },
+  ])("fjerner fritaksalias uten et tilsvarende kriterium %j", (values) => {
+    expect(pruneWtbCriteria({ ...values, eu_control_exempt: true }, vehicleFilters)).toEqual(
+      values,
+    );
+  });
+  it("fjerner fritaksalias ved bytte til en kategori uten EU-status", () => {
+    expect(
+      pruneWtbCriteria({ eu_control_status: ["exempt"], eu_control_exempt: true }, filters),
+    ).toEqual({});
   });
 });

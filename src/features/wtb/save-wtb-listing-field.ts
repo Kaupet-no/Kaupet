@@ -5,7 +5,7 @@ import type { WtbAttributeMap } from "./wtb-criteria-types";
 export type WtbFieldPatch =
   | { group: "title"; title: string }
   | { group: "description"; description: string }
-  | { group: "category"; category_id: string | null }
+  | { group: "category"; category_id: string | null; attributes?: WtbAttributeMap }
   | { group: "max_price"; max_price_nok: number | null }
   | { group: "attributes"; attributes: WtbAttributeMap };
 
@@ -25,7 +25,13 @@ export async function saveWtbListingField(
       await updateFn({ data: { id: listingId, description: patch.description } });
       return;
     case "category":
-      await updateFn({ data: { id: listingId, category_id: patch.category_id } });
+      await updateFn({
+        data: {
+          id: listingId,
+          category_id: patch.category_id,
+          ...(patch.attributes && { attributes: patch.attributes }),
+        },
+      });
       return;
     case "max_price":
       await updateFn({ data: { id: listingId, max_price_nok: patch.max_price_nok } });

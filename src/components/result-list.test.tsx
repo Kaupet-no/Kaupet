@@ -28,6 +28,14 @@ vi.mock("@/hooks/use-listing-card-images", () => ({ useListingCardImages: () => 
 vi.mock("@/hooks/use-listing-favorites", () => ({
   useListingFavorites: () => ({ favoriteIds: new Set(), isReady: true }),
 }));
+const cardStub = vi.hoisted(
+  () =>
+    ({ listing }: { listing: { title: string } }) =>
+      listing.title,
+);
+vi.mock("@/components/listing-card", () => ({ ListingCard: cardStub }));
+vi.mock("@/components/listing-card-images", () => ({ ListingCardImages: cardStub }));
+vi.mock("@/components/listing-card-expanded", () => ({ ListingCardExpanded: cardStub }));
 vi.mock("@/lib/product-analytics", () => ({ trackProductEvent: vi.fn() }));
 
 const mapError = vi.hoisted(() => ({ message: "kartet feilet" }));
@@ -178,5 +186,62 @@ describe("ResultList – kartfeil ved null treff", () => {
     await findByRole("alert");
     expect(getByRole("button", { name: "Last inn siden på nytt" })).toBeTruthy();
     expect(queryByRole("button", { name: "Prøv på nytt" })).toBeNull();
+  });
+});
+
+describe("ResultList – feiltilstander (KG-30-F03)", () => {
+  const card = {
+    id: "1",
+    kaupet_code: "ABC123",
+    title: "Lastet annonse",
+    price_nok: 100,
+    is_free: false,
+    city: null,
+    created_at: "2026-10-01T00:00:00Z",
+    cover_path: null,
+  };
+
+  it("viser feil og retry når første side feiler, ikke «0 annonser»", () => {
+    const onRetry = vi.fn();
+    const { getByRole, getByText, queryByText } = render(
+      <ResultList
+        {...baseProps}
+        totalCount={null}
+        q="sofa"
+        effectiveCategories={[]}
+        resetFilters={vi.fn()}
+        loadError
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(getByText("Kunne ikke hente annonser")).toBeTruthy();
+    expect(getByText("Søket feilet")).toBeTruthy();
+    expect(queryByText("Ingen annonser funnet")).toBeNull();
+    expect(queryByText(/0 annonser/)).toBeNull();
+    fireEvent.click(getByRole("button", { name: "Prøv igjen" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("beholder lastede kort og tilbyr retry når neste side feiler", () => {
+    const fetchNextPage = vi.fn();
+    const { getByRole, getByText } = render(
+      <ResultList
+        {...baseProps}
+        cards={[card]}
+        totalCount={50}
+        hasNextPage
+        nextPageError
+        fetchNextPage={fetchNextPage}
+        q=""
+        effectiveCategories={[]}
+        resetFilters={vi.fn()}
+      />,
+    );
+
+    expect(getByText("Lastet annonse")).toBeTruthy();
+    expect(getByText("Kunne ikke hente flere annonser.")).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "Prøv igjen" }));
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 });

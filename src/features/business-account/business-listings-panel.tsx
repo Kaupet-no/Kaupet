@@ -19,6 +19,7 @@ import { ListingRow, type Row } from "@/features/my-listings/listing-row";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
 import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 
 type Props = {
   organization: BusinessOrganization;
@@ -59,26 +60,22 @@ export function BusinessListingsPanel({
     queryKey: ["business-listings", organization.id, userId, listingAccess, locationId],
     staleTime: 30_000,
     queryFn: async (): Promise<Row[]> => {
-      let baseQuery = supabase
-        .from("listings")
-        .select(
-          "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, attributes, categories(slug), created_at, expires_at, listing_images(storage_path, sort_order)",
-        )
-        .eq("organization_id", organization.id);
-      if (locationId !== "all") {
-        baseQuery = baseQuery.eq("organization_location_id", locationId);
-      }
-      const { data, error } =
-        listingAccess === "own"
-          ? await baseQuery
-              .eq("seller_id", userId)
-              .in("status", ["active", "draft"])
-              .order("created_at", { ascending: false })
-          : await baseQuery
-              .in("status", ["active", "draft"])
-              .order("created_at", { ascending: false });
+      // Byggeren muterer seg selv, så hver side får en ny spørring.
+      const page = (from: number, to: number) => {
+        let query = supabase
+          .from("listings")
+          .select(
+            "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, attributes, categories(slug), created_at, expires_at, listing_images(storage_path, sort_order)",
+          )
+          .eq("organization_id", organization.id)
+          .in("status", ["active", "draft"]);
+        if (locationId !== "all") query = query.eq("organization_location_id", locationId);
+        if (listingAccess === "own") query = query.eq("seller_id", userId);
+        return query.order("created_at", { ascending: false }).order("id").range(from, to);
+      };
+      const { data, error } = await fetchAllPages(page);
       if (error) throw error;
-      return ((data ?? []) as unknown as RawListing[]).map((listing) => {
+      return (data as unknown as RawListing[]).map((listing) => {
         const category = Array.isArray(listing.categories)
           ? listing.categories[0]
           : listing.categories;
@@ -233,12 +230,9 @@ export function BusinessListingsPanel({
                   row={row}
                   isVehicle={false}
                   activePromotion={null}
-                  onPromote={() => undefined}
-                  onMarkSold={() => undefined}
-                  onReactivate={() => undefined}
-                  onRepublish={() => undefined}
-                  onPublishDraft={() => undefined}
-                  onDelete={() => undefined}
+                  // Publisering, salg og sletting gjøres i annonsens
+                  // redigeringsvisning, som håndhever bedriftsrettighetene.
+                  editOnly
                   busy={false}
                   readOnly={
                     listingEditScope === "none" ||

@@ -24,6 +24,15 @@ export function useLocationPicker(params: {
   const [coords, setCoords] = useState<Coords | null>(null);
   const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
   const markerMovedRef = useRef(false);
+  // Øker ved hvert GPS-forsøk og ved metodebytte/reset/unmount, så et sent
+  // GPS- eller reverssvar ikke overstyrer et nyere valg (KG-33-F01).
+  const gpsGenerationRef = useRef(0);
+  useEffect(
+    () => () => {
+      gpsGenerationRef.current += 1;
+    },
+    [],
+  );
 
   // Auto-fill city from postal code
   useEffect(() => {
@@ -34,6 +43,10 @@ export function useLocationPicker(params: {
     // showing a place that doesn't match what's currently typed, even while
     // the lookup below is still in flight or ends up failing.
     setValue("city", "", { shouldValidate: false });
+    // Koordinatene fra forrige postnummer gjelder ikke lenger; publisering
+    // foretrekker coords, så de må ikke overleve et nytt (eller feilet)
+    // oppslag. En manuelt flyttet markør er brukerens eget valg (KG-33-F02).
+    if (!markerMovedRef.current) setCoords(null);
     if (!/^\d{4}$/.test(p)) return;
     let active = true;
     const t = window.setTimeout(async () => {
@@ -71,6 +84,8 @@ export function useLocationPicker(params: {
   }, [coords, setValue]);
 
   function resetLocationMethod() {
+    gpsGenerationRef.current += 1;
+    setLocationLoading(false);
     setLocationMethod(null);
     setCoords(null);
     setValue("postal_code", "");
@@ -80,6 +95,8 @@ export function useLocationPicker(params: {
   }
 
   function switchToPostal() {
+    gpsGenerationRef.current += 1;
+    setLocationLoading(false);
     setCoords(null);
     setValue("postal_code", "");
     setValue("city", "");
@@ -97,11 +114,14 @@ export function useLocationPicker(params: {
   }
 
   async function fetchMyLocation() {
+    const generation = ++gpsGenerationRef.current;
+    const stale = () => generation !== gpsGenerationRef.current;
     setLocationMethod("gps");
     setLocationLoading(true);
     try {
       if (isNative()) {
         const permission = await requestLocationPermission();
+        if (stale()) return;
         if (permission !== "granted") {
           showErrorToast("Gi appen tilgang til posisjon i innstillingene.");
           setLocationMethod(null);
@@ -109,6 +129,7 @@ export function useLocationPicker(params: {
         }
       }
       const pos = await getCurrentPosition();
+      if (stale()) return;
       if (!pos) {
         showErrorToast("Kunne ikke hente posisjon.");
         setLocationMethod(null);
@@ -119,15 +140,17 @@ export function useLocationPicker(params: {
       markerMovedRef.current = false;
       lastEditedRef.current = null;
       const geo = await reverseGeocodeAddress({ lat, lng });
+      if (stale()) return;
       if (geo.city) setValue("city", geo.city, { shouldValidate: false });
       if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
         setValue("postal_code", geo.postal_code, { shouldValidate: false });
       }
     } catch {
+      if (stale()) return;
       showErrorToast("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
       setLocationMethod(null);
     } finally {
-      setLocationLoading(false);
+      if (!stale()) setLocationLoading(false);
     }
   }
 

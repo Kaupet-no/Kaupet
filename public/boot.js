@@ -26,7 +26,14 @@
       else native = p !== "0" && p !== "false";
     } catch (e) {}
   }
-  if (native) document.documentElement.classList.add("native-boot");
+  if (!native) return;
+  document.documentElement.classList.add("native-boot");
+  // Androids tekstskala kommer asynkront over broen, etter første opptegning
+  // (se src/lib/text-scale.ts). Bruk sist kjente verdi til den svarer.
+  try {
+    var s = Number(localStorage.getItem("kaupet_text_scale"));
+    if (s > 0) document.documentElement.style.setProperty("--kaupet-text-scale", String(s));
+  } catch (e) {}
 })();
 
 // Runs before paint so there is no light-mode flash for users who have

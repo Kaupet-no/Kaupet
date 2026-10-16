@@ -80,7 +80,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CONDITIONS } from "@/lib/constants";
+import { CONDITIONS, MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
@@ -141,7 +141,7 @@ const listingSchema = z.object({
         .number()
         .int("Prisen må være et helt tall")
         .min(0, "Prisen kan ikke være negativ")
-        .max(999_999_999, "Prisen er for høy"),
+        .max(MAX_LISTING_PRICE_NOK, "Prisen kan ikke være over 10 000 000 kr"),
       z.literal(""),
     ])
     .optional(),
@@ -702,7 +702,6 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     brand: "Merke",
     model: "Modell",
     sleeping_places: "Soveplasser",
-    eu_control_exempt: "EU-kontroll",
     mileage_km: "Kilometerstand",
     drive_type: "Hjuldrift",
     axle_config: "Akselkombinasjon",
@@ -723,10 +722,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
       .find((group) => group.fieldsToValidate?.includes(field as keyof ListingForm))?.key;
     if (exact) return exact;
     const candidates =
-      field === "brand" ||
-      field === "model" ||
-      field === "sleeping_places" ||
-      field === "eu_control_exempt"
+      field === "brand" || field === "model" || field === "sleeping_places"
         ? ["vehicle-registration", "boat-facts", "category-attributes"]
         : field === "mileage_km" || field === "drive_type" || field === "axle_config"
           ? ["vehicle-facts", "category-attributes"]
@@ -925,7 +921,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
     hasDraftData,
     draftChecked,
     flushLocalDraft,
-    saveDraftToSupabase,
+    saveDraftWithImages,
     retryDraftAfterConflict,
     ensureDraftId,
     restoreDraft: restoreDraftFields,
@@ -2024,7 +2020,7 @@ function NewListingPage({ organizationId }: { organizationId: string | null }) {
             return true;
           }
           setIsSavingDraft(true);
-          const id = await saveDraftToSupabase();
+          const id = await saveDraftWithImages();
           setIsSavingDraft(false);
           if (!id) return false;
           blocker.proceed?.();

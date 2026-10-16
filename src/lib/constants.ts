@@ -1,5 +1,10 @@
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
+/** Høyeste pris en annonse kan ha. Felles for prisfeltet, klientskjemaet,
+ * utkastlagring og publisering, så brukeren aldri kan skrive en pris som
+ * serveren avviser først ved lagring (KG-19-F02). */
+export const MAX_LISTING_PRICE_NOK = 10_000_000;
+
 export const CONDITIONS = [
   { value: "new", label: "Helt ny", description: "Ubrukt, med eller uten original emballasje" },
   { value: "like_new", label: "Som ny", description: "Brukt svært lite — ingen synlige feil" },

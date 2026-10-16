@@ -12,6 +12,7 @@ import {
   validateImages,
 } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
+import { isAiGeneratedImage } from "@/lib/image-metadata";
 import { supabase } from "@/integrations/supabase/client";
 
 export type InlineImageItem = {
@@ -59,6 +60,10 @@ export function useInlineListingImages(params: {
   const [items, setItems] = useState<InlineImageItem[]>(toItems);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const captionTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Neste ledige sorteringsnummer. Tildeles synkront per fil før noen await,
+  // så filer i samme (eller samtidige) valg får stigende, unike nummer i
+  // brukerens rekkefølge (KG-22-F02).
+  const nextSortOrder = useRef(0);
 
   // Re-sync from the query whenever the source list changes (e.g. after
   // invalidation from another field's save), unless a local mutation is
@@ -100,33 +105,40 @@ export function useInlineListingImages(params: {
       showErrorToast(describeImageError(err));
       return;
     }
-    for (const file of files) {
+    nextSortOrder.current = Math.max(
+      nextSortOrder.current,
+      ...items.map((it) => it.sort_order + 1),
+    );
+    const sortOrders = files.map(() => nextSortOrder.current++);
+    for (const [index, file] of files.entries()) {
+      const sortOrder = sortOrders[index];
       const tempPath = `pending-${crypto.randomUUID()}`;
       setItems((curr) => [
         ...curr,
         {
           id: null,
           storage_path: tempPath,
-          sort_order: curr.length,
+          sort_order: sortOrder,
           caption: null,
           uploading: true,
         },
       ]);
       try {
-        const [compressed, thumb] = await Promise.all([
+        const [compressed, thumb, aiGenerated] = await Promise.all([
           compressImage(file, "listing"),
           compressImage(file, "listing-thumb"),
+          isAiGeneratedImage(file),
         ]);
         const path = await uploadListingImage({ listingId, file: compressed });
         await uploadListingImageThumb({ path, file: thumb }).catch((err) =>
           console.warn("Kunne ikke laste opp miniatyrbilde", err),
         );
-        const sortOrder = items.length;
         const { error } = await supabase.from("listing_images").insert({
           listing_id: listingId,
           storage_path: path,
           sort_order: sortOrder,
           caption: null,
+          ai_generated: aiGenerated,
         });
         if (error) throw error;
         setItems((curr) =>

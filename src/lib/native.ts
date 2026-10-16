@@ -68,40 +68,30 @@ export function nativePlatform(): "ios" | "android" | "web" {
   return "web";
 }
 
-/** Take one camera photo or pick multiple gallery photos for the upload pipeline. */
-export async function pickNativePhotos(
-  source: "camera" | "gallery",
-  limit: number,
-): Promise<File[]> {
-  if (nativePlatform() === "web" || limit <= 0) return [];
+/** Take one camera photo for the upload pipeline. The gallery uses the WebView
+ * file input instead: the Camera plugin re-encodes picked images, which strips
+ * the C2PA/IPTC metadata that marks AI-generated images. */
+export async function takeNativePhoto(): Promise<File | null> {
+  if (nativePlatform() === "web") return null;
   const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
   try {
-    const photos =
-      source === "gallery"
-        ? (await Camera.pickImages({ quality: 85, limit })).photos
-        : [
-            await Camera.getPhoto({
-              quality: 85,
-              allowEditing: false,
-              resultType: CameraResultType.Uri,
-              source: CameraSource.Camera,
-            }),
-          ];
-    const files: File[] = [];
-    for (const [index, photo] of photos.entries()) {
-      if (!photo.webPath) continue;
-      const res = await fetch(photo.webPath);
-      if (!res.ok) throw new Error("Kunne ikke lese bildet. Prøv igjen.");
-      const blob = await res.blob();
-      const ext = (photo.format ?? "jpg").toLowerCase();
-      const filename = `photo-${Date.now()}-${index}.${ext === "jpeg" ? "jpg" : ext}`;
-      const type = blob.type || (ext === "png" ? "image/png" : "image/jpeg");
-      files.push(new File([blob], filename, { type }));
-    }
-    return files;
+    const photo = await Camera.getPhoto({
+      quality: 85,
+      allowEditing: false,
+      resultType: CameraResultType.Uri,
+      source: CameraSource.Camera,
+    });
+    if (!photo.webPath) return null;
+    const res = await fetch(photo.webPath);
+    if (!res.ok) throw new Error("Kunne ikke lese bildet. Prøv igjen.");
+    const blob = await res.blob();
+    const ext = (photo.format ?? "jpg").toLowerCase();
+    const filename = `photo-${Date.now()}.${ext === "jpeg" ? "jpg" : ext}`;
+    const type = blob.type || (ext === "png" ? "image/png" : "image/jpeg");
+    return new File([blob], filename, { type });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
-    if (msg.toLowerCase().includes("cancel")) return [];
+    if (msg.toLowerCase().includes("cancel")) return null;
     throw e;
   }
 }

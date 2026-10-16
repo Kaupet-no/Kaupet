@@ -45,6 +45,40 @@ function safeOrigin(value: unknown, ownOrigin: string): string | undefined {
   }
 }
 
+type ReportFields = { directive?: string; blocked: unknown; document: unknown; source: unknown };
+
+/**
+ * Reads both the legacy `report-uri` body (`{"csp-report": {...}}` with
+ * kebab-case keys) and the Reporting API `report-to` body
+ * (`{type: "csp-violation", body: {...}}` with camelCase keys).
+ */
+function normalizeReport(item: unknown): ReportFields | undefined {
+  if (!item || typeof item !== "object") return;
+  const record = item as Record<string, unknown>;
+  if (record.type === "csp-violation") {
+    const body = record.body;
+    if (!body || typeof body !== "object") return;
+    const fields = body as Record<string, unknown>;
+    return {
+      directive:
+        typeof fields.effectiveDirective === "string" ? fields.effectiveDirective : undefined,
+      blocked: fields.blockedURL,
+      document: fields.documentURL,
+      source: fields.sourceFile,
+    };
+  }
+  const report = "csp-report" in record ? record["csp-report"] : record;
+  if (!report || typeof report !== "object") return;
+  const fields = report as Record<string, unknown>;
+  const directive = fields["effective-directive"] ?? fields["violated-directive"];
+  return {
+    directive: typeof directive === "string" ? directive : undefined,
+    blocked: fields["blocked-uri"],
+    document: fields["document-uri"],
+    source: fields["source-file"],
+  };
+}
+
 /**
  * Receives CSP violation reports. The endpoint is deliberately telemetry-only:
  * it accepts a small, known subset of fields and never logs browser-supplied
@@ -66,23 +100,16 @@ export const Route = createFileRoute("/api/public/csp-report")({
           const reports = Array.isArray(body) ? body : [body];
           const ownOrigin = new URL(request.url).origin;
           for (const item of reports.slice(0, 20)) {
-            const report =
-              item && typeof item === "object" && "csp-report" in item
-                ? (item as { "csp-report"?: unknown })["csp-report"]
-                : item;
-            if (!report || typeof report !== "object") continue;
-            const fields = report as Record<string, unknown>;
-            const directive =
-              typeof fields["violated-directive"] === "string"
-                ? fields["violated-directive"].split(/\s+/, 1)[0]
-                : undefined;
+            const fields = normalizeReport(item);
+            if (!fields) continue;
+            const directive = fields.directive?.split(/\s+/, 1)[0];
             console.error(
               "[csp-report]",
               JSON.stringify({
                 directive: directive && DIRECTIVES.has(directive) ? directive : "other",
-                blocked: safeOrigin(fields["blocked-uri"], ownOrigin),
-                document: safeOrigin(fields["document-uri"], ownOrigin),
-                source: safeOrigin(fields["source-file"], ownOrigin),
+                blocked: safeOrigin(fields.blocked, ownOrigin),
+                document: safeOrigin(fields.document, ownOrigin),
+                source: safeOrigin(fields.source, ownOrigin),
               }),
             );
           }

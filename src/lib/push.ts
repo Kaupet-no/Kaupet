@@ -4,13 +4,9 @@
 
 import { savePushSubscription, deletePushSubscription } from "./push.functions";
 
-// Public VAPID key — safe to expose to the browser.
-// Rotated because the old private key wasn't retrievable.
-// All push subscriptions created against the previous key stop working once
-// this ships to production — existing subscribers must re-enable push.
-export const VAPID_PUBLIC_KEY =
-  import.meta.env.VITE_VAPID_PUBLIC_KEY ||
-  "BPFo1ygL7dxhxhtTCPbE6b4qYkP9webql5QNaJuCReVeko8mzNCVyFunhDwIV95v4lKjHttAFgjxTN1zvsVvJnc";
+import { VAPID_PUBLIC_KEY } from "./vapid";
+
+export { VAPID_PUBLIC_KEY };
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);

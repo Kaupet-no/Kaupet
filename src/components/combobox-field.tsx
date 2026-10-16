@@ -38,11 +38,19 @@ export function ComboboxMultiContent({
   return (
     <Command shouldFilter>
       <CommandInput placeholder={placeholder} value={search} onValueChange={setSearch} />
+      {/* cmdk bruker aria-selected for aktiv (fokusert) rad; faktisk valg
+          annonseres med aria-checked. Ikke aria-multiselectable: da leser
+          skjermlesere cmdks aria-selected som valg, i strid med aria-checked. */}
       <CommandList>
         <CommandEmpty>Ingen treff.</CommandEmpty>
         <CommandGroup>
           {options.map((o) => (
-            <CommandItem key={o.value} value={o.label_nb} onSelect={() => onToggle(o.value)}>
+            <CommandItem
+              key={o.value}
+              value={o.label_nb}
+              aria-checked={values.includes(o.value)}
+              onSelect={() => onToggle(o.value)}
+            >
               <Check
                 className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
               />
@@ -52,6 +60,7 @@ export function ComboboxMultiContent({
           {search.trim() && !exactMatch && (
             <CommandItem
               value={`__freeform__${search}`}
+              aria-checked={false}
               onSelect={() => {
                 onToggle(search.trim());
                 setSearch("");

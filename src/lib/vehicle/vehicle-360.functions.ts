@@ -23,10 +23,7 @@ function randomToken(): string {
   );
 }
 
-// Én stabil QR-kode per annonseutkast — ikke en tidsbegrenset engangskode.
-// Idempotent: kalles denne flere ganger for samme utkast (f.eks. ved
-// sidelast på nytt) gjenbrukes samme token i stedet for å opprette en ny
-// rad, slik at koden brukeren evt. allerede har delt/lagret fortsatt virker.
+// Gjenbruk en ubrukt QR-kode frem til utløp; roter utløpte eller brukte koder.
 export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
@@ -110,8 +107,7 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
       .from("listing_360_frames")
       .select("frame_order")
       .eq("listing_id", session.listing_id)
-      .order("frame_order", { ascending: false })
-      .limit(1);
+      .order("frame_order", { ascending: true });
     if (framesError) {
       throw await toClientError("database", framesError);
     }
@@ -120,7 +116,11 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
 
     return {
       listingTitle: (listing?.title as string | undefined) ?? "annonsen din",
-      nextFrameOrder: (existingFrames?.[0]?.frame_order ?? -1) + 1,
+      existingFrameCount: existingFrames?.length ?? 0,
+      // Fyll bare ledige plasser, også hull etter tidligere opplastingsfeil.
+      availableFrameOrders: Array.from({ length: MAX_360_FRAMES }, (_, order) => order).filter(
+        (order) => !existingFrames?.some((frame) => frame.frame_order === order),
+      ),
     };
   });
 

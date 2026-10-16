@@ -6,7 +6,10 @@ import { ThemeProvider, useTheme } from "./use-theme";
 vi.mock("@/lib/native", () => ({ isNative: () => false }));
 vi.mock("@/lib/native-setup", () => ({ syncStatusBarTheme: vi.fn() }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.classList.remove("dark");
@@ -50,5 +53,21 @@ describe("useTheme", () => {
     expect(screen.getByTestId("resolved").textContent).toBe("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localStorage.getItem("kaupet_theme")).toBe("dark");
+  });
+
+  it("starter og bytter tema selv om lagring er blokkert (KG-37-F04)", () => {
+    const blocked = () => {
+      throw new DOMException("blocked", "SecurityError");
+    };
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(screen.getByTestId("theme").textContent).toBe("system");
+    act(() => screen.getByText("set-dark").click());
+    expect(screen.getByTestId("resolved").textContent).toBe("dark");
   });
 });

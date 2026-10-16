@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useSearchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import {
   parseNumericFilters,
@@ -9,6 +9,16 @@ import { negateSynonymMatches } from "@/lib/search-negation";
 import { stripFillerWords } from "@/lib/search-stopwords";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import type { InterpretedCriterion } from "./resolve-text-to-filters";
+// En samlet brikke gjenoppretter flere fraser; hvert helt ordtreff i teksten
+// må forbli fritekst, også når matcheren deler teksten opp igjen.
+function interpretationWasRemoved(matchedText: string, ignored?: Set<string>): boolean {
+  const phrase = ` ${matchedText.trim().toLocaleLowerCase().replace(/\s+/g, " ")} `;
+  for (const text of ignored ?? []) {
+    if (` ${text.trim().toLocaleLowerCase().replace(/\s+/g, " ")} `.includes(phrase)) return true;
+  }
+  return false;
+}
+
 /**
  * Single coordination point for every "recognize this typed word as a
  * structured filter" matcher (equipment/attribute synonyms, number+unit
@@ -97,32 +107,48 @@ export function useTextToFilterPipeline({
   const activeSynonymMatches = useMemo(
     () =>
       synonymMatches?.filter(
-        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+        (match) => !interpretationWasRemoved(match.matchedText, ignoredInterpretations),
       ),
     [ignoredInterpretations, synonymMatches],
   );
   const activeNumericMatches = useMemo(
     () =>
       numericMatches.filter(
-        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+        (match) => !interpretationWasRemoved(match.matchedText, ignoredInterpretations),
       ),
     [ignoredInterpretations, numericMatches],
   );
   const activePriceMatches = useMemo(
     () =>
       priceMatches.filter(
-        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+        (match) => !interpretationWasRemoved(match.matchedText, ignoredInterpretations),
       ),
     [ignoredInterpretations, priceMatches],
   );
 
+  const handledMatchSetRef = useRef<unknown[] | null>(null);
   useEffect(() => {
     const hasSynonyms = !!activeSynonymMatches && activeSynonymMatches.length > 0;
     const hasNumeric = activeNumericMatches.length > 0;
     const hasPrice = activePriceMatches.length > 0;
     if (!hasSynonyms && !hasNumeric && !hasPrice) return;
+    // Hvert treffsett brukes én gang, selv om effekten også kjører når
+    // qDraft endres.
+    const matchSet = [activeSynonymMatches, activeNumericMatches, activePriceMatches];
+    if (handledMatchSetRef.current?.every((matches, i) => matches === matchSet[i])) return;
+    // Treffene gjelder teksten de ble beregnet fra. Har brukeren skrevet
+    // videre, peker ordnumrene inn i en annen tekst: vent til teksten igjen
+    // er den treffene ble beregnet fra, eller på et ferskt resultat, i stedet
+    // for å fjerne feil ord (KG-28-F02).
+    if (matchedQ !== qDraft.trim()) return;
+    handledMatchSetRef.current = matchSet;
 
     const applied: Record<string, string> = {};
+    // Alle verdier i samme runde samles per nøkkel og lagres én gang, så to
+    // treff for samme filter ikke overskriver hverandre fra samme gamle
+    // øyeblikksbilde (KG-28-F01).
+    const patch: Record<string, AttributeFilterValue> = {};
+    const currentValue = (key: string) => (key in patch ? patch[key] : attrValues[key]);
     const criteria: InterpretedCriterion[] = [];
     const appliedSynonymMatches: NonNullable<typeof activeSynonymMatches> = [];
 
@@ -135,13 +161,10 @@ export function useTextToFilterPipeline({
         if (!filter) continue;
         if (m.negated) {
           if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
-            const current = attrValues[m.filterKey];
+            const current = currentValue(m.filterKey);
             const values = current?.kind === "exclude" ? current.values : [];
             if (!values.includes(m.optionValue)) {
-              handleAttrValueChange(m.filterKey, {
-                kind: "exclude",
-                values: [...values, m.optionValue],
-              });
+              patch[m.filterKey] = { kind: "exclude", values: [...values, m.optionValue] };
             }
             applied[`${m.filterKey}:!${m.optionValue}`] = m.matchedText;
             appliedSynonymMatches.push(m);
@@ -156,7 +179,7 @@ export function useTextToFilterPipeline({
           continue;
         }
         if (filter.type === "boolean") {
-          handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
+          patch[m.filterKey] = { kind: "boolean", value: true };
           applied[`${m.filterKey}:`] = m.matchedText;
           appliedSynonymMatches.push(m);
           criteria.push({
@@ -167,7 +190,7 @@ export function useTextToFilterPipeline({
             matchedText: m.matchedText,
           });
         } else if (filter.type === "select" && m.optionValue) {
-          handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
+          patch[m.filterKey] = { kind: "select", value: m.optionValue };
           applied[`${m.filterKey}:`] = m.matchedText;
           appliedSynonymMatches.push(m);
           criteria.push({
@@ -178,13 +201,10 @@ export function useTextToFilterPipeline({
             matchedText: m.matchedText,
           });
         } else if (filter.type === "multiselect" && m.optionValue) {
-          const current = attrValues[m.filterKey];
+          const current = currentValue(m.filterKey);
           const values = current?.kind === "multiselect" ? current.values : [];
           if (!values.includes(m.optionValue)) {
-            handleAttrValueChange(m.filterKey, {
-              kind: "multiselect",
-              values: [...values, m.optionValue],
-            });
+            patch[m.filterKey] = { kind: "multiselect", values: [...values, m.optionValue] };
           }
           applied[`${m.filterKey}:${m.optionValue}`] = m.matchedText;
           appliedSynonymMatches.push(m);
@@ -201,7 +221,7 @@ export function useTextToFilterPipeline({
 
     if (hasNumeric) {
       for (const m of activeNumericMatches) {
-        const current = attrValues[m.filterKey];
+        const current = currentValue(m.filterKey);
         const currentRange: { min?: number; max?: number } =
           current?.kind === "range" ? current : {};
         const value = {
@@ -209,7 +229,7 @@ export function useTextToFilterPipeline({
           min: m.min ?? currentRange.min,
           max: m.max ?? currentRange.max,
         };
-        handleAttrValueChange(m.filterKey, value);
+        patch[m.filterKey] = value;
         applied[`${m.filterKey}:`] = m.matchedText;
         criteria.push({
           kind: "attribute",
@@ -238,6 +258,8 @@ export function useTextToFilterPipeline({
 
     if (appliedSynonymMatches.length === 0 && !hasNumeric && !hasPrice) return;
 
+    for (const [key, value] of Object.entries(patch)) handleAttrValueChange(key, value);
+
     onInterpreted?.(criteria);
     if (Object.keys(applied).length > 0) onApplied?.(applied);
 
@@ -258,8 +280,9 @@ export function useTextToFilterPipeline({
         ...(hasPrice ? { min: nextMin, max: nextMax } : {}),
       });
     }
-    // Runs once per resolved match set; re-triggers naturally once qDraft
-    // changes again as a result of applying it.
+    // Runs once per resolved match set (handledMatchSetRef). qDraft is a
+    // dependency so a set skipped because the text had moved on is applied
+    // when the text matches again, even if the debounced text never changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSynonymMatches, activeNumericMatches, activePriceMatches]);
+  }, [activeSynonymMatches, activeNumericMatches, activePriceMatches, matchedQ, qDraft]);
 }

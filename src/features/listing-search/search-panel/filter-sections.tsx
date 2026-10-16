@@ -857,11 +857,7 @@ export function SearchFilterSections({
           <h3 id="filter-category-heading" className="font-display text-lg tracking-tight">
             {v.categories.length > 0 ? `Egenskaper for ${categorySummary}` : "Egenskaper"}
           </h3>
-          {categoryNotice && categoryNotice.length > 0 && (
-            <p role="status" className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">
-              {formatDroppedNotice(categoryNotice, v.categories.length > 0)}
-            </p>
-          )}
+
           {v.categories.length === 0 ? (
             <button
               type="button"
@@ -925,6 +921,11 @@ export function SearchFilterSections({
 
   return (
     <>
+      {categoryNotice && categoryNotice.length > 0 && (
+        <p role="status" className="rounded-lg bg-muted px-3 py-2 text-sm">
+          {formatDroppedNotice(categoryNotice, v.categories.length > 0)}
+        </p>
+      )}
       {expanded ? (
         <div className="@container space-y-1">
           {desktopGroup ? (

@@ -42,8 +42,9 @@ function ResetPasswordPage() {
   });
   const password = useWatch({ control, name: "password" }) ?? "";
 
-  // Gjenopprettingslenken gir en midlertidig sesjon via URL-hash; supabase-js
-  // plukker den opp asynkront, så vi venter litt før vi konkluderer med utløpt lenke.
+  // Gjenopprettingslenken kommer tilbake med en PKCE-kode (`?code=`) som
+  // supabase-js veksler til en sesjon asynkront under initialiseringen, så vi
+  // venter litt før vi konkluderer med utløpt lenke.
   useEffect(() => {
     let cancelled = false;
     const check = async () => {

@@ -181,14 +181,17 @@ function keyBySynonymIdentity(
   );
 }
 
-function normalizeCategory(c: CategoryRow) {
-  return {
+/** Forelderen sammenlignes som slug, ikke miljøspesifikk UUID, så en
+ * flytting alene gir en synkbar endring (KG-21-F02). */
+function normalizeCategory(slugById: Map<string, string>) {
+  return (c: CategoryRow) => ({
     ...c,
     id: undefined,
     parent_id: undefined,
+    parent_slug: c.parent_id ? (slugById.get(c.parent_id) ?? c.parent_id) : null,
     created_at: undefined,
     updated_at: undefined,
-  };
+  });
 }
 
 function normalizeCategoryFilter(f: CategoryFilterRow) {
@@ -253,7 +256,8 @@ export const getCategorySyncDiff = createServerFn({ method: "GET" })
       categories: diffByKey(
         keyByCategorySlug(prod.categories),
         keyByCategorySlug(staging.categories),
-        normalizeCategory,
+        // UUID-ene er tilfeldige per miljø, så de to oppslagene kan slås sammen.
+        normalizeCategory(new Map([...prodSlugById, ...stagingSlugById])),
       ),
       categoryFilters: diffByKey(
         keyByCategoryAndField(prod.categoryFilters, prodSlugById, (f) => f.key),

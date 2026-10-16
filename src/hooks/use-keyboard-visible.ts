@@ -9,19 +9,25 @@ export function useKeyboardVisible(): boolean {
     // Capacitor Keyboard plugin only exists in a real iOS/Android runtime.
     if (nativePlatform() === "web") return;
 
-    let cleanup: (() => void) | undefined;
+    // Samme mønster som useForegroundRefresh: importen kan løses etter
+    // unmount, og da skal ingen lytter registreres eller bli liggende.
+    let disposed = false;
+    const handles: Promise<{ remove: () => Promise<void> }>[] = [];
 
-    import("@capacitor/keyboard").then(({ Keyboard }) => {
-      const showListener = Keyboard.addListener("keyboardWillShow", () => setVisible(true));
-      const hideListener = Keyboard.addListener("keyboardWillHide", () => setVisible(false));
+    void import("@capacitor/keyboard")
+      .then(({ Keyboard }) => {
+        if (disposed) return;
+        handles.push(
+          Keyboard.addListener("keyboardWillShow", () => setVisible(true)),
+          Keyboard.addListener("keyboardWillHide", () => setVisible(false)),
+        );
+      })
+      .catch(() => {});
 
-      cleanup = () => {
-        showListener.then((h) => h.remove());
-        hideListener.then((h) => h.remove());
-      };
-    });
-
-    return () => cleanup?.();
+    return () => {
+      disposed = true;
+      for (const handle of handles) void handle.then((h) => h.remove()).catch(() => {});
+    };
   }, []);
 
   return visible;

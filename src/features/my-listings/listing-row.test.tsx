@@ -41,6 +41,13 @@ const row: Row = {
 
 const noop = () => {};
 
+// Typekontrakt (kjøres av tsc): uten editOnly er radhandlingene påkrevd, så
+// en glemt onDelete ikke gir en sletteknapp som ikke gjør noe.
+export function _listingRowRequiresActions() {
+  // @ts-expect-error onPromote … onDelete mangler
+  return <ListingRow row={row} isVehicle={false} activePromotion={null} busy={false} />;
+}
+
 describe("ListingRow", () => {
   it("shows the promote action for every user, not just demo/admin roles", () => {
     const { getAllByText } = renderWithClient(
@@ -59,5 +66,22 @@ describe("ListingRow", () => {
     );
 
     expect(getAllByText("Fremhev annonse").length).toBeGreaterThan(0);
+  });
+
+  // KG-06-F01: Proff-konsollen viste Publiser/Marker som solgt/Slett som ikke gjorde noe.
+  it("viser bare Rediger i editOnly, uten døde status- og slettehandlinger", () => {
+    const { getByText, queryByText, queryByLabelText } = renderWithClient(
+      <ListingRow
+        row={{ ...row, status: "draft" }}
+        isVehicle={false}
+        activePromotion={null}
+        busy={false}
+        editOnly
+      />,
+    );
+    expect(getByText("Rediger")).toBeTruthy();
+    expect(queryByText("Publiser")).toBeNull();
+    expect(queryByText("Marker som solgt")).toBeNull();
+    expect(queryByLabelText("Slett")).toBeNull();
   });
 });

@@ -119,7 +119,18 @@ function buildAdmin(
   const calls = { updates: [] as Record<string, unknown>[] };
   const makeChain = (table: string) => {
     const chain: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "is", "gt", "lt", "in", "gte", "order", "limit"]) {
+    for (const method of [
+      "select",
+      "eq",
+      "is",
+      "gt",
+      "lt",
+      "in",
+      "gte",
+      "order",
+      "limit",
+      "range",
+    ]) {
       chain[method] = vi.fn(() => chain);
     }
     chain.maybeSingle = vi.fn(async () => ({
@@ -165,15 +176,7 @@ function buildAdmin(
             ? [{ user_id: "admin-user-1" }]
             : table === "organizations"
               ? [organization]
-              : table === "listings"
-                ? (overrides.listingStats ?? null)
-                : table === "listing_status_history"
-                  ? (overrides.listingStatusHistory ?? null)
-                  : table === "listing_sales"
-                    ? (overrides.sales ?? null)
-                    : table === "listing_view_events"
-                      ? (overrides.viewEvents ?? null)
-                      : null,
+              : null,
         error: null,
       }).then(resolve, reject);
     return chain;
@@ -224,6 +227,35 @@ function buildAdmin(
         data: [
           { claimed, access_until: organization.proff_access_until, sent_invoice_number: null },
         ],
+        error: null,
+      };
+    }
+    if (name === "business_listing_stats_inputs") {
+      // Samme form som RPC-en: visninger summert per annonse og UTC-dag.
+      const viewDays = new Map<string, { listing_id: string; day: string; views: number }>();
+      for (const event of (overrides.viewEvents ?? []) as Array<{
+        listing_id: string;
+        created_at: string;
+      }>) {
+        const day = event.created_at.slice(0, 10);
+        const key = `${event.listing_id}:${day}`;
+        const row = viewDays.get(key) ?? { listing_id: event.listing_id, day, views: 0 };
+        row.views += 1;
+        viewDays.set(key, row);
+      }
+      return {
+        data: {
+          listings: ((overrides.listingStats ?? []) as Array<Record<string, unknown>>).map(
+            ({ listing_view_totals, ...listing }) => ({
+              ...listing,
+              total_views:
+                (listing_view_totals as { total_views: number } | null)?.total_views ?? 0,
+            }),
+          ),
+          status_history: overrides.listingStatusHistory ?? [],
+          sales: overrides.sales ?? [],
+          view_days: [...viewDays.values()],
+        },
         error: null,
       };
     }

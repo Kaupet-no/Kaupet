@@ -108,11 +108,15 @@ function PermissionFields({
   categories,
   onChange,
   collapsible = false,
+  locationOnly = false,
 }: {
   value: MemberFormPermissions;
   categories: Category[];
   onChange: (next: MemberFormPermissions) => void;
   collapsible?: boolean;
+  /** Bare lokasjonstilgangene, som er det `setOrganizationLocationMember`
+   * lagrer. Rolle, opprettelsesrett og kategorier settes ved invitasjon. */
+  locationOnly?: boolean;
 }) {
   const update = (patch: Partial<MemberFormPermissions>) =>
     onChange(normalizeFormPermissions({ ...value, ...patch }));
@@ -138,20 +142,22 @@ function PermissionFields({
       {showAdvanced && (
         <div className="space-y-5">
           <p className="text-sm font-semibold">Rettigheter</p>
-          <div className="space-y-2">
-            <Label htmlFor="member-role">Rolle</Label>
-            <select
-              id="member-role"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={value.role}
-              onChange={(event) =>
-                update({ role: event.target.value as MemberFormPermissions["role"] })
-              }
-            >
-              <option value="member">Bruker</option>
-              <option value="superuser">Superbruker</option>
-            </select>
-          </div>
+          {!locationOnly && (
+            <div className="space-y-2">
+              <Label htmlFor="member-role">Rolle</Label>
+              <select
+                id="member-role"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={value.role}
+                onChange={(event) =>
+                  update({ role: event.target.value as MemberFormPermissions["role"] })
+                }
+              >
+                <option value="member">Bruker</option>
+                <option value="superuser">Superbruker</option>
+              </select>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Choice
               id="member-listing-access"
@@ -198,54 +204,58 @@ function PermissionFields({
               }
             />
           </div>
-          <label className="flex min-h-12 items-center gap-3 text-sm">
-            <Checkbox
-              checked={value.canCreateListings}
-              disabled={disabled}
-              onCheckedChange={(checked) => update({ canCreateListings: checked === true })}
-            />
-            <span>Kan opprette annonser</span>
-          </label>
-          <div className="space-y-3">
-            <Label htmlFor="member-category-access">Kategorier for nye annonser</Label>
-            <select
-              id="member-category-access"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={value.categoryAccess}
-              disabled={disabled || !value.canCreateListings}
-              onChange={(event) =>
-                update({
-                  categoryAccess: event.target.value as MemberFormPermissions["categoryAccess"],
-                })
-              }
-            >
-              <option value="all">Alle kategorier</option>
-              <option value="restricted">Kun valgte kategorier</option>
-            </select>
-            {value.categoryAccess === "restricted" && value.canCreateListings && !disabled && (
-              <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 sm:grid-cols-2">
-                {categories.map((category) => (
-                  <label key={category.id} className="flex min-h-10 items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={value.allowedCategoryIds.includes(category.id)}
-                      onCheckedChange={(checked) =>
-                        update({
-                          allowedCategoryIds:
-                            checked === true
-                              ? [...value.allowedCategoryIds, category.id]
-                              : value.allowedCategoryIds.filter((id) => id !== category.id),
-                        })
-                      }
-                    />
-                    <span>{category.name_nb}</span>
-                  </label>
-                ))}
+          {!locationOnly && (
+            <>
+              <label className="flex min-h-12 items-center gap-3 text-sm">
+                <Checkbox
+                  checked={value.canCreateListings}
+                  disabled={disabled}
+                  onCheckedChange={(checked) => update({ canCreateListings: checked === true })}
+                />
+                <span>Kan opprette annonser</span>
+              </label>
+              <div className="space-y-3">
+                <Label htmlFor="member-category-access">Kategorier for nye annonser</Label>
+                <select
+                  id="member-category-access"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={value.categoryAccess}
+                  disabled={disabled || !value.canCreateListings}
+                  onChange={(event) =>
+                    update({
+                      categoryAccess: event.target.value as MemberFormPermissions["categoryAccess"],
+                    })
+                  }
+                >
+                  <option value="all">Alle kategorier</option>
+                  <option value="restricted">Kun valgte kategorier</option>
+                </select>
+                {value.categoryAccess === "restricted" && value.canCreateListings && !disabled && (
+                  <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 sm:grid-cols-2">
+                    {categories.map((category) => (
+                      <label key={category.id} className="flex min-h-10 items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={value.allowedCategoryIds.includes(category.id)}
+                          onCheckedChange={(checked) =>
+                            update({
+                              allowedCategoryIds:
+                                checked === true
+                                  ? [...value.allowedCategoryIds, category.id]
+                                  : value.allowedCategoryIds.filter((id) => id !== category.id),
+                            })
+                          }
+                        />
+                        <span>{category.name_nb}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {value.categoryAccess === "restricted" && value.allowedCategoryIds.length === 0 && (
+                  <p className="text-xs text-destructive">Velg minst én kategori.</p>
+                )}
               </div>
-            )}
-            {value.categoryAccess === "restricted" && value.allowedCategoryIds.length === 0 && (
-              <p className="text-xs text-destructive">Velg minst én kategori.</p>
-            )}
-          </div>
+            </>
+          )}
           {disabled && (
             <p className="text-xs text-muted-foreground">
               Superbrukere har full tilgang til bedriftens annonser og chatter.
@@ -440,8 +450,6 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
     mutationFn: () => {
       if (!editing) throw new Error("Velg en bruker.");
       const next = normalizeFormPermissions(permissionValue(editing));
-      if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
-        throw new Error("Velg minst én kategori.");
       return callUpdate({
         data: {
           locationId: editing.locationId,
@@ -647,7 +655,8 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
           <AlertDialogHeader>
             <AlertDialogTitle>Endre rettigheter</AlertDialogTitle>
             <AlertDialogDescription>
-              Endringene gjelder ved neste handling brukeren gjør.
+              Endringene gjelder ved neste handling brukeren gjør. Rolle, opprettelsesrett og
+              kategorier kan ikke endres her.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {editing && (
@@ -655,6 +664,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
               value={permissionValue(editing)}
               categories={categories}
               onChange={(next) => setEditing({ ...editing, ...next })}
+              locationOnly
             />
           )}
           <AlertDialogFooter>

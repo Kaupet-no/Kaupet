@@ -7,10 +7,16 @@ import {
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { ZoomableImage } from "@/components/listing-detail/zoomable-image";
+import { AiImageBadge } from "@/components/ai-image-info";
 import { useAutoHide, autoHideClass } from "@/hooks/use-auto-hide";
 import { lockPortraitOnPhone, unlockOrientation } from "@/lib/orientation";
 
-type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
+type ListingImage = {
+  storage_path: string;
+  sort_order: number;
+  caption?: string | null;
+  ai_generated?: boolean;
+};
 
 type Props = {
   images: ListingImage[];
@@ -35,6 +41,8 @@ export function ImageLightbox({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [arrowsVisible, showArrows] = useAutoHide();
   // Zoomet bilde eier gesten selv — Emblas dra-gest slås av mens den varer.
+  // Bare aktiv slide kan være zoomet: et bilde som forlates nullstiller
+  // zoomen (`active`) og melder false, så sveipingen låses opp igjen.
   // Ref, ikke state: `watchDrag` leses ved pointerdown, og en reInit ville
   // hoppet karusellen tilbake til start.
   const zoomedRef = useRef(false);
@@ -153,6 +161,7 @@ export function ImageLightbox({
                   src={imgUrls[img.storage_path]}
                   alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
                   onZoomChange={onZoomChange}
+                  active={i + offset === currentIndex}
                   onDismiss={onClose}
                 />
                 {img.caption && (
@@ -160,6 +169,7 @@ export function ImageLightbox({
                     {img.caption}
                   </p>
                 )}
+                <AiImageBadge show={img.ai_generated} />
               </div>
             ))}
           </div>

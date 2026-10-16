@@ -7,6 +7,7 @@ afterEach(cleanup);
 
 const orderMock = vi.fn();
 const limitMock = vi.fn();
+const imageRangeMock = vi.fn();
 const eqMock = vi.fn();
 const selectMock = vi.fn();
 const fromMock = vi.fn();
@@ -45,7 +46,7 @@ function mockRows(rows: ReturnType<typeof row>[]) {
 function mockImageJobs(
   rows: { listing_id: string; status: string; customer_error: string | null }[],
 ) {
-  imageJobsInMock.mockResolvedValue({ data: rows, error: null });
+  imageRangeMock.mockResolvedValue({ data: rows, error: null });
 }
 
 beforeEach(() => {
@@ -57,13 +58,17 @@ beforeEach(() => {
   imageJobsInMock.mockReset();
   imageJobsSelectMock.mockReset();
   imageJobsSelectMock.mockImplementation(() => ({ in: imageJobsInMock }));
+  imageJobsInMock.mockImplementation(() => ({
+    in: imageJobsInMock,
+    order: () => ({ range: imageRangeMock }),
+  }));
   mockImageJobs([]);
   fromMock.mockImplementation((table: string) =>
     table === "listing_image_jobs" ? { select: imageJobsSelectMock } : { select: selectMock },
   );
   selectMock.mockImplementation(() => ({ eq: eqMock }));
   eqMock.mockImplementation(() => ({ order: orderMock }));
-  orderMock.mockImplementation(() => ({ limit: limitMock }));
+  orderMock.mockImplementation(() => ({ order: orderMock, range: limitMock }));
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -119,5 +124,39 @@ describe("ImportHistory", () => {
     expect(await screen.findByText(/Bilder behandles: 2/)).toBeTruthy();
     expect(screen.getByText(/Bilder feilet: 1/)).toBeTruthy();
     expect(screen.getByText("Bildet finnes ikke på adressen (HTTP 404).")).toBeTruthy();
+    expect(imageJobsInMock).toHaveBeenCalledWith("status", ["pending", "processing", "failed"]);
   });
+});
+
+it("KG-06-F02: historikk og bildejobber fortsetter etter serverens 1000-radersgrense", async () => {
+  const firstPage = Array.from({ length: 1000 }, () => row({ listing_id: "listing-1" }));
+  limitMock.mockResolvedValueOnce({ data: firstPage, error: null }).mockResolvedValueOnce({
+    data: [row({ listing_id: "listing-1", status: "failed" })],
+    error: null,
+  });
+  imageRangeMock
+    .mockResolvedValueOnce({
+      data: Array.from({ length: 1000 }, () => ({
+        listing_id: "listing-1",
+        status: "pending",
+        customer_error: null,
+      })),
+      error: null,
+    })
+    .mockResolvedValueOnce({
+      data: [
+        {
+          listing_id: "listing-1",
+          status: "failed",
+          customer_error: "Bildet mangler",
+        },
+      ],
+      error: null,
+    });
+  render(<ImportHistory organizationId="org-1" />, { wrapper });
+  expect(await screen.findByText(/Opprettet: 1000/)).toBeTruthy();
+  expect(screen.getByText(/Feilet: 1/)).toBeTruthy();
+  expect(limitMock).toHaveBeenNthCalledWith(2, 1000, 1999);
+  expect(imageRangeMock).toHaveBeenNthCalledWith(2, 1000, 1999);
+  expect(screen.getByText("Bildet mangler")).toBeTruthy();
 });

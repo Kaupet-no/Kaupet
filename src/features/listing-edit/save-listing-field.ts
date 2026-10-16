@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { CategoryBehavior } from "@/lib/category-behavior";
-import type { Database, Json } from "@/integrations/supabase/types";
+import type { Database } from "@/integrations/supabase/types";
+import { updateListingAttributes } from "@/lib/listings.functions";
 
 export type ListingFieldPatch =
   | { group: "title"; title: string }
@@ -22,7 +23,13 @@ export type ListingFieldPatch =
       no_known_issues: boolean;
       maintenance_history: string | null;
     }
-  | { group: "attributes"; attributes: Record<string, unknown> }
+  | {
+      group: "attributes";
+      attributes: Record<string, unknown>;
+      /** Nøkler brukeren har tømt. Uten dem ville sammenslåingen med
+       * databasens attributter lagt gamle verdier tilbake (KG-22-F01). */
+      removedKeys?: string[];
+    }
   | { group: "category"; category_id: string; attributes: Record<string, unknown> };
 
 /**
@@ -85,31 +92,30 @@ export async function saveListingField(
         maintenance_history: patch.maintenance_history || null,
       };
       break;
-    case "attributes": {
-      // Shallow-merge on the client against the current attributes before
-      // writing, since several inline sections (vehicle facts, equipment,
-      // generic category attributes) all write to the same JSON column.
-      const { data: current, error: readErr } = await supabase
-        .from("listings")
-        .select("attributes")
-        .eq("id", listingId)
-        .single();
-      if (readErr) throw readErr;
-      const merged = {
-        ...((current?.attributes as Record<string, unknown>) ?? {}),
-        ...patch.attributes,
-      };
-      updateData = { attributes: merged as unknown as Json };
-      break;
-    }
+    // Attributter valideres på serveren (tall- og datoformat), samme
+    // kontroll som ved opprettelse og publisering.
+    case "attributes":
+      await updateListingAttributes({
+        data: { id: listingId, attributes: patch.attributes, removedKeys: patch.removedKeys },
+      });
+      return;
     case "category":
-      updateData = {
-        category_id: patch.category_id,
-        attributes: patch.attributes as unknown as Json,
-      };
-      break;
+      await updateListingAttributes({
+        data: { id: listingId, attributes: patch.attributes, category_id: patch.category_id },
+      });
+      return;
   }
 
-  const { error } = await supabase.from("listings").update(updateData).eq("id", listingId);
+  // RLS kan la en UPDATE uten tilgang (eller mot en slettet annonse) lykkes
+  // uten å treffe noe; «Lagret» skal bare vises når raden faktisk ble
+  // oppdatert (KG-22-F03).
+  const { data: updated, error } = await supabase
+    .from("listings")
+    .update(updateData)
+    .eq("id", listingId)
+    .select("id");
   if (error) throw error;
+  if (updated?.length !== 1) {
+    throw new Error("Endringen ble ikke lagret. Last siden på nytt og prøv igjen.");
+  }
 }

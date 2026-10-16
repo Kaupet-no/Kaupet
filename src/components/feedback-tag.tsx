@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { sanitizeFeedbackPageUrl } from "@/lib/feedback-page-url";
 import { submitFeedback } from "@/lib/feedback.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -40,7 +41,8 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
     setSending(true);
     setError(null);
     try {
-      const pageUrl = typeof window !== "undefined" ? window.location.href : undefined;
+      const pageUrl =
+        typeof window !== "undefined" ? sanitizeFeedbackPageUrl(window.location.href) : undefined;
       await submitFn({ data: { type, message: message.trim(), pageUrl } });
       setSent(true);
       try {

@@ -1,6 +1,18 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { showSuccessToast } from "@/lib/toast";
-import { discardDraftListing, saveDraftListing } from "@/lib/listings.functions";
+import {
+  discardDraftListing,
+  saveDraftListing,
+  syncDraftListingImages,
+} from "@/lib/listings.functions";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 import type { AttributeMap } from "@/components/attribute-fields";
 import type { PendingImage } from "@/components/image-uploader";
@@ -10,6 +22,11 @@ import {
   saveDraftImages,
   transferDraftImages,
 } from "@/features/listing-creation/draft-image-store";
+import {
+  reusableRemote,
+  uploadDraftImage,
+  type RemoteImage,
+} from "@/features/listing-creation/draft-image-sync";
 import {
   draftStorageKey,
   draftStorageScope,
@@ -44,7 +61,7 @@ type DraftFields = {
   isVehicle: boolean;
   attributes: AttributeMap;
   images: PendingImage[];
-  setImages: (images: PendingImage[]) => void;
+  setImages: Dispatch<SetStateAction<PendingImage[]>>;
   knownIssues?: string;
   noKnownIssues?: boolean;
   maintenanceHistory?: string;
@@ -142,12 +159,13 @@ export function useDraftAutosave(fields: DraftFields) {
   // One guard here covers all three save paths.
   const draftSavingStopped = useRef(false);
   const draftSaveInProgress = useRef<Promise<string | null> | null>(null);
-  const saveDraftToSupabaseRef = useRef<() => Promise<string | null>>(() => Promise.resolve(null));
   const saveGeneration = useRef(0);
   const imageStoreReady = useRef(false);
   const imageLoadPromise = useRef<Promise<PendingImage[]> | null>(null);
   const loadImagesRef = useRef<() => Promise<PendingImage[]>>(() => loadDraftImages(DRAFT_KEY));
   const latestImages = useRef(images);
+  const imageSyncInProgress = useRef<Promise<boolean> | null>(null);
+  const lastImageSync = useRef<string | null>(null);
   const latestLocalDraft = useRef<Record<string, unknown> | null>(null);
   const localDraftRevision = useRef(0);
   useEffect(() => {
@@ -464,14 +482,99 @@ export function useDraftAutosave(fields: DraftFields) {
     return save;
   }
 
+  /** Laster opp nye bilder til serverutkastet og avstemmer listen der, så
+   * utkastet i Mine annonser har bildene også uten den lokale kopien. Bilder
+   * som allerede er lastet opp, gjenbrukes. Returnerer false ved feil; bildene
+   * er da fortsatt lagret lokalt. */
+  async function syncDraftImages(listingId: string): Promise<boolean> {
+    // En ventende lagring må synke nyeste bildeliste etter den pågående synken.
+    while (imageSyncInProgress.current) {
+      if (!(await imageSyncInProgress.current)) return false;
+    }
+    if (!authenticated || !ownerId || !isCurrent() || publishPaused.current) return true;
+    if (draftSavingStopped.current || draftRestorePending.current) return true;
+    if (draftIdRef.current !== listingId) return false;
+    const run = (async () => {
+      const images = latestImages.current;
+      const remotes = new Map<string, RemoteImage>();
+      let uploaded = false;
+      const keepRemotes = (synced: boolean) => {
+        const update = (current: PendingImage[]) =>
+          current.map((image) => {
+            const remote = remotes.get(image.id);
+            return remote ? { ...image, remote: { ...remote, synced } } : image;
+          });
+        // Neste lagring kan fortsette før React har rendret opplastingsreferansene.
+        latestImages.current = update(latestImages.current);
+        setImages(update);
+      };
+      try {
+        // Én og én: opplastingen er rate-begrenset per bruker.
+        for (const image of images) {
+          const reusable = reusableRemote(image, listingId);
+          remotes.set(image.id, reusable ?? (await uploadDraftImage(listingId, image)));
+          uploaded ||= !reusable;
+          if (!isCurrent() || draftIdRef.current !== listingId) return false;
+        }
+        const refs = images.map((image, sortOrder) => {
+          const remote = remotes.get(image.id)!;
+          return {
+            id: remote.id,
+            storage_path: remote.path,
+            sort_order: sortOrder,
+            caption: image.caption?.trim() || null,
+            ai_generated: !!image.aiGenerated,
+          };
+        });
+        const signature = JSON.stringify([listingId, refs]);
+        if (signature !== lastImageSync.current) {
+          await syncDraftListingImages({
+            data: { expected_user_id: ownerId!, draftId: listingId, images: refs },
+          });
+          lastImageSync.current = signature;
+        }
+        if (!isCurrent()) return false;
+        if (uploaded || images.some((image) => !image.remote?.synced)) keepRemotes(true);
+        draftSaveMessageRef.current = null;
+        setDraftSaveMessage(null);
+        setDraftSaveError(false);
+        return true;
+      } catch (error) {
+        if (!isCurrent()) return false;
+        // Behold opplastingene, så neste forsøk ikke laster opp på nytt.
+        if (uploaded) keepRemotes(false);
+        draftSaveMessageRef.current = formatErrorMessage(
+          error,
+          "Bildene kunne ikke lagres i utkastet. De er beholdt på denne enheten. Prøv igjen senere.",
+        );
+        setDraftSaveMessage(draftSaveMessageRef.current);
+        setDraftSaveError(true);
+        return false;
+      }
+    })();
+    imageSyncInProgress.current = run;
+    try {
+      return await run;
+    } finally {
+      imageSyncInProgress.current = null;
+    }
+  }
+
+  /** Lagrer felt og bilder i serverutkastet. */
+  async function saveDraftWithImages(): Promise<string | null> {
+    const id = await saveDraftToSupabase();
+    if (!id) return null;
+    return (await syncDraftImages(id)) ? id : null;
+  }
+  const saveDraftWithImagesRef = useRef(saveDraftWithImages);
+  useIsomorphicLayoutEffect(() => {
+    saveDraftWithImagesRef.current = saveDraftWithImages;
+  });
+
   async function ensureDraftId(): Promise<string | null> {
     if (draftIdRef.current) return draftIdRef.current;
     return saveDraftToSupabase();
   }
-
-  useIsomorphicLayoutEffect(() => {
-    saveDraftToSupabaseRef.current = saveDraftToSupabase;
-  });
 
   async function retryDraftAfterConflict(): Promise<string | null> {
     if (draftSaveInProgress.current) await draftSaveInProgress.current;
@@ -483,7 +586,7 @@ export function useDraftAutosave(fields: DraftFields) {
   // Auto-save draft to Supabase every 30 seconds when form has enough data
   useEffect(() => {
     const interval = window.setInterval(() => {
-      void saveDraftToSupabaseRef.current();
+      void saveDraftWithImagesRef.current();
     }, 30_000);
     return () => window.clearInterval(interval);
   }, [
@@ -623,6 +726,7 @@ export function useDraftAutosave(fields: DraftFields) {
     saveGeneration.current += 1;
     latestLocalDraft.current = null;
     localDraftRevision.current += 1;
+    lastImageSync.current = null;
     removeItems(DRAFT_KEY, DRAFT_ID_KEY, DRAFT_UPDATED_AT_KEY);
     draftUpdatedAtRef.current = null;
     draftConflictRef.current = false;
@@ -693,6 +797,7 @@ export function useDraftAutosave(fields: DraftFields) {
     hasDraftData,
     flushLocalDraft,
     saveDraftToSupabase,
+    saveDraftWithImages,
     retryDraftAfterConflict,
     ensureDraftId,
     restoreDraft,

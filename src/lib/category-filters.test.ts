@@ -1,11 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  findInvalidDateAttribute,
+  normalizeDateAttributes,
   applyAttributeFilters,
   effectiveFiltersForCategory,
+  filterDependencyMet,
+  todayIsoDate,
+  searchFilterDependencyMet,
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
+  normalizeNumericAttributes,
+  findNonNumericAttribute,
   retainSearchAttributes,
   NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
@@ -275,7 +282,12 @@ describe("applyAttributeFilters", () => {
 describe("retainSearchAttributes", () => {
   const brand = f({ category_id: "main", key: "brand", type: "brand_select" });
   const model = f({ category_id: "main", key: "model", type: "model_select" });
-  const motor = f({ category_id: "main", key: "motor", type: "select" });
+  const motor = f({
+    category_id: "main",
+    key: "motor",
+    type: "select",
+    options: [{ value: "uten_motor", label_nb: "Uten motor" }],
+  });
   const hp = f({
     category_id: "main",
     key: "hp",
@@ -283,9 +295,72 @@ describe("retainSearchAttributes", () => {
     depends_on_key: "motor",
     depends_on_not_value: "uten_motor",
   });
-  const color = f({ category_id: "main", key: "color" });
+  const color = f({
+    category_id: "main",
+    key: "color",
+    options: [{ value: "rod", label_nb: "Rød" }],
+  });
   const filters = [brand, model, motor, hp, color];
   const range: AttributeFilterValue = { kind: "range", min: 100 };
+
+  it.each([
+    { kind: "select", value: "diesel" },
+    { kind: "multiselect", values: ["gass", "diesel"] },
+    { kind: "exclude", values: ["diesel"] },
+  ] as AttributeFilterValue[])("drops an option absent from the new category ($kind)", (value) => {
+    const fuel = f({
+      category_id: "other",
+      key: "fuel_type",
+      options: [{ value: "gass", label_nb: "Gass" }],
+    });
+    expect(retainSearchAttributes({ fuel_type: value }, [fuel], { dropUnknown: true })).toEqual({
+      kept: {},
+      dropped: ["fuel_type"],
+    });
+  });
+
+  it.each([
+    { kind: "select", value: "gass" },
+    { kind: "multiselect", values: ["gass"] },
+    { kind: "exclude", values: ["gass"] },
+  ] as AttributeFilterValue[])("keeps valid options in the new category ($kind)", (value) => {
+    const fuel = f({
+      category_id: "other",
+      key: "fuel_type",
+      options: [{ value: "gass", label_nb: "Gass" }],
+    });
+    expect(
+      retainSearchAttributes({ fuel_type: value }, [fuel], { dropUnknown: true }).kept,
+    ).toEqual({ fuel_type: value });
+  });
+
+  it("keeps reference-table brand and model values without static options", () => {
+    const values: Record<string, AttributeFilterValue> = {
+      brand: { kind: "select", value: "Volvo" },
+      model: { kind: "select", value: "XC60" },
+      hp: range,
+    };
+    expect(
+      retainSearchAttributes(values, [brand, model, { ...hp, depends_on_key: null }], {
+        dropUnknown: true,
+      }).kept,
+    ).toEqual(values);
+  });
+
+  it("drops dependencies after removing an invalid option, regardless of key order", () => {
+    const fuel = f({
+      category_id: "other",
+      key: "motor",
+      options: [{ value: "gass", label_nb: "Gass" }],
+    });
+    expect(
+      retainSearchAttributes(
+        { hp: range, motor: { kind: "select", value: "diesel" } },
+        [fuel, { ...hp, depends_on_value: "diesel", depends_on_not_value: null }],
+        { dropUnknown: true },
+      ).kept,
+    ).toEqual({});
+  });
 
   it("drops Modell once Merke is cleared", () => {
     const { kept, dropped } = retainSearchAttributes(
@@ -320,4 +395,210 @@ describe("retainSearchAttributes", () => {
     );
     expect(Object.keys(kept)).toEqual(["color"]);
   });
+});
+
+describe("normalisering av tallattributter (ekvivalensklasser)", () => {
+  const filters = [f({ category_id: "main", key: "year", type: "number" })];
+
+  it.each([
+    ["2020", 2020],
+    ["0", 0],
+    ["-12.5", -12.5],
+    ["150 000", 150000],
+    ["1\u00a0500", 1500],
+    ["12,5", 12.5],
+    ["12,50", 12.5],
+    ["1234,567", 1234.567],
+    [2020, 2020],
+  ])("normaliserer gyldig tall %j til %j", (year, expected) => {
+    const attributes = { year, brand: "2020" };
+    const normalized = normalizeNumericAttributes("sub", filters, byId, attributes);
+    expect(normalized).toEqual({ year: expected, brand: "2020" });
+    expect(attributes.year).toBe(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)).toBeNull();
+  });
+
+  it.each([
+    "",
+    "oops",
+    "12,500",
+    "-1,500",
+    "150.000",
+    "-1.500",
+    "æøå😀",
+    "0x10",
+    "Infinity",
+    "9".repeat(400),
+    true,
+    ["2020"],
+  ])("lar ugyldig tall %j bli avvist av valideringen", (year) => {
+    const normalized = normalizeNumericAttributes("sub", filters, byId, { year });
+    expect(normalized.year).toEqual(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)?.key).toBe("year");
+  });
+
+  it.each([null, undefined])("beholder et usatt valgfritt felt %j", (year) => {
+    const normalized = normalizeNumericAttributes("sub", filters, byId, { year });
+    expect(normalized.year).toBe(year);
+    expect(findNonNumericAttribute("sub", filters, byId, normalized)).toBeNull();
+  });
+
+  it("respekterer barnets filtertype og ignorerer andre kategorier", () => {
+    const overridden = [...filters, f({ category_id: "sub", key: "year", type: "select" })];
+    expect(normalizeNumericAttributes("sub", overridden, byId, { year: "2020" })).toEqual({
+      year: "2020",
+    });
+    expect(normalizeNumericAttributes("other", filters, byId, { year: "2020" })).toEqual({
+      year: "2020",
+    });
+  });
+});
+
+describe("datoattributter", () => {
+  const filters = [f({ category_id: "main", key: "next_eu_control", type: "date" })];
+  const extra = [{ key: "first_registration_date", label_nb: "Førstegangsregistrering" }];
+  const normalize = (attributes: Record<string, unknown>) =>
+    normalizeDateAttributes("sub", filters, byId, attributes, extra);
+  const findInvalid = (attributes: Record<string, unknown>) =>
+    findInvalidDateAttribute("sub", filters, byId, attributes, extra);
+
+  it("normaliserer ISO, norsk format og Excel-serienummer til ISO", () => {
+    expect(normalize({ next_eu_control: "2027-05-31" }).next_eu_control).toBe("2027-05-31");
+    expect(normalize({ next_eu_control: "1.5.2027" }).next_eu_control).toBe("2027-05-01");
+    // 46538 = 2027-05-31 i Excel
+    expect(normalize({ first_registration_date: 46538 }).first_registration_date).toBe(
+      "2027-05-31",
+    );
+    expect(normalize({ next_eu_control: "snart" }).next_eu_control).toBe("snart");
+  });
+
+  it("finner datoer som ikke er gyldig ISO", () => {
+    expect(findInvalid({ next_eu_control: "2027-05-31" })).toBeNull();
+    expect(findInvalid({ next_eu_control: "" })).toBeNull();
+    expect(findInvalid({ next_eu_control: "2027-13-01" })?.key).toBe("next_eu_control");
+    expect(findInvalid({ first_registration_date: "31.12" })?.label_nb).toBe(
+      "Førstegangsregistrering",
+    );
+    expect(findInvalid({ next_eu_control: 46538 })?.key).toBe("next_eu_control");
+  });
+
+  it("normaliserer Excel-serienummer som tekst (ekvivalensklasser og grenseverdier)", () => {
+    expect(normalize({ next_eu_control: " 46538 " }).next_eu_control).toBe("2027-05-31");
+    expect(normalize({ next_eu_control: "2958465" }).next_eu_control).toBe("9999-12-31");
+    for (const value of ["0", "-1", "2958466", "46538.5", "46538abc", "", "   "]) {
+      expect(normalize({ next_eu_control: value }).next_eu_control).toBe(value);
+    }
+    expect(findInvalid({ next_eu_control: "46538" })?.key).toBe("next_eu_control");
+  });
+
+  it("styres av filtertypen, ikke nøkkelen", () => {
+    const textFilters = [f({ category_id: "main", key: "next_eu_control", type: "text" })];
+    expect(findInvalidDateAttribute("sub", textFilters, byId, { next_eu_control: "snart" })).toBe(
+      null,
+    );
+    expect(
+      findInvalidDateAttribute("sub", filters, byId, { first_registration_date: "31.12" }),
+    ).toBeNull();
+  });
+});
+
+describe("alternativer til en frist (Mangler/Fritatt EU-kontroll)", () => {
+  const date = f({ category_id: "main", key: "next_eu_control", type: "date" });
+  const status = f({
+    category_id: "main",
+    key: "eu_control_status",
+    is_optional: true,
+    depends_on_key: "next_eu_control",
+    options: [
+      { value: "missing", label_nb: "Mangler EU-kontroll" },
+      { value: "exempt", label_nb: "Fritatt for EU-kontroll" },
+    ],
+  });
+  const filters = [date, status];
+  const missing = (attributes: Record<string, string>) =>
+    getMissingRequiredFilters("sub", filters, byId, attributes).map((x) => x.key);
+
+  afterEach(() => vi.useRealTimers());
+  beforeEach(() => vi.setSystemTime(new Date("2026-10-15T12:00:00")));
+
+  it("gjelder bare når datoen er tom eller passert (grenseverdier rundt i dag)", () => {
+    expect(filterDependencyMet(status, {})).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "" })).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-14" })).toBe(true);
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(false);
+    expect(filterDependencyMet(status, { next_eu_control: "2027-01-01" })).toBe(false);
+  });
+
+  it("regner «i dag» i norsk tid, også når prosessen går i UTC", () => {
+    // 00:30 i Oslo, men fortsatt 15. oktober i UTC (workeren).
+    vi.setSystemTime(new Date("2026-10-15T22:30:00Z"));
+    expect(todayIsoDate()).toBe("2026-10-16");
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(true);
+  });
+
+  it("krever dato i dag eller senere, med mindre et alternativ er valgt", () => {
+    expect(missing({})).toEqual(["next_eu_control"]);
+    expect(missing({ next_eu_control: "2026-10-14" })).toEqual(["next_eu_control"]);
+    expect(missing({ next_eu_control: "2026-10-15" })).toEqual([]);
+    expect(missing({ eu_control_status: "missing" })).toEqual([]);
+    expect(missing({ next_eu_control: "2026-01-01", eu_control_status: "exempt" })).toEqual([]);
+    // Et utdatert alternativ ved en fremtidig dato gjelder ikke, men datoen er gyldig.
+    expect(missing({ next_eu_control: "2027-01-01", eu_control_status: "missing" })).toEqual([]);
+  });
+
+  it("godtar fortsatt passerte datoer i datofelt uten alternativer", () => {
+    expect(
+      getMissingRequiredFilters("sub", [date], byId, { next_eu_control: "2020-01-01" }),
+    ).toEqual([]);
+  });
+
+  it("skjules i søket når tidligste dato er i dag eller senere", () => {
+    expect(searchFilterDependencyMet(status, {}, filters)).toBe(true);
+    expect(
+      searchFilterDependencyMet(
+        status,
+        { next_eu_control: { kind: "date_min", value: "2027-01-01" } },
+        filters,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("eldre fritaksfelt under klientovergangen", () => {
+  const filters = [
+    f({ category_id: "main", key: "brand", type: "brand_select", unit: "bil", is_optional: true }),
+    f({ category_id: "main", key: "next_eu_control", type: "date" }),
+    f({ category_id: "main", key: "eu_control_exempt", type: "boolean", is_optional: true }),
+    f({
+      category_id: "main",
+      key: "eu_control_status",
+      is_optional: true,
+      depends_on_key: "next_eu_control",
+    }),
+  ];
+
+  it("skjuler det gamle feltet bare når erstatningen finnes", () => {
+    expect(effectiveFiltersForCategory("sub", filters, byId).map((x) => x.key)).not.toContain(
+      "eu_control_exempt",
+    );
+    expect(
+      effectiveFiltersForCategory(
+        "sub",
+        filters.filter((x) => x.key !== "eu_control_status"),
+        byId,
+      ).map((x) => x.key),
+    ).toContain("eu_control_exempt");
+  });
+
+  it.each([
+    [true, []],
+    [false, ["next_eu_control"]],
+  ])(
+    "tolker eldre fritak %s ved publiseringsvalidering (beslutningstabell)",
+    (eu_control_exempt, expected) => {
+      expect(
+        getMissingRequiredFilters("sub", filters, byId, { eu_control_exempt }).map((x) => x.key),
+      ).toEqual(expected);
+    },
+  );
 });

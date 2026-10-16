@@ -5,6 +5,7 @@ import { z } from "zod";
 import { formatNok } from "@/lib/format";
 import { isValidWebPushSubscription } from "@/lib/web-push-validation";
 import { describeSafeError } from "@/lib/safe-error";
+import { VAPID_PUBLIC_KEY } from "@/lib/vapid";
 
 // The endpoint is invoked by an internal Postgres trigger via pg_net, which
 // sends a shared secret in the X-Push-Dispatch-Secret header (see the
@@ -107,11 +108,10 @@ async function dispatchPush(params: {
   const webpush = webpushModule.default ?? webpushModule;
 
   const subject = process.env.VAPID_SUBJECT || "mailto:kontakt@kaupet.no";
-  // Must match VAPID_PUBLIC_KEY in src/lib/push.ts — the client signs
-  // subscriptions against that key, so the server must sign with the
-  // matching private key or push services reject with InvalidSignature.
-  const publicKey =
-    "BPFo1ygL7dxhxhtTCPbE6b4qYkP9webql5QNaJuCReVeko8mzNCVyFunhDwIV95v4lKjHttAFgjxTN1zvsVvJnc";
+  // Same build-configured key the client subscribes with (src/lib/vapid.ts);
+  // VAPID_PRIVATE_KEY must be its pair, or push services reject with
+  // InvalidSignature.
+  const publicKey = VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!privateKey) {
     console.error("Missing VAPID configuration");

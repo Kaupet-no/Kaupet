@@ -1,4 +1,5 @@
 import type { PendingImage } from "@/components/image-uploader";
+import type { RemoteImage } from "./draft-image-sync";
 
 const DB_NAME = "kaupet-listing-drafts";
 const STORE_NAME = "images";
@@ -8,6 +9,8 @@ type StoredImage = {
   file: File;
   thumbFile: File;
   caption?: string;
+  aiGenerated?: boolean;
+  remote?: RemoteImage;
   sortOrder: number;
 };
 
@@ -67,6 +70,8 @@ export async function saveDraftImages(images: PendingImage[], actorKey = "guest"
     file: image.file,
     thumbFile: image.thumbFile,
     caption: image.caption,
+    aiGenerated: image.aiGenerated,
+    remote: image.remote,
     sortOrder,
   }));
   const result = await runTransaction("readwrite", (store) => store.put(stored, actorKey));
@@ -86,6 +91,8 @@ export async function loadDraftImages(actorKey = "guest"): Promise<PendingImage[
       file: image.file,
       thumbFile: image.thumbFile,
       caption: image.caption,
+      aiGenerated: image.aiGenerated,
+      remote: image.remote,
       previewUrl: URL.createObjectURL(image.file),
     }));
 }

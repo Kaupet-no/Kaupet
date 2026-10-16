@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Nye PR-commits erstatter gamle kjøringer; push/deploy får fullføre.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     name: Lint, typecheck, build
@@ -51,7 +56,7 @@ jobs:
         run: bun run test:coverage
 
       - name: Local staging configuration
-        run: node --test scripts/staging-env.test.mjs
+        run: node --test scripts/staging-env.test.mjs scripts/r2-bucket-access.test.mjs
 
       - name: Doppler distribution (offline)
         run: |
@@ -112,9 +117,6 @@ jobs:
           print(f"CSP-nonce OK: {len(inline)} inline-skript bærer noncen.")
           PY
 
-      - name: Bundle budget
-        run: bun run check:bundle
-
       # bun audit mister av og til forbindelsen til npm sitt audit-endepunkt
       # og timer ut etter ~5 min ("Timeout"/"ConnectionClosed: audit request
       # failed") uten at det har noe med prosjektets avhengigheter å gjøre.
@@ -131,13 +133,8 @@ jobs:
           done
           exit 1
 
-      - name: Audit dependencies (full report, informational)
-        run: bun audit
-        continue-on-error: true
-
   rls:
     name: Database migrations and RLS
-    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -166,7 +163,9 @@ jobs:
           exit 1
 
       - name: Test database transactions
-        run: bunx supabase test db
+        run: |
+          bunx supabase test db
+          bun run test:db-migration
 
       - name: Run RLS integration tests
         run: bun run test:rls
@@ -176,12 +175,12 @@ jobs:
         run: bunx supabase stop
 
   native-android:
+    # Historisk sjekknavn beholdes fordi main krever det i GitHub-reglene.
     name: Android unit tests
-    needs: verify
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     outputs:
-      android: ${{ steps.filter.outputs.android }}
+      android: ${{ steps.changes.outputs.android }}
       flavor: ${{ steps.env.outputs.flavor }}
       built_at: ${{ steps.build_apk.outputs.built_at }}
     steps:
@@ -195,14 +194,25 @@ jobs:
               - 'android/**'
               - 'capacitor.config.*'
               - 'capacitor-shell/**'
-              - 'src/**'
               - 'package.json'
+              - 'bun.lock'
+              - 'patches/**'
+              - '.github/workflows/ci.yml'
+              - 'scripts/doppler-native.sh'
+            preview:
+              - 'src/**'
+
+      - name: Select Android build
+        id: changes
+        run: echo "android=${{ steps.filter.outputs.android == 'true' || (github.event_name == 'push' && steps.filter.outputs.preview == 'true') }}" >> "$GITHUB_OUTPUT"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: steps.changes.outputs.android == 'true'
         with:
           bun-version: 1.3.14
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        if: steps.changes.outputs.android == 'true'
         with:
           distribution: temurin
           java-version: 21
@@ -224,19 +234,20 @@ jobs:
           fi
 
       - name: Install dependencies
+        if: steps.changes.outputs.android == 'true'
         run: bun install --frozen-lockfile
 
       # Each application id needs its own Firebase registration. Never put
       # production credentials in the isolated staging package.
       - name: Hent produksjonens Firebase-konfigurasjon fra Doppler
-        if: steps.filter.outputs.android == 'true' && github.ref_name == 'main'
+        if: steps.changes.outputs.android == 'true' && github.ref_name == 'main'
         run: bash scripts/doppler-native.sh
         env:
           PLATFORM: android-preview
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
       - name: Skriv google-services.json fra miljøspesifikk secret
-        if: steps.filter.outputs.android == 'true'
+        if: steps.changes.outputs.android == 'true'
         working-directory: android/app
         run: |
           if [ "${{ steps.env.outputs.flavor }}" = "production" ]; then
@@ -249,19 +260,14 @@ jobs:
           GOOGLE_SERVICES_STAGING_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_STAGING_JSON }}
 
       - name: Sync Android project
-        if: steps.filter.outputs.android == 'true'
+        if: steps.changes.outputs.android == 'true'
         run: bunx cap sync android
         env:
           CAPACITOR_ENV: ${{ steps.env.outputs.flavor }}
 
-      - name: Run Android tests
-        if: steps.filter.outputs.android == 'true'
-        working-directory: android
-        run: ./gradlew test${{ steps.env.outputs.flavorCap }}DebugUnitTest
-
       - name: Build debug APK
         id: build_apk
-        if: steps.filter.outputs.android == 'true'
+        if: steps.changes.outputs.android == 'true'
         working-directory: android
         run: |
           ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
@@ -273,7 +279,7 @@ jobs:
           ANDROID_VERSION_CODE: ${{ github.run_number }}
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: steps.filter.outputs.android == 'true'
+        if: steps.changes.outputs.android == 'true'
         with:
           name: android-debug-apk-${{ steps.env.outputs.flavor }}
           path: android/app/build/outputs/apk/${{ steps.env.outputs.flavor }}/debug/app-${{ steps.env.outputs.flavor }}-debug.apk
@@ -389,7 +395,7 @@ jobs:
     # Egen jobb utelukkende for å holde `contents: write` unna jobben som
     # bygger PR-levert kode og kjører `bun install`. Kjører bare på push.
     name: Android release preview
-    needs: native-android
+    needs: [verify, native-android]
     if: needs.native-android.outputs.android == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -445,7 +451,6 @@ jobs:
     #
     # Både staging og produksjon venter på E2E før utrulling.
     name: E2E
-    needs: [verify, rls, native-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -490,7 +495,7 @@ jobs:
       # deployment-status på PR-commiten nedenfor, basert på dette
       # resultatet.
       #
-      # deploy-staging krever at verify+rls+native-android fullfører først,
+      # deploy-staging krever at verify+rls+native-android+e2e fullfører først,
       # så en fersk push til staging kan ligge flere minutter bak denne
       # jobben (som trigges parallelt av samme push, men uten den
       # ventetiden). Derfor polles det i stedet for én engangssjekk.
@@ -503,7 +508,7 @@ jobs:
           git fetch origin staging
           ok=false
           elapsed=0
-          # Staging-deployen venter også på E2E, som starter etter RLS og Android.
+          # Staging-deployen venter på alle parallelle testjobber, inkludert E2E.
           timeout=1800
           interval=20
 

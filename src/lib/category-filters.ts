@@ -1,4 +1,6 @@
+import { format, isValid, parse } from "date-fns";
 import { z } from "zod";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 
 /** Minimal category shape needed for filter inheritance (avoids requiring slug/name). */
 export type CategoryNode = { id: string; parent_id: string | null };
@@ -41,7 +43,9 @@ export type FilterType =
   | "boolean"
   | "text"
   | "brand_select"
-  | "model_select";
+  | "model_select"
+  /** ISO-dato (`yyyy-MM-dd`) med datovelger; søkes som tidligste dato (`date_min`). */
+  | "date";
 
 export type FilterOption = { value: string; label_nb: string };
 
@@ -138,6 +142,7 @@ export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
   text: "Fritekst",
   brand_select: "Bilmerke (koblet)",
   model_select: "Bilmodell (koblet)",
+  date: "Dato",
 };
 
 /** Coerces a raw DB row (options is JSONB) into a typed CategoryFilter. */
@@ -173,6 +178,37 @@ export function normalizeFilter(row: {
   };
 }
 
+/**
+ * En avhengighet uten verdi (`depends_on_key` satt, begge verdiene null) gjør
+ * filteret til et alternativ til feltet det peker på — f.eks. «Mangler
+ * EU-kontroll» for Neste EU-kontroll. Alternativet gjelder når feltet er tomt
+ * eller en passert dato, og et valgt alternativ gjør feltet ikke påkrevd.
+ * Et datofelt med alternativer er en frist: en passert dato teller som ubesvart.
+ */
+export function isAlternativeFilter(
+  filter: Pick<CategoryFilter, "depends_on_key" | "depends_on_value" | "depends_on_not_value">,
+): boolean {
+  return (
+    !!filter.depends_on_key &&
+    filter.depends_on_value == null &&
+    filter.depends_on_not_value == null
+  );
+}
+
+/** Dagens dato som ISO (`yyyy-MM-dd`) i norsk tid — samme «i dag» som
+ * EU-triggeren i databasen, også i workeren som går i UTC. */
+export function todayIsoDate(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" });
+}
+
+function hasAttributeValue(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function isPassedDate(value: unknown): boolean {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && value < todayIsoDate();
+}
+
 /** Returns whether a filter's dependency (if any) is satisfied by the current
  * attribute values — e.g. Motorsport's "Gren"/"Klasse" only apply once
  * "Er bilen lisensiert?" is true. Filters without a dependency always apply. */
@@ -181,6 +217,10 @@ export function filterDependencyMet(
   attributes: Record<string, AttributeValue>,
 ): boolean {
   if (!filter.depends_on_key) return true;
+  if (isAlternativeFilter(filter)) {
+    const parent = attributes[filter.depends_on_key];
+    return parent === undefined || parent === null || parent === "" || isPassedDate(parent);
+  }
   if (filter.depends_on_not_value != null) {
     return String(attributes[filter.depends_on_key]) !== filter.depends_on_not_value;
   }
@@ -209,9 +249,29 @@ export function searchFilterDependencyMet(
   return filterDependencyMet(filter, raw === undefined ? {} : { [filter.depends_on_key]: raw });
 }
 
+/** Whether `filter`'s own options actually contain the value(s) held in
+ * `value` — used to disambiguate a shared attribute key (e.g. "fuel_type")
+ * between categories that define completely different vocabularies for it.
+ * Kinds without an option list (boolean/text/range) have nothing to
+ * validate against, so they're treated as a match by default. */
+export function searchFilterMatchesValue(
+  filter: CategoryFilter,
+  value: AttributeFilterValue | undefined,
+): boolean {
+  if (!value) return false;
+  // Merke og modell har ingen statisk opsjonsliste; verdiene kommer fra egne
+  // referansetabeller og skal ikke valideres mot `options` (KG-30-F02).
+  if (filter.type === "brand_select" || filter.type === "model_select") return true;
+  if (value.kind === "select") return !!filter.options?.some((o) => o.value === value.value);
+  if (value.kind === "multiselect" || value.kind === "exclude") {
+    return value.values.every((v) => filter.options?.some((o) => o.value === v));
+  }
+  return true;
+}
+
 /**
  * Keeps the search filter values that still apply under `filters`. Values
- * whose dependency no longer holds are dropped until stable, so clearing Merke
+ * with invalid options or dependencies are dropped until stable, so clearing Merke
  * also clears Modell. With `dropUnknown`, keys `filters` doesn't define are
  * dropped too — used when the category changes, so Farge survives a switch
  * between two categories that both have it while Rammestørrelse does not.
@@ -222,15 +282,29 @@ export function retainSearchAttributes(
   { dropUnknown = false }: { dropUnknown?: boolean } = {},
 ): { kept: Record<string, AttributeFilterValue>; dropped: string[] } {
   const byKey = new Map(filters.map((filter) => [filter.key, filter]));
+  return pruneUntilStable(values, (key, kept) => {
+    const filter = byKey.get(key);
+    return filter
+      ? searchFilterMatchesValue(filter, kept[key]) &&
+          searchFilterDependencyMet(filter, kept, filters)
+      : !dropUnknown;
+  });
+}
+
+/** Fjerner verdier `keep` avviser, gjentatt til resultatet er stabilt: en
+ * fjernet forutsetning kan gjøre et avhengig filter ugyldig. Felles for søk
+ * (retainSearchAttributes) og kjøpsønsker (pruneWtbCriteria). */
+export function pruneUntilStable<V>(
+  values: Record<string, V>,
+  keep: (key: string, kept: Record<string, V>) => boolean,
+): { kept: Record<string, V>; dropped: string[] } {
   const kept = { ...values };
   const dropped: string[] = [];
   let changed = true;
   while (changed) {
     changed = false;
     for (const key of Object.keys(kept)) {
-      const filter = byKey.get(key);
-      const keep = filter ? searchFilterDependencyMet(filter, kept, filters) : !dropUnknown;
-      if (keep) continue;
+      if (keep(key, kept)) continue;
       delete kept[key];
       dropped.push(key);
       changed = true;
@@ -296,7 +370,146 @@ export function effectiveFiltersForCategory(
       (a, b) => depthOf(a.category_id, categoriesById) - depthOf(b.category_id, categoriesById),
     );
   for (const f of ordered) byKey.set(f.key, f);
-  return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
+  const filters = Array.from(byKey.values());
+  const behavior = getCategoryBehavior(
+    (filters.find((f) => f.type === "brand_select")?.unit as VehicleBrandGroup | null) ?? null,
+  );
+  const legacyKeys = new Set(
+    behavior.legacyFilterAliases.filter((a) => byKey.has(a.replacementKey)).map((a) => a.key),
+  );
+  return filters.filter((f) => !legacyKeys.has(f.key)).sort((a, b) => a.sort_order - b.sort_order);
+}
+
+/** Tallstreng i norsk skrivemåte → tall: mellomrom som tusenskille
+ * («150 000») fjernes og desimalkomma («12,5») blir punktum. «12,500» og
+ * «150.000» kan være både desimal og tusenskille og gir null, så valideringen
+ * avviser dem. Samme regel som tallryddingen i 20261013170000. */
+export function parseNumericString(value: string): number | null {
+  const stripped = value.replace(/[\s\u00a0\u2009\u202f]/g, "");
+  if (/^-?\d{1,3}[.,]\d{3}$/.test(stripped)) return null;
+  const canonical = stripped.replace(/^(-?\d+),(\d+)$/, "$1.$2");
+  if (!/^-?[0-9]+(\.[0-9]+)?$/.test(canonical)) return null;
+  const parsed = Number(canonical);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Eldre importdata kan ha tallstrenger. Bare kategoriens effektive
+ * tallfelt konverteres; tekstvalg og ugyldige tall beholdes for validering. */
+export function normalizeNumericAttributes<T>(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, T>,
+): Record<string, T | number> {
+  const normalized: Record<string, T | number> = { ...attributes };
+  for (const filter of effectiveFiltersForCategory(categoryId, allFilters, categoriesById)) {
+    const value = normalized[filter.key];
+    if ((filter.type !== "number" && filter.type !== "range") || typeof value !== "string") {
+      continue;
+    }
+    const parsed = parseNumericString(value);
+    if (parsed !== null) normalized[filter.key] = parsed;
+  }
+  return normalized;
+}
+
+/** Et attributt som lagres som ISO-dato (`yyyy-MM-dd`). */
+export type DateAttribute = { key: string; label_nb: string };
+
+const ISO_DATE = "yyyy-MM-dd";
+/** Excel lagrer datoer som dager siden 1899-12-30. */
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
+
+function toIsoDate(value: unknown): string | null {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value < 1 || value > 2_958_465) return null;
+    return new Date(EXCEL_EPOCH_UTC + value * 86_400_000).toISOString().slice(0, 10);
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  // Filparseren leser også numeriske Excel-/CSV-celler som tekst.
+  if (/^\d+$/.test(text)) return toIsoDate(Number(text));
+  for (const pattern of [ISO_DATE, "d.M.yyyy"]) {
+    const parsed = parse(text, pattern, new Date(2000, 0, 1));
+    // `parse` godtar f.eks. «2027-5-1»; krev at formatet faktisk stemmer.
+    if (isValid(parsed) && /^\d{4}-\d{2}-\d{2}$|^\d{1,2}\.\d{1,2}\.\d{4}$/.test(text)) {
+      return format(parsed, ISO_DATE);
+    }
+  }
+  return null;
+}
+
+/** Datoattributtene for en kategori: filtre av typen `date`, pluss
+ * attributter uten filterrad som kategorien selv lagrer som dato
+ * (`CategoryBehavior.extraDateAttributes`). */
+function dateAttributesForCategory(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  extra: readonly DateAttribute[],
+): DateAttribute[] {
+  return [
+    ...effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
+      (f) => f.type === "date",
+    ),
+    ...extra,
+  ];
+}
+
+/** Gjør om datoattributter fra import (ISO, `31.12.2027`, Excel-serienummer)
+ * til ISO. Verdier som ikke kan tolkes står urørt, så
+ * `findInvalidDateAttribute` kan avvise dem med en tydelig melding. */
+export function normalizeDateAttributes<T>(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, T>,
+  extra: readonly DateAttribute[] = [],
+): Record<string, T | string> {
+  const normalized: Record<string, T | string> = { ...attributes };
+  for (const { key } of dateAttributesForCategory(categoryId, allFilters, categoriesById, extra)) {
+    const iso = toIsoDate(normalized[key]);
+    if (iso) normalized[key] = iso;
+  }
+  return normalized;
+}
+
+/** Første datoattributt som har en verdi, men ikke er en gyldig ISO-dato.
+ * Ugyldige datoer ødela tidligere visning og matching nedstrøms. */
+export function findInvalidDateAttribute(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+  extra: readonly DateAttribute[] = [],
+): DateAttribute | null {
+  return (
+    dateAttributesForCategory(categoryId, allFilters, categoriesById, extra).find(({ key }) => {
+      const value = attributes[key];
+      if (value === undefined || value === null || value === "") return false;
+      return typeof value !== "string" || toIsoDate(value) !== value;
+    }) ?? null
+  );
+}
+
+/**
+ * Første tallfelt (filtertype range/number) som har en verdi som ikke er et
+ * endelig tall. Søket og forsiden leser disse som tall; en lagret tekst som
+ * «oops» ble tidligere lest som feil for alle (KG-27-F02).
+ */
+export function findNonNumericAttribute(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+): CategoryFilter | null {
+  return (
+    effectiveFiltersForCategory(categoryId, allFilters, categoriesById).find((f) => {
+      if (f.type !== "range" && f.type !== "number") return false;
+      const v = attributes[f.key];
+      return v !== undefined && v !== null && (typeof v !== "number" || !Number.isFinite(v));
+    }) ?? null
+  );
 }
 
 /**
@@ -312,7 +525,24 @@ export function getMissingRequiredFilters(
   excludeKeys?: readonly string[],
 ): CategoryFilter[] {
   const excluded = excludeKeys ? new Set(excludeKeys) : null;
-  const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
+  const effective = effectiveFiltersForCategory(categoryId, allFilters, categoriesById);
+  const behavior = getCategoryBehavior(
+    (effective.find((f) => f.type === "brand_select")?.unit as VehicleBrandGroup | null) ?? null,
+  );
+  attributes = { ...attributes };
+  for (const alias of behavior.legacyFilterAliases) {
+    if (attributes[alias.replacementKey] == null && attributes[alias.key] === alias.value) {
+      attributes[alias.replacementKey] = alias.replacementValue;
+    }
+  }
+  const alternatives = effective.filter(isAlternativeFilter);
+  const answeredByAlternative = new Set(
+    alternatives
+      .filter((a) => filterDependencyMet(a, attributes) && hasAttributeValue(attributes[a.key]))
+      .map((a) => a.depends_on_key),
+  );
+  const hasAlternatives = (key: string) => alternatives.some((a) => a.depends_on_key === key);
+  const filters = effective.filter(
     // "range" is search-only, and "registration_number" is set by the
     // vehicle wizard itself (SVV lookup, or left unset for a manually
     // entered unregistered vehicle) rather than filled in by the user as a
@@ -324,6 +554,7 @@ export function getMissingRequiredFilters(
       !f.is_optional &&
       f.key !== "registration_number" &&
       !excluded?.has(f.key) &&
+      !answeredByAlternative.has(f.key) &&
       filterDependencyMet(f, attributes),
   );
   return filters.filter((f) => {
@@ -334,6 +565,11 @@ export function getMissingRequiredFilters(
       (typeof v !== "number" || !Number.isFinite(v) || v <= 0)
     ) {
       return true;
+    }
+    // En ugyldig dato (fra gammel fritekst) vises tom i datovelgeren; da
+    // skal den også telle som ikke utfylt.
+    if (f.type === "date") {
+      return toIsoDate(v) !== v || (hasAlternatives(f.key) && isPassedDate(v));
     }
     if (typeof v === "string") return v.trim() === "";
     if (Array.isArray(v)) return v.length === 0;
@@ -484,7 +720,7 @@ export type AttributeFilterValue =
   | { kind: "range"; min?: number; max?: number }
   | { kind: "text"; value: string }
   /** Earliest-acceptable ISO date (`yyyy-MM-dd`) — currently only used by
-   * `next_eu_control` ("Tidligst neste EU-kontroll"), matching listings whose
+   * filters of type `date` (e.g. `next_eu_control`), matching listings whose
    * date is on or after this one. Mirrors WtbDateMinValue's "minDate"
    * semantics (wtb-criteria-types.ts) for a sell-listing search filter. */
   | { kind: "date_min"; value: string }

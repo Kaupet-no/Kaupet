@@ -4,6 +4,7 @@ import {
   newImagesPerDayLimitMessage,
   newListingsPerDayLimitMessage,
 } from "@/lib/integration-limits";
+import { normalizeFilter } from "@/lib/category-filters";
 import type { BulkImportRow } from "./import-schema";
 import { syncListings, type SyncContext } from "./listing-sync.server";
 
@@ -139,6 +140,51 @@ describe("syncListings", () => {
         kaupetCode: "12345678",
       },
     ]);
+  });
+
+  it("normaliserer norske datoer til ISO og avviser datoer som ikke kan tolkes", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "created" }, error: null };
+      },
+    });
+    const dateFilter = normalizeFilter({
+      id: "f-eu",
+      category_id: categoryId,
+      key: "next_eu_control",
+      label_nb: "Neste EU-kontroll",
+      type: "date",
+      unit: null,
+      options: null,
+      sort_order: 0,
+      is_primary: false,
+      is_optional: true,
+    });
+    const results = await syncListings(
+      supabaseAdmin,
+      { ...makeContext(), filters: [dateFilter] },
+      {
+        importId,
+        rows: [
+          makeRow({
+            rowNumber: 2,
+            externalId: "ok",
+            attributes: { next_eu_control: "31.12.2027" },
+          }),
+          makeRow({ rowNumber: 3, externalId: "feil", attributes: { next_eu_control: "snart" } }),
+        ],
+        mode: "create",
+      },
+    );
+    expect(results[0]).toMatchObject({ status: "created" });
+    expect(JSON.stringify(rpc.mock.calls[0][0])).toContain('"next_eu_control":"2027-12-31"');
+    expect(results[1]).toMatchObject({
+      status: "failed",
+      error: "Neste EU-kontroll må være en dato, f.eks. 2027-05-31.",
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("dry_run sender _dry_run: true og skriver ikke kvote", async () => {
@@ -436,4 +482,71 @@ describe("syncListings", () => {
       error: "Annonsen kunne ikke opprettes. Prøv igjen senere.",
     });
   });
+});
+
+// KG-08-F01: MCP-standarden «nytt utkast» ble avvist av den delte synkvalideringen.
+describe("syncListings — utkast via MCP", () => {
+  const draftRow = () => makeRow({ status: "draft" as BulkImportRow["status"] });
+
+  it("oppretter ny annonse som utkast når allowDraftStatus er satt", async () => {
+    const supabaseAdmin = makeSupabaseAdmin({
+      rpcImpl: () => ({ data: { status: "created", listing_id: "listing-1" }, error: null }),
+    });
+    const [result] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+      allowDraftStatus: true,
+    });
+    expect(result.status).toBe("created");
+    const rpcArgs = (supabaseAdmin.rpc as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(rpcArgs._listing.status).toBe("draft");
+  });
+
+  it("avviser fortsatt utkast for REST/Excel og for eksisterende referanser", async () => {
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["external-1"],
+      rpcImpl: () => ({ data: { status: "updated", listing_id: "listing-1" }, error: null }),
+    });
+    const [rest] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+    });
+    const [existing] = await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [draftRow()],
+      mode: "upsert",
+      allowDraftStatus: true,
+    });
+    expect(rest.status).toBe("failed");
+    expect(existing.status).toBe("failed");
+    expect(supabaseAdmin.rpc).not.toHaveBeenCalled();
+  });
+});
+
+it.each(["40", "oops"])("synk validerer og normaliserer tallfeltet %j før RPC", async (width) => {
+  const ctx = makeContext();
+  ctx.filters = [
+    {
+      id: "f1",
+      category_id: categoryId,
+      key: "width_cm",
+      label_nb: "Bredde",
+      type: "number",
+      sort_order: 0,
+    } as SyncContext["filters"][number],
+  ];
+  const admin = makeSupabaseAdmin({
+    rpcImpl: (_name, args) => {
+      expect(args._listing).toMatchObject({ attributes: { width_cm: 40, brand: "2020" } });
+      return { data: { status: "created", listing_id: "listing-1" }, error: null };
+    },
+  });
+  const result = await syncListings(admin, ctx, {
+    importId,
+    mode: "create",
+    rows: [makeRow({ attributes: { width_cm: width, brand: "2020" } })],
+  });
+  expect(result[0].status).toBe(width === "40" ? "created" : "failed");
 });

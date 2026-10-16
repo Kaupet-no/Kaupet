@@ -190,6 +190,8 @@ function WebLanding({
     setPriceMin,
     priceMax,
     setPriceMax,
+    includeFree,
+    setIncludeFree,
     subcatRef,
     activeFilters,
     currentCategoryIds,
@@ -208,7 +210,7 @@ function WebLanding({
     conditions: [],
     min: priceMin,
     max: priceMax,
-    includeFree: true,
+    includeFree,
   });
 
   const resultCount = useLandingResultCount({
@@ -216,6 +218,7 @@ function WebLanding({
     filterValues,
     priceMin,
     priceMax,
+    includeFree,
   });
 
   // Sortering for kategori-feeden som erstatter "Populært akkurat nå" m.fl.
@@ -684,7 +687,9 @@ function WebLanding({
                           hideCondition
                           min={priceMin}
                           max={priceMax}
-                          onPriceChange={(mn, mx) => {
+                          includeFree={includeFree}
+                          onPriceChange={(mn, mx, free) => {
+                            setIncludeFree(free);
                             setPriceMin(mn);
                             setPriceMax(mx);
                           }}
@@ -692,6 +697,7 @@ function WebLanding({
                             setFilterValues({});
                             setPriceMin(undefined);
                             setPriceMax(undefined);
+                            setIncludeFree(true);
                           }}
                           counts={facetCounts}
                           footerLeft={

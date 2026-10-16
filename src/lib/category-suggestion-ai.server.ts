@@ -336,6 +336,7 @@ function allowedPhotoAttribute(
   if (
     !filter ||
     filter.type === "text" ||
+    filter.type === "date" ||
     filter.type === "range" ||
     filter.type === "multiselect"
   ) {

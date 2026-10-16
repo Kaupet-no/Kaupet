@@ -1,3 +1,5 @@
+// Ingen inline skript eller eventhandlere: siden serveres under streng CSP
+// (script-src uten unsafe-inline). En tom href laster samme adresse på nytt.
 export function renderErrorPage(): string {
   return `<!doctype html>
 <html lang="nb">
@@ -14,7 +16,7 @@ export function renderErrorPage(): string {
       h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
       p { color: #4b5563; margin: 0 0 1.5rem; }
       .actions { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
-      a, button { padding: 0.5rem 1rem; border-radius: 0.375rem; font: inherit; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
+      a { padding: 0.5rem 1rem; border-radius: 0.375rem; font: inherit; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
       .primary { background: #1f3d34; color: #fff; }
       .secondary { background: #fff; color: #111; border-color: #d1d5db; }
     </style>
@@ -25,7 +27,7 @@ export function renderErrorPage(): string {
       <h1>Siden lastet ikke</h1>
       <p>Noe gikk galt hos oss. Prøv å laste siden på nytt, eller gå tilbake til forsiden.</p>
       <div class="actions">
-        <button class="primary" onclick="location.reload()">Prøv igjen</button>
+        <a class="primary" href="">Prøv igjen</a>
         <a class="secondary" href="/">Gå til forsiden</a>
       </div>
     </div>

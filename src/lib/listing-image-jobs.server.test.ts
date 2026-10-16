@@ -57,32 +57,49 @@ function fakeTransformer(bytes = new Uint8Array(100)): ImageTransformer {
   return { transform: vi.fn().mockResolvedValue({ bytes, contentType: "image/webp" }) };
 }
 
-function buildAdmin(options: { registrationError?: Error; insertError?: Error } = {}) {
-  const updates: Array<{ table: string; payload: unknown }> = [];
+function buildAdmin(
+  options: { registrationError?: Error; insertError?: Error; completion?: "done" | "stale" } = {},
+) {
+  const updates: Array<{ table: string; payload: unknown; filters: Record<string, unknown> }> = [];
   const registered: string[] = [];
+  const completions: Array<Record<string, unknown>> = [];
   const admin = {
-    rpc: (name: string, args: { _key: string }) => {
+    rpc: (name: string, args: Record<string, unknown>) => {
       uploadEvents.push(name);
       if (name === "register_standard_upload_object") {
-        registered.push(args._key);
+        registered.push(args._key as string);
         return Promise.resolve({ data: null, error: options.registrationError ?? null });
+      }
+      if (name === "complete_listing_image_job") {
+        uploadEvents.push("insert");
+        completions.push(args);
+        if (options.insertError) return Promise.resolve({ data: null, error: options.insertError });
+        // Fullføring skriver «done» atomisk sammen med bilderaden.
+        updates.push({
+          table: "listing_image_jobs",
+          payload: { status: "done", customer_error: null, internal_error: null },
+          filters: {},
+        });
+        return Promise.resolve({ data: options.completion ?? "done", error: null });
       }
       throw new Error(`unexpected RPC: ${name}`);
     },
     from: (table: string) => ({
-      insert: (payload: unknown) => {
-        uploadEvents.push("insert");
-        return Promise.resolve({ data: null, error: options.insertError ?? null, payload, table });
+      update: (payload: unknown) => {
+        const entry = { table, payload, filters: {} as Record<string, unknown> };
+        updates.push(entry);
+        const chain = {
+          eq: (column: string, value: unknown) => {
+            entry.filters[column] = value;
+            return chain;
+          },
+          then: (resolve: (value: unknown) => unknown) => resolve({ data: null, error: null }),
+        };
+        return chain;
       },
-      update: (payload: unknown) => ({
-        eq: () => {
-          updates.push({ table, payload });
-          return Promise.resolve({ data: null, error: null });
-        },
-      }),
     }),
   };
-  return { admin, updates, registered };
+  return { admin, updates, registered, completions };
 }
 
 describe("processListingImageJob", () => {
@@ -494,5 +511,38 @@ describe("processListingImageJob", () => {
 
   it("CustomerImageError kan konstrueres direkte (brukt av klassifiseringstester over)", () => {
     expect(new CustomerImageError("x").message).toBe("x");
+  });
+
+  // KG-10-F01: bilderad og «done» skrives atomisk og bare for gjeldende claim.
+  it("fullfører via complete_listing_image_job med claimets forsøksnummer", async () => {
+    const { admin, completions } = buildAdmin();
+    await processListingImageJob(job({ attempts: 3 }), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(completions).toHaveLength(1);
+    expect(completions[0]).toMatchObject({ _job_id: "job-1", _attempt: 3 });
+  });
+
+  it("skriver ingenting mer når jobben er erstattet eller tatt over", async () => {
+    const { admin, updates } = buildAdmin({ completion: "stale" });
+    const result = await processListingImageJob(job(), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(result.outcome).toBe("stale");
+    expect(updates.filter((u) => (u.payload as { status?: string }).status !== "done")).toEqual([]);
+  });
+
+  it("feilstatus skrives bare mens claimet fortsatt eier jobben", async () => {
+    const { admin, updates } = buildAdmin({ insertError: new Error("database nede") });
+    await processListingImageJob(job({ attempts: 2 }), {
+      supabaseAdmin: admin as never,
+      transformer: fakeTransformer(),
+      fetchImpl: vi.fn().mockResolvedValue(jpegResponse()),
+    });
+    expect(updates[0]?.filters).toEqual({ id: "job-1", status: "processing", attempts: 2 });
   });
 });

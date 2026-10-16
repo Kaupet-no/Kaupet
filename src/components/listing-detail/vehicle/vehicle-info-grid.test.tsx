@@ -69,4 +69,21 @@ describe("VehicleInfoGrid", () => {
 
     expect(container.firstChild).toBeNull();
   });
+  it.each([
+    ["missing", "Mangler EU-kontroll"],
+    ["exempt", "Fritatt for EU-kontroll"],
+  ] as const)("viser %s der fristen ellers står", (status, label) => {
+    render(
+      <VehicleInfoGrid
+        vehicleLookup={null}
+        mileageKm={null}
+        euControlStatus={status}
+        attributes={{ next_eu_control: "2025-01-31" }}
+      />,
+    );
+
+    expect(screen.getByText("EU-kontroll")).toBeTruthy();
+    expect(screen.getByText(label)).toBeTruthy();
+    expect(screen.queryByText("Frist EU-kontroll")).toBeNull();
+  });
 });

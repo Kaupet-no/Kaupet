@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PendingImage } from "@/components/image-uploader";
 import { useDraftAutosave } from "./use-draft-autosave";
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -16,9 +17,17 @@ vi.mock("@/lib/toast", () => ({
 
 const saveDraftListingMock = vi.fn();
 const discardDraftListingMock = vi.fn();
+const syncDraftListingImagesMock = vi.fn();
 vi.mock("@/lib/listings.functions", () => ({
   saveDraftListing: (...args: unknown[]) => saveDraftListingMock(...args),
   discardDraftListing: (...args: unknown[]) => discardDraftListingMock(...args),
+  syncDraftListingImages: (...args: unknown[]) => syncDraftListingImagesMock(...args),
+}));
+
+const uploadListingImageMock = vi.fn();
+vi.mock("@/lib/storage", () => ({
+  uploadListingImage: (...args: unknown[]) => uploadListingImageMock(...args),
+  uploadListingImageThumb: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/vehicle/vehicle-title", () => ({
@@ -68,6 +77,10 @@ beforeEach(() => {
   localStorage.clear();
   saveDraftListingMock.mockReset();
   discardDraftListingMock.mockReset();
+  syncDraftListingImagesMock.mockReset().mockResolvedValue({ already_published: false });
+  uploadListingImageMock
+    .mockReset()
+    .mockImplementation(async ({ listingId }: { listingId: string }) => `${listingId}/bilde.webp`);
   loadDraftImagesMock.mockReset().mockResolvedValue([]);
   saveDraftImagesMock.mockReset().mockResolvedValue(undefined);
   transferDraftImagesMock.mockReset().mockResolvedValue(undefined);
@@ -276,6 +289,179 @@ describe("useDraftAutosave", () => {
       expect.objectContaining({ title: "Sykkel til salgs" }),
     );
     expect(result.current.draftId).toBe("draft-123");
+  });
+
+  it("laster opp bilder til serverutkastet én gang og gjenbruker dem ved neste lagring", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+    const file = new File(["x"], "a.webp", { type: "image/webp" });
+    const { result } = renderHook(() => {
+      const [images, setImages] = useState<PendingImage[]>([
+        { id: "img-1", file, thumbFile: file, previewUrl: "blob:a", caption: " Front " },
+      ]);
+      return useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages });
+    });
+    await waitFor(() => expect(result.current.draftChecked).toBe(true));
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBe("draft-1");
+    });
+    expect(uploadListingImageMock).toHaveBeenCalledOnce();
+    expect(syncDraftListingImagesMock).toHaveBeenCalledWith({
+      data: {
+        expected_user_id: "user-1",
+        draftId: "draft-1",
+        images: [
+          {
+            id: expect.any(String),
+            storage_path: "draft-1/bilde.webp",
+            sort_order: 0,
+            caption: "Front",
+            ai_generated: false,
+          },
+        ],
+      },
+    });
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBe("draft-1");
+    });
+    expect(uploadListingImageMock).toHaveBeenCalledOnce();
+    expect(syncDraftListingImagesMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])(
+    "synker bildeendringer etter uendrede lagringer (har bilder: %s)",
+    async (hasImages) => {
+      saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+      const file = new File(["x"], "a.webp", { type: "image/webp" });
+      const image: PendingImage = { id: "img-a", file, thumbFile: file, previewUrl: "blob:a" };
+      const { result } = renderHook(() => {
+        const [images, setImages] = useState<PendingImage[]>(hasImages ? [image] : []);
+        return {
+          setImages,
+          draft: useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages }),
+        };
+      });
+      await waitFor(() => expect(result.current.draft.draftChecked).toBe(true));
+      await act(async () => {
+        await result.current.draft.saveDraftWithImages();
+      });
+      await act(async () => {
+        await result.current.draft.saveDraftWithImages();
+      });
+      act(() => result.current.setImages(hasImages ? [] : [image]));
+      await act(async () => {
+        expect(await result.current.draft.saveDraftWithImages()).toBe("draft-1");
+      });
+      expect(syncDraftListingImagesMock.mock.calls.at(-1)?.[0].data.images).toHaveLength(
+        hasImages ? 0 : 1,
+      );
+    },
+  );
+
+  it.each(["legger til", "fjerner", "endrer bildetekst"])(
+    "lagrer nyeste bildeliste ved avslutning når brukeren %s under opplasting",
+    async (change) => {
+      saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+      let finishUpload!: (path: string) => void;
+      uploadListingImageMock.mockReturnValueOnce(
+        new Promise<string>((resolve) => {
+          finishUpload = resolve;
+        }),
+      );
+      const file = new File(["x"], "a.webp", { type: "image/webp" });
+      const image: PendingImage = { id: "img-a", file, thumbFile: file, previewUrl: "blob:a" };
+      const { result } = renderHook(() => {
+        const [images, setImages] = useState<PendingImage[]>([image]);
+        return {
+          setImages,
+          draft: useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages }),
+        };
+      });
+      await waitFor(() => expect(result.current.draft.draftChecked).toBe(true));
+      let background!: Promise<string | null>;
+      act(() => {
+        background = result.current.draft.saveDraftWithImages();
+      });
+      await waitFor(() => expect(uploadListingImageMock).toHaveBeenCalledOnce());
+      act(() =>
+        result.current.setImages(
+          change === "fjerner"
+            ? []
+            : change === "legger til"
+              ? [image, { ...image, id: "img-b" }]
+              : [{ ...image, caption: "Blå sykkel æøå 🚲" }],
+        ),
+      );
+      let saveOnExit!: Promise<string | null>;
+      act(() => {
+        saveOnExit = result.current.draft.saveDraftWithImages();
+      });
+      await act(async () => {
+        finishUpload("draft-1/a.webp");
+        await background;
+        expect(await saveOnExit).toBe("draft-1");
+      });
+      const savedImages = syncDraftListingImagesMock.mock.calls.at(-1)?.[0].data.images;
+      expect(savedImages).toHaveLength(change === "fjerner" ? 0 : change === "legger til" ? 2 : 1);
+      if (change !== "fjerner") {
+        expect(savedImages[0].id).toBe(
+          syncDraftListingImagesMock.mock.calls[0][0].data.images[0].id,
+        );
+      }
+      if (change === "endrer bildetekst") expect(savedImages[0].caption).toBe("Blå sykkel æøå 🚲");
+    },
+  );
+
+  it("beholder bildene lokalt og melder feil når bildesynken feiler", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+    syncDraftListingImagesMock.mockRejectedValue(new Error("nede"));
+    const file = new File(["x"], "a.webp", { type: "image/webp" });
+    const { result } = renderHook(() => {
+      const [images, setImages] = useState<PendingImage[]>([
+        { id: "img-1", file, thumbFile: file, previewUrl: "blob:a" },
+      ]);
+      return {
+        images,
+        draft: useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages }),
+      };
+    });
+    await waitFor(() => expect(result.current.draft.draftChecked).toBe(true));
+
+    await act(async () => {
+      expect(await result.current.draft.saveDraftWithImages()).toBeNull();
+    });
+    expect(result.current.draft.draftSaveError).toBe(true);
+    // Opplastingen er husket, så neste forsøk laster ikke opp på nytt.
+    expect(result.current.images[0].remote).toMatchObject({
+      path: "draft-1/bilde.webp",
+      synced: false,
+    });
+  });
+
+  it("fjerner lagringsfeilen når bildesynken lykkes etter nettverksfeil", async () => {
+    saveDraftListingMock.mockResolvedValue({ id: "draft-1", updated_at: "2026-10-13T10:00:00Z" });
+    syncDraftListingImagesMock.mockRejectedValueOnce(new Error("Nettverket er nede"));
+    const file = new File(["x"], "a.webp", { type: "image/webp" });
+    const { result } = renderHook(() => {
+      const [images, setImages] = useState<PendingImage[]>([
+        { id: "img-1", file, thumbFile: file, previewUrl: "blob:a" },
+      ]);
+      return useDraftAutosave({ ...baseFields, title: "Sykkel til salgs", images, setImages });
+    });
+    await waitFor(() => expect(result.current.draftChecked).toBe(true));
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBeNull();
+    });
+    expect(result.current.draftSaveError).toBe(true);
+    expect(result.current.draftSaveMessage).toBeTruthy();
+
+    await act(async () => {
+      expect(await result.current.saveDraftWithImages()).toBe("draft-1");
+    });
+    expect(result.current.draftSaveError).toBe(false);
+    expect(result.current.draftSaveMessage).toBeNull();
   });
 
   it("KG-18-F02: går videre uten svar forkaster lokalt utkast, men ikke serverutkastet", async () => {

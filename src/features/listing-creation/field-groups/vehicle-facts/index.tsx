@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { AttributeFields, useAllCategoryFilters } from "@/components/attribute-fields";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { format } from "date-fns";
+import { EuControlDateField } from "@/components/eu-control-date-field";
 import {
   Select,
   SelectContent,
@@ -215,6 +217,7 @@ function SubtitleField({
 const VEHICLE_FACTS_EDITED_KEYS: Record<string, true> = { drive_type: true, axle_config: true };
 
 const VEHICLE_LOOKUP_FILTER_KEY_SET = new Set<string>(VEHICLE_LOOKUP_FILTER_KEYS);
+const NO_KEYS: string[] = [];
 
 const VEHICLE_LOOKUP_SNAPSHOT_KEYS = new Set<string>([
   ...VEHICLE_LOOKUP_FILTER_KEYS,
@@ -308,12 +311,22 @@ function OptionalVehicleTechnicalFields({
       ) : (
         <div className="space-y-2">
           <Label htmlFor={`vehicle-${activeField.key}`}>{activeField.label_nb}</Label>
-          <Input
-            id={`vehicle-${activeField.key}`}
-            value={activeField.value}
-            onChange={(event) => onRawChange(activeField.key, event.target.value)}
-            aria-label={activeField.label_nb}
-          />
+          {activeField.key === "first_registration_date" ? (
+            <EuControlDateField
+              id={`vehicle-${activeField.key}`}
+              value={activeField.value}
+              min="1900-01-01"
+              max={format(new Date(), "yyyy-MM-dd")}
+              onChange={(value) => onRawChange(activeField.key, value)}
+            />
+          ) : (
+            <Input
+              id={`vehicle-${activeField.key}`}
+              value={activeField.value}
+              onChange={(event) => onRawChange(activeField.key, event.target.value)}
+              aria-label={activeField.label_nb}
+            />
+          )}
         </div>
       )}
     </div>
@@ -358,6 +371,15 @@ function MissingVehicleTechnicalFields(props: WizardSharedProps) {
     () => new Map(props.categories.map((category) => [category.id, category])),
     [props.categories],
   );
+  /* Et påkrevd felt som først er vist under «må fylle ut», skal bli stående
+     der også etter at brukeren har fylt det inn — ellers forsvinner det ved
+     første tastetrykk inn i «Tekniske detaljer». Huskes per kjennemerke. */
+  const registrationNumber = lookup?.registrationNumber ?? null;
+  const [shownRequired, setShownRequired] = useState<{ reg: string | null; keys: string[] }>({
+    reg: registrationNumber,
+    keys: [],
+  });
+  const stickyKeys = shownRequired.reg === registrationNumber ? shownRequired.keys : NO_KEYS;
   const { optionalTechnicalFilters, missingRequiredFilterKeys } = useMemo(() => {
     if (!props.vehicleRegistered || !lookup) {
       return { optionalTechnicalFilters: [], missingRequiredFilterKeys: [] };
@@ -369,18 +391,35 @@ function MissingVehicleTechnicalFields(props: WizardSharedProps) {
       categoriesById,
     );
     const optionalLookupKeys = new Set<string>(VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS);
-    const missingRequiredKeys = getMissingRequiredFilters(
-      props.categoryId,
-      allFilters ?? [],
-      categoriesById,
-      props.attributes,
-    )
+    const isRequiredLookupKey = (key: string) =>
+      VEHICLE_LOOKUP_FILTER_KEY_SET.has(key) &&
+      key !== "drive_type" &&
+      !VEHICLE_FACTS_EDITED_KEYS[key] &&
+      !optionalLookupKeys.has(key);
+    const missingNow = new Set(
+      getMissingRequiredFilters(
+        props.categoryId,
+        allFilters ?? [],
+        categoriesById,
+        props.attributes,
+      )
+        .map((filter) => filter.key)
+        .filter(isRequiredLookupKey),
+    );
+    // Nøkler SVV ikke leverte i det opprinnelige oppslaget (wizard-state som
+    // overlever stegbytte), så feltet også står øverst når brukeren kommer
+    // tilbake hit etter å ha fylt det inn.
+    const original = props.vehicleLookupResult as Record<string, unknown> | null;
+    const missingRequiredKeys = effectiveFilters
       .filter(
         (filter) =>
-          VEHICLE_LOOKUP_FILTER_KEY_SET.has(filter.key) &&
-          filter.key !== "drive_type" &&
-          !VEHICLE_FACTS_EDITED_KEYS[filter.key] &&
-          !optionalLookupKeys.has(filter.key),
+          missingNow.has(filter.key) ||
+          (filter.type !== "range" &&
+            !filter.is_optional &&
+            isRequiredLookupKey(filter.key) &&
+            filterDependencyMet(filter, props.attributes) &&
+            (stickyKeys.includes(filter.key) ||
+              (!!original && filter.key in original && original[filter.key] == null))),
       )
       .map((filter) => filter.key);
     const missingRequiredKeySet = new Set(missingRequiredKeys);
@@ -405,7 +444,15 @@ function MissingVehicleTechnicalFields(props: WizardSharedProps) {
     props.categoryId,
     lookup,
     props.vehicleRegistered,
+    props.vehicleLookupResult,
+    stickyKeys,
   ]);
+  if (
+    shownRequired.reg !== registrationNumber ||
+    missingRequiredFilterKeys.some((key) => !stickyKeys.includes(key))
+  ) {
+    setShownRequired({ reg: registrationNumber, keys: missingRequiredFilterKeys });
+  }
   const editableLookup = persistedLookup ?? lookup;
   const hasDriveOrAxleField = hasDriveOrAxleFieldForCategory(
     props.categories,

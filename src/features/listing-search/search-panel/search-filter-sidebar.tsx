@@ -11,7 +11,8 @@ import {
   type AdvancedSearchValue,
 } from "@/lib/advanced-search-value";
 import type { Category } from "@/lib/categories";
-import type { AttributeFilterValue } from "@/lib/category-filters";
+import { retainSearchAttributes, type AttributeFilterValue } from "@/lib/category-filters";
+import { useRetainCategoryAttributes } from "@/features/listing-search/use-retain-category-attributes";
 import { priceBoundsForMax } from "@/lib/filter-range-bounds";
 import { SearchFilterSections } from "./filter-sections";
 import type { SearchPanelResultsContext } from "./search-panel";
@@ -48,14 +49,15 @@ export function SearchFilterSidebar({
   const { applied, onApply } = results;
   const [group, setGroup] = useState<"basis" | "details" | "more">("basis");
 
+  // Samme regler som SearchPanel: ved kategoribytte beholdes verdier den
+  // nye kategorien også har, og avhengige filtre fjernes sammen med
+  // forutsetningen (KG-30-F01).
+  const { categoryNotice, changeCategories } = useRetainCategoryAttributes(categories);
   const setValue = (next: React.SetStateAction<AdvancedSearchValue>) => {
     const value = typeof next === "function" ? next(applied.value) : next;
     onApply({
       value,
-      attributes:
-        value.categories.join("\0") === applied.value.categories.join("\0")
-          ? applied.attributes
-          : {},
+      attributes: changeCategories(applied.value.categories, value.categories, applied.attributes),
     });
   };
 
@@ -63,7 +65,12 @@ export function SearchFilterSidebar({
     const attributes = { ...applied.attributes };
     if (value === undefined) delete attributes[key];
     else attributes[key] = value;
-    onApply({ ...applied, attributes });
+    onApply({
+      ...applied,
+      attributes: results.attributeFilters
+        ? retainSearchAttributes(attributes, results.attributeFilters).kept
+        : attributes,
+    });
   };
   const priceBounds = priceBoundsForMax(results.availablePriceMax, {
     min: applied.value.min ?? undefined,
@@ -128,11 +135,7 @@ export function SearchFilterSidebar({
       label: categoryLabel,
       onRemove: results.categoryLocked
         ? undefined
-        : () =>
-            onApply({
-              value: { ...applied.value, categories: [], catMode: "any" },
-              attributes: {},
-            }),
+        : () => setValue({ ...applied.value, categories: [], catMode: "any" }),
     });
   }
   if (applied.value.location.lat != null) {
@@ -346,6 +349,7 @@ export function SearchFilterSidebar({
             )}
           >
             <SearchFilterSections
+              categoryNotice={categoryNotice}
               layout="expanded"
               desktopGroup={inline ? undefined : group}
               value={applied.value}

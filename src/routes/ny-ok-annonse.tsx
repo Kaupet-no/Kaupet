@@ -23,7 +23,11 @@ import {
   WTB_FREETEXT_KEY,
   type WtbAttributeMap,
 } from "@/features/wtb/wtb-criteria-types";
-import { wtbCriteriaSummary, wtbLocationLabel } from "@/features/wtb/wtb-criteria-presentation";
+import {
+  pruneWtbCriteria,
+  wtbCriteriaSummary,
+  wtbLocationLabel,
+} from "@/features/wtb/wtb-criteria-presentation";
 import { WtbListingPreview, type WtbPreviewSection } from "@/features/wtb/wtb-listing-preview";
 import {
   WtbExistingMatchesBanner,
@@ -456,7 +460,10 @@ function NewWtbPage() {
 
   const shouldBlockNav = !published && (title.trim().length > 0 || stepIndex > 0);
   const blocker = useBlocker({
-    shouldBlockFn: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
+    // Samme pathname = et overlay (f.eks. GuestPublishSheet) rydder sin egen history-oppføring
+    // ved lukking — se useOverlayHistory. Det er ikke en sideforlatelse.
+    shouldBlockFn: ({ current, next }) =>
+      !bypassNavigationBlockerRef.current && shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
     enableBeforeUnload: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
   });
@@ -561,9 +568,24 @@ function NewWtbPage() {
     }
   }
 
+  /** Bytter kategori og fjerner kriterier den nye kategorien ikke har, så
+   * gamle, skjulte krav ikke stopper treff (KG-23-F02). */
+  function setCategory(id: string | null) {
+    setValue("category_id", id, { shouldValidate: true });
+    // Uten lastede filtre og kategorier vet vi ikke hvilke kriterier den nye
+    // kategorien har; da beholdes alle i stedet for å tømmes.
+    if (id === categoryId || !allFilters || allCategories.length === 0) return;
+    const next = pruneWtbCriteria(
+      attributes,
+      effectiveFiltersForCategory(id, allFilters, categoriesById),
+    );
+    setAttributes(next);
+    setCheckedKeys((keys) => keys.filter((key) => key in next || !(key in attributes)));
+  }
+
   /** Kategoristeget: tittelen er allerede validert på forrige steg. */
   function chooseCategory(id: string | null) {
-    setValue("category_id", id, { shouldValidate: true });
+    setCategory(id);
     goNext();
   }
 
@@ -571,7 +593,7 @@ function NewWtbPage() {
    * setter eksplisitt kurs mot kriteriene — indeksen fra den forkortede
    * listen peker på et annet steg i den fulle. */
   function confirmCategory(id: string | null) {
-    if (id) setValue("category_id", id, { shouldValidate: true });
+    if (id) setCategory(id);
     setCategoryConfirmed(true);
     goToStep(baseSteps.indexOf("attributes"));
   }

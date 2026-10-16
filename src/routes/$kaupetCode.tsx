@@ -36,11 +36,11 @@ import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import type { SellerIdentity } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
+import { ListingLoadError } from "@/components/listing-detail/listing-load-error";
 import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
 import { ProffRelatedListings } from "@/components/listing-detail/proff-listing-presentation";
 import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { formatErrorMessage } from "@/lib/errors";
 import {
   genericBrandFilterFor,
   isBoatCategory,
@@ -267,26 +267,37 @@ export const Route = createFileRoute("/$kaupetCode")({
     // every other address this catch-all route sees, which was never an ad
     // to begin with (a typo, a stale link, a route that doesn't exist).
     const reason = (data as { reason?: "listing" | "unknown" } | undefined)?.reason;
-    const isListing = reason === "listing";
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-        <h1 className="font-display text-2xl">
-          {isListing ? "Fant ikke annonsen" : "Fant ikke siden"}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {isListing
-            ? "Annonsen kan ha blitt fjernet eller solgt."
-            : "Siden du prøvde å åpne finnes ikke."}
-        </p>
-        <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-          <Button className="mt-6" variant="outline">
-            Se flere annonser
-          </Button>
-        </Link>
-      </div>
-    );
+    return <RouteNotFound isListing={reason === "listing"} />;
   },
 });
+
+/** Annonsen fantes da loaderen kjørte, men klientens query finner den ikke
+ * (fjernet i mellomtiden). Vises som «ikke funnet», ikke som lastefeil. */
+class ListingNotFoundError extends Error {
+  constructor() {
+    super("Annonsen finnes ikke");
+  }
+}
+
+function RouteNotFound({ isListing }: { isListing: boolean }) {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+      <h1 className="font-display text-2xl">
+        {isListing ? "Fant ikke annonsen" : "Fant ikke siden"}
+      </h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {isListing
+          ? "Annonsen kan ha blitt fjernet eller solgt."
+          : "Siden du prøvde å åpne finnes ikke."}
+      </p>
+      <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+        <Button className="mt-6" variant="outline">
+          Se flere annonser
+        </Button>
+      </Link>
+    </div>
+  );
+}
 
 function RootSlugPage() {
   const loaderData = Route.useLoaderData();
@@ -316,21 +327,13 @@ function ListingErrorBoundary({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   console.error("[listing route] error", describeSafeError(error));
   return (
-    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-      <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {formatErrorMessage(error, "Prøv på nytt eller gå tilbake til forsiden.")}
-      </p>
-      <Button
-        className="mt-6"
-        onClick={() => {
-          router.invalidate();
-          reset();
-        }}
-      >
-        Prøv på nytt
-      </Button>
-    </div>
+    <ListingLoadError
+      error={error}
+      onRetry={() => {
+        router.invalidate();
+        reset();
+      }}
+    />
   );
 }
 
@@ -416,18 +419,18 @@ function ListingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.promotion, search.promo_id]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["listing", kaupetCode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption, ai_generated), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error("Annonsen finnes ikke");
+      if (!data) throw new ListingNotFoundError();
 
       // organizations has commercial columns (selected_plan, proff_access_until,
       // ...) that must not be publicly readable — organizations_public is a
@@ -502,6 +505,9 @@ function ListingDetailPage() {
           : null,
       };
     },
+    // Et nytt forsøk finner ikke en fjernet annonse. Ellers samme ene forsøk
+    // som QueryClient-standarden (`retry: 1` i src/router.tsx).
+    retry: (failureCount, error) => !(error instanceof ListingNotFoundError) && failureCount < 1,
   });
   const organization = data?.organization ?? null;
   const hasEffectiveOrganizationProff = organization?.has_active_proff ?? false;
@@ -691,7 +697,9 @@ function ListingDetailPage() {
     });
   }, [data?.id, data?.seller_id, logView, user?.id]);
 
-  if (isLoading) {
+  // Et nytt forsøk etter feil holder queryen i feilstatus (isLoading er
+  // false); vis lasting så «Prøv på nytt» gir respons.
+  if (isLoading || (!data && isFetching)) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
@@ -715,7 +723,11 @@ function ListingDetailPage() {
       </div>
     );
   }
-  if (!data) return null;
+  // Feil ved senere refetch beholder cachet annonse; bare uten data vises feilen.
+  if (!data) {
+    if (error instanceof ListingNotFoundError) return <RouteNotFound isListing />;
+    return error ? <ListingLoadError error={error} onRetry={() => void refetch()} /> : null;
+  }
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
   const attributes = (data.attributes ?? {}) as Record<string, unknown>;

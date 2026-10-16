@@ -8,6 +8,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
   effectiveFiltersForCategory,
+  findNonNumericAttribute,
+  normalizeNumericAttributes,
+  findInvalidDateAttribute,
   getMissingRequiredFilters,
   normalizeFilter,
   isBoatCategory,
@@ -19,7 +22,7 @@ import {
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { getCategoryBehavior } from "@/lib/category-behavior";
+import { getCategoryBehavior, type CategoryBehavior } from "@/lib/category-behavior";
 import { assertUserNotRateLimited } from "@/lib/rate-limit.server";
 import {
   effectiveFlowForCategory,
@@ -31,6 +34,8 @@ import {
   type OrganizationListingLocation,
 } from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Json } from "@/integrations/supabase/types";
+import { MAX_LISTING_PRICE_NOK } from "@/lib/constants";
 
 const LISTING_CREATE_LIMIT_MESSAGE =
   "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.";
@@ -286,6 +291,49 @@ function validatePartFitment(
     throw new ClientError("Årsmodell fra kan ikke være høyere enn årsmodell til.", 400);
   }
 }
+function assertAttributeFormats(
+  categoryId: string | null,
+  filters: ReturnType<typeof normalizeFilter>[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+  behavior: CategoryBehavior,
+) {
+  const invalid = findNonNumericAttribute(categoryId, filters, categoriesById, attributes);
+  if (invalid) throw new ClientError(`${invalid.label_nb} må være et tall.`, 400);
+  const invalidDate = findInvalidDateAttribute(
+    categoryId,
+    filters,
+    categoriesById,
+    attributes,
+    behavior.extraDateAttributes,
+  );
+  if (invalidDate) throw new ClientError(`${invalidDate.label_nb} må være en gyldig dato.`, 400);
+}
+
+/** Kategorireglene annonsevalideringene trenger. Uten dem kan vi ikke vite
+ * hva som er påkrevd: kast i stedet for å validere mot tomme regler og
+ * publisere en ufullstendig annonse (KG-16-F02). */
+async function loadCategoryRules(supabaseAdmin: SupabaseClient, scope: string) {
+  const [filters, categories, flows] = await Promise.all([
+    supabaseAdmin
+      .from("category_filters")
+      .select(
+        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+      ),
+    supabaseAdmin.from("categories").select("id, parent_id"),
+    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
+  ]);
+  const rulesError = filters.error ?? categories.error ?? flows.error;
+  if (rulesError) throw await toClientError(scope, rulesError);
+  return {
+    normalizedFilters: (filters.data ?? []).map(normalizeFilter),
+    categoriesById: new Map<string, CategoryNode>(
+      (categories.data ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    ),
+    flowRows: (flows.data ?? []) as CategoryFlowRow[],
+  };
+}
+
 async function validateExistingListingForPublish(
   supabaseAdmin: SupabaseClient,
   listing: ListingMutationRow,
@@ -307,7 +355,7 @@ async function validateExistingListingForPublish(
     (listing.price_nok == null ||
       !Number.isInteger(listing.price_nok) ||
       listing.price_nok < 0 ||
-      listing.price_nok > 10_000_000)
+      listing.price_nok > MAX_LISTING_PRICE_NOK)
   ) {
     throw new ClientError("Oppgi en gyldig pris før annonsen publiseres.", 400);
   }
@@ -318,40 +366,29 @@ async function validateExistingListingForPublish(
     throw new ClientError("Annonsens tilstand er ugyldig.", 400);
   }
 
-  const [
-    { data: filterRows, error: filterError },
-    { data: categoryRows, error: categoryError },
-    { data: flowRows, error: flowError },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("category_filters")
-      .select(
-        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-      ),
-    supabaseAdmin.from("categories").select("id, parent_id"),
-    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
-  ]);
-  if (filterError) {
-    throw await toClientError("republishListing.filters", filterError);
-  }
-  if (categoryError) {
-    throw await toClientError("republishListing.categories", categoryError);
-  }
-  if (flowError) {
-    throw await toClientError("republishListing.flows", flowError);
-  }
-
-  const categoriesById = new Map<string, CategoryNode>(
-    (categoryRows ?? []).map((category) => [category.id as string, category as CategoryNode]),
+  const { normalizedFilters, categoriesById, flowRows } = await loadCategoryRules(
+    supabaseAdmin,
+    "republishListing.rules",
   );
-  const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
   const categoryBehavior = getCategoryBehavior(
     vehicleCategoryGroupFor(listing.category_id, normalizedFilters, categoriesById),
     isBoatCategory(listing.category_id, normalizedFilters, categoriesById),
   );
   const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
   if (!attributesResult.success) throw new ClientError("Annonsens attributter er ugyldige.", 400);
-  const attributes = attributesResult.data;
+  const attributes = normalizeNumericAttributes(
+    listing.category_id,
+    normalizedFilters,
+    categoriesById,
+    attributesResult.data,
+  );
+  assertAttributeFormats(
+    listing.category_id,
+    normalizedFilters,
+    categoriesById,
+    attributes,
+    categoryBehavior,
+  );
 
   if (categoryBehavior.requiresCategoryFilterValues) {
     const missing = getMissingRequiredFilters(
@@ -367,18 +404,52 @@ async function validateExistingListingForPublish(
     validatePartFitment(listing.category_id, normalizedFilters, categoriesById, attributes);
   }
 
-  const { fieldGroups } = effectiveFlowForCategory(
-    listing.category_id,
-    (flowRows ?? []) as CategoryFlowRow[],
-    categoriesById,
-  );
+  const { fieldGroups } = effectiveFlowForCategory(listing.category_id, flowRows, categoriesById);
   const fieldGroupError = validateRequiredFieldGroups(
     fieldGroups,
     { condition: listing.condition, can_ship: listing.can_ship },
     categoryBehavior,
   );
   if (fieldGroupError) throw new Error(fieldGroupError);
+  return attributes;
 }
+
+const listingImageRefsSchema = z
+  .array(
+    z.object({
+      id: z.string().uuid(),
+      storage_path: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
+      sort_order: z.number().int().min(0).max(99),
+      caption: z.string().trim().max(140).nullable(),
+      ai_generated: z.boolean().optional(),
+    }),
+  )
+  .max(100);
+
+/** Knytter allerede opplastede bilder til et serverutkast, med samme
+ * avstemming som publiseringen (sync_listing_images). */
+export const syncDraftListingImages = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        expected_user_id: z.string().uuid().optional(),
+        draftId: z.string().uuid(),
+        images: listingImageRefsSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    assertDraftActor(data.expected_user_id, context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: result, error } = await supabaseAdmin.rpc("sync_draft_listing_images", {
+      _listing_id: data.draftId,
+      _user_id: context.userId,
+      _images: data.images,
+    });
+    if (error) throw await toClientError("database", error);
+    return z.object({ already_published: z.boolean() }).parse(result);
+  });
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -398,7 +469,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
           .nullable()
           .optional(),
         is_free: z.boolean().optional(),
-        price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+        price_nok: z.number().int().min(0).max(MAX_LISTING_PRICE_NOK).nullable().optional(),
         postal_code: z
           .string()
           .regex(/^\d{4}$/)
@@ -562,19 +633,7 @@ export const createListing = createServerFn({ method: "POST" })
       .object({
         expected_user_id: z.string().uuid().optional(),
         expected_organization_id: z.string().uuid().nullable().optional(),
-        images: z
-          .array(
-            z.object({
-              id: z.string().uuid(),
-              storage_path: z
-                .string()
-                .regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|jxl)$/iu),
-              sort_order: z.number().int().min(0).max(99),
-              caption: z.string().trim().max(140).nullable(),
-            }),
-          )
-          .max(100)
-          .optional(),
+        images: listingImageRefsSchema.optional(),
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
         subtitle: z.string().trim().max(80).nullable().optional(),
@@ -582,7 +641,7 @@ export const createListing = createServerFn({ method: "POST" })
         category_id: z.string().uuid(),
         condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable(),
         is_free: z.boolean(),
-        price_nok: z.number().int().min(0).max(10_000_000).nullable(),
+        price_nok: z.number().int().min(0).max(MAX_LISTING_PRICE_NOK).nullable(),
         postal_code: z
           .string()
           .regex(/^\d{4}$/)
@@ -623,46 +682,40 @@ export const createListing = createServerFn({ method: "POST" })
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
 
-    const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
-      supabaseAdmin
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        ),
-      supabaseAdmin.from("categories").select("id, parent_id"),
-      supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
-    ]);
-    const categoriesById = new Map<string, CategoryNode>(
-      (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    const { normalizedFilters, categoriesById, flowRows } = await loadCategoryRules(
+      supabaseAdmin,
+      "database",
     );
-    const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
+    const attributes = normalizeNumericAttributes(
+      data.category_id,
+      normalizedFilters,
+      categoriesById,
+      data.attributes ?? {},
+    );
     const categoryBehavior = getCategoryBehavior(
       vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
       isBoatCategory(data.category_id, normalizedFilters, categoriesById),
     );
     const missing = categoryBehavior.requiresCategoryFilterValues
-      ? getMissingRequiredFilters(
-          data.category_id,
-          normalizedFilters,
-          categoriesById,
-          data.attributes ?? {},
-          [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
-        )
+      ? getMissingRequiredFilters(data.category_id, normalizedFilters, categoriesById, attributes, [
+          ...VEHICLE_EQUIPMENT_FILTER_KEYS,
+          ...categoryBehavior.requiredFilterExclusions,
+        ])
       : [];
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
+    assertAttributeFormats(
+      data.category_id,
+      normalizedFilters,
+      categoriesById,
+      attributes,
+      categoryBehavior,
+    );
     if (categoryBehavior.requiresCategoryFilterValues) {
-      validatePartFitment(
-        data.category_id,
-        normalizedFilters,
-        categoriesById,
-        data.attributes ?? {},
-      );
+      validatePartFitment(data.category_id, normalizedFilters, categoriesById, attributes);
     }
 
-    // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
-    const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
     const { fieldGroups } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
     const fieldGroupError = validateRequiredFieldGroups(
       fieldGroups,
@@ -690,7 +743,7 @@ export const createListing = createServerFn({ method: "POST" })
       known_issues: data.known_issues ?? null,
       no_known_issues: !!data.no_known_issues,
       maintenance_history: data.maintenance_history ?? null,
-      ...(data.attributes !== undefined && { attributes: data.attributes }),
+      ...(data.attributes !== undefined && { attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
     };
@@ -824,9 +877,19 @@ export const republishListing = createServerFn({ method: "POST" })
     if (!["draft", "archived", "sold", "expired"].includes(listing.status)) {
       throw new ClientError("Annonsen kan ikke publiseres på nytt fra denne statusen.", 409);
     }
-    await validateExistingListingForPublish(supabaseAdmin, listing);
+    const attributes = await validateExistingListingForPublish(supabaseAdmin, listing);
     if (listing.status !== "draft") {
       await assertListingCreationAllowed(userId, LISTING_PUBLISH_LIMIT_MESSAGE);
+    } else if (listing.organization_id) {
+      // Endringsrett (can_update) er ikke opprettingsrett: et bedriftsutkast
+      // publiseres med samme kontroll som createListing (KG-16-F01).
+      const ownership = await resolveListingOwnership(
+        supabaseAdmin,
+        userId,
+        listing.category_id,
+        listing.organization_location_id,
+      );
+      assertDraftOrganization(listing.organization_id, ownership.organization_id);
     }
 
     const now = new Date().toISOString();
@@ -835,16 +898,23 @@ export const republishListing = createServerFn({ method: "POST" })
     const { data: updated, error } = await supabaseAdmin
       .from("listings")
       .update({
+        attributes,
         status: "active",
         published_at: now,
         expires_at: expiresAt,
       })
       .eq("id", data.id)
       .eq("status", listing.status)
+      .eq("updated_at", listing.updated_at)
       .select("id, status, published_at, expires_at")
-      .single();
+      .maybeSingle();
     if (error) {
       throw await toClientError("republishListing.update", error, { listing_id: data.id });
+    }
+    // Ingen rad: annonsen ble endret (eller fikk ny status) etter at den ble
+    // validert, så publiseringen hadde vært basert på utdaterte data.
+    if (!updated) {
+      throw new ClientError("Annonsen ble endret samtidig. Last siden på nytt og prøv igjen.", 409);
     }
 
     return updated;
@@ -890,14 +960,103 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
     // must not use service-role to reveal a draft/disabled listing's code —
     // same visibility RLS gives everyone else. See
     // the internal security review, L-13.
+    // Synligheten er listing_is_public (aktiv, eller solgt de siste 30
+    // dagene), samme kontrakt som RLS og /$kaupetCode (KG-16-F03).
     const { data: row, error } = await supabaseAdmin
       .from("listings")
-      .select("kaupet_code")
+      .select("kaupet_code, status, sold_at")
       .eq("id", data.listing_id)
-      .eq("status", "active")
+      .in("status", ["active", "sold"])
       .maybeSingle();
     if (error) {
       throw await toClientError("database", error);
     }
-    return { kaupet_code: row?.kaupet_code ?? null };
+    if (!row) return { kaupet_code: null };
+    const { data: isPublic, error: publicError } = await supabaseAdmin.rpc("listing_is_public", {
+      _status: row.status,
+      _sold_at: row.sold_at,
+    });
+    if (publicError) {
+      throw await toClientError("database", publicError);
+    }
+    return { kaupet_code: isPublic === true ? row.kaupet_code : null };
+  });
+
+/**
+ * Lagrer attributter (og ev. ny kategori) for en eksisterende annonse fra
+ * inline-redigeringen. Samme tall-/datokontroll som opprettelse og
+ * publisering; skrivingen går som brukeren, så RLS avgjør tilgang og
+ * hvilken kategori annonsen kan flyttes til.
+ */
+export const updateListingAttributes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        attributes: z.record(z.string(), z.unknown()),
+        /** Nøkler brukeren har tømt (KG-22-F01). */
+        removedKeys: z.array(z.string()).optional(),
+        /** Satt ved kategoribytte: attributtene erstattes i stedet for å flettes. */
+        category_id: z.string().uuid().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: current, error: readError } = await context.supabase
+      .from("listings")
+      .select("category_id, attributes")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (readError) throw await toClientError("updateListingAttributes.read", readError);
+    if (!current) throw new ClientError("Annonsen finnes ikke.", 404);
+    const categoryId = data.category_id ?? current.category_id;
+
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { normalizedFilters, categoriesById } = await loadCategoryRules(
+      supabaseAdmin,
+      "database",
+    );
+    // Bare det brukeren sender valideres: en eldre ugyldig verdi i et annet
+    // felt skal ikke sperre redigering av resten.
+    const patch = normalizeNumericAttributes(
+      categoryId,
+      normalizedFilters,
+      categoriesById,
+      data.attributes,
+    );
+    assertAttributeFormats(
+      categoryId,
+      normalizedFilters,
+      categoriesById,
+      patch,
+      getCategoryBehavior(
+        vehicleCategoryGroupFor(categoryId, normalizedFilters, categoriesById),
+        isBoatCategory(categoryId, normalizedFilters, categoriesById),
+      ),
+    );
+
+    let attributes: Record<string, unknown> = patch;
+    if (!data.category_id) {
+      // Flere inline-paneler skriver til samme JSON-kolonne, så flett med
+      // det som ligger der.
+      attributes = { ...((current.attributes as Record<string, unknown>) ?? {}), ...patch };
+      for (const key of data.removedKeys ?? []) {
+        if (!(key in patch)) delete attributes[key];
+      }
+    }
+
+    // RLS kan la en UPDATE uten tilgang lykkes uten å treffe noe (KG-22-F03).
+    const { data: updated, error } = await context.supabase
+      .from("listings")
+      .update({
+        attributes: attributes as Json,
+        ...(data.category_id && { category_id: data.category_id }),
+      })
+      .eq("id", data.id)
+      .select("id");
+    if (error) throw await toClientError("updateListingAttributes", error, { listing_id: data.id });
+    if (updated?.length !== 1) {
+      throw new ClientError("Endringen ble ikke lagret. Last siden på nytt og prøv igjen.", 409);
+    }
   });

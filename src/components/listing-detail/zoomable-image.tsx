@@ -60,11 +60,14 @@ type Props = {
   alt: string;
   /** Kalles når zoomtilstanden endres — brukes til å skru av Emblas dra-gest. */
   onZoomChange: (zoomed: boolean) => void;
+  /** Bildet er gjeldende slide. Et inaktivt bilde nullstiller zoomen, så en
+   * gammel zoom ikke blir liggende og eie gesten når man kommer tilbake. */
+  active: boolean;
   /** Sveip ned forbi terskelen. */
   onDismiss: () => void;
 };
 
-export function ZoomableImage({ src, alt, onZoomChange, onDismiss }: Props) {
+export function ZoomableImage({ src, alt, onZoomChange, active, onDismiss }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const lastTap = useRef(0);
@@ -79,6 +82,16 @@ export function ZoomableImage({ src, alt, onZoomChange, onDismiss }: Props) {
   useEffect(() => {
     onZoomChange(zoomed);
   }, [zoomed, onZoomChange]);
+
+  // Nullstill ved overgang til inaktiv (justert under render, ikke i effekt).
+  const [wasActive, setWasActive] = useState(active);
+  if (wasActive !== active) {
+    setWasActive(active);
+    if (!active) {
+      setT(IDENTITY);
+      setDragY(0);
+    }
+  }
 
   /** Klientkoordinat → koordinat relativt til containerens senter. */
   function rel(p: Point): Point {

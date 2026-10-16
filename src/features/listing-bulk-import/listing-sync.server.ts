@@ -5,6 +5,10 @@ import {
   getMissingRequiredFilters,
   isBoatCategory,
   normalizeFilter,
+  normalizeNumericAttributes,
+  findNonNumericAttribute,
+  findInvalidDateAttribute,
+  normalizeDateAttributes,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -83,7 +87,8 @@ function safeRowError(message: string): string {
   if (
     message.startsWith("Fyll inn:") ||
     message.startsWith("Velg ") ||
-    message.startsWith("Legg til ")
+    message.startsWith("Legg til ") ||
+    / må være (et tall|en dato, f\.eks\. \d{4}-\d{2}-\d{2})\.$/.test(message)
   ) {
     return message;
   }
@@ -286,6 +291,13 @@ export async function loadSyncContext(
   };
 }
 
+function behaviorFor(categoryId: string, ctx: SyncContext) {
+  return getCategoryBehavior(
+    vehicleCategoryGroupFor(categoryId, ctx.filters, ctx.categoriesById),
+    isBoatCategory(categoryId, ctx.filters, ctx.categoriesById),
+  );
+}
+
 function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null {
   const category = resolveCategory(row.category, ctx.categories);
   if (!category) return "Kategorien finnes ikke. Bruk kategorinavnet eller slug-en fra malen.";
@@ -294,10 +306,17 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
   }
 
   const attributes = row.attributes;
-  const behavior = getCategoryBehavior(
-    vehicleCategoryGroupFor(category.id, ctx.filters, ctx.categoriesById),
-    isBoatCategory(category.id, ctx.filters, ctx.categoriesById),
+  const invalid = findNonNumericAttribute(category.id, ctx.filters, ctx.categoriesById, attributes);
+  if (invalid) return `${invalid.label_nb} må være et tall.`;
+  const behavior = behaviorFor(category.id, ctx);
+  const invalidDate = findInvalidDateAttribute(
+    category.id,
+    ctx.filters,
+    ctx.categoriesById,
+    attributes,
+    behavior.extraDateAttributes,
   );
+  if (invalidDate) return `${invalidDate.label_nb} må være en dato, f.eks. 2027-05-31.`;
   const missing = behavior.requiresCategoryFilterValues
     ? getMissingRequiredFilters(category.id, ctx.filters, ctx.categoriesById, attributes, [
         ...VEHICLE_EQUIPMENT_FILTER_KEYS,
@@ -325,12 +344,27 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
 export function validateSyncRow(
   row: BulkImportRow,
   ctx: SyncContext,
+  allowDraftStatus = false,
 ): { ok: true; row: BulkImportRow } | { ok: false; error: string } {
-  const schemaResult = bulkImportRowSchema.safeParse(row);
+  // Excel-/REST-kontrakten godtar bare active/sold/archived. MCP kan i tillegg
+  // opprette en ny annonse som utkast (KG-08-F01); `syncListings` avviser
+  // utkast for eksisterende referanser.
+  const isDraft = allowDraftStatus && (row.status as string) === "draft";
+  const schemaResult = bulkImportRowSchema.safeParse(isDraft ? { ...row, status: undefined } : row);
   if (!schemaResult.success) {
     return { ok: false, error: schemaResult.error.issues.map((issue) => issue.message).join(" ") };
   }
   const normalized = normalizeBulkImportRow(schemaResult.data, row.rowNumber);
+  if (isDraft) (normalized as { status?: string }).status = "draft";
+  const category = resolveCategory(normalized.category, ctx.categories);
+  const categoryId = category?.id ?? null;
+  normalized.attributes = normalizeDateAttributes(
+    categoryId,
+    ctx.filters,
+    ctx.categoriesById,
+    normalizeNumericAttributes(categoryId, ctx.filters, ctx.categoriesById, normalized.attributes),
+    categoryId ? behaviorFor(categoryId, ctx).extraDateAttributes : [],
+  );
   const validationError = validateRowFields(normalized, ctx);
   if (validationError) return { ok: false, error: safeRowError(validationError) };
   return { ok: true, row: normalized };
@@ -421,9 +455,11 @@ export async function syncListings(
     rows: BulkImportRow[];
     mode: "create" | "upsert";
     dryRun?: boolean;
+    /** Bare MCP: tillat `status: "draft"` ved opprettelse av ny annonse. */
+    allowDraftStatus?: boolean;
   },
 ): Promise<ListingSyncResult[]> {
-  const { importId, rows, mode, dryRun = false } = params;
+  const { importId, rows, mode, dryRun = false, allowDraftStatus = false } = params;
 
   const externalIds = Array.from(
     new Set(rows.map((row) => String(row.externalId ?? "").trim()).filter(Boolean)),
@@ -450,12 +486,20 @@ export async function syncListings(
       batch.map(async (row): Promise<ListingSyncResult> => {
         const rowNumber = row.rowNumber;
         const externalId = String(row.externalId ?? "");
-        const validated = validateSyncRow(row, ctx);
+        const validated = validateSyncRow(row, ctx, allowDraftStatus);
         if (!validated.ok) {
           return { rowNumber, externalId, status: "failed", error: validated.error };
         }
         const normalized = validated.row;
         const wouldCreate = !existingRefs.has(normalized.externalId);
+        if (!wouldCreate && (normalized.status as string) === "draft") {
+          return {
+            rowNumber,
+            externalId: normalized.externalId,
+            status: "failed",
+            error: "Bare nye annonser kan lagres som utkast.",
+          };
+        }
         if (wouldCreate && (normalized.status === "sold" || normalized.status === "archived")) {
           return {
             rowNumber,

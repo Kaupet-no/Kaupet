@@ -312,6 +312,17 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 
 ## 8. CI/CD
 
+`verify`, `rls`, `native-android` og `e2e` kjører parallelt. Begge deployjobber
+venter på alle fire. Nye commits på samme PR avbryter eldre PR-kjøringer;
+push-kjøringer og deploy får fullføre.
+
+Android-jobben beholder sjekknavnet `Android unit tests` fordi main krever
+det i GitHub-reglene, men kontrollerer APK-bygg. Den eneste lokale
+Gradle-enhetstesten var en eksempeltest og er fjernet. Instrumenterte
+`androidTest`-tester kjøres ikke av denne jobben. PR-er bygger ved endringer
+i Android, Capacitor, shell, avhengigheter eller native CI-oppsett. På push
+bygges og publiseres også preview ved endringer i `src/`.
+
 Én workflow, `.github/workflows/ci.yml`, kjører på pull request og push mot
 `main` og `staging`:
 
@@ -319,7 +330,7 @@ Fullstendig liste over variabler med forklaring: `.env.example` og
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `verify`          | Formatering, grensesjekker, RLS-tabellinventar, lint, typecheck, enhetstester med dekningskrav, bygg og røyktest i `workerd` |
 | `rls`             | RLS-tester mot en midlertidig lokal Supabase-stack                                                                           |
-| `native-android`  | Android-enhetstester og debug-APK                                                                                            |
+| `native-android`  | Debug-APK ved native-endringer; push bygger også preview ved webendringer                                                    |
 | `e2e`             | Playwright mot egen lokal stack. Kreves før både staging- og produksjonsdeploy                                               |
 | `staging-gate`    | På PR mot `main`: krever vellykket staging-deploy av samme innhold                                                           |
 | `deploy-staging`  | Push til `staging`: bygger og deployer `kaupet-no-staging`                                                                   |

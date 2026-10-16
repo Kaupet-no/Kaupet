@@ -179,4 +179,77 @@ describe("usePhotoSuggestion", () => {
     expect(result.current.status).toBe("idle");
     expect(result.current.canRequestAttributes).toBe(false);
   });
+
+  // KG-21-F01: svaret for «Stol» ble tatt i bruk etter at tittelen var «Sykkel».
+  it("ignorerer et sent svar etter at tittelen er endret", async () => {
+    let resolveResult!: (value: unknown) => void;
+    suggestListingFromPhotos.mockReturnValue(
+      new Promise((resolve) => {
+        resolveResult = resolve;
+      }),
+    );
+    const { result, rerender } = renderHook(
+      ({ title }) => usePhotoSuggestion({ images: [image], title }),
+      { initialProps: { title: "Stol" } },
+    );
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => Promise.resolve("token"),
+      reset: vi.fn(),
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.analyzePhotos();
+    });
+    await waitFor(() => expect(suggestListingFromPhotos).toHaveBeenCalled());
+    rerender({ title: "Sykkel" });
+    await act(async () => {
+      resolveResult({
+        status: "pending",
+        source: "photo-ai",
+        categories: [{ category_id: "c1", parent_id: null, name_nb: "Stol", parent_name_nb: null }],
+        title: "Stol",
+      });
+      await pending;
+    });
+    expect(result.current.categorySuggestions).toHaveLength(0);
+    expect(result.current.titleSuggestion).toBeNull();
+    expect(result.current.status).toBe("idle");
+  });
+
+  it("returnerer ingen attributter fra et svar for gamle bilder", async () => {
+    suggestListingFromPhotos.mockResolvedValueOnce({
+      status: "pending",
+      source: "photo-ai",
+      categories: [{ category_id: "c1", parent_id: null, name_nb: "Stol", parent_name_nb: null }],
+    });
+    const { result, rerender } = renderHook(
+      ({ images }) => usePhotoSuggestion({ images, title: "Stol" }),
+      { initialProps: { images: [image] } },
+    );
+    result.current.turnstileRef.current = {
+      getResponsePromise: () => Promise.resolve("token"),
+      reset: vi.fn(),
+    } as unknown as NonNullable<typeof result.current.turnstileRef.current>;
+    await act(async () => result.current.analyzePhotos());
+
+    let resolveResult!: (value: unknown) => void;
+    suggestListingFromPhotos.mockReturnValue(
+      new Promise((resolve) => {
+        resolveResult = resolve;
+      }),
+    );
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = result.current.requestAttributeSuggestions("stoler");
+    });
+    await waitFor(() => expect(suggestListingFromPhotos).toHaveBeenCalledTimes(2));
+    rerender({ images: [{ ...image, id: "photo-2" }] });
+    let attributes: unknown;
+    await act(async () => {
+      resolveResult({ status: "pending", attributes: [{ key: "color", value: "red" }] });
+      attributes = await pending;
+    });
+    expect(attributes).toEqual([]);
+  });
 });

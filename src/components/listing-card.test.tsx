@@ -95,3 +95,24 @@ describe("offentlige annonsekort", () => {
     expect(screen.queryByText("250 000 kr")).toBeNull();
   });
 });
+
+it("KG-32-F01: utvidet kort viser manuelt oppgitte kjøretøyfakta", () => {
+  render(
+    <ListingCardExpanded
+      listing={{
+        ...listing,
+        category_slug: "bil",
+        attributes: {
+          fuel_type: "bensin",
+          transmission: "manuell",
+          power_hk: 99,
+          seats: 5,
+          color: "red",
+        },
+      }}
+    />,
+  );
+  for (const value of ["Bensin", "Manuell", "99 hk", "5 seter", "Rød"]) {
+    expect(screen.getByText(value)).toBeTruthy();
+  }
+});

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyVehicleLookup, useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
 
@@ -416,5 +416,27 @@ describe("applyVehicleLookup", () => {
   it("beholder manuelle verdier når samme kjennemerke bekreftes igjen", () => {
     const afterA = { ...applyVehicleLookup({}, lookupA), seats: 5 };
     expect(applyVehicleLookup(afterA, lookupA).seats).toBe(5);
+  });
+
+  describe("EU-kontrollstatus", () => {
+    afterEach(() => vi.useRealTimers());
+    const passed = { registrationNumber: "AB12345", next_eu_control: "2026-01-01" } as never;
+
+    it("krysser av «Mangler EU-kontroll» når fristen er passert", () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+      expect(applyVehicleLookup({}, passed).eu_control_status).toBe("missing");
+    });
+
+    it("overstyrer ikke brukerens valg for samme kjennemerke", () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00"));
+      const afterA = { ...applyVehicleLookup({}, passed), eu_control_status: "exempt" };
+      expect(applyVehicleLookup(afterA, passed).eu_control_status).toBe("exempt");
+    });
+
+    it("fjerner forrige kjøretøys valg ved nytt kjennemerke", () => {
+      const afterA = { ...applyVehicleLookup({}, passed), eu_control_status: "exempt" };
+      const afterB = applyVehicleLookup(afterA, { registrationNumber: "CD54321" } as never);
+      expect(afterB).not.toHaveProperty("eu_control_status");
+    });
   });
 });

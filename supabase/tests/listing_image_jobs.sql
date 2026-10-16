@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(16);
+SELECT plan(18);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-4000-8000-00000000e001', 'image-jobs-pgtap@example.com');
@@ -76,6 +76,15 @@ SELECT is(public.complete_listing_image_job('00000000-0000-4000-8000-00000000e30
 SELECT is((SELECT count(*)::int FROM public.listing_images
   WHERE source_url = 'https://example.com/b.jpg'), 0,
   'Erstattet jobb legger ikke gamle bilder tilbake');
+
+-- RV-20261016-03: ny rekkefølge flytter også et ferdig behandlet bilde.
+SELECT lives_ok($$SELECT public.enqueue_listing_image_jobs(
+  '00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e201',
+  ARRAY['https://example.com/d.jpg', 'https://example.com/a.jpg'], true)$$,
+  'Ny synk legger et nytt bilde foran et ferdig bilde');
+SELECT is((SELECT sort_order FROM public.listing_images
+  WHERE source_url = 'https://example.com/a.jpg'), 1,
+  'Det ferdige bildet flyttes til sin nye plass');
 
 -- En jobb som dreper workeren hver gang gis opp etter 24 timer i stedet
 -- for å claimes hvert tiende minutt for alltid.

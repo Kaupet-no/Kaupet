@@ -159,10 +159,16 @@ describe.skipIf(!canRun)("B16: fasetter, tallverdier og kategoriflytting", () =>
       password: PASSWORD,
     });
     expect(signInError).toBeNull();
+    // Databasen avviser nå ugyldige tall (20261015160000). Eldre data lagret
+    // før det simuleres ved å skrive mens feltet midlertidig er tekst.
+    const setHorsepowerType = (type: "text" | "range") =>
+      admin.from("category_filters").update({ type }).eq("id", filterIds[2]);
+    expect((await setHorsepowerType("text")).error).toBeNull();
     const { error: updateError } = await owner
       .from("listings")
       .update({ attributes: { fuel_type: "petrol", horsepower: "oops", mileage_km: "oops" } })
       .eq("id", listingIds[1]);
+    expect((await setHorsepowerType("range")).error).toBeNull();
     expect(updateError).toBeNull();
 
     const facets = await facet({ horsepower: { kind: "range", min: 100 } }, ["fuel_type"]);

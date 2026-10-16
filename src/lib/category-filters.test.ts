@@ -6,6 +6,7 @@ import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
   filterDependencyMet,
+  todayIsoDate,
   searchFilterDependencyMet,
   getMissingRequiredFilters,
   isBoatCategory,
@@ -526,6 +527,13 @@ describe("alternativer til en frist (Mangler/Fritatt EU-kontroll)", () => {
     expect(filterDependencyMet(status, { next_eu_control: "2026-10-14" })).toBe(true);
     expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(false);
     expect(filterDependencyMet(status, { next_eu_control: "2027-01-01" })).toBe(false);
+  });
+
+  it("regner «i dag» i norsk tid, også når prosessen går i UTC", () => {
+    // 00:30 i Oslo, men fortsatt 15. oktober i UTC (workeren).
+    vi.setSystemTime(new Date("2026-10-15T22:30:00Z"));
+    expect(todayIsoDate()).toBe("2026-10-16");
+    expect(filterDependencyMet(status, { next_eu_control: "2026-10-15" })).toBe(true);
   });
 
   it("krever dato i dag eller senere, med mindre et alternativ er valgt", () => {

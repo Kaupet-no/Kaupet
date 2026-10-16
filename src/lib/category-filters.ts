@@ -195,9 +195,10 @@ export function isAlternativeFilter(
   );
 }
 
-/** Dagens dato som ISO (`yyyy-MM-dd`) i brukerens tidssone. */
+/** Dagens dato som ISO (`yyyy-MM-dd`) i norsk tid — samme «i dag» som
+ * EU-triggeren i databasen, også i workeren som går i UTC. */
 export function todayIsoDate(): string {
-  return format(new Date(), "yyyy-MM-dd");
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" });
 }
 
 function hasAttributeValue(value: unknown): boolean {

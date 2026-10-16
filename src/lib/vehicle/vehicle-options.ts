@@ -14,8 +14,15 @@ export function parseEuControlStatus(
   nextEuControl?: unknown,
   legacyExempt?: unknown,
 ): EuControlStatus | null {
-  // Samme fristregel som filterDependencyMet, også for eldre lagrede verdier.
-  if (typeof nextEuControl === "string" && nextEuControl >= todayIsoDate()) return null;
+  // Bare en gyldig, kommende ISO-frist skjuler statusen, som i DB-triggeren
+  // sync_legacy_eu_control_attributes: eldre fritekst («31.12.2027») gjør ikke.
+  if (
+    typeof nextEuControl === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(nextEuControl) &&
+    nextEuControl >= todayIsoDate()
+  ) {
+    return null;
+  }
   if (value === "missing" || value === "exempt") return value;
   return legacyExempt === true ? "exempt" : null;
 }

@@ -310,6 +310,30 @@ function assertAttributeFormats(
   if (invalidDate) throw new ClientError(`${invalidDate.label_nb} må være en gyldig dato.`, 400);
 }
 
+/** Kategorireglene annonsevalideringene trenger. Uten dem kan vi ikke vite
+ * hva som er påkrevd: kast i stedet for å validere mot tomme regler og
+ * publisere en ufullstendig annonse (KG-16-F02). */
+async function loadCategoryRules(supabaseAdmin: SupabaseClient, scope: string) {
+  const [filters, categories, flows] = await Promise.all([
+    supabaseAdmin
+      .from("category_filters")
+      .select(
+        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+      ),
+    supabaseAdmin.from("categories").select("id, parent_id"),
+    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
+  ]);
+  const rulesError = filters.error ?? categories.error ?? flows.error;
+  if (rulesError) throw await toClientError(scope, rulesError);
+  return {
+    normalizedFilters: (filters.data ?? []).map(normalizeFilter),
+    categoriesById: new Map<string, CategoryNode>(
+      (categories.data ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    ),
+    flowRows: (flows.data ?? []) as CategoryFlowRow[],
+  };
+}
+
 async function validateExistingListingForPublish(
   supabaseAdmin: SupabaseClient,
   listing: ListingMutationRow,
@@ -342,33 +366,10 @@ async function validateExistingListingForPublish(
     throw new ClientError("Annonsens tilstand er ugyldig.", 400);
   }
 
-  const [
-    { data: filterRows, error: filterError },
-    { data: categoryRows, error: categoryError },
-    { data: flowRows, error: flowError },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("category_filters")
-      .select(
-        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-      ),
-    supabaseAdmin.from("categories").select("id, parent_id"),
-    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
-  ]);
-  if (filterError) {
-    throw await toClientError("republishListing.filters", filterError);
-  }
-  if (categoryError) {
-    throw await toClientError("republishListing.categories", categoryError);
-  }
-  if (flowError) {
-    throw await toClientError("republishListing.flows", flowError);
-  }
-
-  const categoriesById = new Map<string, CategoryNode>(
-    (categoryRows ?? []).map((category) => [category.id as string, category as CategoryNode]),
+  const { normalizedFilters, categoriesById, flowRows } = await loadCategoryRules(
+    supabaseAdmin,
+    "republishListing.rules",
   );
-  const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
   const categoryBehavior = getCategoryBehavior(
     vehicleCategoryGroupFor(listing.category_id, normalizedFilters, categoriesById),
     isBoatCategory(listing.category_id, normalizedFilters, categoriesById),
@@ -403,11 +404,7 @@ async function validateExistingListingForPublish(
     validatePartFitment(listing.category_id, normalizedFilters, categoriesById, attributes);
   }
 
-  const { fieldGroups } = effectiveFlowForCategory(
-    listing.category_id,
-    (flowRows ?? []) as CategoryFlowRow[],
-    categoriesById,
-  );
+  const { fieldGroups } = effectiveFlowForCategory(listing.category_id, flowRows, categoriesById);
   const fieldGroupError = validateRequiredFieldGroups(
     fieldGroups,
     { condition: listing.condition, can_ship: listing.can_ship },
@@ -685,27 +682,10 @@ export const createListing = createServerFn({ method: "POST" })
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
 
-    const [
-      { data: filterRows, error: filterError },
-      { data: categoryRows, error: categoryError },
-      flowsResult,
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        ),
-      supabaseAdmin.from("categories").select("id, parent_id"),
-      supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
-    ]);
-    // Uten reglene kan vi ikke vite hva som er påkrevd: avbryt i stedet for å
-    // validere mot tomme regler og publisere en ufullstendig annonse (KG-16-F02).
-    const rulesError = filterError ?? categoryError ?? flowsResult.error;
-    if (rulesError) throw await toClientError("database", rulesError);
-    const categoriesById = new Map<string, CategoryNode>(
-      (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    const { normalizedFilters, categoriesById, flowRows } = await loadCategoryRules(
+      supabaseAdmin,
+      "database",
     );
-    const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
     const attributes = normalizeNumericAttributes(
       data.category_id,
       normalizedFilters,
@@ -736,7 +716,6 @@ export const createListing = createServerFn({ method: "POST" })
       validatePartFitment(data.category_id, normalizedFilters, categoriesById, attributes);
     }
 
-    const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
     const { fieldGroups } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
     const fieldGroupError = validateRequiredFieldGroups(
       fieldGroups,
@@ -1034,21 +1013,10 @@ export const updateListingAttributes = createServerFn({ method: "POST" })
     const categoryId = data.category_id ?? current.category_id;
 
     const supabaseAdmin = await getSupabaseAdmin();
-    const [{ data: filterRows, error: filterError }, { data: categoryRows, error: categoryError }] =
-      await Promise.all([
-        supabaseAdmin
-          .from("category_filters")
-          .select(
-            "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-          ),
-        supabaseAdmin.from("categories").select("id, parent_id"),
-      ]);
-    const rulesError = filterError ?? categoryError;
-    if (rulesError) throw await toClientError("database", rulesError);
-    const categoriesById = new Map<string, CategoryNode>(
-      (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    const { normalizedFilters, categoriesById } = await loadCategoryRules(
+      supabaseAdmin,
+      "database",
     );
-    const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
     // Bare det brukeren sender valideres: en eldre ugyldig verdi i et annet
     // felt skal ikke sperre redigering av resten.
     const patch = normalizeNumericAttributes(

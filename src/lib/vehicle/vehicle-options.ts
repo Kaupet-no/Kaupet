@@ -1,3 +1,4 @@
+import { isMatch } from "date-fns";
 import { todayIsoDate } from "@/lib/category-filters";
 
 /** Selgerens alternativ til en tom eller passert «Neste EU-kontroll»
@@ -9,13 +10,22 @@ export const EU_CONTROL_STATUS_LABEL_NB: Record<EuControlStatus, string> = {
   exempt: "Fritatt for EU-kontroll",
 };
 
+/** Bare en gyldig ISO-frist i dag eller senere erstatter et statusvalg. */
+export function hasUpcomingEuControlDate(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    isMatch(value, "yyyy-MM-dd") &&
+    value >= todayIsoDate()
+  );
+}
+
 export function parseEuControlStatus(
   value: unknown,
   nextEuControl?: unknown,
   legacyExempt?: unknown,
 ): EuControlStatus | null {
-  // Samme fristregel som filterDependencyMet, også for eldre lagrede verdier.
-  if (typeof nextEuControl === "string" && nextEuControl >= todayIsoDate()) return null;
+  if (hasUpcomingEuControlDate(nextEuControl)) return null;
   if (value === "missing" || value === "exempt") return value;
   return legacyExempt === true ? "exempt" : null;
 }

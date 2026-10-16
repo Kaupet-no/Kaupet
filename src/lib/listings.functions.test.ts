@@ -56,9 +56,12 @@ vi.mock("@/integrations/supabase/client.server", () => ({
     from: (table: string) => {
       let inserted: unknown;
       let updating = false;
+      let from = 0;
       const result = () => {
         if (db.tableErrors[table]) return { data: null, error: db.tableErrors[table] };
-        if (db.tableData[table]) return { data: db.tableData[table], error: null };
+        // Som PostgREST: hvert svar kappes ved max-rows (1000), også uten range.
+        if (db.tableData[table])
+          return { data: db.tableData[table].slice(from, from + 1000), error: null };
         if (updating && db.updateResult !== undefined)
           return { data: db.updateResult, error: null };
         if (table === "organization_members") return { data: db.membership, error: null };
@@ -77,9 +80,13 @@ vi.mock("@/integrations/supabase/client.server", () => ({
         return { data: [], count: 0, error: null };
       };
       const query: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte", "in"]) {
+      for (const method of ["select", "eq", "gte", "in", "order"]) {
         query[method] = () => query;
       }
+      query.range = (start: number) => {
+        from = start;
+        return query;
+      };
       query.update = (value: unknown) => {
         updating = true;
         db.updates(value);
@@ -680,6 +687,43 @@ it("avviser et ikke-numerisk tallattributt før publisering", async () => {
     category_filters: [
       {
         id: "f1",
+        category_id: categoryId,
+        key: "horsepower",
+        label_nb: "Hestekrefter",
+        type: "range",
+        sort_order: 0,
+      },
+    ],
+    categories: [{ id: categoryId, parent_id: null }],
+    category_flows: [],
+  };
+  await expect(
+    createListing({ data: { ...listingInput, attributes: { horsepower: "oops" } } }),
+  ).rejects.toMatchObject({ status: 400, message: "Hestekrefter må være et tall." });
+  expect(db.inserts).toEqual([]);
+});
+
+// RV-20261016-01: reglene ble lest uten paginering, så filtre etter rad 1000
+// falt ut og publiseringen ble godtatt uten valideringen de krever.
+it("validerer også mot kategorifiltre etter PostgRESTs radgrense", async () => {
+  setOrganization("superuser");
+  db.rpc.mockImplementation(async (name: string) => ({
+    data: name === "can_create_organization_listing" ? true : null,
+    error: null,
+  }));
+  const filler = Array.from({ length: 1000 }, (_, i) => ({
+    id: `f${String(i).padStart(4, "0")}`,
+    category_id: "00000000-0000-0000-0000-000000000099",
+    key: `annet_${i}`,
+    label_nb: `Annet ${i}`,
+    type: "text",
+    sort_order: i,
+  }));
+  db.tableData = {
+    category_filters: [
+      ...filler,
+      {
+        id: "f9999",
         category_id: categoryId,
         key: "horsepower",
         label_nb: "Hestekrefter",

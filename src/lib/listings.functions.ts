@@ -36,6 +36,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/integrations/supabase/types";
 import { MAX_LISTING_PRICE_NOK } from "@/lib/constants";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 
 const LISTING_CREATE_LIMIT_MESSAGE =
   "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.";
@@ -312,16 +313,29 @@ function assertAttributeFormats(
 
 /** Kategorireglene annonsevalideringene trenger. Uten dem kan vi ikke vite
  * hva som er påkrevd: kast i stedet for å validere mot tomme regler og
- * publisere en ufullstendig annonse (KG-16-F02). */
+ * publisere en ufullstendig annonse (KG-16-F02). Hentes side for side, ellers
+ * kapper PostgREST ved 1000 rader og påkrevde felt faller ut (RV-20261016-01). */
 async function loadCategoryRules(supabaseAdmin: SupabaseClient, scope: string) {
   const [filters, categories, flows] = await Promise.all([
-    supabaseAdmin
-      .from("category_filters")
-      .select(
-        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-      ),
-    supabaseAdmin.from("categories").select("id, parent_id"),
-    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
+    fetchAllPages((from, to) =>
+      supabaseAdmin
+        .from("category_filters")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAllPages((from, to) =>
+      supabaseAdmin.from("categories").select("id, parent_id").order("id").range(from, to),
+    ),
+    fetchAllPages((from, to) =>
+      supabaseAdmin
+        .from("category_flows")
+        .select("id, category_id, field_groups, sort_order")
+        .order("id")
+        .range(from, to),
+    ),
   ]);
   const rulesError = filters.error ?? categories.error ?? flows.error;
   if (rulesError) throw await toClientError(scope, rulesError);

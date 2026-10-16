@@ -12,6 +12,8 @@ describe("EU-status og frist", () => {
     [undefined, null, true, "exempt"],
     [undefined, null, false, null],
     ["ugyldig", null, undefined, null],
+    ["exempt", "31.12.2027", undefined, "exempt"],
+    ["missing", "2027-02-30", undefined, "missing"],
   ])(
     "tolker status %s med frist %s (grenseverdier og eldre klient)",
     (status, date, legacy, expected) => {

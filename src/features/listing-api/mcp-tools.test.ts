@@ -140,6 +140,35 @@ describe("upsert_listing — utkast-default", () => {
     expect(result.text).toMatch(/publisert/);
   });
 
+  // KG-08-F02: annonsen kan opprettes av et annet kall mellom oppslaget og
+  // lagringen. Create-modus lar SQL avgjøre atomisk, så den står urørt.
+  it("status for en ny annonse sendes bare i create-modus", async () => {
+    getListingApi.mockRejectedValue(notFound);
+    upsertListingApi.mockResolvedValue({
+      importId: "imp-1",
+      status: "duplicate",
+      externalRef: "SKU-6",
+      listingId: "l6",
+    });
+    const { findMcpTool } = await import("./mcp-tools");
+    const result = await findMcpTool("upsert_listing")!.execute(auth(), {
+      externalRef: "SKU-6",
+      category: "sykler",
+      title: "En fin sykkel",
+      description: "En beskrivelse på minst tjue tegn.",
+      price: 1000,
+      publish: true,
+    });
+    expect(upsertListingApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createOnly: true,
+        body: expect.objectContaining({ status: "active" }),
+      }),
+    );
+    expect(result.text).toMatch(/ikke endret/);
+    expect(result.text).not.toMatch(/publisert/);
+  });
+
   // KG-08-F02: publish gjelder bare nye annonser.
   it("publish: true på en solgt annonse beholder statusen", async () => {
     getListingApi.mockResolvedValue({ externalRef: "SKU-5", status: "sold" });
@@ -159,7 +188,10 @@ describe("upsert_listing — utkast-default", () => {
       publish: true,
     });
     expect(upsertListingApi).toHaveBeenCalledWith(
-      expect.objectContaining({ body: expect.not.objectContaining({ status: expect.anything() }) }),
+      expect.objectContaining({
+        createOnly: false,
+        body: expect.not.objectContaining({ status: expect.anything() }),
+      }),
     );
   });
 

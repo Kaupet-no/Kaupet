@@ -2,6 +2,7 @@ import { capitalizeWord } from "@/lib/utils";
 import type {
   AttributeFilterValue,
   CategoryFilter,
+  DateAttribute,
   VehicleBrandGroup,
 } from "@/lib/category-filters";
 
@@ -54,6 +55,9 @@ export type CategoryBehavior = {
   requiresCategoryFilterValues: boolean;
   /** Filter keys excluded from the required-attribute contract for this category behavior. */
   requiredFilterExclusions: readonly string[];
+  /** Attributter uten filterrad som lagres som ISO-dato og valideres som det
+   * (filtre av typen `date` dekkes allerede av filtertypen). */
+  extraDateAttributes: readonly DateAttribute[];
   /** Extra breadcrumb segments appended after the category chain, derived from the listing's attributes. */
   extraBreadcrumbSegments: (
     attributes: Record<string, unknown>,
@@ -68,6 +72,7 @@ const DEFAULT_BEHAVIOR: CategoryBehavior = {
   showGenericAttributes: true,
   requiresCategoryFilterValues: true,
   requiredFilterExclusions: [],
+  extraDateAttributes: [],
   attributeReviewGroupKey: defaultAttributeReviewGroupKey,
   extraBreadcrumbSegments: (attributes, { rootCategorySlug, genericBrandFilter }) => {
     if (!genericBrandFilter) return [];
@@ -97,6 +102,8 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
   // lib/vehicle/vehicle-lookup.types.ts. Den kan ikke importeres hit: denne
   // filen er vertikal-agnostisk kjerne, og eslint blokkerer @/lib/vehicle/*.
   requiredFilterExclusions: ["cylinders", "engine_displacement_cc", "engine_code"],
+  // Settes fra SVV-oppslaget eller datovelgeren i kjøretøyveiviseren.
+  extraDateAttributes: [{ key: "first_registration_date", label_nb: "Førstegangsregistrering" }],
   attributeReviewGroupKey: (pages, vehicleRegistered) =>
     vehicleRegistered ? "vehicle-facts" : defaultAttributeReviewGroupKey(pages),
   extraBreadcrumbSegments: (attributes, { rootCategorySlug }) => {

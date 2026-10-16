@@ -338,12 +338,19 @@ async function parseXlsx(file: File): Promise<unknown[][]> {
     const workbook = XLSX.read(await file.arrayBuffer(), {
       type: "array",
       sheetRows: XLSX_PHYSICAL_ROW_LIMIT,
+      cellDates: true,
     });
     if (workbook.SheetNames.length === 0) {
       throw new ImportFileError("Excel-filen mangler et regneark.");
     }
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
+      // Overstyr også egendefinerte datoformater og bufret visningstekst.
+      for (const cell of Object.values(sheet)) {
+        if (cell?.t === "d" && cell.v instanceof Date) {
+          cell.w = cell.v.toISOString().slice(0, 10);
+        }
+      }
       const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",

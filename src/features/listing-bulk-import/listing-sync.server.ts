@@ -7,6 +7,8 @@ import {
   normalizeFilter,
   normalizeNumericAttributes,
   findNonNumericAttribute,
+  findInvalidDateAttribute,
+  normalizeDateAttributes,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -85,7 +87,8 @@ function safeRowError(message: string): string {
   if (
     message.startsWith("Fyll inn:") ||
     message.startsWith("Velg ") ||
-    message.startsWith("Legg til ")
+    message.startsWith("Legg til ") ||
+    / må være (et tall|en dato, f\.eks\. \d{4}-\d{2}-\d{2})\.$/.test(message)
   ) {
     return message;
   }
@@ -288,6 +291,13 @@ export async function loadSyncContext(
   };
 }
 
+function behaviorFor(categoryId: string, ctx: SyncContext) {
+  return getCategoryBehavior(
+    vehicleCategoryGroupFor(categoryId, ctx.filters, ctx.categoriesById),
+    isBoatCategory(categoryId, ctx.filters, ctx.categoriesById),
+  );
+}
+
 function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null {
   const category = resolveCategory(row.category, ctx.categories);
   if (!category) return "Kategorien finnes ikke. Bruk kategorinavnet eller slug-en fra malen.";
@@ -298,10 +308,15 @@ function validateRowFields(row: BulkImportRow, ctx: SyncContext): string | null 
   const attributes = row.attributes;
   const invalid = findNonNumericAttribute(category.id, ctx.filters, ctx.categoriesById, attributes);
   if (invalid) return `${invalid.label_nb} må være et tall.`;
-  const behavior = getCategoryBehavior(
-    vehicleCategoryGroupFor(category.id, ctx.filters, ctx.categoriesById),
-    isBoatCategory(category.id, ctx.filters, ctx.categoriesById),
+  const behavior = behaviorFor(category.id, ctx);
+  const invalidDate = findInvalidDateAttribute(
+    category.id,
+    ctx.filters,
+    ctx.categoriesById,
+    attributes,
+    behavior.extraDateAttributes,
   );
+  if (invalidDate) return `${invalidDate.label_nb} må være en dato, f.eks. 2027-05-31.`;
   const missing = behavior.requiresCategoryFilterValues
     ? getMissingRequiredFilters(category.id, ctx.filters, ctx.categoriesById, attributes, [
         ...VEHICLE_EQUIPMENT_FILTER_KEYS,
@@ -342,11 +357,13 @@ export function validateSyncRow(
   const normalized = normalizeBulkImportRow(schemaResult.data, row.rowNumber);
   if (isDraft) (normalized as { status?: string }).status = "draft";
   const category = resolveCategory(normalized.category, ctx.categories);
-  normalized.attributes = normalizeNumericAttributes(
-    category?.id ?? null,
+  const categoryId = category?.id ?? null;
+  normalized.attributes = normalizeDateAttributes(
+    categoryId,
     ctx.filters,
     ctx.categoriesById,
-    normalized.attributes,
+    normalizeNumericAttributes(categoryId, ctx.filters, ctx.categoriesById, normalized.attributes),
+    categoryId ? behaviorFor(categoryId, ctx).extraDateAttributes : [],
   );
   const validationError = validateRowFields(normalized, ctx);
   if (validationError) return { ok: false, error: safeRowError(validationError) };

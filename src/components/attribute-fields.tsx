@@ -25,10 +25,18 @@ import {
   type VehicleBrandGroup,
 } from "@/lib/category-filters";
 import { PartFitmentField } from "@/components/part-fitment-fields";
+import { EuControlDateField } from "@/components/eu-control-date-field";
 import {
   VehicleBrandField,
   VehicleModelWithClassField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+
+/** Hvor langt tilbake en dato kan velges ved opprettelse. Sammen med
+ * EuControlDateField sin standard-max (fire år frem) passer grensene for
+ * EU-kontroll, den eneste datofiltertypen i dag.
+ * ponytail: faste grenser for alle datofiltre; legg min/max på filterraden
+ * når en datotype trenger andre grenser. */
+const DATE_YEARS_BACK = 10;
 
 export type AttributeMap = Record<string, AttributeValue>;
 
@@ -401,22 +409,36 @@ function AttributeField({
           <span className="font-normal text-muted-foreground"> (valgfritt)</span>
         )}
       </Label>
-      <Input
-        id={fieldId}
-        type={isNumber ? "number" : "text"}
-        inputMode={isNumber ? "numeric" : undefined}
-        aria-required={showRequiredMark || undefined}
-        aria-invalid={!!error}
-        aria-describedby={error ? errorId : undefined}
-        value={value === undefined ? "" : String(value)}
-        min={requiresPositiveValue ? 1 : undefined}
-        onChange={(e) => {
-          let raw = e.target.value;
-          if (isNumber && digitCap) raw = raw.replace(/\D/g, "").slice(0, digitCap);
-          if (raw === "") return onChange(undefined);
-          onChange(isNumber ? Number(raw) : raw);
-        }}
-      />
+      {filter.type === "date" ? (
+        // Kun datovelger: fritekst ga ugyldige datoer som ødela visning og
+        // matching. En passert frist er reell (forfalt EU-kontroll).
+        <EuControlDateField
+          id={fieldId}
+          value={typeof value === "string" ? value : ""}
+          min={`${new Date().getFullYear() - DATE_YEARS_BACK}-01-01`}
+          onChange={(v) => onChange(v || undefined)}
+          aria-required={showRequiredMark || undefined}
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
+        />
+      ) : (
+        <Input
+          id={fieldId}
+          type={isNumber ? "number" : "text"}
+          inputMode={isNumber ? "numeric" : undefined}
+          aria-required={showRequiredMark || undefined}
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
+          value={value === undefined ? "" : String(value)}
+          min={requiresPositiveValue ? 1 : undefined}
+          onChange={(e) => {
+            let raw = e.target.value;
+            if (isNumber && digitCap) raw = raw.replace(/\D/g, "").slice(0, digitCap);
+            if (raw === "") return onChange(undefined);
+            onChange(isNumber ? Number(raw) : raw);
+          }}
+        />
+      )}
       {error && (
         <p id={errorId} className="text-sm text-destructive">
           {error}

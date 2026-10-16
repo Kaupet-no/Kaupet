@@ -74,6 +74,31 @@ describe("AttributeFields", () => {
     expect(screen.getByText("Fyll inn farge")).toBeTruthy();
   });
 
+  it("rendrer datoattributter som datovelger, aldri fritekst", () => {
+    filters.current = [
+      { ...textFilter, key: "next_eu_control", label_nb: "Neste EU-kontroll", type: "date" },
+    ];
+    const onChange = vi.fn();
+    render(
+      <AttributeFields
+        categoryId="category-1"
+        categories={[{ id: "category-1", parent_id: null }]}
+        value={{ next_eu_control: "31.12" }}
+        onChange={onChange}
+        required
+        showErrors
+      />,
+    );
+
+    const input = screen.getByLabelText("Neste EU-kontroll *") as HTMLInputElement;
+    expect(input.type).toBe("date");
+    // Et gammelt, ugyldig utkast vises som tomt felt i stedet for å vises videre.
+    expect(input.value).toBe("");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(input, { target: { value: "2027-05-31" } });
+    expect(onChange).toHaveBeenCalledWith({ next_eu_control: "2027-05-31" });
+  });
+
   it("rendrer ≤6 alternativer som chip-radiogruppe med mulighet til å fjerne valgfritt valg", () => {
     filters.current = [selectFilter(4)];
     const onChange = vi.fn();

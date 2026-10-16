@@ -1,3 +1,5 @@
+import type { ComponentProps } from "react";
+
 import { Input } from "@/components/ui/input";
 
 /** Fire år frem er så langt en EU-kontrollfrist realistisk kan ligge. */
@@ -8,29 +10,38 @@ function isoDate(d: Date): string {
 }
 
 /**
- * Datofelt for EU-kontroll. `<input type="date">` snakker allerede ISO
+ * Datofelt for EU-kontroll og andre datoattributter (filtertypen `date` og
+ * `CategoryBehavior.extraDateAttributes`). `<input type="date">` snakker allerede ISO
  * (`yyyy-MM-dd`) — samme format som SVV leverer og som vi lagrer — og gir
  * brukeren plattformens egen datovelger, som er den native appen vil ha.
+ * Brukeren kan ikke skrive fritekst, så et ugyldig format kan ikke oppstå.
+ * `min`/`max` er som standard i dag → fire år frem (søk/ønskeliste).
  */
 export function EuControlDateField({
   id,
   value,
   onChange,
+  min,
+  max,
+  ...inputProps
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
-}) {
+  min?: string;
+  max?: string;
+} & Pick<ComponentProps<"input">, "aria-invalid" | "aria-describedby" | "aria-required">) {
   const today = new Date();
   const maxDate = new Date(today.getFullYear() + MAX_YEARS_AHEAD, 11, 31);
   return (
     <Input
+      {...inputProps}
       id={id}
       type="date"
       className="w-full"
       value={value}
-      min={isoDate(today)}
-      max={isoDate(maxDate)}
+      min={min ?? isoDate(today)}
+      max={max ?? isoDate(maxDate)}
       onChange={(e) => onChange(e.target.value)}
     />
   );

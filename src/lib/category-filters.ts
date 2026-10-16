@@ -1,3 +1,4 @@
+import { format, isValid, parse } from "date-fns";
 import { z } from "zod";
 
 /** Minimal category shape needed for filter inheritance (avoids requiring slug/name). */
@@ -41,7 +42,9 @@ export type FilterType =
   | "boolean"
   | "text"
   | "brand_select"
-  | "model_select";
+  | "model_select"
+  /** ISO-dato (`yyyy-MM-dd`) med datovelger; søkes som tidligste dato (`date_min`). */
+  | "date";
 
 export type FilterOption = { value: string; label_nb: string };
 
@@ -138,6 +141,7 @@ export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
   text: "Fritekst",
   brand_select: "Bilmerke (koblet)",
   model_select: "Bilmodell (koblet)",
+  date: "Dato",
 };
 
 /** Coerces a raw DB row (options is JSONB) into a typed CategoryFilter. */
@@ -366,6 +370,85 @@ export function normalizeNumericAttributes<T>(
   return normalized;
 }
 
+/** Et attributt som lagres som ISO-dato (`yyyy-MM-dd`). */
+export type DateAttribute = { key: string; label_nb: string };
+
+const ISO_DATE = "yyyy-MM-dd";
+/** Excel lagrer datoer som dager siden 1899-12-30. */
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
+
+function toIsoDate(value: unknown): string | null {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value < 1 || value > 2_958_465) return null;
+    return new Date(EXCEL_EPOCH_UTC + value * 86_400_000).toISOString().slice(0, 10);
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  // Filparseren leser også numeriske Excel-/CSV-celler som tekst.
+  if (/^\d+$/.test(text)) return toIsoDate(Number(text));
+  for (const pattern of [ISO_DATE, "d.M.yyyy"]) {
+    const parsed = parse(text, pattern, new Date(2000, 0, 1));
+    // `parse` godtar f.eks. «2027-5-1»; krev at formatet faktisk stemmer.
+    if (isValid(parsed) && /^\d{4}-\d{2}-\d{2}$|^\d{1,2}\.\d{1,2}\.\d{4}$/.test(text)) {
+      return format(parsed, ISO_DATE);
+    }
+  }
+  return null;
+}
+
+/** Datoattributtene for en kategori: filtre av typen `date`, pluss
+ * attributter uten filterrad som kategorien selv lagrer som dato
+ * (`CategoryBehavior.extraDateAttributes`). */
+function dateAttributesForCategory(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  extra: readonly DateAttribute[],
+): DateAttribute[] {
+  return [
+    ...effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
+      (f) => f.type === "date",
+    ),
+    ...extra,
+  ];
+}
+
+/** Gjør om datoattributter fra import (ISO, `31.12.2027`, Excel-serienummer)
+ * til ISO. Verdier som ikke kan tolkes står urørt, så
+ * `findInvalidDateAttribute` kan avvise dem med en tydelig melding. */
+export function normalizeDateAttributes<T>(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, T>,
+  extra: readonly DateAttribute[] = [],
+): Record<string, T | string> {
+  const normalized: Record<string, T | string> = { ...attributes };
+  for (const { key } of dateAttributesForCategory(categoryId, allFilters, categoriesById, extra)) {
+    const iso = toIsoDate(normalized[key]);
+    if (iso) normalized[key] = iso;
+  }
+  return normalized;
+}
+
+/** Første datoattributt som har en verdi, men ikke er en gyldig ISO-dato.
+ * Ugyldige datoer ødela tidligere visning og matching nedstrøms. */
+export function findInvalidDateAttribute(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, unknown>,
+  extra: readonly DateAttribute[] = [],
+): DateAttribute | null {
+  return (
+    dateAttributesForCategory(categoryId, allFilters, categoriesById, extra).find(({ key }) => {
+      const value = attributes[key];
+      if (value === undefined || value === null || value === "") return false;
+      return typeof value !== "string" || toIsoDate(value) !== value;
+    }) ?? null
+  );
+}
+
 /**
  * Første tallfelt (filtertype range/number) som har en verdi som ikke er et
  * endelig tall. Søket og forsiden leser disse som tall; en lagret tekst som
@@ -422,6 +505,9 @@ export function getMissingRequiredFilters(
     ) {
       return true;
     }
+    // En ugyldig dato (fra gammel fritekst) vises tom i datovelgeren; da
+    // skal den også telle som ikke utfylt.
+    if (f.type === "date") return toIsoDate(v) !== v;
     if (typeof v === "string") return v.trim() === "";
     if (Array.isArray(v)) return v.length === 0;
     return false;
@@ -571,7 +657,7 @@ export type AttributeFilterValue =
   | { kind: "range"; min?: number; max?: number }
   | { kind: "text"; value: string }
   /** Earliest-acceptable ISO date (`yyyy-MM-dd`) — currently only used by
-   * `next_eu_control` ("Tidligst neste EU-kontroll"), matching listings whose
+   * filters of type `date` (e.g. `next_eu_control`), matching listings whose
    * date is on or after this one. Mirrors WtbDateMinValue's "minDate"
    * semantics (wtb-criteria-types.ts) for a sell-listing search filter. */
   | { kind: "date_min"; value: string }

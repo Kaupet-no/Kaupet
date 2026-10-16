@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CategoryFilter } from "@/lib/category-filters";
@@ -74,6 +74,12 @@ function requiredFilter(key: string): CategoryFilter {
   };
 }
 
+/** filterKeys i «Tekniske opplysninger du må fylle ut» (ikke den valgfrie listen). */
+function requiredSectionKeys() {
+  const section = screen.getByRole("region", { name: "Tekniske opplysninger du må fylle ut" });
+  return within(section).getByTestId("technical-attributes").getAttribute("data-filter-keys");
+}
+
 function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
   return {
     categories: [category],
@@ -109,6 +115,36 @@ describe("VehicleFactsGroup", () => {
     expect(screen.getAllByText("Førstegangsregistrering").length).toBeGreaterThan(0);
     expect(screen.getAllByText("VIN").length).toBeGreaterThan(0);
   });
+  it("lar et påkrevd felt bli stående etter at brukeren har fylt det inn", () => {
+    categoryFilters.current = [requiredFilter("next_eu_control")];
+    const lookup = { registrationNumber: "AB12345" } as WizardSharedProps["vehicleLookupResult"];
+
+    const { rerender } = render(<VehicleFactsGroup {...props({ vehicleLookupResult: lookup })} />);
+    expect(requiredSectionKeys()).toBe("next_eu_control");
+
+    rerender(
+      <VehicleFactsGroup
+        {...props({ vehicleLookupResult: lookup, attributes: { next_eu_control: "2027-05-31" } })}
+      />,
+    );
+    expect(requiredSectionKeys()).toBe("next_eu_control");
+  });
+
+  it("viser felt SVV manglet øverst også når steget åpnes med verdien utfylt", () => {
+    categoryFilters.current = [requiredFilter("fuel_type")];
+    const lookup = {
+      registrationNumber: "AB12345",
+      fuel_type: null,
+    } as unknown as WizardSharedProps["vehicleLookupResult"];
+
+    render(
+      <VehicleFactsGroup
+        {...props({ vehicleLookupResult: lookup, attributes: { fuel_type: "diesel" } })}
+      />,
+    );
+    expect(requiredSectionKeys()).toBe("fuel_type");
+  });
+
   it("viser Hjuldrift i seksjonen for påkrevde tekniske opplysninger uten SVV-oppslag", () => {
     render(<VehicleFactsGroup {...props({ vehicleRegistered: false })} />);
 

@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   setQueryData: vi.fn(),
   setQueriesData: vi.fn(),
   mutate: vi.fn(),
+  messageRows: [] as { id: string; created_at: string }[],
+  messageOrders: [] as string[],
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -75,7 +77,32 @@ vi.mock("@/integrations/supabase/client", () => {
       return channel;
     },
   };
-  return { supabase: { channel: () => channel, removeChannel: vi.fn() } };
+  // Som PostgREST: range respekteres, men svaret kappes på 1000 rader.
+  const from = () => {
+    const orders: string[] = [];
+    let start = 0;
+    let end = Infinity;
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: (column: string) => {
+        orders.push(column);
+        return query;
+      },
+      range: (a: number, b: number) => {
+        start = a;
+        end = b;
+        return query;
+      },
+      then: (resolve: (value: unknown) => unknown) => {
+        mocks.messageOrders = orders;
+        const rows = mocks.messageRows.slice(start, Math.min(end + 1, start + 1000));
+        return resolve({ data: rows, error: null });
+      },
+    };
+    return query;
+  };
+  return { supabase: { channel: () => channel, removeChannel: vi.fn(), from } };
 });
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
@@ -205,6 +232,21 @@ describe("meldinger.$id — realtime-fallback (F16)", () => {
     expect(lastQueryOptsFor("messages")?.refetchInterval).toBe(false);
     expect(lastQueryOptsFor("conversation")?.refetchInterval).toBe(false);
   });
+});
+
+// RV-20261016-02: tråden ble lest eldste først uten paginering, så den
+// nyeste meldingen manglet i samtaler med over 1000 meldinger.
+it("henter også meldinger etter PostgRESTs radgrense, i stabil rekkefølge", async () => {
+  mocks.messageRows = Array.from({ length: 1001 }, (_, i) => ({
+    id: `m${String(i).padStart(4, "0")}`,
+    created_at: "2026-10-16T10:00:00Z",
+  }));
+  render(<ConversationPage />);
+  const queryFn = lastQueryOptsFor("messages")?.queryFn as () => Promise<{ id: string }[]>;
+  const rows = await queryFn();
+  expect(rows).toHaveLength(1001);
+  expect(rows.at(-1)?.id).toBe("m1000");
+  expect(mocks.messageOrders).toEqual(["created_at", "id"]);
 });
 
 // Blokkerings-UI (App Store 1.2): komponenten skal vise en tydelig tilstand

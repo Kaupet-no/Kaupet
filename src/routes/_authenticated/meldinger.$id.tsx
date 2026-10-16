@@ -27,6 +27,7 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { displayPriceNok, formatNokNumber, formatWtbMaxPrice } from "@/lib/format";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
@@ -216,14 +217,22 @@ function ConversationPage() {
     queryKey: ["messages", id],
     enabled: !!user,
     refetchInterval: realtimeDown ? MESSAGES_POLL_INTERVAL_MS : false,
+    // Alle sider: PostgREST kapper ved 1000 rader, og eldste-først ga da en
+    // tråd uten de nyeste meldingene (RV-20261016-02). id gjør rekkefølgen
+    // stabil ved like tidsstempler.
+    // ponytail: henter hele tråden; bakoverpaginering hvis tråder blir så lange at det merkes.
     queryFn: async (): Promise<Message[]> => {
-      const { data, error } = await supabase
-        .from("messages")
-        .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
-        .eq("conversation_id", id)
-        .order("created_at", { ascending: true });
+      const { data, error } = await fetchAllPages<Message>((from, to) =>
+        supabase
+          .from("messages")
+          .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
+          .eq("conversation_id", id)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
       if (error) throw error;
-      return data ?? [];
+      return data;
     },
   });
 

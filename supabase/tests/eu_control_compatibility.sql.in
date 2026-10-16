@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(20);
+SELECT plan(24);
 
 DROP TRIGGER IF EXISTS listings_compat_eu_control ON public.listings;
 DROP TRIGGER IF EXISTS wtb_listings_compat_eu_control ON public.wtb_listings;
@@ -25,6 +25,7 @@ INSERT INTO public.wtb_listings (id, user_id, title, status, attributes, updated
 
 -- APPLY_EU_STATUS_MIGRATION
 -- APPLY_EU_COMPAT_MIGRATION
+-- APPLY_EU_CLEAR_MIGRATION
 
 SELECT ok(EXISTS(SELECT 1 FROM public.category_filters f JOIN public.categories c ON c.id = f.category_id
   WHERE c.slug = 'tilhenger-leaf' AND f.key = 'eu_control_exempt' AND f.type = 'boolean' AND f.is_optional), 'Gammel veiviser får fortsatt fritaksspørsmålet');
@@ -71,5 +72,16 @@ SELECT ok(NOT has_function_privilege('authenticated', 'public.sync_legacy_eu_con
 INSERT INTO public.listings (id, seller_id, title, status, attributes) VALUES
   ('00000000-0000-4000-8000-00000000e103', '00000000-0000-4000-8000-00000000e001', 'Vanlig annonse', 'draft', '{"color":"blue"}');
 SELECT is((SELECT attributes FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e103'), '{"color":"blue"}'::jsonb, 'Andre annonser får ikke kjøretøyattributter');
+-- En eldre mobilklient tømmer bare det boolske feltet via serverfunksjonen.
+UPDATE public.wtb_listings SET attributes = '{"eu_control_status":["exempt"]}' WHERE id = '00000000-0000-4000-8000-00000000e202';
+UPDATE public.wtb_listings SET attributes = attributes - 'eu_control_exempt' WHERE id = '00000000-0000-4000-8000-00000000e202';
+SELECT is((SELECT attributes FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e202'), '{}'::jsonb, 'Gammel mobilklient kan velge Ingen begrensning');
+UPDATE public.wtb_listings SET attributes = '{"eu_control_status":["exempt"]}' WHERE id = '00000000-0000-4000-8000-00000000e202';
+UPDATE public.wtb_listings SET attributes = attributes || '{"brand":"Volvo"}' WHERE id = '00000000-0000-4000-8000-00000000e202';
+SELECT is((SELECT attributes->'eu_control_status' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e202'), '["exempt"]'::jsonb, 'Urelatert redigering beholder fritakskriteriet');
+UPDATE public.wtb_listings SET attributes = (attributes - 'eu_control_exempt') || '{"eu_control_status":["missing"]}' WHERE id = '00000000-0000-4000-8000-00000000e202';
+SELECT is((SELECT attributes->'eu_control_status' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e202'), '["missing"]'::jsonb, 'Eksplisitt ny status vinner over slettet alias');
+UPDATE public.listings SET attributes = '{"next_eu_control":"2099-02-30","eu_control_status":"exempt"}' WHERE id = '00000000-0000-4000-8000-00000000e103';
+SELECT is((SELECT attributes->>'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e103'), 'exempt', 'Ugyldig fremtidig dato fjerner ikke EU-status i eldre utkast');
 SELECT * FROM finish();
 ROLLBACK;

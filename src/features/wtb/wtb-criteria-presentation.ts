@@ -1,8 +1,10 @@
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   filterDependencyMet,
   pruneUntilStable,
   type AttributeValue,
   type CategoryFilter,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
 import {
   isWtbDateMinValue,
@@ -21,8 +23,22 @@ export function pruneWtbCriteria(
   filters: CategoryFilter[],
 ): WtbAttributeMap {
   const byKey = new Map(filters.map((filter) => [filter.key, filter]));
+  const { legacyFilterAliases } = getCategoryBehavior(
+    (filters.find((filter) => filter.type === "brand_select")?.unit as VehicleBrandGroup) ?? null,
+  );
   return pruneUntilStable(value, (key, kept) => {
     if (key === WTB_FREETEXT_KEY) return true;
+    // Et fjernet alias betyr «Ingen begrensning» for eldre klienter i DB-triggeren.
+    const alias = legacyFilterAliases.find((candidate) => candidate.key === key);
+    if (alias && byKey.has(alias.replacementKey)) {
+      const replacement = kept[alias.replacementKey];
+      return (
+        Array.isArray(replacement) &&
+        replacement.length === 1 &&
+        replacement[0] === alias.replacementValue &&
+        kept[key] === alias.value
+      );
+    }
     const filter = byKey.get(key);
     return !!filter && filterDependencyMet(filter, kept as Record<string, AttributeValue>);
   }).kept;

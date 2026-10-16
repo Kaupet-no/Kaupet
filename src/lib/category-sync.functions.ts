@@ -27,72 +27,29 @@ function assertProductionEnvironment() {
   }
 }
 
-const SYNC_PAGE_SIZE = 500;
-
-/** Offset-paging kan hoppe over rader når staging redigeres under henting.
- * Bruk siste ID som markør og avvis endret antall før synken kan slette noe. */
-async function fetchAllRows<T extends { id: string }>(
-  client: SupabaseClient<Database>,
-  table: "categories" | "category_filters" | "category_flows" | "filter_synonyms",
-): Promise<T[]> {
-  const rows: T[] = [];
-  const readCount = async () => {
-    const { count, error } = await client.from(table).select("id", { count: "exact", head: true });
-    if (error) throw await toClientError("database", error);
-    return count ?? -1;
-  };
-  const total = await readCount();
-  let hasMore: boolean;
-  do {
-    let query = client
-      .from(table)
-      .select("*")
-      .order("id")
-      .range(0, SYNC_PAGE_SIZE - 1);
-    const lastId = rows.at(-1)?.id;
-    if (lastId) query = query.gt("id", lastId);
-    const { data, error } = await query;
-    if (error) throw await toClientError("database", error);
-    rows.push(...((data ?? []) as unknown as T[]));
-    hasMore = data?.length === SYNC_PAGE_SIZE;
-  } while (hasMore && rows.length <= total);
-  if (rows.length !== total || (await readCount()) !== total) {
-    throw new Error(
-      `Kunne ikke hente hele ${table} (${rows.length} av ${total} rader). Synken er avbrutt.`,
-    );
-  }
-  return rows;
-}
-
+/** Hele kildegrunnlaget fra ett konsistent snapshot (én SQL-setning), så
+ * en endring under hentingen ikke kan gi et blandet grunnlag som synken
+ * sletter produksjonsrader etter (KG-06-F02). */
 async function fetchCategorySyncTables(client: SupabaseClient<Database>) {
-  const [categories, categoryFilters, categoryFlows, filterSynonyms, siteSettings] =
-    await Promise.all([
-      fetchAllRows<CategoryRow>(client, "categories"),
-      fetchAllRows<CategoryFilterRow>(client, "category_filters"),
-      fetchAllRows<CategoryFlowRow>(client, "category_flows"),
-      fetchAllRows<FilterSynonymRow>(client, "filter_synonyms"),
-      client.from("site_settings").select("default_search_examples").eq("id", true).single(),
-    ]);
-  if (siteSettings.error) {
-    throw await toClientError("database", siteSettings.error);
-  }
-
+  const { data, error } = await client.rpc("category_sync_snapshot");
+  if (error) throw await toClientError("database", error);
+  const snapshot = data as {
+    categories: CategoryRow[];
+    category_filters: CategoryFilterRow[];
+    category_flows: CategoryFlowRow[];
+    filter_synonyms: FilterSynonymRow[];
+    default_search_examples: Tables<"site_settings">["default_search_examples"];
+  };
   return {
-    categories,
-    categoryFilters,
-    categoryFlows,
-    filterSynonyms,
-    defaultSearchExamples: siteSettings.data.default_search_examples,
+    categories: snapshot.categories,
+    categoryFilters: snapshot.category_filters,
+    categoryFlows: snapshot.category_flows,
+    filterSynonyms: snapshot.filter_synonyms,
+    defaultSearchExamples: snapshot.default_search_examples,
   };
 }
 
-function maxUpdatedAt(rows: { updated_at?: string | null }[]): string | null {
-  let max: string | null = null;
-  for (const r of rows) {
-    if (r.updated_at && (!max || r.updated_at > max)) max = r.updated_at;
-  }
-  return max;
-}
+type CategorySyncTables = Awaited<ReturnType<typeof fetchCategorySyncTables>>;
 
 export const getCategorySyncStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -101,29 +58,24 @@ export const getCategorySyncStatus = createServerFn({ method: "GET" })
     const supabaseAdmin = await getSupabaseAdmin();
     const { stagingAdmin } = await import("@/integrations/supabase/staging-client.server");
 
-    const [staging, status] = await Promise.all([
+    const [staging, prod, status] = await Promise.all([
       fetchCategorySyncTables(stagingAdmin),
+      fetchCategorySyncTables(supabaseAdmin),
       supabaseAdmin.from("category_sync_status").select("last_synced_at").eq("id", true).single(),
     ]);
     if (status.error) {
       throw await toClientError("database", status.error);
     }
 
-    const stagingUpdatedAt =
-      [
-        maxUpdatedAt(staging.categories),
-        maxUpdatedAt(staging.categoryFilters),
-        maxUpdatedAt(staging.categoryFlows),
-        maxUpdatedAt(staging.filterSynonyms),
-      ]
-        .filter((d): d is string => !!d)
-        .sort()
-        .at(-1) ?? null;
+    // Ajour betyr likt innhold. Tidsstempler ser ikke slettinger (KG-06-F02).
+    const diff = diffCategorySync(staging, prod);
+    const inSync =
+      !diff.defaultSearchExamplesChanged &&
+      [diff.categories, diff.categoryFilters, diff.categoryFlows, diff.filterSynonyms].every(
+        (d) => d.added.length + d.updated.length + d.removed.length === 0,
+      );
 
-    const lastSyncedAt = status.data.last_synced_at;
-    const inSync = !!lastSyncedAt && (!stagingUpdatedAt || stagingUpdatedAt <= lastSyncedAt);
-
-    return { inSync, stagingUpdatedAt, lastSyncedAt };
+    return { inSync, lastSyncedAt: status.data.last_synced_at };
   });
 
 type DiffEntry<T> = { added: T[]; updated: { before: T; after: T }[]; removed: T[] };
@@ -224,6 +176,51 @@ function normalizeFilterSynonym(s: FilterSynonymRow) {
   };
 }
 
+function diffCategorySync(staging: CategorySyncTables, prod: CategorySyncTables) {
+  const stagingSlugById = new Map(staging.categories.map((c) => [c.id, c.slug]));
+  const prodSlugById = new Map(prod.categories.map((c) => [c.id, c.slug]));
+
+  const stagingFilterKeyById = new Map(
+    staging.categoryFilters.map((f) => [
+      f.id,
+      `${stagingSlugById.get(f.category_id) ?? f.category_id}::${f.key}`,
+    ]),
+  );
+  const prodFilterKeyById = new Map(
+    prod.categoryFilters.map((f) => [
+      f.id,
+      `${prodSlugById.get(f.category_id) ?? f.category_id}::${f.key}`,
+    ]),
+  );
+
+  return {
+    categories: diffByKey(
+      keyByCategorySlug(prod.categories),
+      keyByCategorySlug(staging.categories),
+      // UUID-ene er tilfeldige per miljø, så de to oppslagene kan slås sammen.
+      normalizeCategory(new Map([...prodSlugById, ...stagingSlugById])),
+    ),
+    categoryFilters: diffByKey(
+      keyByCategoryAndField(prod.categoryFilters, prodSlugById, (f) => f.key),
+      keyByCategoryAndField(staging.categoryFilters, stagingSlugById, (f) => f.key),
+      normalizeCategoryFilter,
+    ),
+    categoryFlows: diffByKey(
+      keyByCategoryAndField(prod.categoryFlows, prodSlugById, () => ""),
+      keyByCategoryAndField(staging.categoryFlows, stagingSlugById, () => ""),
+      normalizeCategoryFlow,
+    ),
+    filterSynonyms: diffByKey(
+      keyBySynonymIdentity(prod.filterSynonyms, prodFilterKeyById),
+      keyBySynonymIdentity(staging.filterSynonyms, stagingFilterKeyById),
+      normalizeFilterSynonym,
+    ),
+    defaultSearchExamplesChanged:
+      JSON.stringify(prod.defaultSearchExamples ?? []) !==
+      JSON.stringify(staging.defaultSearchExamples ?? []),
+  };
+}
+
 export const getCategorySyncDiff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -236,49 +233,7 @@ export const getCategorySyncDiff = createServerFn({ method: "GET" })
       fetchCategorySyncTables(supabaseAdmin),
     ]);
 
-    const stagingSlugById = new Map(staging.categories.map((c) => [c.id, c.slug]));
-    const prodSlugById = new Map(prod.categories.map((c) => [c.id, c.slug]));
-
-    const stagingFilterKeyById = new Map(
-      staging.categoryFilters.map((f) => [
-        f.id,
-        `${stagingSlugById.get(f.category_id) ?? f.category_id}::${f.key}`,
-      ]),
-    );
-    const prodFilterKeyById = new Map(
-      prod.categoryFilters.map((f) => [
-        f.id,
-        `${prodSlugById.get(f.category_id) ?? f.category_id}::${f.key}`,
-      ]),
-    );
-
-    return {
-      categories: diffByKey(
-        keyByCategorySlug(prod.categories),
-        keyByCategorySlug(staging.categories),
-        // UUID-ene er tilfeldige per miljø, så de to oppslagene kan slås sammen.
-        normalizeCategory(new Map([...prodSlugById, ...stagingSlugById])),
-      ),
-      categoryFilters: diffByKey(
-        keyByCategoryAndField(prod.categoryFilters, prodSlugById, (f) => f.key),
-        keyByCategoryAndField(staging.categoryFilters, stagingSlugById, (f) => f.key),
-        normalizeCategoryFilter,
-      ),
-      categoryFlows: diffByKey(
-        keyByCategoryAndField(prod.categoryFlows, prodSlugById, () => ""),
-        keyByCategoryAndField(staging.categoryFlows, stagingSlugById, () => ""),
-        normalizeCategoryFlow,
-      ),
-      filterSynonyms: diffByKey(
-        keyBySynonymIdentity(prod.filterSynonyms, prodFilterKeyById),
-        keyBySynonymIdentity(staging.filterSynonyms, stagingFilterKeyById),
-        normalizeFilterSynonym,
-      ),
-      defaultSearchExamplesChanged:
-        JSON.stringify(prod.defaultSearchExamples ?? []) !==
-        JSON.stringify(staging.defaultSearchExamples ?? []),
-      staging,
-    };
+    return { ...diffCategorySync(staging, prod), staging };
   });
 
 export const syncCategoriesFromStaging = createServerFn({ method: "POST" })

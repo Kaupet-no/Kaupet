@@ -78,6 +78,9 @@ export function applyVehicleLookup(
   const fromLookup = vehicleLookupAttributes(lookup);
   if (attributes.vehicle_lookup && attributes.registration_number !== lookup.registrationNumber) {
     for (const key of Object.keys(fromLookup)) delete next[key];
+    // Eldre klienters fritak hører til forrige kjøretøy og ville ellers
+    // blokkert automatisk EU-status for det nye.
+    delete next.eu_control_exempt;
   }
   next.is_registered = true;
   next.registration_number = lookup.registrationNumber;

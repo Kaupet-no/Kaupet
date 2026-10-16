@@ -12,6 +12,7 @@ describe("EU-status og frist", () => {
     [undefined, null, true, "exempt"],
     [undefined, null, false, null],
     ["ugyldig", null, undefined, null],
+    ["missing", "31.12.2027", undefined, "missing"],
     ["exempt", "31.12.2027", undefined, "exempt"],
     ["missing", "2027-02-30", undefined, "missing"],
   ])(

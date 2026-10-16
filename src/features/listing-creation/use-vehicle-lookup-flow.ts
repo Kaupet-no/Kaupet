@@ -15,6 +15,7 @@ import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import { isValidVehicleRegistrationNumber } from "@/lib/vehicle/vehicle-registration";
+import { euControlStatusFromLookup } from "@/lib/vehicle/vehicle-options";
 import type { AttributeMap } from "@/components/attribute-fields";
 
 /** Attributtene et kjøretøyoppslag fyller, med verdien fra `lookup` eller
@@ -40,6 +41,7 @@ function vehicleLookupAttributes(
     color: guessColorOption(lookup.color) ?? undefined,
     body_type: lookup.body_type || undefined,
     next_eu_control: lookup.next_eu_control || undefined,
+    eu_control_status: euControlStatusFromLookup(lookup) ?? undefined,
     power_hk: lookup.power_hk ?? undefined,
     drive_type: lookup.drive_type || undefined,
     tow_hitch: lookup.tow_hitch ?? undefined,
@@ -81,6 +83,9 @@ export function applyVehicleLookup(
   next.registration_number = lookup.registrationNumber;
   next.vehicle_lookup = JSON.stringify(lookup);
   for (const [key, value] of Object.entries(fromLookup)) {
+    // Et EU-valg brukeren alt har gjort for dette kjennemerket (også eldre
+    // klienters eu_control_exempt) overstyres ikke.
+    if (key === "eu_control_status" && (next[key] || next.eu_control_exempt === true)) continue;
     if (value !== undefined) next[key] = value;
   }
   return next;

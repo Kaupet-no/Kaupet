@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(18);
+SELECT plan(20);
 
 DROP TRIGGER IF EXISTS listings_compat_eu_control ON public.listings;
 DROP TRIGGER IF EXISTS wtb_listings_compat_eu_control ON public.wtb_listings;
@@ -18,10 +18,10 @@ ON CONFLICT (category_id, key) DO NOTHING;
 INSERT INTO public.category_filters (category_id, key, label_nb, type, is_optional)
 SELECT id, 'eu_control_exempt', 'Fritatt for EU-kontroll', 'boolean', false FROM public.categories WHERE slug = 'tilhenger-leaf'
 ON CONFLICT (category_id, key) DO NOTHING;
-INSERT INTO public.listings (id, seller_id, title, status, attributes) VALUES
-  ('00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e001', 'Eldre fritatt tilhenger', 'draft', '{"eu_control_exempt":true,"color":"red"}');
-INSERT INTO public.wtb_listings (id, user_id, title, status, attributes) VALUES
-  ('00000000-0000-4000-8000-00000000e201', '00000000-0000-4000-8000-00000000e001', 'Eldre kjøpsønske', 'draft', '{"eu_control_exempt":true}');
+INSERT INTO public.listings (id, seller_id, title, status, attributes, updated_at) VALUES
+  ('00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e001', 'Eldre fritatt tilhenger', 'draft', '{"eu_control_exempt":true,"color":"red"}', '2020-01-01T00:00:00Z');
+INSERT INTO public.wtb_listings (id, user_id, title, status, attributes, updated_at) VALUES
+  ('00000000-0000-4000-8000-00000000e201', '00000000-0000-4000-8000-00000000e001', 'Eldre kjøpsønske', 'draft', '{"eu_control_exempt":true}', '2020-01-01T00:00:00Z');
 
 -- APPLY_EU_STATUS_MIGRATION
 -- APPLY_EU_COMPAT_MIGRATION
@@ -32,6 +32,8 @@ SELECT is((SELECT attributes->'eu_control_exempt' FROM public.listings WHERE id 
 SELECT is((SELECT attributes->>'eu_control_status' FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e101'), 'exempt', 'Ny status bevares');
 SELECT is((SELECT attributes->'eu_control_exempt' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e201'), 'true'::jsonb, 'Gamle klienter leser fortsatt fritatte kjøpsønsker');
 SELECT is((SELECT attributes->'eu_control_status' FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e201'), '["exempt"]'::jsonb, 'Kjøpsønskets status er fortsatt en liste');
+SELECT is((SELECT updated_at FROM public.listings WHERE id = '00000000-0000-4000-8000-00000000e101'), '2020-01-01T00:00:00Z'::timestamptz, 'Migreringen endrer ikke annonsens sist endret');
+SELECT is((SELECT updated_at FROM public.wtb_listings WHERE id = '00000000-0000-4000-8000-00000000e201'), '2020-01-01T00:00:00Z'::timestamptz, 'Migreringen endrer ikke kjøpsønskets sist endret');
 
 INSERT INTO public.listings (id, seller_id, title, status, attributes) VALUES
   ('00000000-0000-4000-8000-00000000e102', '00000000-0000-4000-8000-00000000e001', 'Ny fra gammel klient', 'draft', '{"eu_control_exempt":true}');

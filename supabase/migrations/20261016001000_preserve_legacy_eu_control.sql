@@ -71,7 +71,12 @@ REVOKE ALL ON FUNCTION public.sync_legacy_eu_control_attributes()
   FROM PUBLIC, anon, authenticated, service_role;
 
 -- Gjenopprett lesbarheten for gamle klienter etter forrige migrasjons flytting.
+-- Bare kompatibilitetstriggeren skal kjøre; updated_at beholdes.
+ALTER TABLE public.listings DISABLE TRIGGER listings_set_updated_at;
+ALTER TABLE public.wtb_listings DISABLE TRIGGER wtb_listings_updated_at;
 UPDATE public.listings SET attributes = attributes
 WHERE attributes ? 'eu_control_status';
 UPDATE public.wtb_listings SET attributes = attributes
 WHERE attributes ? 'eu_control_status';
+ALTER TABLE public.listings ENABLE TRIGGER listings_set_updated_at;
+ALTER TABLE public.wtb_listings ENABLE TRIGGER wtb_listings_updated_at;

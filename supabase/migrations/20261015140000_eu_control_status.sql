@@ -29,6 +29,12 @@ FROM public.category_filters
 WHERE key = 'next_eu_control'
 ON CONFLICT (category_id, key) DO NOTHING;
 
+-- Datamigreringen skal ikke se ut som brukerendringer (sortering, API-
+-- synk, sitemap og optimistisk lås leser updated_at).
+ALTER TABLE public.listings DISABLE TRIGGER listings_set_updated_at;
+ALTER TABLE public.wtb_listings DISABLE TRIGGER wtb_listings_updated_at;
+ALTER TABLE public.saved_searches DISABLE TRIGGER saved_searches_updated_at;
+
 UPDATE public.listings
 SET attributes = (attributes - 'eu_control_exempt')
   || CASE WHEN attributes->'eu_control_exempt' = 'true'::jsonb
@@ -55,5 +61,9 @@ SET criteria = jsonb_set(
          ELSE '{}'::jsonb END
 )
 WHERE criteria->'attributes' ? 'eu_control_exempt';
+
+ALTER TABLE public.listings ENABLE TRIGGER listings_set_updated_at;
+ALTER TABLE public.wtb_listings ENABLE TRIGGER wtb_listings_updated_at;
+ALTER TABLE public.saved_searches ENABLE TRIGGER saved_searches_updated_at;
 
 DELETE FROM public.category_filters WHERE key = 'eu_control_exempt';

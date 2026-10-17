@@ -414,8 +414,11 @@ export async function upsertListingApi(params: {
    * REST-endepunktet (`/api/v1/listings/{externalRef}`) sender aldri denne,
    * så REST-oppførselen er uendret. */
   allowDraftStatus?: boolean;
+  /** Kun MCP: opprett bare. Finnes referansen likevel når transaksjonen
+   * kjører, blir den stående urørt («duplicate») (KG-08-F02). */
+  createOnly?: boolean;
 }): Promise<UpsertListingApiResult> {
-  const { auth, externalRef, body, dryRun, allowDraftStatus } = params;
+  const { auth, externalRef, body, dryRun, allowDraftStatus, createOnly } = params;
   if (!externalRef || externalRef.trim().length === 0 || externalRef.length > 120) {
     throw new ListingApiError(
       422,
@@ -436,7 +439,7 @@ export async function upsertListingApi(params: {
   const [result] = await syncListings(supabaseAdmin, ctx, {
     importId,
     rows: [row],
-    mode: "upsert",
+    mode: createOnly ? "create" : "upsert",
     dryRun,
     allowDraftStatus,
   });

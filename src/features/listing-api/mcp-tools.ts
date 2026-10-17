@@ -476,7 +476,9 @@ const upsertListing: McpTool = {
       // `publish` gjelder bare nye annonser: en eksisterende annonse skal
       // ALDRI få statusen endret implisitt, heller ikke solgt/arkivert
       // (KG-08-F02). Ett ekstra lesekall avgjør om annonsen finnes; det
-      // telles ikke separat mot rategrensen.
+      // telles ikke separat mot rategrensen. Statusen for en ny annonse
+      // sendes bare i create-modus, så en annonse som opprettes samtidig
+      // står urørt i stedet for å få statusen.
       let exists = true;
       try {
         await api.getListingApi({ auth, externalRef });
@@ -486,6 +488,7 @@ const upsertListing: McpTool = {
       }
       if (!exists) sentStatus = publish === true ? "active" : "draft";
     }
+    const createOnly = !explicitStatus && sentStatus !== undefined;
 
     const body = withoutUndefined({ ...rest, status: sentStatus });
     const result = await api.upsertListingApi({
@@ -494,6 +497,7 @@ const upsertListing: McpTool = {
       body,
       dryRun: false,
       allowDraftStatus: true,
+      createOnly,
     });
 
     const verb =
@@ -506,7 +510,10 @@ const upsertListing: McpTool = {
             : "fantes allerede (create-modus, duplicate)";
     const warning = result.warning ? ` Merk: ${result.warning}` : "";
     return {
-      text: `Annonsen ${result.externalRef} er ${verb}. ${draftNote(sentStatus)}${warning}`,
+      text:
+        result.status === "duplicate"
+          ? `Annonsen ${result.externalRef} ble opprettet samtidig av et annet kall og er ikke endret. Kjør upsert_listing på nytt for å oppdatere den.${warning}`
+          : `Annonsen ${result.externalRef} er ${verb}. ${draftNote(sentStatus)}${warning}`,
       structured: result,
     };
   },

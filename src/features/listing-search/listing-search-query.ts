@@ -64,9 +64,14 @@ export function buildListingsSearchRpcArgs({
       ],
     }))
     .filter((group) => group.terms.length > 0);
+  // «Alle ord»-ekskludering skjuler bare annonser med hele gruppen; den må
+  // ikke slås sammen med «minst ett»-ordene (SUP-B15-01).
   const excludeAnyTerms = extraGroups
-    .filter((group) => group.exclude)
+    .filter((group) => group.exclude && group.mode === "any")
     .flatMap((group) => group.terms);
+  const excludeAllGroups = extraGroups
+    .filter((group) => group.exclude && group.mode === "all" && group.terms.length > 0)
+    .map((group) => group.terms);
   const categoryIds =
     effectiveCategories.length > 0 && categories
       ? (resolveCategoryIds(effectiveCategories, categories) ?? [])
@@ -89,7 +94,7 @@ export function buildListingsSearchRpcArgs({
   return {
     _include_groups: includeGroups as Json,
     _exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : null,
-    _exclude_all_groups: [] as Json,
+    _exclude_all_groups: excludeAllGroups as Json,
     _category_ids: categoryIds,
     _conditions: search.conditions.length > 0 ? search.conditions : null,
     _include_free: search.includeFree ?? true,

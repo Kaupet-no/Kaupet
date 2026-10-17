@@ -292,7 +292,7 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
   });
 
   // KG-08-F03 / B5: sjekken ligger i samme transaksjon som køskrivingen.
-  it("enqueue_listing_image_jobs håndhever aktørens endringsrett når _user_id er gitt", async () => {
+  it("enqueue_listing_image_jobs krever aktør og håndhever endringsrett ved kølegging", async () => {
     const { data: outsider, error: userError } = await admin.auth.admin.createUser({
       email: `listing-sync-outsider-${suffix}@example.com`,
       password: PASSWORD,
@@ -326,7 +326,7 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
         _listing_id: listingId,
         _urls: [`https://example.com/actor-${suffix}.jpg`],
         _replace: true,
-        ...(userId ? { _user_id: userId } : {}),
+        _user_id: userId as string,
       });
 
     const forbidden = await enqueue(outsider.user!.id);
@@ -338,8 +338,15 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     expect(jobs).toEqual([]);
 
     expect((await enqueue(userIds[0])).error).toBeNull();
-    // Uten aktør (bulk-synken) er oppførselen uendret.
-    expect((await enqueue(undefined)).error).toBeNull();
+    expect((await enqueue(undefined)).error).not.toBeNull();
+    const nullActor = await admin.rpc("enqueue_listing_image_jobs", {
+      _organization_id: organizationId,
+      _listing_id: listingId,
+      _urls: ["https://example.com/denied.jpg"],
+      _replace: true,
+      _user_id: null as unknown as string,
+    });
+    expect(nullActor.error?.message).toContain("listing_actor_required");
 
     const { error: disableError } = await admin
       .from("listings")
@@ -348,6 +355,92 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     expect(disableError).toBeNull();
     const disabled = await enqueue(userIds[0]);
     expect(disabled.error?.message).toContain("listing_disabled");
+  });
+
+  // KG-08-F02 / PB-8: status velges atomisk, ikke fra et tidligere oppslag.
+  it("tilstandsovergang: opprettelsesstatus publiserer ikke eksisterende solgte annonser", async () => {
+    const ref = `mcp-status-${suffix}`;
+    const upsert = (createStatus: string, status = "") =>
+      admin.rpc("upsert_listing_from_external", {
+        _organization_id: organizationId,
+        _user_id: userIds[0],
+        _location_id: locationId,
+        _import_id: crypto.randomUUID(),
+        _source: "api",
+        _external_ref: ref,
+        _mode: "mcp",
+        _listing: {
+          title: "MCP status",
+          description: "En beskrivelse",
+          category_id: categoryId,
+          price_nok: 100,
+          create_status: createStatus,
+          status,
+        },
+      });
+    const created = await upsert("draft");
+    expect(created.error).toBeNull();
+    expect(created.data).toMatchObject({ status: "created" });
+    const read = () =>
+      admin
+        .from("listings")
+        .select("status")
+        .eq("organization_id", organizationId)
+        .eq("external_ref", ref)
+        .single();
+    expect((await read()).data?.status).toBe("draft");
+    await admin
+      .from("listings")
+      .update({ status: "sold" })
+      .eq("organization_id", organizationId)
+      .eq("external_ref", ref);
+    expect((await upsert("active")).error).toBeNull();
+    expect((await read()).data?.status).toBe("sold");
+    // Annonsen forsvinner etter et tenkt MCP-oppslag: ny rad er fortsatt utkast.
+    await admin
+      .from("listings")
+      .delete()
+      .eq("organization_id", organizationId)
+      .eq("external_ref", ref);
+    expect((await upsert("draft")).error).toBeNull();
+    expect((await read()).data?.status).toBe("draft");
+    expect((await upsert("draft", "active")).error).toBeNull();
+    expect((await read()).data?.status).toBe("active");
+  });
+
+  it("feilgjetting: samtidige opprettelser beholder statusen fra den første transaksjonen", async () => {
+    const ref = `mcp-concurrent-${suffix}`;
+    const results = await Promise.all(
+      ["draft", "active"].map((createStatus) =>
+        admin.rpc("upsert_listing_from_external", {
+          _organization_id: organizationId,
+          _user_id: userIds[0],
+          _location_id: locationId,
+          _import_id: crypto.randomUUID(),
+          _source: "api",
+          _external_ref: ref,
+          _mode: "mcp",
+          _listing: {
+            title: "Samtidig MCP",
+            description: "En beskrivelse",
+            category_id: categoryId,
+            price_nok: 100,
+            create_status: createStatus,
+          },
+        }),
+      ),
+    );
+    for (const result of results) expect(result.error).toBeNull();
+    const statuses = results.map((result) => (result.data as { status: string }).status);
+    expect(statuses.slice().sort()).toEqual(["created", "unchanged"]);
+    const { data, error } = await admin
+      .from("listings")
+      .select("status")
+      .eq("organization_id", organizationId)
+      .eq("external_ref", ref)
+      .single();
+    expect(error).toBeNull();
+    expect(data?.status).toBe(["draft", "active"][statuses.indexOf("created")]);
   });
 
   it("dry_run skriver ingenting", async () => {
@@ -486,12 +579,14 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     const [first, second] = await Promise.all([
       admin.rpc("enqueue_listing_image_jobs", {
         _organization_id: organizationId,
+        _user_id: userIds[0],
         _listing_id: listingId,
         _urls: [`https://example.com/image-a-${suffix}.jpg`],
         _replace: false,
       }),
       admin.rpc("enqueue_listing_image_jobs", {
         _organization_id: organizationId,
+        _user_id: userIds[0],
         _listing_id: listingId,
         _urls: [`https://example.com/image-b-${suffix}.jpg`],
         _replace: false,
@@ -517,6 +612,7 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     expect(imageSeedError).toBeNull();
     const reorder = await admin.rpc("enqueue_listing_image_jobs", {
       _organization_id: organizationId,
+      _user_id: userIds[0],
       _listing_id: listingId,
       _urls: [chargedUrl],
       _replace: true,
@@ -524,6 +620,7 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     expect(reorder.error).toBeNull();
     const replace = await admin.rpc("enqueue_listing_image_jobs", {
       _organization_id: organizationId,
+      _user_id: userIds[0],
       _listing_id: listingId,
       _urls: [`https://example.com/replacement-${suffix}.jpg`],
       _replace: true,
@@ -548,6 +645,7 @@ describe.skipIf(!canRun)("RLS: listing external sync RPCs", () => {
     await admin.from("listing_image_jobs").delete().eq("listing_id", listingId);
     const recreated = await admin.rpc("enqueue_listing_image_jobs", {
       _organization_id: organizationId,
+      _user_id: userIds[0],
       _listing_id: listingId,
       _urls: [chargedUrl],
       _replace: false,

@@ -181,8 +181,10 @@ export function PersonvernContent() {
               registreringen, slik at du ikke mister innholdet ved utilsiktet lukking. Nøkkelen
               inneholder bruker-ID-en din og eventuell bedrifts-ID, slik at et utkast aldri vises
               for en annen konto på samme enhet. Bilder i utkastet lagres i nettleserens
-              IndexedDB-database <strong>kaupet-listing-drafts</strong>. Slettes når annonsen er
-              publisert eller forkastet.
+              IndexedDB-database <strong>kaupet-listing-drafts</strong>. Er du innlogget, lastes
+              bildene også opp og lagres sammen med utkastet på kontoen din, slik at du kan
+              fortsette på en annen enhet. Slettes når annonsen er publisert eller forkastet, og
+              serverutkastet med bilder slettes automatisk etter 90 dager uten redigering.
             </li>
             <li>
               <strong>kaupet_push_msg_hint_dismissed_v1</strong>,{" "}
@@ -202,7 +204,8 @@ export function PersonvernContent() {
             <code>sessionStorage</code>, som slettes automatisk når du lukker fanen. Denne brukes
             til å ta deg tilbake til søkeresultatene dine etter å ha sett på en annonse. Bildeutkast
             til en påbegynt annonse mellomlagres tilsvarende i nettleserens <code>IndexedDB</code>,
-            og slettes sammen med det tekstlige utkastet.
+            og slettes sammen med det tekstlige utkastet. Er du innlogget, lagres bildene også på
+            kontoen din som beskrevet over.
           </p>
         </details>
 

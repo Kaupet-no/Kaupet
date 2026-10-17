@@ -82,8 +82,9 @@ describe("buildListingsSearchRpcArgs", () => {
       offset: 0,
     });
     expect(args?._include_groups).toEqual([{ mode: "any", terms: ["gul", "grønn", "blå"] }]);
-    expect(args?._exclude_any_terms).toEqual(["kopi", "defekt"]);
-    expect(args?._exclude_all_groups).toEqual([]);
+    // SUP-B15-01: «alle ord» skjuler bare annonser med begge ordene.
+    expect(args?._exclude_any_terms).toBeNull();
+    expect(args?._exclude_all_groups).toEqual([["kopi", "defekt"]]);
   });
 
   it("fjerner valgt maksimum når den tilgjengelige høyeste prisen beregnes", () => {

@@ -548,6 +548,9 @@ export async function syncListings(
               _listing_id: result.listingId,
               _urls: normalized.imageUrls,
               _replace: true,
+              // KG-08-F03: køgrensen kontrollerer aktørens rett i samme
+              // transaksjon som bildeendringen.
+              _user_id: ctx.userId,
             });
             if (enqueueError) throw enqueueError;
           } catch (cause) {

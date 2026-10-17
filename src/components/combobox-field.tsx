@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { ChecklistRow, ChecklistSearch } from "@/components/checklist";
 
 export type ComboboxOption = { value: string; label_nb: string };
 
@@ -12,11 +11,7 @@ export type ComboboxOption = { value: string; label_nb: string };
  * open-vocabulary fields where more than one value can apply at once (e.g.
  * Merke, matching the Bil brand/model multiselect pattern in
  * attribute-filter-chips.tsx's BrandMultiChip).
- *
- * Ekte avkrysningsbokser, ikke cmdk: cmdk tvinger role="option" og bruker
- * aria-selected for aktiv rad, og Chromium på Android ignorerer aria-checked
- * på option. TalkBack leste da aktiv rad som valgt og faktisk valg som
- * ikke-valgt (KG-36-F01).
+ * Ekte avkrysningsbokser, ikke cmdk — se checklist.tsx (KG-36-F01).
  */
 export function ComboboxMultiContent({
   values,
@@ -42,9 +37,7 @@ export function ComboboxMultiContent({
 
   return (
     <div>
-      <Input
-        type="search"
-        enterKeyHint="done"
+      <ChecklistSearch
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         onKeyDown={(e) => {
@@ -54,23 +47,15 @@ export function ComboboxMultiContent({
           else addFreeform();
         }}
         placeholder={placeholder}
-        aria-label={placeholder}
-        className="rounded-none border-0 border-b shadow-none focus-visible:ring-0"
       />
       <ul className="max-h-[300px] overflow-y-auto p-1">
         {visible.map((o) => (
-          <li key={o.value}>
-            <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm hover:bg-accent">
-              {/* Radix-boksen er en <button>; Chromium navngir den ikke fra
-                  omsluttende <label>. */}
-              <Checkbox
-                checked={values.includes(o.value)}
-                onCheckedChange={() => onToggle(o.value)}
-                aria-label={o.label_nb}
-              />
-              {o.label_nb}
-            </label>
-          </li>
+          <ChecklistRow
+            key={o.value}
+            label={o.label_nb}
+            checked={values.includes(o.value)}
+            onToggle={() => onToggle(o.value)}
+          />
         ))}
         {trimmed && !exactMatch && (
           <li>

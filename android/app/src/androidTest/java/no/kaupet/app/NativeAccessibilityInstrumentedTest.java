@@ -1,5 +1,6 @@
 package no.kaupet.app;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -8,16 +9,25 @@ import android.app.Instrumentation;
 import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.webkit.WebStorage;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
 import java.util.function.BooleanSupplier;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.io.File;
+import java.io.FileOutputStream;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,6 +44,7 @@ public class NativeAccessibilityInstrumentedTest {
     private UiDevice device;
     private String originalAccessibilityEnabled;
     private String originalAccessibilityServices;
+    private String originalFontScale;
 
     @Before
     public void setUp() throws Exception {
@@ -44,6 +55,7 @@ public class NativeAccessibilityInstrumentedTest {
             device.executeShellCommand("settings get secure accessibility_enabled").trim();
         originalAccessibilityServices =
             device.executeShellCommand("settings get secure enabled_accessibility_services").trim();
+        originalFontScale = device.executeShellCommand("settings get system font_scale").trim();
         disableAccessibilityServices();
         instrumentation.runOnMainSync(() -> WebStorage.getInstance().deleteAllData());
 
@@ -59,6 +71,7 @@ public class NativeAccessibilityInstrumentedTest {
 
     @After
     public void tearDown() throws Exception {
+        device.executeShellCommand("settings put system font_scale " + ("null".equals(originalFontScale) ? "1.0" : originalFontScale));
         restoreSecureSetting("enabled_accessibility_services", originalAccessibilityServices);
         restoreSecureSetting("accessibility_enabled", originalAccessibilityEnabled);
     }
@@ -70,7 +83,7 @@ public class NativeAccessibilityInstrumentedTest {
 
         assertNamedControl("Søk i annonser");
         assertNamedControl("Velg lokasjon: Hele Norge");
-        assertNamedControl("Alle kategorier");
+        assertNamedControl("Kategorier");
         assertNamedControl("Hjem");
         assertNamedControl("Søk");
         assertNamedControl("Ny annonse");
@@ -97,6 +110,54 @@ public class NativeAccessibilityInstrumentedTest {
         );
     }
 
+    // KG-39-F02: ekte OS-endring må skalere tekst, men beholde rotmål og sidebredde.
+    @Test
+    public void androidFontScaleChangesTextWithoutScalingRootLayout() throws Exception {
+        device.executeShellCommand("settings put system font_scale 1.0");
+        connectStagingShellToLocalServer();
+        completeOnboarding();
+        JSONObject baseline = readLayoutMetrics();
+        assertEquals(1.0, baseline.getDouble("scale"), 0.01);
+
+        device.executeShellCommand("settings put system font_scale 2.0");
+        assertTrue("WebView must apply the new OS text scale", waitForCondition(() -> {
+            try { return readLayoutMetrics().getDouble("scale") == 2.0; }
+            catch (Exception notReady) { return false; }
+        }, PAGE_TIMEOUT));
+        assertNamedControl("Hjem");
+        assertNamedControl("Ny annonse");
+        JSONObject enlarged = readLayoutMetrics();
+        assertEquals("Root spacing must stay unchanged", baseline.getDouble("root"), enlarged.getDouble("root"), 0.01);
+        assertEquals("Visible location text must double", baseline.getDouble("text") * 2, enlarged.getDouble("text"), 0.1);
+        assertTrue("Landing page must fit horizontally at 200%", enlarged.getInt("scrollWidth") <= enlarged.getInt("width"));
+        System.out.println("font-scale baseline=" + baseline + " enlarged=" + enlarged);
+        File screenshot = new File(instrumentation.getTargetContext().getCacheDir(), "fontscale-200.png");
+        try (FileOutputStream out = new FileOutputStream(screenshot)) {
+            automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, out);
+        }
+    }
+
+    private JSONObject readLayoutMetrics() throws Exception {
+        CountDownLatch ready = new CountDownLatch(1);
+        String[] result = { null };
+        instrumentation.runOnMainSync(() -> {
+            for (android.app.Activity activity : ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)) {
+                if (!(activity instanceof MainActivity)) continue;
+                ((MainActivity) activity).getBridge().getWebView().evaluateJavascript("""
+                    JSON.stringify({
+                        scale: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kaupet-text-scale')) || 1,
+                        root: parseFloat(getComputedStyle(document.documentElement).fontSize),
+                        text: parseFloat(getComputedStyle(document.querySelector('[aria-label="Velg lokasjon: Hele Norge"]').lastElementChild).fontSize),
+                        width: document.documentElement.clientWidth,
+                        scrollWidth: document.documentElement.scrollWidth
+                    })
+                    """, value -> { result[0] = value; ready.countDown(); });
+            }
+        });
+        if (!ready.await(SHORT_TIMEOUT, TimeUnit.MILLISECONDS)) throw new IllegalStateException("WebView metrics unavailable");
+        return new JSONObject((String) new JSONTokener(result[0]).nextValue());
+    }
+
     private void assertSearchPanel() {
         assertNamedControl("Søk og filtrer");
         assertNamedControl("Søk etter sted");
@@ -117,14 +178,19 @@ public class NativeAccessibilityInstrumentedTest {
     }
 
     private void completeOnboarding() {
-        UiObject2 explore = waitFor(By.text("Utforsk Kaupet"), PAGE_TIMEOUT);
-        assertNotNull("Onboarding must load from localhost:3000", explore);
-        explore.click();
+        UiObject2 start = waitForNamedControl("Kom i gang", PAGE_TIMEOUT);
+        assertNotNull("Onboarding must load from localhost:3000", start);
+        start.click();
+        UiObject2 skip = waitForNamedControl("Hopp over", SHORT_TIMEOUT);
+        assertNotNull("Sign-in step must offer skipping", skip);
+        assertTrue("Skip must become enabled after auth bootstrap", waitForCondition(() -> {
+            AccessibilityNodeInfo node = findNodeByName(automation.getRootInActiveWindow(), "Hopp over");
+            return node != null && node.isEnabled();
+        }, SHORT_TIMEOUT));
+        focusInputNode("Hopp over");
+        device.pressKeyCode(KeyEvent.KEYCODE_ENTER);
 
-        UiObject2 continueButton = waitForNamedControl("Fortsett til Kaupet", SHORT_TIMEOUT);
-        assertNotNull("Onboarding continuation must be exposed", continueButton);
-        continueButton.click();
-
+        // Avslutningsanimasjonen går automatisk videre; vent på den stabile målsiden.
         assertNotNull(
             "Native landing page must load after onboarding",
             waitForNamedControl("Velg lokasjon: Hele Norge", PAGE_TIMEOUT)
@@ -145,10 +211,14 @@ public class NativeAccessibilityInstrumentedTest {
     }
 
     private UiObject2 waitForNamedControl(String name, long timeout) {
-        long attemptTimeout = timeout / 3;
-        UiObject2 node = waitFor(By.hintContains(name), attemptTimeout);
-        if (node == null) node = waitFor(By.descContains(name), attemptTimeout);
-        return node != null ? node : waitFor(By.textContains(name), attemptTimeout);
+        UiObject2[] found = { null };
+        waitForCondition(() -> {
+            found[0] = device.findObject(By.hintContains(name));
+            if (found[0] == null) found[0] = device.findObject(By.descContains(name));
+            if (found[0] == null) found[0] = device.findObject(By.textContains(name));
+            return found[0] != null;
+        }, timeout);
+        return found[0];
     }
 
     private UiObject2 waitFor(androidx.test.uiautomator.BySelector selector, long timeout) {

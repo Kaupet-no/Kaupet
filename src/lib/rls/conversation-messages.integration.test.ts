@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Database } from "@/integrations/supabase/types";
-import { lastConversationMessages } from "../conversation-messages";
+import { conversationMessagesPage, lastConversationMessages } from "../conversation-messages";
 import {
   URL,
   ANON_KEY,
@@ -95,5 +95,42 @@ describe.skipIf(!canRun)("siste melding per samtale", () => {
     const anon = createClient<Database>(URL!, ANON_KEY!);
     expect(await lastConversationMessages(conversationIds, outsider)).toEqual(new Map());
     expect(await lastConversationMessages(conversationIds, anon)).toEqual(new Map());
+  });
+  it("RV-02: henter siste side og alle eldre meldinger med like tidsstempler uten hull", async () => {
+    const sellerId = userIds[0];
+    const rows = Array.from({ length: 1001 }, (_, i) => ({
+      id: crypto.randomUUID(),
+      conversation_id: conversationIds[2],
+      sender_id: sellerId,
+      body: `Sidegrense æøå 👋 ${i}`,
+      created_at: "2026-10-16T10:00:00.000Z",
+    }));
+    const { error } = await admin.from("messages").insert(rows);
+    expect(error).toBeNull();
+    const seller = await signInWithRetry(sellerEmail);
+    const first = await conversationMessagesPage(conversationIds[2], null, seller);
+    expect(first.messages).toHaveLength(50);
+    const expectedIds = rows
+      .map((m) => m.id)
+      .sort()
+      .reverse();
+    expect(first.messages.map((m) => m.id)).toEqual(expectedIds.slice(0, 50));
+    // En nyere melding endrer ikke markøren for eldre sider.
+    const inserted = await admin.from("messages").insert({
+      conversation_id: conversationIds[2],
+      sender_id: sellerId,
+      body: "Ny under henting",
+      created_at: "2026-10-16T10:00:01.000Z",
+    });
+    expect(inserted.error).toBeNull();
+    const ids = first.messages.map((m) => m.id);
+    let cursor = first.nextCursor;
+    while (cursor) {
+      const page = await conversationMessagesPage(conversationIds[2], cursor, seller);
+      ids.push(...page.messages.map((m) => m.id));
+      cursor = page.nextCursor;
+    }
+    expect(ids).toEqual(expectedIds);
+    expect(new Set(ids).size).toBe(1001);
   });
 });

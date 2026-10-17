@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import type { ConvSummary } from "@/hooks/use-unread";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowLeft, Paperclip, Send, User as UserIcon, X } from "lucide-react";
@@ -27,7 +27,13 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
-import { fetchAllPages } from "@/lib/fetch-all-pages";
+import {
+  conversationMessagesPage,
+  mapMessagePages,
+  upsertConversationMessage,
+  type ConversationMessagesData,
+  type MessageCursor,
+} from "@/lib/conversation-messages";
 import { displayPriceNok, formatNokNumber, formatWtbMaxPrice } from "@/lib/format";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
@@ -213,28 +219,41 @@ function ConversationPage() {
     },
   });
 
-  const { data: messages, isLoading: messagesLoading } = useQuery({
+  const {
+    data: messageData,
+    isLoading: messagesLoading,
+    isError: messagesError,
+    isFetchNextPageError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch: refetchMessages,
+  } = useInfiniteQuery({
     queryKey: ["messages", id],
     enabled: !!user,
     refetchInterval: realtimeDown ? MESSAGES_POLL_INTERVAL_MS : false,
-    // Alle sider: PostgREST kapper ved 1000 rader, og eldste-først ga da en
-    // tråd uten de nyeste meldingene (RV-20261016-02). id gjør rekkefølgen
-    // stabil ved like tidsstempler.
-    // ponytail: henter hele tråden; bakoverpaginering hvis tråder blir så lange at det merkes.
-    queryFn: async (): Promise<Message[]> => {
-      const { data, error } = await fetchAllPages<Message>((from, to) =>
-        supabase
-          .from("messages")
-          .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
-          .eq("conversation_id", id)
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true })
-          .range(from, to),
-      );
-      if (data === null) throw error;
-      return data;
-    },
+    initialPageParam: null as MessageCursor | null,
+    queryFn: ({ pageParam }) => conversationMessagesPage(id, pageParam),
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
+  const messages = useMemo(() => {
+    const byId = new Map(messageData?.pages.flatMap((page) => page.messages).map((m) => [m.id, m]));
+    return [...byId.values()].sort(
+      (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+    );
+  }, [messageData]);
+  const latestMessage = messages.at(-1);
+  const messagesLoaded = messageData !== undefined;
+
+  async function loadOlderMessages() {
+    const el = scrollRef.current;
+    const height = el?.scrollHeight ?? 0;
+    const top = el?.scrollTop ?? 0;
+    await fetchNextPage();
+    requestAnimationFrame(() => {
+      if (el && el === scrollRef.current) el.scrollTop = top + el.scrollHeight - height;
+    });
+  }
 
   // Signerte URL-er for meldingsvedlegg (privat bucket, samme mønster som annonsebilder).
   const signMissingAttachments = useEffectEvent((msgs: typeof messages) => {
@@ -324,13 +343,19 @@ function ConversationPage() {
           table: "messages",
           filter: `conversation_id=eq.${id}`,
         },
-        (payload) => {
+        async (payload) => {
           const m = payload.new as Message;
-          queryClient.setQueryData<Message[]>(["messages", id], (prev) => {
-            if (!prev) return [m];
-            if (prev.some((x) => x.id === m.id)) return prev;
-            return [...prev, m];
-          });
+          // Avbryt en eldre henting før den kan overskrive realtime-meldingen.
+          await queryClient.cancelQueries({ queryKey: ["messages", id] });
+          if (!active) return;
+          const cached = queryClient.getQueryData(["messages", id]);
+          if (cached) {
+            queryClient.setQueryData<ConversationMessagesData>(["messages", id], (prev) =>
+              upsertConversationMessage(prev, m),
+            );
+          } else {
+            void queryClient.invalidateQueries({ queryKey: ["messages", id] });
+          }
           // Markér som lest når brukeren er inne i samtalen
           if (conv && user && !(lastMarkedRef.current && m.created_at <= lastMarkedRef.current)) {
             lastMarkedRef.current = m.created_at;
@@ -350,8 +375,8 @@ function ConversationPage() {
           // Sletting er en UPDATE (deleted_at): motparten må se den uten
           // refresh (KG-24-F03).
           const m = payload.new as Message;
-          queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
-            prev?.map((x) => (x.id === m.id ? { ...x, ...m } : x)),
+          queryClient.setQueryData<ConversationMessagesData>(["messages", id], (prev) =>
+            mapMessagePages(prev, (page) => page.map((x) => (x.id === m.id ? { ...x, ...m } : x))),
           );
         },
       )
@@ -413,15 +438,14 @@ function ConversationPage() {
         el.scrollTop = el.scrollHeight;
       });
     }
-    if (messages && conv && user) {
-      const readAt =
-        messages.length > 0 ? messages[messages.length - 1].created_at : new Date().toISOString();
+    if (messagesLoaded && conv && user) {
+      const readAt = latestMessage?.created_at ?? new Date().toISOString();
       if (!(lastMarkedRef.current && readAt <= lastMarkedRef.current)) {
         lastMarkedRef.current = readAt;
         markRead({ readAt, conv, user });
       }
     }
-  }, [messages, id, conv, user]);
+  }, [latestMessage?.id, latestMessage?.created_at, id, conv, user, messagesLoaded]);
 
   const sendMessageFn = useServerFn(sendMessage);
 
@@ -462,7 +486,8 @@ function ConversationPage() {
     // databasetrigger (messages_bump_conversation_last_message_at_trg)
     // for å unngå at feltet kan drifte fra faktisk siste melding.
     // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.
-    onMutate: ({ text, file, conversationId }) => {
+    onMutate: async ({ text, file, conversationId }) => {
+      await queryClient.cancelQueries({ queryKey: ["messages", conversationId] });
       const trimmed = text.trim();
       if ((!trimmed && !file) || trimmed.length > 4000) return {};
       const previewUrl = file ? URL.createObjectURL(file) : undefined;
@@ -476,19 +501,19 @@ function ConversationPage() {
         pending: true,
         attachmentPreviewUrl: previewUrl,
       };
-      queryClient.setQueryData<Message[]>(["messages", conversationId], (prev) =>
-        prev ? [...prev, optimistic] : [optimistic],
+      queryClient.setQueryData<ConversationMessagesData>(["messages", conversationId], (prev) =>
+        upsertConversationMessage(prev, optimistic),
       );
       setBody("");
       clearAttachment();
       return { optimisticId: optimistic.id, previousBody: text, previewUrl };
     },
     onSuccess: (m, vars, context) => {
-      queryClient.setQueryData<Message[]>(["messages", vars.conversationId], (prev) => {
-        const withoutOptimistic = (prev ?? []).filter((x) => x.id !== context?.optimisticId);
-        if (withoutOptimistic.some((x) => x.id === m.id)) return withoutOptimistic;
-        return [...withoutOptimistic, m];
-      });
+      queryClient.setQueryData<ConversationMessagesData>(
+        ["messages", vars.conversationId],
+        (prev) => upsertConversationMessage(prev, m, context?.optimisticId),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["messages", vars.conversationId] });
       if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
       void import("@/lib/haptics").then((m) => m.hapticSelection());
@@ -496,8 +521,10 @@ function ConversationPage() {
     },
     onError: (e: Error, vars, context) => {
       if (context?.optimisticId) {
-        queryClient.setQueryData<Message[]>(["messages", vars.conversationId], (prev) =>
-          prev?.filter((x) => x.id !== context.optimisticId),
+        queryClient.setQueryData<ConversationMessagesData>(
+          ["messages", vars.conversationId],
+          (prev) =>
+            mapMessagePages(prev, (page) => page.filter((x) => x.id !== context.optimisticId)),
         );
         if (sendAttemptRef.current === vars.attempt) {
           setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
@@ -508,6 +535,7 @@ function ConversationPage() {
         }
       }
       if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
+      void queryClient.invalidateQueries({ queryKey: ["messages", vars.conversationId] });
       showErrorToast(formatErrorMessage(e, "Meldingen ble ikke sendt. Prøv igjen."));
     },
   });
@@ -556,8 +584,12 @@ function ConversationPage() {
       return messageId;
     },
     onSuccess: (messageId) => {
-      queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
-        prev?.map((m) => (m.id === messageId ? { ...m, deleted_at: new Date().toISOString() } : m)),
+      queryClient.setQueryData<ConversationMessagesData>(["messages", id], (prev) =>
+        mapMessagePages(prev, (page) =>
+          page.map((m) =>
+            m.id === messageId ? { ...m, deleted_at: new Date().toISOString() } : m,
+          ),
+        ),
       );
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette meldingen")),
@@ -840,13 +872,34 @@ function ConversationPage() {
         )}
 
         <div
+          key={id}
           ref={scrollRef}
           role="log"
           aria-live="polite"
           aria-relevant="additions"
           className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4"
         >
-          {messagesLoading ? (
+          {hasNextPage && (
+            <Button
+              variant="outline"
+              className="mx-auto flex"
+              disabled={isFetchingNextPage}
+              onClick={() => void loadOlderMessages()}
+            >
+              {isFetchingNextPage ? "Henter eldre meldinger…" : "Vis eldre meldinger"}
+            </Button>
+          )}
+          {isFetchNextPageError && (
+            <p role="alert">Kunne ikke hente eldre meldinger. Prøv igjen.</p>
+          )}
+          {messagesError && !messageData ? (
+            <div role="alert">
+              <p>Kunne ikke hente meldingene.</p>
+              <Button variant="outline" onClick={() => void refetchMessages()}>
+                Prøv igjen
+              </Button>
+            </div>
+          ) : messagesLoading ? (
             <div className="space-y-3 py-2">
               <Skeleton className="h-10 w-2/3" />
               <Skeleton className="ml-auto h-10 w-1/2" />

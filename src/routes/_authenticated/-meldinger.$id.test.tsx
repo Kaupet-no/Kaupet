@@ -27,8 +27,8 @@ const mocks = vi.hoisted(() => ({
   setQueryData: vi.fn(),
   setQueriesData: vi.fn(),
   mutate: vi.fn(),
-  messageRows: [] as { id: string; created_at: string }[],
-  messageOrders: [] as string[],
+  fetchNextPage: vi.fn().mockResolvedValue({}),
+  infiniteState: {} as Record<string, unknown>,
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -50,12 +50,26 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false, isError: false, error: null };
   },
+  useInfiniteQuery: (opts: { queryKey: unknown[] } & Record<string, unknown>) => {
+    mocks.queryCalls.push({ key: opts.queryKey, opts });
+    return {
+      data: mocks.queryData.messages ?? {
+        pages: [{ messages: [], nextCursor: undefined }],
+        pageParams: [null],
+      },
+      isLoading: false,
+      hasNextPage: false,
+      fetchNextPage: mocks.fetchNextPage,
+      ...mocks.infiniteState,
+    };
+  },
   useMutation: () => ({ mutate: mocks.mutate, isPending: false }),
   useQueryClient: () => ({
     invalidateQueries: vi.fn(),
     setQueryData: mocks.setQueryData,
     setQueriesData: mocks.setQueriesData,
-    getQueryData: vi.fn(),
+    getQueryData: () => mocks.queryData.messages,
+    cancelQueries: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -77,32 +91,7 @@ vi.mock("@/integrations/supabase/client", () => {
       return channel;
     },
   };
-  // Som PostgREST: range respekteres, men svaret kappes på 1000 rader.
-  const from = () => {
-    const orders: string[] = [];
-    let start = 0;
-    let end = Infinity;
-    const query = {
-      select: () => query,
-      eq: () => query,
-      order: (column: string) => {
-        orders.push(column);
-        return query;
-      },
-      range: (a: number, b: number) => {
-        start = a;
-        end = b;
-        return query;
-      },
-      then: (resolve: (value: unknown) => unknown) => {
-        mocks.messageOrders = orders;
-        const rows = mocks.messageRows.slice(start, Math.min(end + 1, start + 1000));
-        return resolve({ data: rows, error: null });
-      },
-    };
-    return query;
-  };
-  return { supabase: { channel: () => channel, removeChannel: vi.fn(), from } };
+  return { supabase: { channel: () => channel, removeChannel: vi.fn() } };
 });
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
@@ -164,6 +153,8 @@ beforeEach(() => {
   mocks.setQueryData.mockReset();
   mocks.setQueriesData.mockReset();
   mocks.mutate.mockReset();
+  mocks.infiniteState = {};
+  mocks.fetchNextPage.mockClear();
 });
 
 afterEach(() => {
@@ -234,19 +225,20 @@ describe("meldinger.$id — realtime-fallback (F16)", () => {
   });
 });
 
-// RV-20261016-02: tråden ble lest eldste først uten paginering, så den
-// nyeste meldingen manglet i samtaler med over 1000 meldinger.
-it("henter også meldinger etter PostgRESTs radgrense, i stabil rekkefølge", async () => {
-  mocks.messageRows = Array.from({ length: 1001 }, (_, i) => ({
-    id: `m${String(i).padStart(4, "0")}`,
-    created_at: "2026-10-16T10:00:00Z",
-  }));
-  render(<ConversationPage />);
-  const queryFn = lastQueryOptsFor("messages")?.queryFn as () => Promise<{ id: string }[]>;
-  const rows = await queryFn();
-  expect(rows).toHaveLength(1001);
-  expect(rows.at(-1)?.id).toBe("m1000");
-  expect(mocks.messageOrders).toEqual(["created_at", "id"]);
+// RV-20261016-02 / PB-2: eksplisitt bakoverpaginering, med feiltilstand.
+it("lar brukeren hente eldre meldinger", async () => {
+  mocks.infiniteState = { hasNextPage: true };
+  mocks.queryData.conversation = baseConv();
+  const view = render(<ConversationPage />);
+  await act(async () => fireEvent.click(view.getByRole("button", { name: "Vis eldre meldinger" })));
+  expect(mocks.fetchNextPage).toHaveBeenCalledOnce();
+});
+it("viser feil ved henting av eldre meldinger og beholder nytt forsøk", () => {
+  mocks.infiniteState = { hasNextPage: true, isFetchNextPageError: true };
+  mocks.queryData.conversation = baseConv();
+  const view = render(<ConversationPage />);
+  expect(view.getByRole("alert").textContent).toContain("Kunne ikke hente eldre meldinger");
+  expect(view.getByRole("button", { name: "Vis eldre meldinger" })).toBeTruthy();
 });
 
 // Blokkerings-UI (App Store 1.2): komponenten skal vise en tydelig tilstand
@@ -352,7 +344,11 @@ describe("meldinger.$id — kjøpsønsker, realtime og komposer (KG-24)", () => 
     act(() => handler("messages", "UPDATE")?.({ new: deleted }));
     const call = mocks.setQueryData.mock.calls.find(([key]) => key[0] === "messages");
     expect(call?.[0]).toEqual(["messages", "conv-1"]);
-    expect(call?.[1]([{ id: "m1", body: "hei", deleted_at: null }])).toEqual([
+    const data = {
+      pages: [{ messages: [{ id: "m1", body: "hei", deleted_at: null }], nextCursor: undefined }],
+      pageParams: [null],
+    };
+    expect(call?.[1](data).pages[0].messages).toEqual([
       { id: "m1", body: "", deleted_at: "2026-10-13T10:00:00Z" },
     ]);
   });

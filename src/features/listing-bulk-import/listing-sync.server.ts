@@ -378,6 +378,7 @@ async function callUpsert(
   row: BulkImportRow,
   mode: "create" | "upsert",
   dryRun: boolean,
+  createStatus?: "active" | "draft",
 ): Promise<ListingSyncResult> {
   const category = resolveCategory(row.category, ctx.categories)!;
   const { data, error } = await supabaseAdmin.rpc("upsert_listing_from_external", {
@@ -405,8 +406,9 @@ async function callUpsert(
       maintenance_history: row.maintenanceHistory ?? "",
       attributes: row.attributes,
       status: row.status ?? "",
+      create_status: createStatus,
     },
-    _mode: mode,
+    _mode: createStatus ? "mcp" : mode,
     _dry_run: dryRun,
   });
   if (error) throw error;
@@ -457,6 +459,7 @@ export async function syncListings(
     dryRun?: boolean;
     /** Bare MCP: tillat `status: "draft"` ved opprettelse av ny annonse. */
     allowDraftStatus?: boolean;
+    createStatus?: "active" | "draft";
   },
 ): Promise<ListingSyncResult[]> {
   const { importId, rows, mode, dryRun = false, allowDraftStatus = false } = params;
@@ -518,6 +521,7 @@ export async function syncListings(
             normalized,
             mode,
             dryRun,
+            params.createStatus,
           );
         } catch {
           return {

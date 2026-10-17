@@ -283,6 +283,29 @@ describe("syncListings", () => {
     );
   });
 
+  it("sender opprettelsesstatus separat fra eksplisitt status i MCP-modus", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["existing-ref"],
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "unchanged", listing_id: "listing-1" }, error: null };
+      },
+    });
+    await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "existing-ref" })],
+      mode: "upsert",
+      createStatus: "draft",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _mode: "mcp",
+        _listing: expect.objectContaining({ status: "", create_status: "draft" }),
+      }),
+    );
+  });
+
   it("sender tom status videre når raden ikke har status satt", async () => {
     const rpc = vi.fn();
     const supabaseAdmin = makeSupabaseAdmin({

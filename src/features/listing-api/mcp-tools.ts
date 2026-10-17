@@ -149,15 +149,6 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { isApiBusinessError?: unknown }).isApiBusinessError === true &&
-    (error as { status?: unknown }).status === 404
-  );
-}
-
 /** Fjerner `undefined`-felt slik at de aldri overskriver eksisterende
  * verdier i `mapApiBodyToRow`/`normalizeBulkImportRow` (som tolker
  * fravær ≠ eksplisitt tom verdi for enkelte felt). */
@@ -471,33 +462,14 @@ const upsertListing: McpTool = {
     const explicitStatus = asString(rest.status);
     const api = await loadApi();
 
-    let sentStatus = explicitStatus;
-    if (!explicitStatus) {
-      // `publish` gjelder bare nye annonser: en eksisterende annonse skal
-      // ALDRI få statusen endret implisitt, heller ikke solgt/arkivert
-      // (KG-08-F02). Ett ekstra lesekall avgjør om annonsen finnes; det
-      // telles ikke separat mot rategrensen. Statusen for en ny annonse
-      // sendes bare i create-modus, så en annonse som opprettes samtidig
-      // står urørt i stedet for å få statusen.
-      let exists = true;
-      try {
-        await api.getListingApi({ auth, externalRef });
-      } catch (error) {
-        if (isNotFoundError(error)) exists = false;
-        else throw error;
-      }
-      if (!exists) sentStatus = publish === true ? "active" : "draft";
-    }
-    const createOnly = !explicitStatus && sentStatus !== undefined;
-
-    const body = withoutUndefined({ ...rest, status: sentStatus });
+    // Databasen velger opprettelse/oppdatering under samme lås (KG-08-F02).
     const result = await api.upsertListingApi({
       auth,
       externalRef,
-      body,
+      body: withoutUndefined({ ...rest, status: explicitStatus }),
       dryRun: false,
       allowDraftStatus: true,
-      createOnly,
+      createStatus: publish === true ? "active" : "draft",
     });
 
     const verb =
@@ -510,10 +482,7 @@ const upsertListing: McpTool = {
             : "fantes allerede (create-modus, duplicate)";
     const warning = result.warning ? ` Merk: ${result.warning}` : "";
     return {
-      text:
-        result.status === "duplicate"
-          ? `Annonsen ${result.externalRef} ble opprettet samtidig av et annet kall og er ikke endret. Kjør upsert_listing på nytt for å oppdatere den.${warning}`
-          : `Annonsen ${result.externalRef} er ${verb}. ${draftNote(sentStatus)}${warning}`,
+      text: `Annonsen ${result.externalRef} er ${verb}. ${result.status === "created" ? draftNote(explicitStatus ?? (publish === true ? "active" : "draft")) : ""}${warning}`,
       structured: result,
     };
   },

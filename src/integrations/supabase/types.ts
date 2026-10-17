@@ -3574,9 +3574,9 @@ export type Database = {
         Args: {
           _listing_id: string
           _organization_id: string
-          _replace?: boolean
+          _replace: boolean
           _urls: string[]
-          _user_id?: string
+          _user_id: string
         }
         Returns: number
       }

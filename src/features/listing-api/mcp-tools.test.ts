@@ -110,7 +110,8 @@ describe("upsert_listing — utkast-default", () => {
         externalRef: "SKU-1",
         dryRun: false,
         allowDraftStatus: true,
-        body: expect.objectContaining({ status: "draft" }),
+        createStatus: "draft",
+        body: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
     expect(result.text).toMatch(/UTKAST/);
@@ -135,38 +136,36 @@ describe("upsert_listing — utkast-default", () => {
       publish: true,
     });
     expect(upsertListingApi).toHaveBeenCalledWith(
-      expect.objectContaining({ body: expect.objectContaining({ status: "active" }) }),
+      expect.objectContaining({
+        createStatus: "active",
+        body: expect.not.objectContaining({ status: expect.anything() }),
+      }),
     );
     expect(result.text).toMatch(/publisert/);
   });
 
-  // KG-08-F02: annonsen kan opprettes av et annet kall mellom oppslaget og
-  // lagringen. Create-modus lar SQL avgjøre atomisk, så den står urørt.
-  it("status for en ny annonse sendes bare i create-modus", async () => {
-    getListingApi.mockRejectedValue(notFound);
+  it("velger opprettelsesstatus uten et separat oppslag som kan bli foreldet", async () => {
+    getListingApi.mockRejectedValue(new Error("Et oppslag skal ikke være nødvendig"));
     upsertListingApi.mockResolvedValue({
-      importId: "imp-1",
-      status: "duplicate",
-      externalRef: "SKU-6",
+      status: "created",
+      externalRef: "SKU-race",
       listingId: "l6",
     });
     const { findMcpTool } = await import("./mcp-tools");
-    const result = await findMcpTool("upsert_listing")!.execute(auth(), {
-      externalRef: "SKU-6",
+    await findMcpTool("upsert_listing")!.execute(auth(), {
+      externalRef: "SKU-race",
       category: "sykler",
       title: "En fin sykkel",
       description: "En beskrivelse på minst tjue tegn.",
       price: 1000,
-      publish: true,
     });
+    expect(getListingApi).not.toHaveBeenCalled();
     expect(upsertListingApi).toHaveBeenCalledWith(
       expect.objectContaining({
-        createOnly: true,
-        body: expect.objectContaining({ status: "active" }),
+        createStatus: "draft",
+        body: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
-    expect(result.text).toMatch(/ikke endret/);
-    expect(result.text).not.toMatch(/publisert/);
   });
 
   // KG-08-F02: publish gjelder bare nye annonser.
@@ -189,7 +188,7 @@ describe("upsert_listing — utkast-default", () => {
     });
     expect(upsertListingApi).toHaveBeenCalledWith(
       expect.objectContaining({
-        createOnly: false,
+        createStatus: "active",
         body: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
@@ -214,7 +213,7 @@ describe("upsert_listing — utkast-default", () => {
     expect(upsertListingApi).toHaveBeenCalledWith(
       expect.objectContaining({ body: expect.not.objectContaining({ status: expect.anything() }) }),
     );
-    expect(result.text).toMatch(/ikke endret/);
+    expect(result.text).not.toMatch(/UTKAST|publisert/);
   });
 
   it("eksplisitt status vinner alltid, uansett publish/eksistens", async () => {

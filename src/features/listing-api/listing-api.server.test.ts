@@ -176,7 +176,7 @@ describe("replaceListingImagesApi tilgang", () => {
     );
   });
 
-  it("faller tilbake til signaturen uten aktør før migrasjonen er anvendt", async () => {
+  it("avviser manglende RPC uten å prøve igjen uten aktør", async () => {
     mockListing({});
     supabaseAdmin.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
       if (name === "can_update_organization_listing") return { data: true, error: null };
@@ -185,16 +185,17 @@ describe("replaceListingImagesApi tilgang", () => {
         : { data: 1, error: null };
     });
 
-    // Bildestatusen som leses etterpå er ikke mocket her; bare køkallene telles.
-    await replaceListingImagesApi({
-      auth: apiAuth,
-      externalRef: "sku-b",
-      body: { urls: ["https://example.com/a.jpg"] },
-    }).catch(() => undefined);
+    await expect(
+      replaceListingImagesApi({
+        auth: apiAuth,
+        externalRef: "sku-b",
+        body: { urls: ["https://example.com/a.jpg"] },
+      }),
+    ).rejects.toMatchObject({ code: "PGRST202" });
     const enqueueCalls = supabaseAdmin.rpc.mock.calls.filter(
       ([name]) => name === "enqueue_listing_image_jobs",
     );
-    expect(enqueueCalls.map(([, args]) => "_user_id" in args)).toEqual([true, false]);
+    expect(enqueueCalls.map(([, args]) => "_user_id" in args)).toEqual([true]);
   });
 
   it("avviser deaktiverte annonser selv med endringsrett", async () => {

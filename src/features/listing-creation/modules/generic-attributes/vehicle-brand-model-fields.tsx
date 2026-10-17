@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { ChecklistGroup, ChecklistRow, ChecklistSearch } from "@/components/checklist";
 import {
   useAllVehicleBrands,
   useAllVehicleModelClasses,
@@ -412,10 +413,10 @@ export function VehicleModelWithClassField({
  * -rad som velger/fjerner alle modellene i klassen på én gang) — brukes av
  * søkesider der flere modeller kan krysses av samtidig, i motsetning til
  * annonse-skjemaets `VehicleModelField` (én annonse har kun én modell). Kun
- * innholdet (Command/søkefelt/liste), ingen egen trigger-knapp — kallsteder
- * som skal ha en ferdig felt-med-trigger bruker `VehicleModelMultiField`
- * under, kallsteder med egen chip/trigger (f.eks. attribute-filter-chips.tsx)
- * bruker denne direkte inni sin egen `PopoverContent`.
+ * innholdet (søkefelt/avkrysningsliste, se checklist.tsx), ingen egen
+ * trigger-knapp — kallsteder som skal ha en ferdig felt-med-trigger bruker
+ * `VehicleModelMultiField` under, kallsteder med egen chip/trigger (f.eks.
+ * attribute-filter-chips.tsx) bruker denne direkte inni sin egen `PopoverContent`.
  */
 export function VehicleModelMultiComboboxContent({
   categoryGroup,
@@ -466,93 +467,72 @@ export function VehicleModelMultiComboboxContent({
     ? groupsForList.groups.length > 0
     : providedOptions == null && singleBrand != null && grouped.hasClasses;
 
+  const q = search.trim().toLowerCase();
+  const matches = (label: string) => label.toLowerCase().includes(q);
+  const optionRow = (o: VehicleOption, className?: string) => (
+    <ChecklistRow
+      key={o.value}
+      label={countLabel(o.value, o.label)}
+      checked={values.includes(o.value)}
+      onToggle={() => toggle(o.value)}
+      className={className}
+    />
+  );
+  const selectAllRow = selectAllLabel && onToggleAll && matches(selectAllLabel) && (
+    <ChecklistRow
+      label={selectAllLabel}
+      checked={allSelected}
+      onToggle={onToggleAll}
+      className="font-medium"
+    />
+  );
+
+  let rows: ReactNode[];
+  if (useGrouped) {
+    rows = groupsForList.groups.map((g) => {
+      const modelNames = g.options.map((o) => o.value);
+      const allChecked = modelNames.length > 0 && modelNames.every((n) => values.includes(n));
+      const allLabel = `${g.className} (Alle)`;
+      const visible = g.options.filter((o) => matches(o.label));
+      if (!matches(allLabel) && visible.length === 0) return null;
+      return (
+        <ChecklistGroup key={g.classId} heading={g.className}>
+          {matches(allLabel) && (
+            <ChecklistRow
+              label={allLabel}
+              checked={allChecked}
+              onToggle={() => toggleAll(modelNames, !allChecked)}
+              className="font-medium"
+            />
+          )}
+          {visible.map((o) => optionRow(o, "pl-6"))}
+        </ChecklistGroup>
+      );
+    });
+    rows.push(...groupsForList.ungrouped.filter((o) => matches(o.label)).map((o) => optionRow(o)));
+  } else {
+    rows = optionsForList.filter((o) => matches(o.label)).map((o) => optionRow(o));
+  }
+  const empty = !selectAllRow && rows.every((r) => !r);
+
   return (
-    <Command shouldFilter>
-      <CommandInput placeholder="Søk modell…" value={search} onValueChange={setSearch} />
-      <CommandList>
-        <CommandEmpty>
-          {emptyMessage ??
-            (brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller.")}
-        </CommandEmpty>
-        {useGrouped ? (
-          <>
-            {selectAllLabel && onToggleAll && (
-              <CommandGroup>
-                <CommandItem value={selectAllLabel} className="font-medium" onSelect={onToggleAll}>
-                  <Check className={cn("size-4", allSelected ? "opacity-100" : "opacity-0")} />
-                  {selectAllLabel}
-                </CommandItem>
-              </CommandGroup>
-            )}
-            {groupsForList.groups.map((g) => {
-              const modelNames = g.options.map((o) => o.value);
-              const allChecked =
-                modelNames.length > 0 && modelNames.every((n) => values.includes(n));
-              return (
-                <CommandGroup key={g.classId} heading={g.className}>
-                  <CommandItem
-                    value={`${g.className} (Alle)`}
-                    className="font-medium"
-                    onSelect={() => toggleAll(modelNames, !allChecked)}
-                  >
-                    <Check className={cn("size-4", allChecked ? "opacity-100" : "opacity-0")} />
-                    {g.className} (Alle)
-                  </CommandItem>
-                  {g.options.map((o) => (
-                    <CommandItem
-                      key={o.value}
-                      value={o.label}
-                      className="pl-6"
-                      onSelect={() => toggle(o.value)}
-                    >
-                      <Check
-                        className={cn(
-                          "size-4",
-                          values.includes(o.value) ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      {countLabel(o.value, o.label)}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              );
-            })}
-            {groupsForList.ungrouped.length > 0 && (
-              <CommandGroup>
-                {groupsForList.ungrouped.map((o) => (
-                  <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
-                    <Check
-                      className={cn(
-                        "size-4",
-                        values.includes(o.value) ? "opacity-100" : "opacity-0",
-                      )}
-                    />
-                    {countLabel(o.value, o.label)}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </>
-        ) : (
-          <CommandGroup>
-            {selectAllLabel && onToggleAll && (
-              <CommandItem value={selectAllLabel} className="font-medium" onSelect={onToggleAll}>
-                <Check className={cn("size-4", allSelected ? "opacity-100" : "opacity-0")} />
-                {selectAllLabel}
-              </CommandItem>
-            )}
-            {optionsForList.map((o) => (
-              <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
-                <Check
-                  className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
-                />
-                {countLabel(o.value, o.label)}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+    <div>
+      <ChecklistSearch
+        placeholder="Søk modell…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <ul className="max-h-[300px] overflow-y-auto p-1">
+        {selectAllRow}
+        {rows}
+        {empty && (
+          <li className="py-6 text-center text-sm text-muted-foreground">
+            {emptyMessage ??
+              (brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller.")}
+          </li>
         )}
-      </CommandList>
-    </Command>
+      </ul>
+    </div>
   );
 }
 

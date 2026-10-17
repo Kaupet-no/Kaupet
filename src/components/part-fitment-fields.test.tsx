@@ -81,7 +81,7 @@ describe("PartFitmentField", () => {
 
     fireEvent.click(screen.getByRole("combobox", { name: "Merke" }));
     fireEvent.click(screen.getByRole("option", { name: "Volvo" }));
-    fireEvent.click(screen.getByRole("option", { name: "V70" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "V70" }));
 
     expect(onChange).toHaveBeenCalledWith({
       kind: "multiselect",
@@ -96,7 +96,7 @@ describe("PartFitmentField", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Merke" }));
     fireEvent.click(screen.getByRole("option", { name: "Volvo" }));
     fireEvent.click(screen.getByRole("combobox", { name: "Bilmodell" }));
-    fireEvent.click(screen.getByRole("option", { name: "Volvo (alle)" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Volvo (alle)" }));
 
     expect(onChange).toHaveBeenCalledWith({
       kind: "multiselect",
@@ -123,7 +123,7 @@ describe("PartFitmentField", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Merke" }));
     fireEvent.click(screen.getByRole("option", { name: "Volvo" }));
     fireEvent.click(screen.getByRole("combobox", { name: "Bilmodell" }));
-    fireEvent.click(screen.getByRole("option", { name: "Volvo (alle)" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Volvo (alle)" }));
 
     expect(onChange).toHaveBeenCalledWith({
       part_fitment_scope: "specific",

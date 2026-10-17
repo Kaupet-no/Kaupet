@@ -9,16 +9,7 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { Select, SelectContent, SelectItem, SelectTriggerBare } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChecklistRow, ChecklistSearch } from "@/components/checklist";
 import { FilterChip } from "@/features/listing-search/filters/filter-chip";
 import { CategoryFilterFields } from "@/features/listing-search/filters/category-filter-fields";
 import { PartVehicleSearchField } from "@/components/part-fitment-fields";
@@ -874,23 +865,29 @@ function MultiSelectPopoverBody({
   if (options.length === 0 && emptyMessage) {
     return <p className="p-2 text-sm text-muted-foreground">{emptyMessage}</p>;
   }
+  const q = search.trim().toLowerCase();
+  const visible = options.filter((o) => o.label.toLowerCase().includes(q));
   return (
-    <Command shouldFilter>
-      <CommandInput placeholder="Søk…" value={search} onValueChange={setSearch} />
-      <CommandList className="max-h-80">
-        <CommandEmpty>Ingen treff.</CommandEmpty>
-        <CommandGroup>
-          {options.map((o) => (
-            <CommandItem key={o.value} value={o.label} onSelect={() => onToggle(o.value)}>
-              <Check
-                className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
-              />
-              {counts?.[o.value] != null ? `${o.label} (${counts[o.value]})` : o.label}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-      </CommandList>
-    </Command>
+    <div>
+      <ChecklistSearch
+        placeholder="Søk…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <ul className="max-h-80 overflow-y-auto p-1">
+        {visible.map((o) => (
+          <ChecklistRow
+            key={o.value}
+            label={counts?.[o.value] != null ? `${o.label} (${counts[o.value]})` : o.label}
+            checked={values.includes(o.value)}
+            onToggle={() => onToggle(o.value)}
+          />
+        ))}
+        {visible.length === 0 && (
+          <li className="py-6 text-center text-sm text-muted-foreground">Ingen treff.</li>
+        )}
+      </ul>
+    </div>
   );
 }
 

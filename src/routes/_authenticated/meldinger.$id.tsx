@@ -429,7 +429,7 @@ function ConversationPage() {
     markReadMutation.mutate(vars),
   );
 
-  // Auto-scroll + markér som lest når meldinger lastes/oppdateres
+  // Eldre sider og polling av lesekvitteringer skal ikke flytte leseposisjonen.
   useEffect(() => {
     if (scrollRef.current) {
       // Utsett scroll til etter DOM-paint (viktig på Capacitor WebView)
@@ -438,6 +438,9 @@ function ConversationPage() {
         el.scrollTop = el.scrollHeight;
       });
     }
+  }, [latestMessage?.id, id]);
+
+  useEffect(() => {
     if (messagesLoaded && conv && user) {
       const readAt = latestMessage?.created_at ?? new Date().toISOString();
       if (!(lastMarkedRef.current && readAt <= lastMarkedRef.current)) {

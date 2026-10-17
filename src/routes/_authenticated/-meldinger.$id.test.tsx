@@ -241,6 +241,36 @@ it("viser feil ved henting av eldre meldinger og beholder nytt forsøk", () => {
   expect(view.getByRole("button", { name: "Vis eldre meldinger" })).toBeTruthy();
 });
 
+it("beholder leseposisjonen når eldre sider eller lesekvitteringer lastes", () => {
+  const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    callback(0);
+    return 0;
+  });
+  try {
+    const newest = { id: "m2", created_at: "2026-10-16T12:00:00Z" };
+    mocks.queryData = {
+      conversation: baseConv(),
+      messages: { pages: [{ messages: [newest], nextCursor: newest }], pageParams: [null] },
+    };
+    const view = render(<ConversationPage />);
+    const log = view.getByRole("log");
+    Object.defineProperty(log, "scrollHeight", { value: 1000, configurable: true });
+    log.scrollTop = 30;
+    mocks.queryData.conversation = baseConv({ seller_last_read_at: newest.created_at });
+    mocks.queryData.messages = {
+      pages: [
+        { messages: [newest], nextCursor: newest },
+        { messages: [{ id: "m1", created_at: "2026-10-15T12:00:00Z" }], nextCursor: undefined },
+      ],
+      pageParams: [null, newest],
+    };
+    view.rerender(<ConversationPage />);
+    expect(log.scrollTop).toBe(30);
+  } finally {
+    raf.mockRestore();
+  }
+});
+
 // Blokkerings-UI (App Store 1.2): komponenten skal vise en tydelig tilstand
 // og deaktivere komposeren når innlogget bruker har blokkert motparten, eller
 // er blokkert av den. useAuth er mocket til user-1, som er buyer_id i

@@ -13,19 +13,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export type Message = {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  body: string;
-  created_at: string;
-  deleted_at: string | null;
-  attachment_path?: string | null;
-  /** True for meldinger som er sendt optimistisk og venter på bekreftelse fra serveren. */
-  pending?: boolean;
-  /** Lokal `URL.createObjectURL`-forhåndsvisning for et vedlegg som ennå ikke er lastet opp. */
-  attachmentPreviewUrl?: string;
-};
+import type { ConversationMessage as Message } from "@/lib/conversation-messages";
+export type { ConversationMessage as Message } from "@/lib/conversation-messages";
 
 export function renderWithDayDividers(
   messages: Message[],

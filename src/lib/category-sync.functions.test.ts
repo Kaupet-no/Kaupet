@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const { prod, staging } = vi.hoisted(() => ({
   prod: { rpc: vi.fn(), from: vi.fn() },
-  staging: { from: vi.fn() },
+  staging: { rpc: vi.fn() },
 }));
 
 vi.mock("@tanstack/react-start", () => ({
@@ -28,178 +28,126 @@ vi.mock("@/lib/admin-auth.server", () => ({ requireAdminRole: vi.fn() }));
 vi.mock("@/integrations/supabase/admin", () => ({ getSupabaseAdmin: async () => prod }));
 vi.mock("@/integrations/supabase/staging-client.server", () => ({ stagingAdmin: staging }));
 
-import { getCategorySyncDiff, syncCategoriesFromStaging } from "./category-sync.functions";
+import {
+  getCategorySyncDiff,
+  getCategorySyncStatus,
+  syncCategoriesFromStaging,
+} from "./category-sync.functions";
 
-const MAX_ROWS = 1000;
+type Tables = Partial<
+  Record<"categories" | "category_filters" | "category_flows" | "filter_synonyms", unknown[]>
+>;
 
-/** Etterligner PostgREST: range respekteres, men svaret kappes på max-rows. */
-function stagingTables(sizes: Record<string, number>, { truncate = false, change = "" } = {}) {
-  const records: Record<string, Array<{ id: string }>> = {};
-  const calls: Record<string, number> = {};
-  staging.from.mockImplementation((table: string) => {
-    if (table === "site_settings") {
-      const single = { data: { default_search_examples: [] }, error: null };
-      return { select: () => ({ eq: () => ({ single: async () => single }) }) };
-    }
-    records[table] ??= Array.from({ length: sizes[table] ?? 0 }, (_, i) => ({
-      id: `${table}-${String(i).padStart(4, "0")}`,
-    }));
-    let from = 0;
-    let afterId = "";
-    let head = false;
-    let to = Infinity;
-    const query = {
-      select: (_columns: string, options?: { head?: boolean }) => {
-        head = !!options?.head;
-        return query;
-      },
-      order: () => query,
-      gt: (_column: string, id: string) => {
-        afterId = id;
-        return query;
-      },
-      range: (start: number, end: number) => {
-        from = start;
-        to = end;
-        return query;
-      },
-      then: (resolve: (value: unknown) => unknown) => {
-        if (head) return resolve({ data: null, error: null, count: records[table].length });
-        const pageNumber = calls[table] ?? 0;
-        calls[table] = pageNumber + 1;
-        if (table === "category_filters" && pageNumber === 1 && change) {
-          records[table] = records[table].slice(1);
-          if (change === "replace") records[table].push({ id: "category_filters-9999" });
-        }
-        const candidates = records[table].filter((row) => row.id > afterId);
-        const page = candidates.slice(from, Math.min(to + 1, from + MAX_ROWS));
-        // Simulert feilside: siste side kommer tom tilbake.
-        const data = truncate && (from > 0 || afterId !== "") ? [] : page;
-        return resolve({ data, error: null, count: candidates.length });
-      },
-    };
-    return query;
-  });
-}
-
-const call = () => syncCategoriesFromStaging({ context: { userId: "admin-1" } } as never);
-
-// KG-06-F02: select("*") ga bare første 1000 rader, og synk-RPC-en slettet
-// produksjonsrader som manglet i den avkortede payloaden.
-describe("syncCategoriesFromStaging", () => {
-  beforeEach(() => {
-    prod.rpc.mockReset().mockResolvedValue({ error: null });
-  });
-
-  it("sender alle rader også over radgrensen", async () => {
-    stagingTables({ categories: 3, category_filters: 1010, category_flows: 0, filter_synonyms: 1 });
-    await call();
-    const payload = prod.rpc.mock.calls[0][1];
-    expect(payload.p_category_filters).toHaveLength(1010);
-    expect(new Set(payload.p_category_filters.map((r: { id: string }) => r.id)).size).toBe(1010);
-    expect(payload.p_categories).toHaveLength(3);
-  });
-
-  it.each([0, 499, 500, 501, 1000, 1001])(
-    "sender alle %i rader ved sidegrensen (grenseverdier)",
-    async (size) => {
-      stagingTables({ category_filters: size });
-      await call();
-      expect(prod.rpc.mock.calls[0][1].p_category_filters).toHaveLength(size);
-    },
-  );
-
-  it("avviser ufullstendig henting før RPC-en kan slette noe", async () => {
-    stagingTables(
-      { categories: 3, category_filters: 1010, category_flows: 0, filter_synonyms: 1 },
-      { truncate: true },
-    );
-    await expect(call()).rejects.toThrow(/Kunne ikke hente hele category_filters/);
-    expect(prod.rpc).not.toHaveBeenCalled();
-  });
-  it.each(["delete", "replace"])(
-    "avviser endret kildetabell mellom sidene: %s (feilgjetting)",
-    async (change) => {
-      stagingTables({ category_filters: 1000 }, { change });
-      await expect(call()).rejects.toThrow(/Synken er avbrutt/);
-      expect(prod.rpc).not.toHaveBeenCalled();
-    },
-  );
+const snapshot = (tables: Tables) => ({
+  categories: [],
+  category_filters: [],
+  category_flows: [],
+  filter_synonyms: [],
+  default_search_examples: [],
+  ...tables,
 });
 
-/** Enkel tabelldobbel: alle rader på én side. */
-function serveTables(
-  client: { from: ReturnType<typeof vi.fn> },
-  tables: Record<string, unknown[]>,
-) {
-  client.from.mockImplementation((table: string) => {
-    if (table === "site_settings") {
-      const single = { data: { default_search_examples: [] }, error: null };
-      return { select: () => ({ eq: () => ({ single: async () => single }) }) };
-    }
-    let head = false;
-    let afterId = "";
-    const query = {
-      select: (_columns: string, options?: { head?: boolean }) => {
-        head = !!options?.head;
-        return query;
-      },
-      order: () => query,
-      gt: (_column: string, id: string) => {
-        afterId = id;
-        return query;
-      },
-      range: () => query,
-      then: (resolve: (value: unknown) => unknown) => {
-        const rows = (tables[table] ?? []) as Array<{ id: string }>;
-        return head
-          ? resolve({ data: null, error: null, count: rows.length })
-          : resolve({ data: afterId ? [] : rows, error: null });
-      },
-    };
-    return query;
+/** Begge miljøene svarer på category_sync_snapshot; produksjonen tar også
+ * imot selve synken og leser sist synket. */
+function serve(stagingTables: Tables, prodTables: Tables = {}) {
+  staging.rpc.mockReset().mockResolvedValue({ data: snapshot(stagingTables), error: null });
+  prod.rpc
+    .mockReset()
+    .mockImplementation(async (name: string) =>
+      name === "category_sync_snapshot"
+        ? { data: snapshot(prodTables), error: null }
+        : { data: null, error: null },
+    );
+  prod.from.mockReset().mockReturnValue({
+    select: () => ({
+      eq: () => ({ single: async () => ({ data: { last_synced_at: "x" }, error: null }) }),
+    }),
   });
 }
+
+const context = { context: { userId: "admin-1" } } as never;
+const syncPayload = () =>
+  prod.rpc.mock.calls.find(([name]) => name === "sync_categories_from_payload")?.[1];
+
+// KG-06-F02: select("*") ga bare første 1000 rader, og sidevis henting kunne
+// gi et blandet grunnlag. Synk-RPC-en sletter produksjonsrader som mangler.
+describe("syncCategoriesFromStaging", () => {
+  it("sender hele snapshotet fra staging, også over radgrensen", async () => {
+    const filters = Array.from({ length: 1010 }, (_, i) => ({ id: `f${i}` }));
+    serve({ categories: [{ id: "c1" }], category_filters: filters });
+    await syncCategoriesFromStaging(context);
+    expect(staging.rpc).toHaveBeenCalledWith("category_sync_snapshot");
+    expect(syncPayload().p_category_filters).toHaveLength(1010);
+    expect(syncPayload().p_categories).toEqual([{ id: "c1" }]);
+  });
+
+  it("synker ikke når snapshotet ikke kan leses", async () => {
+    serve({});
+    staging.rpc.mockResolvedValue({ data: null, error: { message: "timeout" } });
+    await expect(syncCategoriesFromStaging(context)).rejects.toThrow();
+    expect(syncPayload()).toBeUndefined();
+  });
+});
+
+const category = (id: string, slug: string, parent_id: string | null, updated_at = "x") => ({
+  id,
+  slug,
+  parent_id,
+  name_nb: slug,
+  created_at: "x",
+  updated_at,
+});
+
+describe("getCategorySyncStatus", () => {
+  it("er ajour når innholdet er likt, selv med ulike UUID-er", async () => {
+    serve(
+      { categories: [category("s-a", "a", null)] },
+      { categories: [category("p-a", "a", null)] },
+    );
+    expect(await getCategorySyncStatus(context)).toMatchObject({ inSync: true });
+  });
+
+  // KG-06-F02: en sletting i staging endrer ingen updated_at, så den gamle
+  // tidsstempelsammenligningen meldte «ajour».
+  it("er ikke ajour når en kategori er slettet i staging", async () => {
+    serve(
+      { categories: [category("s-a", "a", null)] },
+      { categories: [category("p-a", "a", null), category("p-b", "b", null)] },
+    );
+    expect(await getCategorySyncStatus(context)).toMatchObject({ inSync: false });
+  });
+});
 
 // KG-21-F02: parent_id ble fjernet fra sammenligningen, så en flytting alene
 // ga ingen diff og kunne ikke synkes.
 describe("getCategorySyncDiff", () => {
-  const category = (id: string, slug: string, parent_id: string | null) => ({
-    id,
-    slug,
-    parent_id,
-    name_nb: slug,
-    created_at: "x",
-    updated_at: "x",
-  });
-
   it("viser en kategori som bare har byttet forelder som endret", async () => {
-    serveTables(prod, {
-      categories: [
-        category("p-a", "a", null),
-        category("p-b", "b", null),
-        category("p-child", "barn", "p-a"),
-      ],
-    });
-    serveTables(staging, {
-      categories: [
-        category("s-a", "a", null),
-        category("s-b", "b", null),
-        category("s-child", "barn", "s-b"),
-      ],
-    });
-    const diff = await getCategorySyncDiff({ context: { userId: "admin-1" } } as never);
+    serve(
+      {
+        categories: [
+          category("s-a", "a", null),
+          category("s-b", "b", null),
+          category("s-child", "barn", "s-b"),
+        ],
+      },
+      {
+        categories: [
+          category("p-a", "a", null),
+          category("p-b", "b", null),
+          category("p-child", "barn", "p-a"),
+        ],
+      },
+    );
+    const diff = await getCategorySyncDiff(context);
     expect(diff.categories.updated.map((u) => u.after.slug)).toEqual(["barn"]);
   });
 
   it("ser bort fra ulike UUID-er når forelderen er den samme", async () => {
-    serveTables(prod, {
-      categories: [category("p-a", "a", null), category("p-child", "barn", "p-a")],
-    });
-    serveTables(staging, {
-      categories: [category("s-a", "a", null), category("s-child", "barn", "s-a")],
-    });
-    const diff = await getCategorySyncDiff({ context: { userId: "admin-1" } } as never);
+    serve(
+      { categories: [category("s-a", "a", null), category("s-child", "barn", "s-a")] },
+      { categories: [category("p-a", "a", null), category("p-child", "barn", "p-a")] },
+    );
+    const diff = await getCategorySyncDiff(context);
     expect(diff.categories.updated).toEqual([]);
   });
 });

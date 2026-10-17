@@ -178,6 +178,13 @@ describe.skipIf(!canRun)("Saved-search matching: internal access and new matches
       hit: "TOKEN hel",
       miss: "TOKEN ødelagt",
     },
+    // SUP-B15-01: «alle ord»-ekskludering ble behandlet som «minst ett».
+    {
+      name: "ekskludering med alle ord skjuler bare hele gruppen",
+      groups: [{ id: "y", mode: "all", exclude: true, terms: ["rust", "bulk"] }],
+      hit: "TOKEN rust",
+      miss: "TOKEN rust bulk",
+    },
     {
       name: "inkluderingsgruppe med alle ord",
       groups: [{ id: "a", mode: "all", exclude: false, terms: ["rød", "ramme"] }],

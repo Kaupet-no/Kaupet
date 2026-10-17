@@ -2,12 +2,16 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(16);
+SELECT plan(18);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-4000-8000-00000000e001', 'image-jobs-pgtap@example.com');
 INSERT INTO public.organizations (id, organization_number, legal_name, display_name)
 VALUES ('00000000-0000-4000-8000-00000000e101', '999000301', 'Bildejobb AS', 'Bildejobb');
+UPDATE public.organizations SET verification_status = 'verified'
+WHERE id = '00000000-0000-4000-8000-00000000e101';
+INSERT INTO public.organization_members (organization_id, user_id, role, status) VALUES
+('00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e001', 'superuser', 'active');
 INSERT INTO public.listings (id, seller_id, organization_id, title, status, price_nok) VALUES
   ('00000000-0000-4000-8000-00000000e201', '00000000-0000-4000-8000-00000000e001',
    '00000000-0000-4000-8000-00000000e101', 'Annonse med bildejobb', 'draft', 100);
@@ -69,13 +73,22 @@ SELECT is((SELECT count(*)::int FROM public.listing_images
 -- En ny synk erstatter bildesettet mens jobb b behandles.
 SELECT lives_ok($$SELECT public.enqueue_listing_image_jobs(
   '00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e201',
-  ARRAY['https://example.com/a.jpg'], true)$$, 'Erstattende synk fjerner jobb b');
+  ARRAY['https://example.com/a.jpg'], true, '00000000-0000-4000-8000-00000000e001')$$, 'Erstattende synk fjerner jobb b');
 SELECT is(public.complete_listing_image_job('00000000-0000-4000-8000-00000000e302', 1,
   '00000000-0000-4000-8000-00000000e201/00000000-0000-4000-8000-00000000e404.jpg', 'h', 1),
   'stale', 'En erstattet jobb kan ikke fullføres');
 SELECT is((SELECT count(*)::int FROM public.listing_images
   WHERE source_url = 'https://example.com/b.jpg'), 0,
   'Erstattet jobb legger ikke gamle bilder tilbake');
+
+-- RV-20261016-03: ny rekkefølge flytter også et ferdig behandlet bilde.
+SELECT lives_ok($$SELECT public.enqueue_listing_image_jobs(
+  '00000000-0000-4000-8000-00000000e101', '00000000-0000-4000-8000-00000000e201',
+  ARRAY['https://example.com/d.jpg', 'https://example.com/a.jpg'], true, '00000000-0000-4000-8000-00000000e001')$$,
+  'Ny synk legger et nytt bilde foran et ferdig bilde');
+SELECT is((SELECT sort_order FROM public.listing_images
+  WHERE source_url = 'https://example.com/a.jpg'), 1,
+  'Det ferdige bildet flyttes til sin nye plass');
 
 -- En jobb som dreper workeren hver gang gis opp etter 24 timer i stedet
 -- for å claimes hvert tiende minutt for alltid.

@@ -283,6 +283,29 @@ describe("syncListings", () => {
     );
   });
 
+  it("sender opprettelsesstatus separat fra eksplisitt status i MCP-modus", async () => {
+    const rpc = vi.fn();
+    const supabaseAdmin = makeSupabaseAdmin({
+      existingRefs: ["existing-ref"],
+      rpcImpl: (_name, args) => {
+        rpc(args);
+        return { data: { status: "unchanged", listing_id: "listing-1" }, error: null };
+      },
+    });
+    await syncListings(supabaseAdmin, makeContext(), {
+      importId,
+      rows: [makeRow({ externalId: "existing-ref" })],
+      mode: "upsert",
+      createStatus: "draft",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _mode: "mcp",
+        _listing: expect.objectContaining({ status: "", create_status: "draft" }),
+      }),
+    );
+  });
+
   it("sender tom status videre når raden ikke har status satt", async () => {
     const rpc = vi.fn();
     const supabaseAdmin = makeSupabaseAdmin({
@@ -385,6 +408,8 @@ describe("syncListings", () => {
       _listing_id: "listing-1",
       _urls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
       _replace: true,
+      // KG-08-F03: aktøren kontrolleres i køgrensen, ikke bare ved upsert.
+      _user_id: makeContext().userId,
     });
   });
 

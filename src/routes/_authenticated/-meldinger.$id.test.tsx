@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   setQueryData: vi.fn(),
   setQueriesData: vi.fn(),
   mutate: vi.fn(),
+  fetchNextPage: vi.fn().mockResolvedValue({}),
+  infiniteState: {} as Record<string, unknown>,
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -48,12 +50,26 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false, isError: false, error: null };
   },
+  useInfiniteQuery: (opts: { queryKey: unknown[] } & Record<string, unknown>) => {
+    mocks.queryCalls.push({ key: opts.queryKey, opts });
+    return {
+      data: mocks.queryData.messages ?? {
+        pages: [{ messages: [], nextCursor: undefined }],
+        pageParams: [null],
+      },
+      isLoading: false,
+      hasNextPage: false,
+      fetchNextPage: mocks.fetchNextPage,
+      ...mocks.infiniteState,
+    };
+  },
   useMutation: () => ({ mutate: mocks.mutate, isPending: false }),
   useQueryClient: () => ({
     invalidateQueries: vi.fn(),
     setQueryData: mocks.setQueryData,
     setQueriesData: mocks.setQueriesData,
-    getQueryData: vi.fn(),
+    getQueryData: () => mocks.queryData.messages,
+    cancelQueries: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -137,6 +153,8 @@ beforeEach(() => {
   mocks.setQueryData.mockReset();
   mocks.setQueriesData.mockReset();
   mocks.mutate.mockReset();
+  mocks.infiniteState = {};
+  mocks.fetchNextPage.mockClear();
 });
 
 afterEach(() => {
@@ -205,6 +223,52 @@ describe("meldinger.$id — realtime-fallback (F16)", () => {
     expect(lastQueryOptsFor("messages")?.refetchInterval).toBe(false);
     expect(lastQueryOptsFor("conversation")?.refetchInterval).toBe(false);
   });
+});
+
+// RV-20261016-02 / PB-2: eksplisitt bakoverpaginering, med feiltilstand.
+it("lar brukeren hente eldre meldinger", async () => {
+  mocks.infiniteState = { hasNextPage: true };
+  mocks.queryData.conversation = baseConv();
+  const view = render(<ConversationPage />);
+  await act(async () => fireEvent.click(view.getByRole("button", { name: "Vis eldre meldinger" })));
+  expect(mocks.fetchNextPage).toHaveBeenCalledOnce();
+});
+it("viser feil ved henting av eldre meldinger og beholder nytt forsøk", () => {
+  mocks.infiniteState = { hasNextPage: true, isFetchNextPageError: true };
+  mocks.queryData.conversation = baseConv();
+  const view = render(<ConversationPage />);
+  expect(view.getByRole("alert").textContent).toContain("Kunne ikke hente eldre meldinger");
+  expect(view.getByRole("button", { name: "Vis eldre meldinger" })).toBeTruthy();
+});
+
+it("beholder leseposisjonen når eldre sider eller lesekvitteringer lastes", () => {
+  const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    callback(0);
+    return 0;
+  });
+  try {
+    const newest = { id: "m2", created_at: "2026-10-16T12:00:00Z" };
+    mocks.queryData = {
+      conversation: baseConv(),
+      messages: { pages: [{ messages: [newest], nextCursor: newest }], pageParams: [null] },
+    };
+    const view = render(<ConversationPage />);
+    const log = view.getByRole("log");
+    Object.defineProperty(log, "scrollHeight", { value: 1000, configurable: true });
+    log.scrollTop = 30;
+    mocks.queryData.conversation = baseConv({ seller_last_read_at: newest.created_at });
+    mocks.queryData.messages = {
+      pages: [
+        { messages: [newest], nextCursor: newest },
+        { messages: [{ id: "m1", created_at: "2026-10-15T12:00:00Z" }], nextCursor: undefined },
+      ],
+      pageParams: [null, newest],
+    };
+    view.rerender(<ConversationPage />);
+    expect(log.scrollTop).toBe(30);
+  } finally {
+    raf.mockRestore();
+  }
 });
 
 // Blokkerings-UI (App Store 1.2): komponenten skal vise en tydelig tilstand
@@ -310,7 +374,11 @@ describe("meldinger.$id — kjøpsønsker, realtime og komposer (KG-24)", () => 
     act(() => handler("messages", "UPDATE")?.({ new: deleted }));
     const call = mocks.setQueryData.mock.calls.find(([key]) => key[0] === "messages");
     expect(call?.[0]).toEqual(["messages", "conv-1"]);
-    expect(call?.[1]([{ id: "m1", body: "hei", deleted_at: null }])).toEqual([
+    const data = {
+      pages: [{ messages: [{ id: "m1", body: "hei", deleted_at: null }], nextCursor: undefined }],
+      pageParams: [null],
+    };
+    expect(call?.[1](data).pages[0].messages).toEqual([
       { id: "m1", body: "", deleted_at: "2026-10-13T10:00:00Z" },
     ]);
   });

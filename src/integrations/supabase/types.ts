@@ -3393,6 +3393,7 @@ export type Database = {
         Returns: boolean
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
+      category_sync_snapshot: { Args: never; Returns: Json }
       check_endpoint_rate_limit: {
         Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
         Returns: boolean
@@ -3573,9 +3574,9 @@ export type Database = {
         Args: {
           _listing_id: string
           _organization_id: string
-          _replace?: boolean
+          _replace: boolean
           _urls: string[]
-          _user_id?: string
+          _user_id: string
         }
         Returns: number
       }

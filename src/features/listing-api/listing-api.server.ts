@@ -414,8 +414,10 @@ export async function upsertListingApi(params: {
    * REST-endepunktet (`/api/v1/listings/{externalRef}`) sender aldri denne,
    * så REST-oppførselen er uendret. */
   allowDraftStatus?: boolean;
+  /** Bare ved opprettelse; eksisterende annonsers status avgjøres av body.status. */
+  createStatus?: "active" | "draft";
 }): Promise<UpsertListingApiResult> {
-  const { auth, externalRef, body, dryRun, allowDraftStatus } = params;
+  const { auth, externalRef, body, dryRun, allowDraftStatus, createStatus } = params;
   if (!externalRef || externalRef.trim().length === 0 || externalRef.length > 120) {
     throw new ListingApiError(
       422,
@@ -439,6 +441,7 @@ export async function upsertListingApi(params: {
     mode: "upsert",
     dryRun,
     allowDraftStatus,
+    createStatus,
   });
 
   if (result.status === "failed") {
@@ -647,21 +650,13 @@ export async function replaceListingImagesApi(params: {
 
   // Sjekken over gir tydelige feilmeldinger; RPC-en gjentar den i samme
   // transaksjon som køskrivingen, så endringer i mellomtiden fanges også.
-  const enqueueArgs = {
+  const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
     _organization_id: auth.organizationId,
     _listing_id: listing.id,
     _urls: urls,
     _replace: true,
-  };
-  let { error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", {
-    ...enqueueArgs,
     _user_id: actor.userId,
   });
-  // ponytail: utrullingsbro til 20261012103000 er anvendt i alle miljøer.
-  // PGRST202 = signaturen med _user_id finnes ikke ennå. Fjern deretter.
-  if (enqueueError?.code === "PGRST202") {
-    ({ error: enqueueError } = await supabaseAdmin.rpc("enqueue_listing_image_jobs", enqueueArgs));
-  }
   if (enqueueError) {
     if (enqueueError.message.includes("organization_new_images_daily_quota_exceeded")) {
       throw new ListingApiError(422, "validation_error", newImagesPerDayLimitMessage(), "images");

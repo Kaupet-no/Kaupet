@@ -10,6 +10,7 @@ import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.os.Build;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.webkit.WebStorage;
@@ -206,8 +207,18 @@ public class NativeAccessibilityInstrumentedTest {
 
     private void assertNamedControl(String name) {
         UiObject2 node = waitForNamedControl(name, SHORT_TIMEOUT);
-        assertNotNull("Accessibility tree must expose \"" + name + "\"", node);
-        assertTrue("\"" + name + "\" must be enabled", node.isEnabled());
+        if (node != null) {
+            assertTrue("\"" + name + "\" must be enabled", node.isEnabled());
+            return;
+        }
+        // UiAutomator-selektorene ser ikke supplementalDescription/containerTitle (se nodeHasName).
+        AccessibilityNodeInfo[] found = { null };
+        waitForCondition(
+            () -> (found[0] = findNodeByName(automation.getRootInActiveWindow(), name)) != null,
+            SHORT_TIMEOUT
+        );
+        assertNotNull("Accessibility tree must expose \"" + name + "\"", found[0]);
+        assertTrue("\"" + name + "\" must be enabled", found[0].isEnabled());
     }
 
     private UiObject2 waitForNamedControl(String name, long timeout) {
@@ -264,9 +275,15 @@ public class NativeAccessibilityInstrumentedTest {
         return null;
     }
 
+    // WebView på Android 16+ legger navnet til redigerbare felt i
+    // supplementalDescription og navnet til grupper i containerTitle, ikke i
+    // text/contentDescription/hint (KG-39-F01). TalkBack leser begge.
     private static boolean nodeHasName(AccessibilityNodeInfo node, String name) {
         return name.equals(String.valueOf(node.getText())) ||
-            name.equals(String.valueOf(node.getContentDescription()));
+            name.equals(String.valueOf(node.getContentDescription())) ||
+            (Build.VERSION.SDK_INT >= 36 && (
+                name.equals(String.valueOf(node.getSupplementalDescription())) ||
+                name.equals(String.valueOf(node.getContainerTitle()))));
     }
 
     private static boolean waitForCondition(BooleanSupplier condition, long timeout) {
